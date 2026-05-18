@@ -4,10 +4,10 @@ import re
 import json
 
 # -----------------------------------------------------------------------------
-# 1. SOFT BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
+# 1. PRIME BRANDED BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="TRADE AREA SCAN",
+    page_title="TRADE AREA SCAN | PRIME",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -15,27 +15,31 @@ st.set_page_config(
 st.markdown("""
     <style>
         :root {
-            --navy-brand: #001a3d !important;
+            --midnight-blue: #003366 !important; /* PRIME Blue Anchor */
+            --prime-gold: #C9AB4C !important; /* PRIME Gold Anchor */
             --white-clean: #ffffff !important;
-            --soft-shadow: 0 4px 16px rgba(0, 26, 61, 0.12) !important;
+            --grid-line: rgba(128, 128, 128, 0.10) !important; /* Screen grid lines */
+            --soft-shadow: 0 4px 16px rgba(0, 51, 102, 0.12) !important;
         }
         
+        /* Typography Rules: Arial / Helvetica for digital screens */
         html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main, .block-container {
             background-color: var(--white-clean) !important;
-            color: var(--navy-brand) !important;
+            color: var(--midnight-blue) !important;
+            font-family: 'Arial', 'Helvetica', sans-serif !important;
         }
         
         [data-testid="stSidebar"] {
             background-color: var(--white-clean) !important;
-            color: var(--navy-brand) !important;
-            border-right: 1px solid rgba(0, 26, 61, 0.1) !important;
+            color: var(--midnight-blue) !important;
+            border-right: 1px solid var(--grid-line) !important;
             width: 320px !important;
             min-width: 320px !important;
             max-width: 320px !important;
             transform: none !important;
             visibility: visible !important;
             overflow: hidden !important;
-            box-shadow: 2px 0 10px rgba(0, 26, 61, 0.05) !important;
+            box-shadow: 2px 0 10px rgba(0, 51, 102, 0.05) !important;
         }
         
         [data-testid="collapsedControl"] { display: none !important; }
@@ -43,7 +47,7 @@ st.markdown("""
         * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
         
         p, span, label, h1, h2, h3, h4, h5, h6, .stMarkdown, [data-testid="stExpander"] summary p {
-            color: var(--navy-brand) !important;
+            color: var(--midnight-blue) !important;
         }
         
         [data-testid="stHeader"], header, #stDecoration { display: none !important; }
@@ -71,39 +75,45 @@ st.markdown("""
         
         div[data-baseweb="input"], div[data-baseweb="select"] {
             background-color: transparent !important;
-            border: none !important; border-bottom: 2px solid rgba(0, 26, 61, 0.2) !important;
+            border: none !important; border-bottom: 2px solid var(--grid-line) !important;
             border-radius: 0px !important; box-shadow: none !important;
         }
-        div[data-baseweb="input"]:focus-within { border-bottom: 2px solid var(--navy-brand) !important; }
+        div[data-baseweb="input"]:focus-within { border-bottom: 2px solid var(--midnight-blue) !important; }
         
-        /* PRIMARY & POPOVER BUTTONS */
+        /* PRIMARY & POPOVER BUTTONS - Midnight Base */
         div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button {
-            background-color: var(--navy-brand) !important; 
+            background-color: var(--midnight-blue) !important; 
             border: none !important; border-radius: 4px !important; width: 100% !important; padding: 8px !important;
             box-shadow: var(--soft-shadow) !important; transition: all 0.2s ease !important;
         }
         div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p {
             color: var(--white-clean) !important; font-weight: 800 !important; font-size: 11px !important; text-transform: uppercase !important;
         }
+        div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover {
+            background-color: var(--prime-gold) !important;
+        }
         
         div.stDownloadButton > button {
-            background-color: var(--navy-brand) !important; 
+            background-color: var(--midnight-blue) !important; 
             border: none !important; border-radius: 4px !important; width: 100% !important; padding: 4px !important;
-            box-shadow: var(--soft-shadow) !important;
+            box-shadow: var(--soft-shadow) !important; transition: all 0.2s ease !important;
+        }
+        div.stDownloadButton > button:hover {
+            background-color: var(--prime-gold) !important;
         }
         
         /* HYPERLINK STYLE FOR CLEAR BUTTON */
         div.stButton > button[kind="primary"] {
-            background: transparent !important; border: none !important; color: var(--navy-brand) !important;
+            background: transparent !important; border: none !important; color: var(--midnight-blue) !important;
             box-shadow: none !important; padding: 0 !important; margin-top: 4px; display: inline-flex;
         }
         div.stButton > button[kind="primary"] p {
-            color: var(--navy-brand) !important; font-size: 11px !important; font-weight: 800 !important; text-decoration: underline !important; text-transform: uppercase;
+            color: var(--midnight-blue) !important; font-size: 11px !important; font-weight: 800 !important; text-decoration: underline !important; text-transform: uppercase;
         }
-        div.stButton > button[kind="primary"]:hover p { color: #ff3366 !important; }
+        div.stButton > button[kind="primary"]:hover p { color: var(--prime-gold) !important; }
         
         [data-testid="stSidebar"] .st-expander {
-            border: 1px solid rgba(0, 26, 61, 0.1) !important; background-color: var(--white-clean) !important;
+            border: 1px solid var(--grid-line) !important; background-color: var(--white-clean) !important;
             border-radius: 4px !important; margin-bottom: 4px !important; overflow: hidden !important;
         }
         .stDeployButton, footer { display:none !important; }
@@ -152,7 +162,7 @@ def compile_features_kml(features):
 # 3. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div style="color: #001a3d; font-size: 20px; font-weight: 900; letter-spacing: 1px; margin-bottom: 24px; text-align: center;">TRADE AREA SCAN</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color: #003366; font-size: 20px; font-weight: 900; letter-spacing: 1px; margin-bottom: 24px; text-align: center;">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
     coords_val = st.text_input("COORDINATES", key="geo_coords")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, key="geo_radius", step=100)
@@ -208,7 +218,7 @@ with st.sidebar:
         st.session_state.scanned_records = []
         st.rerun()
 
-    st.markdown("<hr style='margin: 16px 0; border: 0; border-top: 1px solid rgba(0, 26, 61, 0.1);'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 16px 0; border: 0; border-top: 1px solid rgba(128, 128, 128, 0.1);'>", unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -217,7 +227,7 @@ with st.sidebar:
         st.download_button("EXPORT KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
     with st.popover("IMPORT PROJECT", use_container_width=True):
-        st.markdown("<div style='font-size:11px; font-weight:800; color:#001a3d; margin-bottom: 8px;'>UPLOAD SAVED PROJECT FILE</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:11px; font-weight:800; color:#003366; margin-bottom: 8px;'>UPLOAD SAVED PROJECT FILE</div>", unsafe_allow_html=True)
         imported_file = st.file_uploader("Select JSON file", type=["json"], label_visibility="collapsed")
         if imported_file is not None:
             if st.button("EXECUTE IMPORT", type="secondary", use_container_width=True):
@@ -243,16 +253,16 @@ leaflet_template = """
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Arial', sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Arial', 'Helvetica', sans-serif; }
         #map { height: 100vh; width: 100%; }
         
         #minimal-basemap-panel {
             position: absolute; bottom: 20px; left: 10px; z-index: 1000;
-            background: #ffffff; border-radius: 4px; border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box;
+            background: #ffffff; border-radius: 4px; border: 2px solid rgba(128,128,128,0.2); background-clip: padding-box;
             display: flex; flex-direction: column; padding: 2px;
         }
         #minimal-basemap-panel select {
-            border: none; border-bottom: 1px solid #eee; padding: 4px; font-size: 11px; font-weight: bold;
+            border: none; border-bottom: 1px solid rgba(128,128,128,0.2); padding: 4px; font-size: 11px; font-weight: bold;
             color: #333; background: transparent; outline: none; cursor: pointer; width: 100%;
         }
         .minimal-label {
@@ -261,34 +271,34 @@ leaflet_template = """
 
         #search-container { position: absolute; top: 10px; left: 54px; z-index: 1000; width: 340px; }
         #map-search {
-            width: 100%; padding: 10px 14px; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; background-clip: padding-box;
+            width: 100%; padding: 10px 14px; border: 2px solid rgba(128,128,128,0.2); border-radius: 4px; background-clip: padding-box;
             font-size: 13px; font-weight: bold; color: #333; background: #ffffff; outline: none; box-sizing: border-box;
         }
         #search-results {
             position: absolute; top: 45px; left: 0; width: 100%; background: #ffffff;
             border-radius: 4px; display: none; max-height: 250px; overflow-y: auto; 
-            border: 2px solid rgba(0,0,0,0.2); box-sizing: border-box; z-index: 1001;
+            border: 2px solid rgba(128,128,128,0.2); box-sizing: border-box; z-index: 1001;
         }
-        .search-item { padding: 10px 14px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .search-item { padding: 10px 14px; font-size: 12px; cursor: pointer; border-bottom: 1px solid rgba(128,128,128,0.1); }
         .search-item:hover { background: #f4f4f4; }
 
         #scan-results-panel {
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff;
-            width: 280px; max-height: calc(100vh - 20px); border-radius: 4px; border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box;
+            width: 280px; max-height: calc(100vh - 20px); border-radius: 4px; border: 2px solid rgba(128,128,128,0.2); background-clip: padding-box;
             display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         .results-header {
-            background: #001a3d; color: #ffffff; padding: 12px 14px; font-size: 11px; font-weight: 900;
+            background: #003366; color: #ffffff; padding: 12px 14px; font-size: 11px; font-weight: 900;
             display: flex; justify-content: space-between; align-items: center; text-transform: uppercase;
         }
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
-        .layer-category-block { border-bottom: 1px solid #eee; }
+        .layer-category-block { border-bottom: 1px solid rgba(128,128,128,0.1); }
         .layer-category-header {
             background: #ffffff; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;
             cursor: pointer; user-select: none;
         }
         .layer-category-header:hover { background: #fafafa; }
-        .layer-header-left { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; color: #001a3d; }
+        .layer-header-left { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; color: #003366; }
         
         .layer-category-items { padding: 0; background: #fafafa; }
         .layer-category-items.collapsed { display: none !important; }
@@ -299,17 +309,17 @@ leaflet_template = """
         }
         .results-item:hover { background: #eaeaea; }
 
-        .poi-text-label { background: #fff; border: 1px solid #000; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-weight: bold; white-space: nowrap; }
+        .poi-text-label { background: #fff; border: 1px solid rgba(128,128,128,0.2); padding: 2px 4px; border-radius: 2px; font-size: 10px; font-weight: bold; white-space: nowrap; color: #888780; }
         .hide-labels .poi-text-label { display: none !important; }
         .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.2); }
 
         #right-viewer-panel {
             position: absolute; top: 10px; right: 300px; z-index: 1001; background: #ffffff; border-radius: 4px;
-            width: 450px; height: calc(100vh - 20px); border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box;
+            width: 450px; height: calc(100vh - 20px); border: 2px solid rgba(128,128,128,0.2); background-clip: padding-box;
             display: none; flex-direction: column; box-shadow: -4px 0 20px rgba(0,0,0,0.15); overflow: hidden;
         }
         .viewer-header {
-            background: #001a3d; color: #ffffff; padding: 12px 14px; font-weight: 900; font-size: 11px;
+            background: #003366; color: #ffffff; padding: 12px 14px; font-weight: 900; font-size: 11px;
             display: flex; justify-content: space-between; align-items: center; text-transform: uppercase;
         }
         .viewer-header span.close-btn { cursor: pointer; font-size: 16px; line-height: 1; }
@@ -385,20 +395,21 @@ leaflet_template = """
         
         const starIcon = L.divIcon({
             className: 'custom-center-icon',
-            html: '<div style="background-color: #001a3d; color: #ffffff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">★</div>',
+            html: '<div style="background-color: #C9AB4C; color: #003366; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">★</div>',
             iconSize: [26, 26], iconAnchor: [13, 13]
         });
         const centerMarker = L.marker([__LAT__, __LON__], { icon: starIcon, zIndexOffset: 10000 }).addTo(map);
         
         const radiusCircle = L.circle([__LAT__, __LON__], {
-            radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
+            radius: __RADIUS__, color: "#003366", weight: 2, fillColor: "#003366", fillOpacity: 0.1
         }).addTo(map);
         
         const pts = __GEOJSON__;
         const categoryMap = {};
         const layerGroupsRef = {};
         
-        const catPalette = ["#6b8ca6", "#bfa482", "#8da186", "#b095a8", "#dca77d", "#92a6af", "#d4b8b2", "#a69aa4", "#859ea8", "#adae95", "#bf929a", "#7e9c91"];
+        // PRIME 10-Series Categorical Palette (S1 to S9 - Champagne excluded for data fills)
+        const catPalette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F"];
         const categoryColors = {}; let colorIndex = 0;
         
         pts.forEach(p => {
@@ -468,9 +479,9 @@ leaflet_template = """
             const menuHtml = `
                 <div style="font-family: Arial; font-size: 11px; color: #333; min-width: 140px;">
                     <div style="font-weight: 900; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 6px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP ACTIONS</div>
-                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#001a3d'" onmouseout="this.style.color='#333'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">📋 COPY COORDINATES</div>
-                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#001a3d'" onmouseout="this.style.color='#333'" onclick="openRightPanel('routes', ${lat}, ${lng}); map.closePopup();">🗺️ GOOGLE MAPS</div>
-                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#001a3d'" onmouseout="this.style.color='#333'" onclick="openRightPanel('streetview', ${lat}, ${lng}); map.closePopup();">🛣️ STREETVIEW</div>
+                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#003366'" onmouseout="this.style.color='#333'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">📋 COPY COORDINATES</div>
+                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#003366'" onmouseout="this.style.color='#333'" onclick="openRightPanel('routes', ${lat}, ${lng}); map.closePopup();">🗺️ GOOGLE MAPS</div>
+                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#003366'" onmouseout="this.style.color='#333'" onclick="openRightPanel('streetview', ${lat}, ${lng}); map.closePopup();">🛣️ STREETVIEW</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
