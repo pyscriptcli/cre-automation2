@@ -66,7 +66,7 @@ st.markdown("""
             display: block !important;
         }
         
-        /* RESTORE RIGID FIXED SIDEBAR DEFINITION */
+        /* FIXED COMFORTABLE SIDEBAR LAYOUT FRAME */
         [data-testid="stSidebar"] {
             background-color: var(--white-clean) !important;
             color: var(--navy-brand) !important;
@@ -76,36 +76,35 @@ st.markdown("""
             max-width: 320px !important;
         }
         
-        /* STRIP NATIVE AND CUSTOM SIDEBAR COLLAPSE TRIGGERS TO FORCE ANCHORED STATE */
+        /* LOCK SIDEBAR TO PREVENT USER COLLAPSE MISALIGNMENTS */
         [data-testid="stSidebarCollapseButton"], 
-        [data-testid="collapsedControl"],
-        .sidebar-toggle-handle {
+        [data-testid="collapsedControl"] {
             display: none !important;
-            width: 0px !important;
-            height: 0px !important;
         }
         
         [data-testid="stSidebarUserContent"] {
-            padding-top: 12px !important;
-            padding-left: 0px !important;
-            padding-right: 0px !important;
-            display: flex !important;
-            flex-direction: column !important;
-            height: 100vh !important;
-        }
-        
-        /* SCROLLABLE INNER AREA FOR SIDEBAR ELEMENTS */
-        .sidebar-scrollable-content {
-            padding-top: 4px !important;
+            padding-top: 14px !important;
             padding-left: 14px !important;
             padding-right: 14px !important;
-            overflow-y: auto !important;
-            flex-grow: 1 !important;
+            height: 100vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        
+        .sidebar-title {
+            color: var(--navy-brand) !important;
+            font-size: 22px !important;
+            font-weight: 900 !important;
+            letter-spacing: 1px !important;
+            text-transform: uppercase !important;
+            text-align: center !important;
+            margin-bottom: 2px !important;
+            font-family: 'Arial', sans-serif !important;
         }
         
         .clear-link-container {
-            text-align: right !important;
-            margin-top: 0px !important;
+            text-align: center !important;
+            margin-top: 2px !important;
             margin-bottom: 12px !important;
             width: 100% !important;
         }
@@ -129,19 +128,11 @@ st.markdown("""
             color: var(--navy-brand) !important;
         }
         
-        /* HARDWARE ACCELERATED VIEWPORT STICKY BOTTOM CONTROL DECK */
-        .sidebar-bottom-sticky-zone {
-            position: sticky !important;
-            bottom: 0px !important;
-            background-color: var(--white-clean) !important;
-            padding-top: 10px !important;
-            padding-bottom: 20px !important;
-            padding-left: 14px !important;
-            padding-right: 14px !important;
-            border-top: 1px solid var(--border-gray) !important;
-            box-shadow: 0px -8px 24px rgba(0, 26, 61, 0.06) !important;
-            z-index: 9999 !important;
-            width: 100% !important;
+        /* INTERNAL EXPANDER VIEWPORT SCROLL LOCKS (Keeps sidebar controls persistent) */
+        [data-testid="stSidebar"] .st-expander div[data-testid="stVerticalBlock"] {
+            max-height: 220px !important;
+            overflow-y: auto !important;
+            padding-right: 4px !important;
         }
         
         [data-testid="stSidebar"] label p {
@@ -174,7 +165,7 @@ st.markdown("""
             width: 100% !important;
             padding: 8px !important;
             transition: all 0.1s ease-in-out !important;
-            margin-top: 2px !important;
+            margin-top: 12px !important;
         }
         .action-tray div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
             background-color: var(--gold-accent) !important;
@@ -266,8 +257,8 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-scrollable-content">', unsafe_allow_html=True)
-
+    st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
+    
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
         execute_global_purge()
@@ -305,12 +296,8 @@ with st.sidebar:
                     with cols[i % 2]:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): 
                             selected_tags.append(tag)
-                            
-    st.markdown('</div>', unsafe_allow_html=True) # End Scrollable Content
 
-    # FIXED VIEWPORT STICKY BOTTOM CONTROL ZONE
-    st.markdown('<div class="sidebar-bottom-sticky-zone">', unsafe_allow_html=True)
-    
+    # ACTION PATH CONSOLE DOCK
     st.markdown('<div class="action-tray">', unsafe_allow_html=True)
     if st.button("🚀 SCAN AREA", use_container_width=True):
         if not selected_tags:
@@ -339,15 +326,13 @@ with st.sidebar:
                 except Exception as e: st.sidebar.error("Timeout")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:10px; margin-bottom:4px;'>DATA EXPORTS</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:14px; margin-bottom:4px;'>DATA EXPORTS</p>", unsafe_allow_html=True)
     exp_fmt = st.selectbox("Format", ["Select Format...", "Export Radius (KML)", "Export POIs (KML)"], label_visibility="collapsed")
     
     if exp_fmt == "Export Radius (KML)":
         st.download_button("Download File", compile_radius_kml(lat_coord, lon_coord, radius_val), f"Radius_{radius_val}m.kml", "application/vnd.google-earth.kml+xml")
     elif exp_fmt == "Export POIs (KML)":
         st.download_button("Download File", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", disabled=not st.session_state.scanned_records)
-        
-    st.markdown('</div>', unsafe_allow_html=True) # End Sticky Zone
 
 # -----------------------------------------------------------------------------
 # 5. ZERO-LATENCY SPATIAL CANVAS & EMBEDDED GEOGRAPHIC SEARCH SUITE
