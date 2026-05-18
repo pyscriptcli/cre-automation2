@@ -4,11 +4,17 @@ import re
 import math
 import json
 
+import streamlit as st
+import requests
+import re
+import math
+import json
+
 # -----------------------------------------------------------------------------
 # 0. GLOBAL DISPLAY CONFIGURATION
 # -----------------------------------------------------------------------------
-MAP_PANEL_HEIGHT = 900  # Adjust pixel height of the spatial canvas
-MAP_PANEL_WIDTH = None  # Set to None for fluid 100% width, or integer (e.g. 1200) for fixed width
+MAP_PANEL_HEIGHT = 900  
+MAP_PANEL_WIDTH = None  
 
 # -----------------------------------------------------------------------------
 # 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
@@ -29,8 +35,20 @@ st.markdown("""
             --link-muted: #64748b;
         }
         
-        .block-container {
-            padding: 0rem !important;
+        /* OVERRIDE STREAMLIT LAYOUT FOR HEIGHT & CENTERING */
+        [data-testid="stHeader"] {
+            height: 0px !important;
+            min-height: 0px !important;
+            display: none !important;
+        }
+        
+        [data-testid="stAppViewBlockContainer"] {
+            padding-top: 0.5rem !important; 
+            padding-bottom: 0rem !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+            max-width: 95% !important; 
+            margin: 0 auto !important; 
         }
         
         [data-testid="stSidebar"] {
@@ -57,7 +75,6 @@ st.markdown("""
             font-family: 'Arial', sans-serif !important;
         }
         
-        /* Hyperlink Emulation for Tertiary Button */
         button[kind="tertiary"] {
             background: transparent !important;
             border: none !important;
@@ -108,20 +125,12 @@ st.markdown("""
             transition: all 0.1s ease-in-out !important;
             margin-top: 5px !important;
         }
-        .action-tray div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
-            background-color: var(--gold-accent) !important;
-            color: var(--navy-brand) !important;
-        }
         
         [data-testid="stSidebar"] .st-expander {
             border: 1px solid var(--border-gray) !important;
             background-color: #f8fafc !important;
             border-radius: 4px !important;
             margin-bottom: 2px !important;
-        }
-        [data-testid="stSidebar"] .st-expander details summary {
-            padding-top: 4px !important;
-            padding-bottom: 4px !important;
         }
         
         .stDeployButton, footer, #stDecoration { display:none !important; }
