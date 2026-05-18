@@ -5,7 +5,7 @@ import math
 import json
 
 # -----------------------------------------------------------------------------
-# 1. HIGH-DENSITY LIGHT MODE & FULL SCREEN OVERRIDES
+# 1. HIGH-DENSITY LIGHT MODE & TRUE FULL SCREEN OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -24,14 +24,17 @@ st.markdown("""
         }
         
         /* ELIMINATE STREAMLIT HEADER ZONE */
-        [data-testid="stHeader"] {
+        [data-testid="stHeader"], header, #stDecoration {
             height: 0px !important;
             min-height: 0px !important;
             display: none !important;
         }
         
-        /* BRUTE FORCE ENTIRE MAIN AREA TO BE 100% EDGE-TO-EDGE OVERRIDING MARGINS */
-        [data-testid="stAppViewBlockContainer"] {
+        /* BRUTE FORCE ENTIRE MAIN AREA LAYOUT MATRIX TO BE 100% EDGE-TO-EDGE */
+        .main, .block-container, 
+        [data-testid="stAppViewBlockContainer"], 
+        [data-testid="stMain"], 
+        [data-testid="stAppViewMain"] {
             padding-top: 0rem !important; 
             padding-bottom: 0rem !important;
             padding-left: 0rem !important;
@@ -40,15 +43,19 @@ st.markdown("""
             width: 100% !important;
             margin: 0px !important;
             overflow: hidden !important;
+            height: 100vh !important;
         }
         
-        /* REMOVE INTERNAL VERTICAL BLOCK GAPS AND PADDING */
-        [data-testid="stVerticalBlock"] {
+        /* REMOVE INNER GAP ELEMENTS AND PADDING IN ALL STREAMLIT WRAPPER BLOCKS */
+        [data-testid="stVerticalBlock"], 
+        [data-testid="stVerticalBlockWrapper"],
+        .stElementContainer {
             gap: 0rem !important;
             padding: 0px !important;
+            margin: 0px !important;
         }
         
-        /* FORCE STREAMLIT IFRAME SEAMLESS WRAPPING TO FILL 100% VIEWPORT EXACTLY */
+        /* FORCE STREAMLIT IFRAME COMPONENT TO MAP EXACTLY TO THE VIEWPORT WINDOW */
         iframe {
             height: 100vh !important;
             width: 100% !important;
@@ -158,7 +165,7 @@ st.markdown("""
             padding-bottom: 4px !important;
         }
         
-        .stDeployButton, footer, #stDecoration { display:none !important; }
+        .stDeployButton, footer { display:none !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -311,7 +318,7 @@ with st.sidebar:
         st.download_button("Download File", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", disabled=not st.session_state.scanned_records)
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY SPATIAL CANVAS (FULL VIEWPORT SCALE)
+# 5. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = st.session_state.last_scan_lat
@@ -325,7 +332,7 @@ leaflet_template = """
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
-        #map { height: 100%; width: 100%; }
+        #map { height: 100vh; width: 100%; }
     </style>
 </head>
 <body>
@@ -381,5 +388,5 @@ leaflet_html = (leaflet_template
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__GEOJSON__", geojson_str))
 
-# Set to pass parameters completely fluidly without fixed constraints
+# Passed with explicit visibility configurations to lock the layout fluidly
 st.components.v1.html(leaflet_html, scrolling=False)
