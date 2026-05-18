@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import re
-import math
 import json
 
 # -----------------------------------------------------------------------------
@@ -83,14 +82,14 @@ st.markdown("""
         }
         div[data-baseweb="input"]:focus-within { border: 2px solid var(--navy-brand) !important; box-shadow: var(--soft-shadow) !important; }
         
-        /* ROUNDED BUTTONS */
-        .action-tray div.stButton > button[kind="secondary"], div.stDownloadButton > button {
+        /* ROUNDED BUTTONS (Broadened selector to guarantee visibility) */
+        div.stButton > button, div.stDownloadButton > button {
             background-color: var(--navy-brand) !important; color: var(--white-clean) !important;
             font-weight: 800 !important; font-size: 11px !important; text-transform: uppercase !important;
             border: none !important; border-radius: 8px !important; width: 100% !important; padding: 10px !important;
             box-shadow: var(--soft-shadow) !important; transition: all 0.2s ease !important;
         }
-        .action-tray div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
+        div.stButton > button:hover, div.stDownloadButton > button:hover {
             transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(0, 26, 61, 0.2) !important;
         }
@@ -107,14 +106,12 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA MODELS
 # -----------------------------------------------------------------------------
-DEFAULT_COORDS = "14.6465, 121.0371"
+DEFAULT_COORDS = ""
 DEFAULT_RADIUS = 1000
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
-if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.6465
-if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 121.0371
 if 'map_styles' not in st.session_state:
     st.session_state.map_styles = {
         "pin_color": "#001a3d",
@@ -128,49 +125,40 @@ POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
     "RETAIL": [['Mall/Dept Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
     "FOOD & BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Club', '"amenity"~"bar|pub|nightclub",i'], ['Bakery', '"shop"="bakery"']],
-    "INDUSTRIAL & LOGISTICS": [
-        ['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], 
-        ['Ports & Terms', '"industrial"="port"'], 
-        ['Mfg Plants', '"industrial"~"factory|manufacturing|processing",i'],
-        ['Cold Storage', '"warehouse"~"cold_store|cold_storage",i'],
-        ['Ind. Parks', '"landuse"~"industrial|industrial_estate",i'],
-        ['Warehouses', '"building"~"warehouse|depot",i'],
-        ['Storage Facs', '"building"="storage"'],
-        ['Truck Routes', '"hgv"~"designated|yes",i']
-    ],
+    "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports & Terms', '"industrial"="port"'], ['Mfg Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage', '"warehouse"~"cold_store|cold_storage",i'], ['Ind. Parks', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses', '"building"~"warehouse|depot",i'], ['Storage Facs', '"building"="storage"'], ['Truck Routes', '"hgv"~"designated|yes",i']],
     "GOV & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport', '"aeroway"~"terminal|aerodrome",i']],
     "SCHOOLS": [['University', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational', '"amenity"="learning_centre"']]
 }
 
 ADVANCED_CONFIG = {
-    "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Clinic', '"amenity"="clinic"'], ['Embassy', '"amenity"="embassy"'], ['Firestation', '"amenity"="fire_station"'], ['Fuel', '"amenity"="fuel"'], ['Hospital', '"amenity"="hospital"'], ['Library', '"amenity"="library"'], ['Parking', '"amenity"="parking"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police', '"amenity"="police"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['Taxi', '"amenity"="taxi"']],
+    "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Clinic', '"amenity"="clinic"'], ['Embassy', '"amenity"="embassy"'], ['Firestation', '"amenity"="fire_station"'], ['Fuel', '"amenity"="fuel"'], ['Library', '"amenity"="library"'], ['Parking', '"amenity"="parking"'], ['Post Office', '"amenity"="post_office"'], ['Taxi', '"amenity"="taxi"']],
     "PLACE OF WORSHIP": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Cemetery', '"landuse"="cemetery"']],
-    "FOOD & BEVERAGE": [['Bar', '"amenity"="bar"'], ['Cafe', '"amenity"="cafe"'], ['Fast food', '"amenity"="fast_food"'], ['Restaurant', '"amenity"="restaurant"']],
     "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['Construction', '"landuse"="construction"'], ['Public camera', '"man_made"="surveillance"']]
 }
 
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
-        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
+        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
-# 3. SIDEBAR WORKSPACE
+# 3. SIDEBAR WORKSPACE (Raw Inputs - No Containers)
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div style="color: #001a3d; font-size: 22px; font-weight: 900; letter-spacing: 1px; margin-bottom: 24px; text-align: center;">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
-    coords_val = st.text_input("TARGET COORDINATES", key="geo_coords")
+    # Uncontainerized raw inputs
+    coords_val = st.text_input("COORDINATES", key="geo_coords")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, key="geo_radius", step=100)
 
     coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
     lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.6465, 121.0371)
 
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    search_query = st.text_input("FILTER CATALOG", placeholder="Search tags...").lower()
+    search_query = st.text_input("SEARCH", placeholder="Search tags...").lower()
     
     selected_tags = []
     
@@ -196,8 +184,7 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 16px 0; border: 0; border-top: 1px solid rgba(0, 26, 61, 0.1);'>", unsafe_allow_html=True)
     
-    st.markdown('<div class="action-tray">', unsafe_allow_html=True)
-    if st.button("RUN SPATIAL SCAN", use_container_width=True):
+    if st.button("SCAN AREA", use_container_width=True):
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
         else:
@@ -220,8 +207,8 @@ with st.sidebar:
                         st.session_state.last_scan_lat = lat_coord
                         st.session_state.last_scan_lon = lon_coord
                         st.rerun()
-                except Exception as e: st.sidebar.error("Timeout")
-    st.markdown('</div>', unsafe_allow_html=True)
+                except Exception as e: 
+                    st.error("Timeout")
 
     st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:900; margin-top:24px; margin-bottom:8px; text-transform: uppercase;'>System Config</p>", unsafe_allow_html=True)
     
@@ -239,18 +226,6 @@ with st.sidebar:
         st.download_button("EXPORT PROJECT", json.dumps(project_bundle, indent=2), "trade_area_scan.json", "application/json", use_container_width=True)
     with col2:
         st.download_button("EXPORT KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
-    
-    imported_project = st.file_uploader("IMPORT PROJECT [JSON]", type=["json"], label_visibility="collapsed")
-    if imported_project is not None:
-        try:
-            config_payload = json.load(imported_project)
-            st.session_state.geo_coords = config_payload.get("geo_coords", DEFAULT_COORDS)
-            st.session_state.geo_radius = config_payload.get("geo_radius", DEFAULT_RADIUS)
-            st.session_state.scanned_records = config_payload.get("scanned_records", [])
-            st.session_state.last_scan_lat = config_payload.get("last_scan_lat", 14.6465)
-            st.session_state.last_scan_lon = config_payload.get("last_scan_lon", 121.0371)
-            st.rerun()
-        except: pass
 
 # -----------------------------------------------------------------------------
 # 4. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
@@ -286,7 +261,7 @@ leaflet_template = """
             position: absolute; top: 50px; left: 0; width: 100%; background: #ffffff;
             border-radius: 8px; display: none; max-height: 250px; overflow-y: auto; 
             box-shadow: 0 6px 20px rgba(0, 26, 61, 0.15); border: 1px solid rgba(0, 26, 61, 0.1); margin-top: 8px;
-            box-sizing: border-box;
+            box-sizing: border-box; z-index: 1001;
         }
         .search-item {
             padding: 12px 16px; font-size: 12px; font-weight: 600; color: #001a3d;
@@ -308,10 +283,11 @@ leaflet_template = """
         }
         .toolbar-trigger-btn:hover { background: #001a3d; color: #ffffff; transform: scale(1.05); }
         
-        /* ROUNDED FLOATING MENU BLOCKS */
+        /* ROUNDED FLOATING MENU BLOCKS - ELEVATED Z-INDEX */
         .toolbar-floating-menu {
             position: absolute; left: 46px; background: #ffffff; border-radius: 8px; border: 1px solid rgba(0, 26, 61, 0.1);
-            padding: 16px; color: #001a3d; width: 200px; display: none; box-shadow: 0 8px 24px rgba(0, 26, 61, 0.12);
+            padding: 16px; color: #001a3d; width: 220px; display: none; box-shadow: 0 8px 24px rgba(0, 26, 61, 0.2);
+            z-index: 1005;
         }
         #basemap-menu-container { top: 0px; }
         
@@ -353,21 +329,6 @@ leaflet_template = """
         }
         .results-item:hover { background: #001a3d; color: #ffffff; padding-left: 42px; }
 
-        /* RIGHT CLICK CONTEXT PANEL VIEWER */
-        #right-viewer-panel {
-            position: absolute; top: 16px; right: 312px; z-index: 1001; background: #ffffff; border-radius: 12px;
-            width: 450px; height: calc(100vh - 32px); border: 1px solid rgba(0, 26, 61, 0.1);
-            display: none; flex-direction: column; box-shadow: -4px 0 20px rgba(0, 26, 61, 0.15); overflow: hidden;
-        }
-        .viewer-header {
-            background: #001a3d; color: #ffffff; padding: 14px 16px; font-weight: 900; font-size: 11px;
-            display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; letter-spacing: 1px;
-        }
-        .viewer-header a { color: #ffffff !important; text-decoration: none; font-weight: bold; margin-right: 15px; border: 1px solid rgba(255,255,255,0.4); padding: 4px 8px; border-radius: 4px; transition: all 0.2s;}
-        .viewer-header a:hover { background: #ffffff; color: #001a3d !important; }
-        .viewer-header span.close-btn { cursor: pointer; font-size: 16px; line-height: 1; }
-        #viewer-iframe { flex-grow: 1; border: none; width: 100%; background: #f8fafc; }
-
         .poi-text-label {
             background: #ffffff; border: 1px solid #001a3d; padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; color: #001a3d; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
@@ -383,21 +344,21 @@ leaflet_template = """
     </div>
 
     <div id="map-action-toolbar">
-        <div class="toolbar-trigger-btn" title="Basemap Settings" onclick="toggleMenuPanel(event, 'basemap-menu-container')">▤</div>
+        <div class="toolbar-trigger-btn" title="Basemap & Layers" onclick="toggleMenuPanel(event, 'basemap-menu-container')">▤</div>
     </div>
     
     <div id="basemap-menu-container" class="toolbar-floating-menu" onclick="event.stopPropagation();">
         <div class="panel-row">
             <label>Map Raster View</label>
             <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
-                <option value="osm">OSM Standard</option>
+                <option value="osm">OpenStreetMap</option>
                 <option value="satellite">Google Satellite</option>
                 <option value="carto">Carto Light</option>
             </select>
         </div>
         <div class="panel-row" style="display:flex; align-items:center; gap:8px; margin-top:12px; margin-bottom: 4px;">
             <input type="checkbox" id="label-toggle-chk" style="margin:0; transform: scale(1.1); cursor: pointer;" onchange="toggleLabelsMatrix(this.checked)">
-            <label style="margin:0; cursor:pointer; text-transform: none; font-weight: 800; font-size: 11px;" for="label-toggle-chk">Show Text Labels</label>
+            <label style="margin:0; cursor:pointer; text-transform: none; font-weight: 800; font-size: 11px;" for="label-toggle-chk">Show POI Labels</label>
         </div>
     </div>
 
@@ -409,21 +370,8 @@ leaflet_template = """
         <div class="results-list" id="results-list-box"></div>
     </div>
 
-    <div id="right-viewer-panel">
-        <div class="viewer-header">
-            <span id="viewer-title">VIEWER</span>
-            <div style="display: flex; align-items: center;">
-                <a id="viewer-ext-link" href="#" target="_blank">⤢ NEW TAB</a>
-                <span class="close-btn" onclick="closeViewer()">✖</span>
-            </div>
-        </div>
-        <iframe id="viewer-iframe" src=""></iframe>
-    </div>
-
     <script>
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
-        
-        // Relocate zoom control below custom tools
         map.zoomControl.setPosition('topleft');
         
         const basemaps = {
@@ -454,7 +402,6 @@ leaflet_template = """
             localStorage.setItem('ts_persistent_labels', isShown);
         }
         
-        // Improved toggle with global click listener to close menu
         function toggleMenuPanel(event, panelId) {
             event.stopPropagation();
             const el = document.getElementById(panelId);
@@ -467,42 +414,7 @@ leaflet_template = """
             document.querySelectorAll('.toolbar-floating-menu').forEach(p => p.style.display = 'none');
             document.getElementById('search-results').style.display = 'none';
         });
-        
-        document.getElementById('search-container').addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
 
-        let searchTimeout;
-        function handleSearch(e) {
-            clearTimeout(searchTimeout);
-            const q = e.target.value;
-            const resDiv = document.getElementById('search-results');
-            if (q.length < 3) { resDiv.style.display = 'none'; return; }
-            searchTimeout = setTimeout(() => {
-                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`)
-                .then(res => res.json())
-                .then(data => {
-                    resDiv.innerHTML = '';
-                    if(data.length > 0) {
-                        data.forEach(item => {
-                            const div = document.createElement('div');
-                            div.className = 'search-item'; div.innerText = item.display_name;
-                            div.onclick = () => {
-                                const newLat = parseFloat(item.lat); const newLon = parseFloat(item.lon);
-                                map.flyTo([newLat, newLon], 15);
-                                centerMarker.setLatLng([newLat, newLon]);
-                                radiusCircle.setLatLng([newLat, newLon]);
-                                resDiv.style.display = 'none';
-                                document.getElementById('map-search').value = item.display_name;
-                            };
-                            resDiv.appendChild(div);
-                        });
-                        resDiv.style.display = 'block';
-                    } else { resDiv.style.display = 'none'; }
-                });
-            }, 400);
-        }
-        
         const centerMarker = L.circleMarker([__LAT__, __LON__], {
             radius: 8, fillColor: "#ffffff", color: "#001a3d", weight: 3, opacity: 1, fillOpacity: 1
         }).addTo(map).bindPopup("<b style='font-family: Arial;'>TARGET COORDINATES</b>");
@@ -589,41 +501,6 @@ leaflet_template = """
             });
         }
         
-        map.on('contextmenu', function(e) {
-            const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
-            
-            const menuHtml = `
-                <div style="font-family: Arial; font-size: 11px; color: #001a3d; min-width: 140px;">
-                    <div style="font-weight: 900; border-bottom: 1px solid rgba(0,26,61,0.1); padding-bottom: 6px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP ACTIONS</div>
-                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#64748b'" onmouseout="this.style.color='#001a3d'" onclick="navigator.clipboard.writeText('${coordStr}'); alert('Copied: ${coordStr}'); map.closePopup();">◧ COPY COORDINATES</div>
-                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#64748b'" onmouseout="this.style.color='#001a3d'" onclick="openRightPanel('routes', ${lat}, ${lng}); map.closePopup();">↱ OPEN ROUTES</div>
-                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#64748b'" onmouseout="this.style.color='#001a3d'" onclick="openRightPanel('streetview', ${lat}, ${lng}); map.closePopup();">👁 OPEN STREETVIEW</div>
-                </div>
-            `;
-            L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
-        });
-
-        function openRightPanel(type, lat, lng) {
-            const panel = document.getElementById('right-viewer-panel');
-            const iframe = document.getElementById('viewer-iframe');
-            const extLink = document.getElementById('viewer-ext-link');
-            document.getElementById('viewer-title').innerText = type.toUpperCase();
-            
-            if(type === 'routes') {
-                iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&output=embed`;
-                extLink.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-            } else {
-                iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&layer=c&cbll=${lat},${lng}&output=svembed`;
-                extLink.href = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
-            }
-            panel.style.display = 'flex';
-        }
-        function closeViewer() {
-            document.getElementById('right-viewer-panel').style.display = 'none';
-            document.getElementById('viewer-iframe').src = "";
-        }
-        
         if (pts.length > 0 && !__IS_STALE__) {
             const bounds = L.featureGroup([L.marker([__LAT__, __LON__]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
             map.fitBounds(bounds.pad(0.1));
@@ -641,4 +518,5 @@ leaflet_html = (leaflet_template
                 .replace("__IS_STALE__", is_stale)
                 .replace("__GEOJSON__", geojson_str))
 
-st.components.v1.html(leaflet_html, scrolling=False)
+# EXPLICIT HEIGHT DECLARATION TO PREVENT STREAMLIT IFRAME TRUNCATION
+st.components.v1.html(leaflet_html, height=850, scrolling=False)
