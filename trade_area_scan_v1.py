@@ -64,7 +64,7 @@ st.markdown("""
             font-family: 'Material Symbols Rounded' !important;
             font-weight: normal !important;
             font-style: normal !important;
-            font-size: 12px !important;
+            font-size: 10px !important;
             line-height: 1 !important;
             letter-spacing: normal !important;
             text-transform: none !important;
@@ -132,7 +132,7 @@ st.markdown("""
             box-shadow: none !important; padding: 0 !important; margin-top: 2px; display: inline-flex;
         }
         div.stButton > button[kind="primary"] p {
-            color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600 !important; text-decoration: none !important; text-transform: uppercase;
+            color: var(--text-muted) !important; font-size: 10px !important; font-weight: 600 !important; text-decoration: none !important; text-transform: uppercase;
         }
         div.stButton > button[kind="primary"]:hover p { color: #AA2E20 !important; }
         
@@ -141,7 +141,7 @@ st.markdown("""
             border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important;
             border-radius: 2px !important; margin-bottom: 2px !important; overflow: hidden !important;
         }
-        [data-testid="stSidebar"] .st-expander summary p { font-size: 7px !important; font-weight: 700 !important; }
+        [data-testid="stSidebar"] .st-expander summary p { font-size: 10px !important; font-weight: 700 !important; }
         .stDeployButton, footer { display:none !important; }
         
         /* BRANDED TITLE */
@@ -157,7 +157,7 @@ st.markdown("""
         }
         
         /* TEXT SIZING OVERRIDES */
-        .stTextInput label p, .stNumberInput label p { font-size: 12px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
+        .stTextInput label p, .stNumberInput label p { font-size: 10px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
         .stCheckbox label p { font-size: 7px !important; }
     </style>
 """, unsafe_allow_html=True)
