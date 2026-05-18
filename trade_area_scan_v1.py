@@ -14,7 +14,6 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        /* FORCE STRICT BICHROMATIC THEME WITH MODERN TACTILE GEOMETRY */
         :root {
             --navy-brand: #001a3d !important;
             --white-clean: #ffffff !important;
@@ -63,43 +62,45 @@ st.markdown("""
             padding: 0px !important; margin: 0px !important; max-width: 100% !important; gap: 0rem !important;
         }
         
+        iframe { height: 100vh !important; width: 100% !important; border: none !important; display: block !important; }
+        
         [data-testid="stSidebarUserContent"] {
             padding-top: 24px !important; padding-left: 16px !important; padding-right: 16px !important;
             height: 100vh !important; overflow-y: auto !important; overflow-x: hidden !important;
         }
         
-        /* MINIMAL INPUTS */
         div[data-baseweb="input"], div[data-baseweb="select"] {
-            background-color: transparent !important; border: none !important; border-bottom: 2px solid rgba(0, 26, 61, 0.2) !important;
+            background-color: transparent !important;
+            border: none !important; border-bottom: 2px solid rgba(0, 26, 61, 0.2) !important;
             border-radius: 0px !important; box-shadow: none !important;
         }
         div[data-baseweb="input"]:focus-within { border-bottom: 2px solid var(--navy-brand) !important; }
         
-        /* STANDARD BUTTONS */
-        div.stButton > button[kind="secondary"], div.stDownloadButton > button {
-            background-color: var(--navy-brand) !important; border: none !important; border-radius: 4px !important; 
-            width: 100% !important; padding: 8px !important; box-shadow: var(--soft-shadow) !important; transition: all 0.2s ease !important;
+        /* PRIMARY BUTTONS */
+        div.stButton > button[kind="secondary"] {
+            background-color: var(--navy-brand) !important; 
+            border: none !important; border-radius: 4px !important; width: 100% !important; padding: 8px !important;
+            box-shadow: var(--soft-shadow) !important; transition: all 0.2s ease !important;
         }
         div.stButton > button[kind="secondary"] p, div.stDownloadButton > button p {
             color: var(--white-clean) !important; font-weight: 800 !important; font-size: 11px !important; text-transform: uppercase !important;
         }
-        div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
-            transform: translateY(-1px); box-shadow: 0 6px 15px rgba(0, 26, 61, 0.3) !important;
-        }
-
-        /* CLEAR ALL HYPERLINK BUTTON OVERRIDE */
-        div.stButton > button[kind="tertiary"] {
-            background: transparent !important; color: #ff3366 !important; border: none !important;
-            padding: 0 !important; font-size: 11px !important; font-weight: 900 !important;
-            text-decoration: underline !important; box-shadow: none !important;
-        }
-        div.stButton > button[kind="tertiary"] p { color: #ff3366 !important; font-weight: 900 !important; text-transform: uppercase; }
-        div.stButton > button[kind="tertiary"]:hover { transform: none !important; opacity: 0.7; }
         
-        /* FILE UPLOADER MINIMAL */
-        [data-testid="stFileUploader"] {
-            padding: 8px; border: 1px dashed rgba(0, 26, 61, 0.3); border-radius: 4px; text-align: center; margin-top: 8px;
+        div.stDownloadButton > button {
+            background-color: var(--navy-brand) !important; 
+            border: none !important; border-radius: 4px !important; width: 100% !important; padding: 4px !important;
+            box-shadow: var(--soft-shadow) !important;
         }
+        
+        /* HYPERLINK STYLE FOR CLEAR BUTTON (Tertiary/Primary fallback) */
+        div.stButton > button[kind="primary"] {
+            background: transparent !important; border: none !important; color: var(--navy-brand) !important;
+            box-shadow: none !important; padding: 0 !important; margin-top: 4px; display: inline-flex;
+        }
+        div.stButton > button[kind="primary"] p {
+            color: var(--navy-brand) !important; font-size: 11px !important; font-weight: 800 !important; text-decoration: underline !important; text-transform: uppercase;
+        }
+        div.stButton > button[kind="primary"]:hover p { color: #ff3366 !important; }
         
         [data-testid="stSidebar"] .st-expander {
             border: 1px solid rgba(0, 26, 61, 0.1) !important; background-color: var(--white-clean) !important;
@@ -122,20 +123,29 @@ if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 121.0371
 
 POI_CONFIG = {
-    "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"']],
-    "RETAIL": [['Mall', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"']],
-    "FOOD & BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"']],
-    "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Mfg Plants', '"industrial"~"factory|manufacturing",i'], ['Warehouses', '"building"~"warehouse|depot",i']],
-    "GOV & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police', '"amenity"="police"'], ['Fire', '"amenity"="fire_station"']],
-    "SCHOOLS": [['University', '"amenity"~"university|college",i'], ['School', '"amenity"="school"']]
+    "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
+    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
+    "FOOD AND BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"']],
+    "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports & Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'], ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses & Depots', '"building"~"warehouse|depot",i'], ['Storage Facilities', '"building"="storage"'], ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']],
+    "GOVERNMENT & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i']],
+    "SCHOOLS": [['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"']]
+}
+
+ADVANCED_CONFIG = {
+    "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Clinic', '"amenity"="clinic"'], ['Embassy', '"amenity"="embassy"'], ['Firestation', '"amenity"="fire_station"'], ['Fuel', '"amenity"="fuel"'], ['Hospital', '"amenity"="hospital"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Parking', '"amenity"="parking"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police', '"amenity"="police"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['University', '"amenity"="university"']],
+    "PLACE OF WORSHIP": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Casino', '"amenity"="casino"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"']],
+    "FOOD & BEVERAGE": [['Bar', '"amenity"="bar"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Cafe', '"amenity"="cafe"'], ['Fast food', '"amenity"="fast_food"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Restaurant', '"amenity"="restaurant"']],
+    "RETAIL_ADV": [['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"']],
+    "SPORTS": [['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"']],
+    "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
 }
 
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
-        ctype = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
-        kml += f"<Placemark><name>{name}</name><description>{ctype}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
+        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
@@ -154,7 +164,6 @@ with st.sidebar:
     search_query = st.text_input("SEARCH TAGS", placeholder="Search...").lower()
     
     selected_tags = []
-    
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -162,54 +171,64 @@ with st.sidebar:
                 for label, tag in matched:
                     if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
 
+    for cat_name, node_items in ADVANCED_CONFIG.items():
+        matched = [item for item in node_items if search_query in item[0].lower()]
+        if matched:
+            with st.expander(f"ADV - {cat_name}", expanded=(len(search_query) > 0)):
+                for label, tag in matched:
+                    if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
+
     st.markdown("<br>", unsafe_allow_html=True)
     
-    col_run, col_clear = st.columns([3, 1])
-    with col_run:
-        if st.button("RUN SCAN", use_container_width=True, type="secondary"):
-            if not selected_tags:
-                st.error("Select ≥ 1 layer.")
-            else:
-                url = "https://overpass-api.de/api/interpreter"
-                statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
-                ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
-                with st.spinner("Extracting nodes..."):
-                    try:
-                        res = requests.post(url, data={"data": ql}, headers={"User-Agent": "TAS/3.1"}, timeout=100)
-                        if res.status_code == 200:
-                            records = []
-                            for el in res.json().get('elements', []):
-                                e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                                e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                                if e_lat and e_lon:
-                                    tags = el.get('tags', {})
-                                    records.append({"lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node'})
-                            st.session_state.scanned_records = records
-                            st.session_state.last_scan_lat = lat_coord
-                            st.session_state.last_scan_lon = lon_coord
-                            st.rerun()
-                    except Exception: st.error("Timeout")
-    with col_clear:
-        if st.button("CLEAR ALL", use_container_width=True, type="tertiary"):
-            st.session_state.scanned_records = []
-            st.rerun()
+    if st.button("RUN SPATIAL SCAN", type="secondary", use_container_width=True):
+        if not selected_tags:
+            st.error("Select ≥ 1 layer.")
+        else:
+            url = "https://overpass-api.de/api/interpreter"
+            statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
+            ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
+            with st.spinner("Extracting nodes..."):
+                try:
+                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "TradeAreaScan/3.1"}, timeout=100)
+                    if res.status_code == 200:
+                        records = []
+                        for el in res.json().get('elements', []):
+                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
+                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
+                            if e_lat and e_lon:
+                                tags = el.get('tags', {})
+                                records.append({"lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node'})
+                        st.session_state.scanned_records = records
+                        st.session_state.last_scan_lat = lat_coord
+                        st.session_state.last_scan_lon = lon_coord
+                        st.rerun()
+                except Exception as e: st.error("Timeout")
+
+    # Hyperlink-styled Clear Button
+    if st.button("Clear All POIs", type="primary"):
+        st.session_state.scanned_records = []
+        st.rerun()
 
     st.markdown("<hr style='margin: 16px 0; border: 0; border-top: 1px solid rgba(0, 26, 61, 0.1);'>", unsafe_allow_html=True)
     
-    c1, c2 = st.columns(2)
-    with c1: st.download_button("EXP JSON", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True, type="secondary")
-    with c2: st.download_button("EXP KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True, type="secondary")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button("EXPORT PROJ", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
+    with col2:
+        st.download_button("EXPORT KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
-    imported_project = st.file_uploader("IMPORT FILE", type=["json"], label_visibility="collapsed")
-    if imported_project is not None:
+    # Import Module
+    imported_file = st.file_uploader("IMPORT DATA", type=["json"], label_visibility="collapsed")
+    if imported_file is not None:
         try:
-            config_payload = json.load(imported_project)
-            if isinstance(config_payload, list): st.session_state.scanned_records = config_payload
+            data = json.load(imported_file)
+            st.session_state.scanned_records = data.get("scanned_records", data)
             st.rerun()
-        except: pass
+        except Exception:
+            pass
 
 # -----------------------------------------------------------------------------
-# 4. ZERO-LATENCY SPATIAL CANVAS
+# 4. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = lat_coord
@@ -226,98 +245,110 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Arial', sans-serif; }
         #map { height: 100vh; width: 100%; }
         
-        /* ULTRA MINIMAL BASEMAP TOOLBAR */
-        #map-action-toolbar { position: absolute; top: 80px; left: 10px; z-index: 1000; }
-        .toolbar-trigger-btn {
-            background: #ffffff; width: 30px; height: 30px; border-radius: 4px; border: 2px solid rgba(0,0,0,0.2);
-            display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px;
-            color: #333; font-weight: bold; user-select: none; transition: background 0.2s;
+        /* MINIMAL INLINE BASEMAP TOOLBAR */
+        #minimal-basemap-panel {
+            position: absolute; top: 80px; left: 10px; z-index: 1000;
+            background: #ffffff; border-radius: 4px; border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box;
+            display: flex; flex-direction: column; padding: 2px;
         }
-        .toolbar-trigger-btn:hover { background: #f4f4f4; }
-        
-        .toolbar-floating-menu {
-            position: absolute; left: 36px; top: 0px; background: #ffffff; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15);
-            padding: 8px 12px; color: #333; width: 180px; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1005;
+        #minimal-basemap-panel select {
+            border: none; border-bottom: 1px solid #eee; padding: 4px; font-size: 11px; font-weight: bold;
+            color: #333; background: transparent; outline: none; cursor: pointer; width: 100%;
         }
-        .panel-row { margin-bottom: 8px; }
-        .panel-row:last-child { margin-bottom: 0; }
-        .panel-row select { width: 100%; font-size: 11px; padding: 4px; border: 1px solid #ddd; border-radius: 2px; background: #fff; outline: none; }
+        .minimal-label {
+            font-size: 10px; font-weight: bold; padding: 4px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #333; margin: 0;
+        }
 
-        /* ROUNDED SEARCH BAR */
-        #search-container { position: absolute; top: 10px; left: 54px; z-index: 1000; width: 300px; }
+        #search-container { position: absolute; top: 10px; left: 54px; z-index: 1000; width: 340px; }
         #map-search {
-            width: 100%; padding: 8px 12px; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px;
-            font-size: 12px; font-weight: bold; color: #333; background: #ffffff; outline: none; box-sizing: border-box;
+            width: 100%; padding: 10px 14px; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; background-clip: padding-box;
+            font-size: 13px; font-weight: bold; color: #333; background: #ffffff; outline: none; box-sizing: border-box;
         }
-        
+        #search-results {
+            position: absolute; top: 45px; left: 0; width: 100%; background: #ffffff;
+            border-radius: 4px; display: none; max-height: 250px; overflow-y: auto; 
+            border: 2px solid rgba(0,0,0,0.2); box-sizing: border-box; z-index: 1001;
+        }
+        .search-item { padding: 10px 14px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .search-item:hover { background: #f4f4f4; }
+
         #scan-results-panel {
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff;
-            width: 260px; max-height: calc(100vh - 20px); border-radius: 4px; border: 2px solid rgba(0,0,0,0.2);
+            width: 280px; max-height: calc(100vh - 20px); border-radius: 4px; border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box;
             display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         .results-header {
-            background: #001a3d; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 900;
+            background: #001a3d; color: #ffffff; padding: 12px 14px; font-size: 11px; font-weight: 900;
             display: flex; justify-content: space-between; align-items: center; text-transform: uppercase;
         }
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
         .layer-category-block { border-bottom: 1px solid #eee; }
         .layer-category-header {
-            background: #ffffff; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;
+            background: #ffffff; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;
             cursor: pointer; user-select: none;
         }
         .layer-category-header:hover { background: #fafafa; }
         .layer-header-left { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; color: #001a3d; }
+        
         .layer-category-items { padding: 0; background: #fafafa; }
         .layer-category-items.collapsed { display: none !important; }
-        .results-item { padding: 6px 12px 6px 30px; font-size: 10px; font-weight: 600; color: #333; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .results-item {
+            padding: 8px 14px 8px 34px; font-size: 11px; font-weight: 600; color: #333;
+            cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
         .results-item:hover { background: #eaeaea; }
 
-        .poi-text-label { background: #fff; border: 1px solid #ccc; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-weight: bold; white-space: nowrap; color: #333; }
+        .poi-text-label { background: #fff; border: 1px solid #000; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-weight: bold; white-space: nowrap; }
         .hide-labels .poi-text-label { display: none !important; }
-        .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.3); }
+        .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.2); }
 
-        /* RIGHT PANEL FOR STREETVIEW */
+        /* RIGHT PANEL VIEWER */
         #right-viewer-panel {
-            position: absolute; top: 10px; right: 280px; z-index: 1001; background: #ffffff; border-radius: 4px;
-            width: 400px; height: calc(100vh - 20px); border: 2px solid rgba(0,0,0,0.2);
+            position: absolute; top: 10px; right: 300px; z-index: 1001; background: #ffffff; border-radius: 4px;
+            width: 450px; height: calc(100vh - 20px); border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box;
             display: none; flex-direction: column; box-shadow: -4px 0 20px rgba(0,0,0,0.15); overflow: hidden;
         }
         .viewer-header {
-            background: #001a3d; color: #ffffff; padding: 10px 12px; font-weight: 900; font-size: 10px;
+            background: #001a3d; color: #ffffff; padding: 12px 14px; font-weight: 900; font-size: 11px;
             display: flex; justify-content: space-between; align-items: center; text-transform: uppercase;
         }
-        .viewer-header span.close-btn { cursor: pointer; font-size: 14px; line-height: 1; }
-        #viewer-iframe { flex-grow: 1; border: none; width: 100%; background: #eee; }
+        .viewer-header span.close-btn { cursor: pointer; font-size: 16px; line-height: 1; }
+        #viewer-iframe { flex-grow: 1; border: none; width: 100%; background: #f8fafc; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     
-    <div id="search-container"><input type="text" id="map-search" placeholder="Search..."></div>
+    <div id="search-container">
+        <input type="text" id="map-search" placeholder="Search location globally..." onkeyup="handleSearch(event)">
+        <div id="search-results"></div>
+    </div>
 
-    <div id="map-action-toolbar">
-        <div class="toolbar-trigger-btn" onclick="toggleMenuPanel(event, 'basemap-menu-container')">▤</div>
-        <div id="basemap-menu-container" class="toolbar-floating-menu" onclick="event.stopPropagation();">
-            <div class="panel-row">
-                <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
-                    <option value="osm">OpenStreetMap</option>
-                    <option value="satellite">Google Satellite</option>
-                </select>
-            </div>
-            <div class="panel-row" style="display:flex; align-items:center; gap:6px; margin-top:8px;">
-                <input type="checkbox" id="label-toggle-chk" style="margin:0; cursor: pointer;" onchange="toggleLabelsMatrix(this.checked)">
-                <label style="margin:0; cursor:pointer; font-weight: bold; font-size: 10px;" for="label-toggle-chk">Show POI Labels</label>
-            </div>
-        </div>
+    <div id="minimal-basemap-panel">
+        <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
+            <option value="osm">OpenStreetMap</option>
+            <option value="satellite">Google Satellite</option>
+            <option value="carto">Carto Light</option>
+        </select>
+        <label class="minimal-label" for="label-toggle-chk">
+            <input type="checkbox" id="label-toggle-chk" style="margin:0; cursor: pointer;" onchange="toggleLabelsMatrix(this.checked)"> Show Labels
+        </label>
     </div>
 
     <div id="scan-results-panel">
-        <div class="results-header"><span>SCAN INDEX</span><span id="results-count">0</span></div>
+        <div class="results-header">
+            <span>SCAN INDEX</span>
+            <span id="results-count">0</span>
+        </div>
         <div class="results-list" id="results-list-box"></div>
     </div>
 
     <div id="right-viewer-panel">
-        <div class="viewer-header"><span>STREETVIEW</span><span class="close-btn" onclick="closeViewer()">✖</span></div>
+        <div class="viewer-header">
+            <span id="viewer-title">VIEWER</span>
+            <span class="close-btn" onclick="closeViewer()">✖</span>
+        </div>
         <iframe id="viewer-iframe" src=""></iframe>
     </div>
 
@@ -327,7 +358,8 @@ leaflet_template = """
         
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 })
+            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
         };
         
         let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'osm';
@@ -336,8 +368,10 @@ leaflet_template = """
         basemaps[activeBasemapKey].addTo(map);
         
         function switchActiveBasemap(targetKey) {
-            map.removeLayer(basemaps[activeBasemapKey]); basemaps[targetKey].addTo(map);
-            activeBasemapKey = targetKey; localStorage.setItem('ts_persistent_basemap', targetKey);
+            map.removeLayer(basemaps[activeBasemapKey]);
+            basemaps[targetKey].addTo(map);
+            activeBasemapKey = targetKey;
+            localStorage.setItem('ts_persistent_basemap', targetKey);
         }
         
         let labelsActive = localStorage.getItem('ts_persistent_labels') !== 'false';
@@ -350,34 +384,31 @@ leaflet_template = """
             localStorage.setItem('ts_persistent_labels', isShown);
         }
         
-        function toggleMenuPanel(event, panelId) {
-            event.stopPropagation(); const el = document.getElementById(panelId);
-            const activeNow = el.style.display === 'block';
-            document.querySelectorAll('.toolbar-floating-menu').forEach(p => p.style.display = 'none');
-            if (!activeNow) el.style.display = 'block';
-        }
-        
-        document.addEventListener('click', function() { document.querySelectorAll('.toolbar-floating-menu').forEach(p => p.style.display = 'none'); });
-
-        // BLUE CIRCLE WITH WHITE STAR
+        // CUSTOM STAR CENTER PIN (Z-INDEX 10000)
         const starIcon = L.divIcon({
-            html: '<div style="background:#0055ff; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-size:16px; border:2px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.4);">★</div>',
-            className: '', iconSize: [28, 28], iconAnchor: [14, 14]
+            className: 'custom-center-icon',
+            html: '<div style="background-color: #001a3d; color: #ffffff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">★</div>',
+            iconSize: [26, 26], iconAnchor: [13, 13]
         });
-        L.marker([__LAT__, __LON__], {icon: starIcon}).addTo(map);
+        const centerMarker = L.marker([__LAT__, __LON__], { icon: starIcon, zIndexOffset: 10000 }).addTo(map);
         
-        const radiusCircle = L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#001a3d", weight: 1, fillColor: "#001a3d", fillOpacity: 0.08 }).addTo(map);
+        const radiusCircle = L.circle([__LAT__, __LON__], {
+            radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
+        }).addTo(map);
         
         const pts = __GEOJSON__;
-        const categoryMap = {}; const layerGroupsRef = {};
+        const categoryMap = {};
+        const layerGroupsRef = {};
         
-        // PASTEL COLOR PALETTE
-        const catPalette = ["#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9", "#BAE1FF", "#E8BAFF", "#FFC6FF", "#BDB2FF", "#9BF6FF", "#FAD02E"];
+        // MUTED / PASTEL COLOR PALETTE
+        const catPalette = ["#6b8ca6", "#bfa482", "#8da186", "#b095a8", "#dca77d", "#92a6af", "#d4b8b2", "#a69aa4", "#859ea8", "#adae95", "#bf929a", "#7e9c91"];
         const categoryColors = {}; let colorIndex = 0;
         
         pts.forEach(p => {
             const layerKey = p.type || 'Unclassified';
-            if (!categoryMap[layerKey]) { categoryMap[layerKey] = []; categoryColors[layerKey] = catPalette[colorIndex % catPalette.length]; colorIndex++; }
+            if (!categoryMap[layerKey]) {
+                categoryMap[layerKey] = []; categoryColors[layerKey] = catPalette[colorIndex % catPalette.length]; colorIndex++;
+            }
             categoryMap[layerKey].push(p);
         });
         
@@ -385,8 +416,12 @@ leaflet_template = """
             layerGroupsRef[key] = L.layerGroup().addTo(map);
             const pColor = categoryColors[key];
             categoryMap[key].forEach(p => {
-                const marker = L.circleMarker([p.lat, p.lon], { radius: 6, fillColor: pColor, color: "#333", weight: 1, opacity: 1, fillOpacity: 1 }).bindPopup("<b>" + p.name + "</b><br>" + p.type);
-                if (p.name && p.name !== 'Unknown') marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -6], className: 'poi-text-label' });
+                const marker = L.circleMarker([p.lat, p.lon], {
+                    radius: 5, fillColor: pColor, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.9
+                }).bindPopup("<b>" + p.name + "</b><br>" + p.type);
+                if (p.name && p.name !== 'Unknown') {
+                    marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -6], className: 'poi-text-label' });
+                }
                 marker.addTo(layerGroupsRef[key]);
             });
         });
@@ -397,39 +432,64 @@ leaflet_template = """
         if (pts.length > 0) {
             let htmlPayload = '';
             Object.keys(categoryMap).forEach(catName => {
+                const dotColor = categoryColors[catName];
                 htmlPayload += `
                     <div class="layer-category-block">
-                        <div class="layer-category-header" onclick="document.getElementById('items-${catName}').classList.toggle('collapsed')">
+                        <div class="layer-category-header" onclick="toggleAccordionCollapse('${catName}')">
                             <div class="layer-header-left">
-                                <span class="color-dot" style="background-color: ${categoryColors[catName]};"></span>
-                                <span>${catName} <span style="color:#888; font-size:9px;">(${categoryMap[catName].length})</span></span>
+                                <input type="checkbox" checked onclick="event.stopPropagation(); toggleCategoryVisibility('${catName}', this.checked)">
+                                <span class="color-dot" style="background-color: ${dotColor};"></span>
+                                <span>${catName} <span style="color: #888; font-size: 10px;">(${categoryMap[catName].length})</span></span>
                             </div>
+                            <span id="chevron-${catName}" style="font-size: 10px;">▼</span>
                         </div>
                         <div class="layer-category-items" id="items-${catName}">
                 `;
-                categoryMap[catName].forEach(p => { htmlPayload += `<div class="results-item" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">${p.name || 'Unknown'}</div>`; });
+                categoryMap[catName].forEach(p => {
+                    htmlPayload += `<div class="results-item" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">${p.name || 'Unknown'}</div>`;
+                });
                 htmlPayload += '</div></div>';
             });
             listBox.innerHTML = htmlPayload;
         }
 
-        // ICON ONLY RIGHT CLICK MENU
+        function toggleCategoryVisibility(catKey, isVisible) {
+            if (isVisible) map.addLayer(layerGroupsRef[catKey]);
+            else map.removeLayer(layerGroupsRef[catKey]);
+        }
+
+        function toggleAccordionCollapse(catKey) {
+            const panel = document.getElementById('items-' + catKey);
+            const chev = document.getElementById('chevron-' + catKey);
+            panel.classList.toggle('collapsed');
+            chev.innerText = panel.classList.contains('collapsed') ? '▲' : '▼';
+        }
+
+        // ICON-ONLY RIGHT CLICK MENU
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
             const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
             const menuHtml = `
-                <div style="display:flex; gap:16px; padding:4px;">
-                    <div title="Copy Coordinates" style="cursor:pointer; font-size:20px;" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">📍</div>
-                    <div title="View on Google Maps" style="cursor:pointer; font-size:20px;" onclick="window.open('https://maps.google.com/?q=${lat},${lng}', '_blank'); map.closePopup();">🗺️</div>
-                    <div title="Google Streetview" style="cursor:pointer; font-size:20px;" onclick="openRightPanel(${lat}, ${lng}); map.closePopup();">🛣️</div>
+                <div style="display:flex; gap:16px; padding: 4px 8px; justify-content:center; align-items:center;">
+                    <div title="Copy Coordinates" style="cursor:pointer; font-size:20px;" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">📋</div>
+                    <div title="Google Maps" style="cursor:pointer; font-size:20px;" onclick="openRightPanel('routes', ${lat}, ${lng}); map.closePopup();">🗺️</div>
+                    <div title="Google Streetview" style="cursor:pointer; font-size:20px;" onclick="openRightPanel('streetview', ${lat}, ${lng}); map.closePopup();">🛣️</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
 
-        function openRightPanel(lat, lng) {
-            document.getElementById('right-viewer-panel').style.display = 'flex';
-            document.getElementById('viewer-iframe').src = `https://maps.google.com/maps?q=${lat},${lng}&layer=c&cbll=${lat},${lng}&output=svembed`;
+        function openRightPanel(type, lat, lng) {
+            const panel = document.getElementById('right-viewer-panel');
+            const iframe = document.getElementById('viewer-iframe');
+            document.getElementById('viewer-title').innerText = type === 'routes' ? 'GOOGLE MAPS' : 'STREETVIEW';
+            
+            if(type === 'routes') {
+                iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&output=embed`;
+            } else {
+                iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&layer=c&cbll=${lat},${lng}&output=svembed`;
+            }
+            panel.style.display = 'flex';
         }
         function closeViewer() {
             document.getElementById('right-viewer-panel').style.display = 'none';
