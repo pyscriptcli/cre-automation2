@@ -5,4 +5,3 @@ pandas
 requests
 folium
 streamlit-folium
-libreoffice
