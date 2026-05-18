@@ -19,9 +19,9 @@ LUXURY_CRE_SYSTEM = """
         background-color: #FFFFFF !important;
     }
     .block-container {
-        padding-top: 3rem !important;
-        padding-bottom: 4rem !important;
-        max-width: 800px !important; /* Centered spacious layout column */
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 1200px !important; /* Expanded width for side-by-side single page execution */
     }
     
     /* 2. Flat Luxury Input Fields (Larger Fonts, Sharp 0px Corners) */
@@ -43,7 +43,7 @@ LUXURY_CRE_SYSTEM = """
         background-color: #FFFFFF !important;
         font-size: 16px !important; /* Larger font size override */
         font-weight: 500 !important;
-        padding: 12px 16px !important;
+        padding: 10px 14px !important;
     }
     
     /* 3. Minimalist Template File Uploader */
@@ -71,7 +71,7 @@ LUXURY_CRE_SYSTEM = """
         color: #002B49 !important;
         display: flex;
         align-items: center;
-        padding-top: 14px;
+        padding-top: 12px;
     }
     .large-icon {
         font-size: 24px !important; /* Magnified flat icon framework */
@@ -84,17 +84,7 @@ LUXURY_CRE_SYSTEM = """
         background-color: #FFFFFF;
         border-top: 4px solid #002B49; /* Massive Navy Block Line */
         padding-top: 20px;
-        margin-bottom: 35px;
-    }
-    
-    .luxury-tagline {
-        font-size: 13px !important;
-        font-weight: 700 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.1em !important;
-        color: #C5A059 !important; /* Gold section marker text */
-        margin-bottom: 24px;
-        display: block;
+        margin-bottom: 25px;
     }
 
     /* 6. Heavy Command Button Overrides */
@@ -160,7 +150,7 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
         return img_file
 
 # --- APP CONFIGURATION ---
-st.set_page_config(page_title="Asset Engine", page_icon="🏢", layout="centered")
+st.set_page_config(page_title="Asset Engine", page_icon="🏢", layout="wide")
 st.markdown(LUXURY_CRE_SYSTEM, unsafe_allow_html=True)
 
 # HIGH DENSITY STRUCTURAL ROW HELPERS
@@ -178,47 +168,43 @@ def dynamic_uploader_row(icon, label_text, allowed_types, state_key):
     with r_col2:
         return st.file_uploader(label_text, type=allowed_types, key=state_key, label_visibility="collapsed")
 
-# --- STEP 1: COMPILER ARCHITECTURE BLUEPRINT (TEMPLATE FIRST) ---
-st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
-st.markdown('<span class="luxury-tagline">BLUEPRINT BLUEPRINT COMPILER</span>', unsafe_allow_html=True)
+# --- TWO COLUMN MASTER WORKSPACE (ONE PAGE MATRIX) ---
+col_left, col_right = st.columns([1, 1], gap="large")
 
-t_col1, t_col2 = st.columns([9, 11])
-with t_col1:
-    st.markdown('<div class="row-metric-label"><span class="large-icon">📂</span> TEMPLATE</div>', unsafe_allow_html=True)
-with t_col2:
-    u_template = st.file_uploader("Template File Input", type=["pptx"], key="web_tpl")
-st.markdown('</div>', unsafe_allow_html=True)
+with col_left:
+    # Property Details Layout Section (Headers completely removed)
+    st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+    prop_location = dynamic_form_row("📍", "Property Location", "Tagaytay, Cavite", "cre_loc")
+    prop_size     = dynamic_form_row("📐", "Property Size (SQM)", "386", "cre_size")
+    prop_type     = dynamic_form_row("🏢", "Property Type", "Commercial Space", "cre_type")
+    prop_address  = dynamic_form_row("🗺️", "Full Address", "Mendez Crossing East, Tagaytay City, Cavite", "cre_addr")
+    lease_rates   = dynamic_form_row("💰", "Lease Rates", "200,000 per month", "cre_rates")
+    sec_deposit   = dynamic_form_row("🛡️", "Security Deposit", "3 months", "cre_sec")
+    adv_rent      = dynamic_form_row("💵", "Advance Rent", "3 months", "cre_adv")
+    escalation    = dynamic_form_row("📈", "Rental Escalation", "5%", "cre_esc")
+    lease_term    = dynamic_form_row("📅", "Lease Term", "5 years", "cre_term")
+    handover      = dynamic_form_row("🏗️", "Handover Condition", "As is where is", "cre_hand")
+    st.markdown('</div>', unsafe_allow_html=True)
 
+with col_right:
+    # Template Input Section (Headers completely removed)
+    st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+    t_col1, t_col2 = st.columns([9, 11])
+    with t_col1:
+        st.markdown('<div class="row-metric-label"><span class="large-icon">📂</span> TEMPLATE</div>', unsafe_allow_html=True)
+    with t_col2:
+        u_template = st.file_uploader("Template File Input", type=["pptx"], key="web_tpl")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# --- STEP 2: METADATA DETAILS (PROPERTY DETAILS) ---
-st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
-st.markdown('<span class="luxury-tagline">PROPERTY DETAILS</span>', unsafe_allow_html=True)
-
-prop_location = dynamic_form_row("📍", "Property Location", "Tagaytay, Cavite", "cre_loc")
-prop_size     = dynamic_form_row("📐", "Property Size (SQM)", "386", "cre_size")
-prop_type     = dynamic_form_row("🏢", "Property Type", "Commercial Space", "cre_type")
-prop_address  = dynamic_form_row("🗺️", "Full Address", "Mendez Crossing East, Tagaytay City, Cavite", "cre_addr")
-lease_rates   = dynamic_form_row("💰", "Lease Rates", "200,000 per month", "cre_rates")
-sec_deposit   = dynamic_form_row("🛡️", "Security Deposit", "3 months", "cre_sec")
-adv_rent      = dynamic_form_row("💵", "Advance Rent", "3 months", "cre_adv")
-escalation    = dynamic_form_row("📈", "Rental Escalation", "5%", "cre_esc")
-lease_term    = dynamic_form_row("📅", "Lease Term", "5 years", "cre_term")
-handover      = dynamic_form_row("🏗️", "Handover Condition", "As is where is", "cre_hand")
-st.markdown('</div>', unsafe_allow_html=True)
-
-
-# --- STEP 3: PROPERTY IMAGES BLOCK (RESTORED SEAMLESSLY) ---
-st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
-st.markdown('<span class="luxury-tagline">PROPERTY IMAGES</span>', unsafe_allow_html=True)
-
-img_types = ["png", "jpg", "jpeg"]
-u_photo1  = dynamic_uploader_row("📸", "Property Photo 1", img_types, "web_p1")
-u_map     = dynamic_uploader_row("🗺️", "Location Map", img_types, "web_mp")
-u_lotplan = dynamic_uploader_row("📐", "Lot Plan", img_types, "web_lp")
-u_photo2  = dynamic_uploader_row("📸", "Property Photo 2", img_types, "web_p2")
-u_photo3  = dynamic_uploader_row("📸", "Property Photo 3", img_types, "web_p3")
-st.markdown('</div>', unsafe_allow_html=True)
-
+    # Property Images Section (Headers completely removed)
+    st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+    img_types = ["png", "jpg", "jpeg"]
+    u_photo1  = dynamic_uploader_row("📸", "Property Photo 1", img_types, "web_p1")
+    u_map     = dynamic_uploader_row("🗺️", "Location Map", img_types, "web_mp")
+    u_lotplan = dynamic_uploader_row("📐", "Lot Plan", img_types, "web_lp")
+    u_photo2  = dynamic_uploader_row("📸", "Property Photo 2", img_types, "web_p2")
+    u_photo3  = dynamic_uploader_row("📸", "Property Photo 3", img_types, "web_p3")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Data Mapping Containers
 data_inputs = {
@@ -236,7 +222,7 @@ image_inputs = {
 }
 
 # --- CONTROL DESK ACTION LAYER ---
-st.markdown("<div style='margin-top: 20px; border-top: 1px solid #002B49; padding-top: 25px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-top: 10px; border-top: 1px solid #002B49; padding-top: 20px;'></div>", unsafe_allow_html=True)
 action_col1, action_col2 = st.columns([1, 2])
 
 with action_col1:
