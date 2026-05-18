@@ -185,7 +185,6 @@ if st.session_state.counts_summary:
         st.dataframe(df_metrics, use_container_width=True)
 
 # --- MAP RENDERING ENGINE BLOCK ---
-# FIXED: Isolated namespace to 'trade_map' to eliminate script scope collisions
 trade_map = folium.Map(location=[lat, lon], zoom_start=14)
 
 # Main target asset marker placement
@@ -198,7 +197,7 @@ folium.CircleMarker(
     fill_opacity=1,
     weight=2,
     popup=f"<b>PRIME TARGET ASSET</b><br>Lat: {lat}<br>Lon: {lon}"
-).addTo(trade_map)
+).add_to(trade_map) # FIXED: Changed from .addTo() to .add_to()
 
 # Radius layout ring construction
 folium.Circle(
@@ -209,14 +208,13 @@ folium.Circle(
     fill_color="#001a3d",
     fill_opacity=0.06,
     weight=1.5
-).addTo(trade_map)
+).add_to(trade_map) # FIXED: Changed from .addTo() to .add_to()
 
 # Marker cluster mapping for heavy node loads
-marker_cluster = MarkerCluster(name="Extracted POI Nodes").addTo(trade_map)
+marker_cluster = MarkerCluster(name="Extracted POI Nodes").add_to(trade_map) # FIXED: Changed from .addTo() to .add_to()
 
 # Map over elements to populate external markers
 for elem in st.session_state.features_data:
-    # FIXED: Defensive lookup handling for missing/malformed center geometry objects
     center_geometry = elem.get("center") or {}
     e_lat = elem.get("lat") or center_geometry.get("lat")
     e_lon = elem.get("lon") or center_geometry.get("lon")
@@ -232,7 +230,7 @@ for elem in st.session_state.features_data:
             location=[e_lat, e_lon],
             popup=folium.Popup(popup_html, max_width=300),
             icon=folium.Icon(color="cadetblue", icon="building", prefix="fa")
-        ).addTo(marker_cluster)
+        ).add_to(marker_cluster) # FIXED: Changed from .addTo() to .add_to()
 
 # Final render invocation mapping
 st_folium(trade_map, width=1300, height=650, key="trade_area_map_canvas")
