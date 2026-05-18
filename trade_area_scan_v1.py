@@ -64,7 +64,7 @@ st.markdown("""
             font-family: 'Material Symbols Rounded' !important;
             font-weight: normal !important;
             font-style: normal !important;
-            font-size: 18px !important;
+            font-size: 12px !important;
             line-height: 1 !important;
             letter-spacing: normal !important;
             text-transform: none !important;
