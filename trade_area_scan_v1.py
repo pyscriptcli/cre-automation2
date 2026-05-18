@@ -7,8 +7,8 @@ import json
 # -----------------------------------------------------------------------------
 # 0. GLOBAL DISPLAY CONFIGURATION
 # -----------------------------------------------------------------------------
-MAP_PANEL_HEIGHT = 900 # Optimized pixel height to fit without vertical scrollbars
-MAP_PANEL_WIDTH = 1200  # None for fluid 100% width, or integer (e.g. 1200) for fixed width
+MAP_PANEL_HEIGHT = 2000 # Optimized pixel height to fit without vertical scrollbars
+MAP_PANEL_WIDTH = 2000  # None for fluid 100% width, or integer (e.g. 1200) for fixed width
 
 # -----------------------------------------------------------------------------
 # 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
