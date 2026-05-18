@@ -1,221 +1,251 @@
 import streamlit as st
 import urllib.parse
 
-# Force wide-screen layout to map the workspace perfectly
+# Force wide-screen layout
 st.set_page_config(layout="wide", page_title="Market Study Dashboard", initial_sidebar_state="expanded")
 
-# --- Custom CSS for Light Theme & Full-Screen Map ---
+# Initialize State Variables
+if "map_fullscreen" not in st.session_state:
+    st.session_state.map_fullscreen = False
+
+if "target_url" not in st.session_state:
+    st.session_state.target_url = "https://overpass-turbo.eu/"
+
+def toggle_fullscreen():
+    st.session_state.map_fullscreen = not st.session_state.map_fullscreen
+
+# --- Custom CSS: Navy, White, & Gold Theme ---
 st.markdown("""
     <style>
-    /* Light Theme Sidebar Foundation */
-    [data-testid="stSidebar"] {
-        background-color: #f7f9fc; /* Soft light gray */
+    /* Global Backgrounds */
+    .stApp {
+        background-color: #050a15; /* Deep rich space navy */
     }
     
-    [data-testid="stSidebar"] * {
-        color: #2d3748 !important; /* Dark slate text */
-        font-family: Arial, sans-serif !important;
+    [data-testid="stSidebar"] {
+        background-color: #0b1528 !important; /* Lighter navy for sidebar */
+        border-right: 1px solid #1a2942;
     }
 
-    /* Remove padding to allow full-width components in sidebar */
-    [data-testid="stSidebar"] .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 0;
+    /* Targeted Text Coloring (Fixes overlapping arrow icons) */
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, .stMarkdown p {
+        color: #ffffff !important;
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     }
 
-    /* Embossed Container Style for Navigation (Light Mode) */
+    /* Hide Top Header entirely */
+    header[data-testid="stHeader"] {
+        display: none !important;
+    }
+
+    /* Navigation Radio Buttons - Embossed Rounded Cards */
     div.stRadio > div {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        padding: 0 10px;
+        gap: 12px;
+        padding: 0 5px;
     }
     div.stRadio > div > label {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 12px 10px !important;
-        box-shadow: 2px 2px 6px rgba(0,0,0,0.04);
+        background: linear-gradient(145deg, #13223b, #0e192c);
+        border: 1px solid #1e3354;
+        border-radius: 16px;
+        padding: 16px 12px !important;
+        box-shadow: 3px 3px 6px #050a14, -3px -3px 6px #11203c;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.3s ease;
         text-align: center;
         margin: 0;
     }
     div.stRadio > div > label:hover {
-        border-color: #cbd5e0;
-        background: #f7fafc;
-        box-shadow: 3px 3px 8px rgba(0,0,0,0.08);
+        border-color: #d4af37; /* Gold Accent */
+        background: #1a2e4c;
     }
-    /* Style the radio text inside the box */
+    div.stRadio > div > label[data-baseweb="radio"] > div:first-child {
+        display: none; /* Hide default radio circle */
+    }
     div.stRadio > div > label > div[data-testid="stMarkdownContainer"] > p {
         font-weight: 800;
         letter-spacing: 0.5px;
-        color: #2b6cb0 !important;
+        color: #ffffff !important;
         margin: 0;
         font-size: 14px;
         text-transform: uppercase;
     }
 
-    /* Accordion (Expander) Styling for clean POI lists */
-    .streamlit-expanderHeader {
-        background-color: #edf2f7 !important;
-        color: #4a5568 !important;
-        border-radius: 6px;
-        font-size: 12px !important;
-        font-weight: 700;
-        text-transform: uppercase;
-        border: 1px solid #e2e8f0;
+    /* Inputs (Text & Number) - Rounded */
+    .stTextInput input, .stNumberInput input {
+        border-radius: 12px !important;
+        background-color: #121e36 !important;
+        border: 1px solid #1e3354 !important;
+        color: #ffffff !important;
+        padding: 10px 15px !important;
     }
-    .streamlit-expanderContent {
-        background-color: #ffffff;
-        border-left: 2px solid #cbd5e0;
-        padding-left: 10px;
+    .stTextInput input:focus, .stNumberInput input:focus {
+        border-color: #d4af37 !important;
+        box-shadow: 0 0 0 1px #d4af37 !important;
     }
 
-    /* Persistent Action Button Styling - White Button */
+    /* Accordion / Expander - Rounded & Styled */
+    .streamlit-expanderHeader {
+        background-color: #121e36 !important;
+        border-radius: 12px !important;
+        border: 1px solid #1e3354 !important;
+        color: #ffffff !important;
+        font-size: 13px !important;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+    .streamlit-expanderHeader:hover {
+        border-color: #4a6fa5 !important;
+    }
+    .streamlit-expanderContent {
+        background-color: transparent !important;
+        border: none !important;
+        padding: 5px 10px 15px 10px !important;
+    }
+
+    /* Checkboxes */
+    .stCheckbox > label > div[role="checkbox"] {
+        border-radius: 6px !important;
+        background-color: #121e36 !important;
+        border: 1px solid #2a3f5f !important;
+    }
+    .stCheckbox > label > div[role="checkbox"][aria-checked="true"] {
+        background-color: #d4af37 !important;
+        border-color: #d4af37 !important;
+    }
+
+    /* Fixed Gold Scan Button at Bottom */
     .scan-btn-container {
         position: fixed;
         bottom: 0;
         left: 0;
-        width: 336px; /* Matches default sidebar width */
+        width: 336px; /* Streamlit sidebar default width */
         padding: 20px;
-        background-color: rgba(247, 249, 252, 0.95);
-        backdrop-filter: blur(5px);
-        border-top: 1px solid #e2e8f0;
+        background: linear-gradient(0deg, #0b1528 80%, rgba(11,21,40,0) 100%);
         z-index: 100;
     }
-    .stButton>button {
+    /* Target the primary action button */
+    div.scan-btn-container div[data-testid="stButton"] > button {
         width: 100%;
-        background: #ffffff !important;
-        color: #1a202c !important;
+        background: linear-gradient(135deg, #d4af37 0%, #b5952f 100%) !important;
+        color: #050a15 !important; /* Dark text for high contrast on gold */
         font-weight: 900 !important;
-        border-radius: 8px !important;
+        border-radius: 20px !important;
+        border: none !important;
+        padding: 14px 0 !important;
+        box-shadow: 0 4px 10px rgba(212, 175, 55, 0.3);
+        transition: all 0.2s;
         text-transform: uppercase;
-        border: 2px solid #e2e8f0 !important;
-        padding: 12px 0;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        transition: transform 0.1s, box-shadow 0.1s;
+        letter-spacing: 1px;
     }
-    .stButton>button:hover {
-        border-color: #cbd5e0 !important;
-        box-shadow: 0 6px 8px rgba(0,0,0,0.08);
+    div.scan-btn-container div[data-testid="stButton"] > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(212, 175, 55, 0.4);
     }
-    .stButton>button:active {
+    div.scan-btn-container div[data-testid="stButton"] > button:active {
         transform: scale(0.98);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 
-    /* Absolute Full-Screen Iframe Setup */
+    /* Top Corner Toggle Button Styling */
+    .toggle-btn div[data-testid="stButton"] > button {
+        background: #121e36 !important;
+        color: #d4af37 !important;
+        border: 1px solid #1e3354 !important;
+        border-radius: 12px !important;
+        padding: 4px 16px !important;
+        font-size: 12px !important;
+        font-weight: bold;
+    }
+    .toggle-btn div[data-testid="stButton"] > button:hover {
+        border-color: #d4af37 !important;
+    }
+
+    /* Map Iframe Styling */
     iframe {
-        border: none !important;
-        outline: none !important;
-        width: 100%;
+        border-radius: 16px;
+        border: 2px solid #1e3354 !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
     
-    /* Eradicate main area padding and margins to let map hit the edges */
     .main .block-container {
-        padding: 0 !important;
+        padding: 1rem 1.5rem !important;
         max-width: 100% !important;
-    }
-    
-    /* Hide Streamlit top header bar for pure app view */
-    header[data-testid="stHeader"] {
-        display: none !important;
-    }
-    
-    /* Hide Streamlit footer */
-    footer {
-        display: none !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Define configurations
+# Configurations Data
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
-    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
-    "FOOD & BEVERAGE": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="blackery"']],
-    "INDUSTRIAL": [
-        ['Expressways', '"highway"~"motorway_junction|toll_gantry",i'], 
-        ['Ports', '"industrial"="port"'], 
-        ['Manufacturing', '"industrial"~"factory|manufacturing|processing",i'],
-        ['Cold Storage', '"warehouse"~"cold_store|cold_storage",i'],
-        ['Industrial Parks', '"landuse"~"industrial|industrial_estate",i'],
-        ['Warehouses', '"building"~"warehouse|depot",i']
-    ],
-    "INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport', '"aeroway"~"terminal|aerodrome",i']],
+    "RETAIL": [['Mall/Dept Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i']],
+    "FOOD & BEVERAGE": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub', '"amenity"~"bar|pub|nightclub",i']],
+    "INDUSTRIAL": [['Expressways', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports', '"industrial"="port"'], ['Manufacturing', '"industrial"~"factory|manufacturing|processing",i'], ['Warehouses', '"building"~"warehouse|depot",i']],
+    "INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"']],
     "SCHOOLS": [['University', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"']]
 }
 
 ADVANCED_CONFIG = {
     "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Clinic', '"amenity"="clinic"'], ['Parking', '"amenity"="parking"']],
-    "MISC": [['Busstop', '"highway"="bus_stop"'], ['City', '"place"="city"'], ['Town', '"place"="town"']]
+    "MISC": [['Busstop', '"highway"="bus_stop"'], ['City', '"place"="city"']]
 }
 
-# Extension State Variable Persistence
-if "target_url" not in st.session_state:
-    st.session_state.target_url = "https://overpass-turbo.eu/"
+# Icon Dictionary for Categories
+ICON_MAP = {
+    "COMMERCIAL": "🏢", "RETAIL": "🛒", "FOOD & BEVERAGE": "🍽️", 
+    "INDUSTRIAL": "🏭", "INFRASTRUCTURE": "🏛️", "SCHOOLS": "🎓"
+}
 
-# --- Navigation Section ---
-st.sidebar.markdown("<h2 style='text-align: center; color: #1a202c; font-weight: 900; letter-spacing: 1px; margin-bottom: 20px;'>MARKET STUDY</h2>", unsafe_allow_html=True)
+# --- Sidebar Header ---
+st.sidebar.markdown("<div style='text-align: center; margin-bottom: 25px;'><h2 style='color: #ffffff; font-weight: 900; letter-spacing: 2px; margin-top: 10px;'>MARKET STUDY</h2></div>", unsafe_allow_html=True)
 
-# The styled radio buttons act as the embossed containers
-app_mode = st.sidebar.radio(
-    "Select Module",
-    ["Trade Area Scan", "UMap Integration", "Demographics Hub"],
-    label_visibility="collapsed"
-)
-
+app_mode = st.sidebar.radio("Module", ["Trade Area Scan", "UMap Integration", "Demographics Hub"], label_visibility="collapsed")
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
 
 # --- Routing Engine ---
 if app_mode == "Trade Area Scan":
     
-    st.sidebar.markdown("<div style='padding: 0 10px;'>", unsafe_allow_html=True) 
+    st.sidebar.markdown("<div style='padding: 0 5px;'>", unsafe_allow_html=True)
     
     col1, col2 = st.sidebar.columns([2, 1])
     with col1:
-        coords_input = st.text_input("Target Coordinates", value="14.6465, 121.0371", help="Format: Lat, Lon")
+        coords_input = st.text_input("Coordinates", value="14.6465, 121.0371")
     with col2:
         radius_input = st.number_input("Radius (M)", value=1000, step=100)
 
     try:
         lat, lon = map(float, coords_input.split(","))
     except ValueError:
-        st.sidebar.error("Invalid format. Use: lat, lon")
+        st.sidebar.error("Invalid format.")
         st.stop()
 
-    search_term = st.sidebar.text_input("🔍 Quick Search POI:", "").lower()
-    st.sidebar.markdown("<hr style='margin: 10px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
+    search_term = st.sidebar.text_input("Search", "").lower()
+    st.sidebar.markdown("<br>", unsafe_allow_html=True)
     
     selected_queries = []
 
-    st.sidebar.markdown("<small style='color:#718096; font-weight: bold;'>SELECT TARGET ASSETS</small>", unsafe_allow_html=True)
-    
+    # Map POI Expanders with Icons
     for cat, items in POI_CONFIG.items():
         filtered_items = [i for i in items if search_term in i[0].lower()]
         if filtered_items:
-            with st.sidebar.expander(f"📁 {cat}", expanded=bool(search_term)):
+            icon = ICON_MAP.get(cat, "📁")
+            with st.sidebar.expander(f"{icon} {cat}", expanded=bool(search_term)):
                 for label, q_str in filtered_items:
                     if st.checkbox(label, key=f"core_{cat}_{label}"):
                         selected_queries.append(q_str)
 
-    with st.sidebar.expander("⚙️ ADVANCED POI LIBRARY", expanded=bool(search_term)):
+    with st.sidebar.expander("⚙️ ADVANCED POI", expanded=bool(search_term)):
         for cat, items in ADVANCED_CONFIG.items():
             filtered_items = [i for i in items if search_term in i[0].lower()]
             if filtered_items:
-                st.markdown(f"<small style='color:#a0aec0;'><b>{cat}</b></small>", unsafe_allow_html=True)
+                st.markdown(f"<small style='color:#a0aec0; font-weight: bold;'>{cat}</small>", unsafe_allow_html=True)
                 for label, q_str in filtered_items:
                     if st.checkbox(label, key=f"adv_{cat}_{label}"):
                         selected_queries.append(q_str)
 
-    # Padding to prevent button overlap
-    st.sidebar.markdown("<div style='height: 100px;'></div>", unsafe_allow_html=True)
-    st.sidebar.markdown("</div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<div style='height: 120px;'></div></div>", unsafe_allow_html=True)
 
-    # Persistent Bottom Button Layout
-    scan_container = st.sidebar.container()
-    with scan_container:
+    # Persistent Action Button
+    with st.sidebar.container():
         st.markdown("<div class='scan-btn-container'>", unsafe_allow_html=True)
         scan_triggered = st.button("SCAN AREA")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -229,16 +259,20 @@ if app_mode == "Trade Area Scan":
             encoded_query = urllib.parse.quote(overpass_ql)
             st.session_state.target_url = f"https://overpass-turbo.eu/?Q={encoded_query}&R"
 
-    # Borderless, Title-less Workspace Map. 
-    # Height set to an aggressive 1000px so it automatically clips to the edge of standard monitors.
-    st.components.v1.iframe(st.session_state.target_url, height=1000, scrolling=False)
+    # Screen Toggling Controls
+    col_empty, col_toggle = st.columns([8, 1])
+    with col_toggle:
+        st.markdown("<div class='toggle-btn'>", unsafe_allow_html=True)
+        if st.button("⛶ FULLSCREEN" if not st.session_state.map_fullscreen else "🗗 MINIMIZE"):
+            toggle_fullscreen()
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+    iframe_height = 950 if st.session_state.map_fullscreen else 650
+    st.components.v1.iframe(st.session_state.target_url, height=iframe_height, scrolling=False)
 
 elif app_mode == "UMap Integration":
-    st.components.v1.iframe("https://umap.openstreetmap.fr/en/", height=1000, scrolling=False)
+    st.components.v1.iframe("https://umap.openstreetmap.fr/en/", height=850, scrolling=False)
 
 elif app_mode == "Demographics Hub":
-    # Fallback padding just for the 'coming soon' page so text isn't stuck to the very edge.
-    st.markdown("<div style='padding: 40px;'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #2b6cb0; font-weight: 800;'>Population Analytics</h3>", unsafe_allow_html=True)
-    st.info("🚧 Data visualization models are currently provisioning. Check back soon.")
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div style='padding: 40px; text-align: center;'><h2 style='color: #d4af37; font-weight: 900;'>POPULATION ANALYTICS</h2><br><p style='color:white;'>🚧 Data visualization models are currently provisioning. Check back soon.</p></div>", unsafe_allow_html=True)
