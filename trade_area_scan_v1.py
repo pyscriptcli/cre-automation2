@@ -5,13 +5,7 @@ import math
 import json
 
 # -----------------------------------------------------------------------------
-# 0. GLOBAL DISPLAY CONFIGURATION
-# -----------------------------------------------------------------------------
-MAP_PANEL_HEIGHT = 2000 # Optimized pixel height to fit without vertical scrollbars
-MAP_PANEL_WIDTH = 2000  # None for fluid 100% width, or integer (e.g. 1200) for fixed width
-
-# -----------------------------------------------------------------------------
-# 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
+# 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES (100% VIEWPORT FILL)
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -29,20 +23,30 @@ st.markdown("""
             --link-muted: #64748b;
         }
         
-        /* OVERRIDE STREAMLIT LAYOUT FOR HEIGHT & CENTERING */
+        /* ELIMINATE STREAMLIT HEADER ZONE */
         [data-testid="stHeader"] {
             height: 0px !important;
             min-height: 0px !important;
             display: none !important;
         }
         
+        /* FORCE MAIN CANVAS TO BE EXACTLY 100% EDGE-TO-EDGE */
         [data-testid="stAppViewBlockContainer"] {
-            padding-top: 0.5rem !important; 
+            padding-top: 0rem !important; 
             padding-bottom: 0rem !important;
-            padding-left: 1.5rem !important;
-            padding-right: 1.5rem !important;
-            max-width: 98% !important; 
+            padding-left: 0rem !important;
+            padding-right: 0rem !important;
+            max-width: 100% !important; 
             margin: 0 auto !important; 
+            overflow: hidden !important;
+        }
+        
+        /* FORCE STREAMLIT IFRAME COMPONENT TO FILL 100% OF VIEWPORT HEIGHT & WIDTH */
+        iframe {
+            height: 100vh !important;
+            width: 100% !important;
+            border: none !important;
+            display: block !important;
         }
         
         [data-testid="stSidebar"] {
@@ -64,7 +68,7 @@ st.markdown("""
             font-weight: 900 !important;
             letter-spacing: 1px !important;
             text-transform: uppercase !important;
-            text-align: center !important; /* Centered layout header */
+            text-align: center !important;
             margin-bottom: 2px !important;
             font-family: 'Arial', sans-serif !important;
             display: block !important;
@@ -72,7 +76,7 @@ st.markdown("""
         }
         
         .clear-link-container {
-            text-align: center !important; /* Centered alignment symmetry */
+            text-align: center !important;
             margin-top: -4px !important;
             margin-bottom: 12px !important;
             width: 100% !important;
@@ -221,10 +225,8 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # Title centered globally
     st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
-    # "Clear All" centered block neatly underneath the title
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
         execute_global_purge()
@@ -241,7 +243,6 @@ with st.sidebar:
     
     selected_tags = []
     
-    # Standard POI Generation in 2-Column Grid
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -252,7 +253,6 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_{cat_name}_{label}"): 
                             selected_tags.append(tag)
 
-    # Advanced POI Generation in 2-Column Grid
     for cat_name, node_items in ADVANCED_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -293,7 +293,6 @@ with st.sidebar:
                 except Exception as e: st.sidebar.error("Timeout")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Simplified Data Exports Tray
     st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:15px; margin-bottom:0;'>DATA EXPORTS</p>", unsafe_allow_html=True)
     exp_fmt = st.selectbox("Format", ["Select Format...", "Export Radius (KML)", "Export POIs (KML)"], label_visibility="collapsed")
     
@@ -373,4 +372,5 @@ leaflet_html = (leaflet_template
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__GEOJSON__", geojson_str))
 
-st.components.v1.html(leaflet_html, height=MAP_PANEL_HEIGHT, width=MAP_PANEL_WIDTH, scrolling=False)
+# Inline height and width parameters are set to generic values; global css overrides them completely
+st.components.v1.html(leaflet_html, height=100, width=100, scrolling=False)
