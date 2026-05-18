@@ -97,6 +97,14 @@ LUXURY_CRE_SYSTEM = """
         padding-top: 20px;
         margin-bottom: 25px;
     }
+    
+    .luxury-subcard-cta {
+        background-color: #FFFFFF;
+        border: 1px solid #002B49; /* Solid structural framework wrapper */
+        border-radius: 0px;
+        padding: 20px;
+        margin-top: 15px;
+    }
 
     /* 6. Heavy Command Button Overrides */
     div.stButton > button {
@@ -219,39 +227,36 @@ with col_left:
     lease_term    = dynamic_form_row("📅", "Lease Term", "5 years", "cre_term")
     handover      = dynamic_form_row("🏗️", "Handover Condition", "As is where is", "cre_hand")
     
-    # --- NEW: CALL TO ACTION SECTION (DYNAMIC MAX-2 CHECKBOX MATRIX) ---
-    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-    cta_col1, cta_col2 = st.columns([9, 11])
-    with cta_col1:
-        st.markdown('<div class="row-metric-label"><span class="large-icon">📞</span> CALL TO ACTION</div>', unsafe_allow_html=True)
-    with cta_col2:
-        contacts_database = {
-            "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
-            "Meliza Zapata": {"phone": "0917 555 1234", "email": "meliza.zapata@primephilippines.com"},
-            "Dykstra Pineda": {"phone": "0917 555 5678", "email": "dykstra.pineda@primephilippines.com"},
-            "Cedtrix Rena": {"phone": "0917 555 9012", "email": "cedtriz.rena@primephilippines.com"},
-            "Carlo Medina": {"phone": "0920 986 2764", "email": "carlo.medina@primephilippines.com"},
-            "Dave Policarpio": {"phone": "0917 555 3456", "email": "dave.policarpio@primephilippines.com"},
-            "Irish Rima": {"phone": "0917 555 7890", "email": "irish.rima@primephilippines.com"}
-        }
+    # --- UPGRADED CALL TO ACTION DESIGN SECTOR ---
+    st.markdown('<div class="luxury-subcard-cta">', unsafe_allow_html=True)
+    st.markdown('<span style="font-size: 11px; font-weight: 700; color: #C5A059; letter-spacing: 0.1em; text-transform: uppercase; display: block; margin-bottom: 15px;">📞 SELECT TEAM CONTACTS (MAXIMUM 2)</span>', unsafe_allow_html=True)
+    
+    contacts_database = {
+        "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
+        "Meliza Zapata": {"phone": "0917 555 1234", "email": "meliza.zapata@primephilippines.com"},
+        "Dykstra Pineda": {"phone": "0917 555 5678", "email": "dykstra.pineda@primephilippines.com"},
+        "Cedtriz Rena": {"phone": "0917 555 9012", "email": "cedtriz.rena@primephilippines.com"},
+        "Carlo Medina": {"phone": "0920 986 2764", "email": "carlo.medina@primephilippines.com"},
+        "Dave Policarpio": {"phone": "0917 555 3456", "email": "dave.policarpio@primephilippines.com"},
+        "Irish Rena": {"phone": "0917 555 7890", "email": "irish.rena@primephilippines.com"}
+    }
+    
+    # Pre-calculate active checkboxes for enforcement constraints
+    selected_names = [name for name in contacts_database if st.session_state.get(f"state_cb_{name}", False)]
+    current_checked_count = len(selected_names)
+    
+    cb_sub_col1, cb_sub_col2 = st.columns(2)
+    contact_keys = list(contacts_database.keys())
+    
+    for idx, name in enumerate(contact_keys):
+        is_active = st.session_state.get(f"state_cb_{name}", False)
+        should_freeze = (current_checked_count >= 2 and not is_active)
         
-        # Calculate currently selected count ahead of layout pass to enforce freezing
-        selected_names = [name for name in contacts_database if st.session_state.get(f"state_cb_{name}", False)]
-        current_checked_count = len(selected_names)
-        
-        # Split contacts array into a beautiful internal two-column layout
-        cb_sub_col1, cb_sub_col2 = st.columns(2)
-        contact_keys = list(contacts_database.keys())
-        
-        for idx, name in enumerate(contact_keys):
-            is_active = st.session_state.get(f"state_cb_{name}", False)
-            # Freeze rule: Disable if 2 elements are checked, unless it is the element currently active
-            should_freeze = (current_checked_count >= 2 and not is_active)
+        target_sub_column = cb_sub_col1 if idx % 2 == 0 else cb_sub_col2
+        with target_sub_column:
+            st.checkbox(name, key=f"state_cb_{name}", disabled=should_freeze)
             
-            target_sub_column = cb_sub_col1 if idx % 2 == 0 else cb_sub_col2
-            with target_sub_column:
-                st.checkbox(name, key=f"state_cb_{name}", disabled=should_freeze)
-                
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col_right:
@@ -263,11 +268,12 @@ with col_right:
         u_template = st.file_uploader("Template File Input", type=["pptx"], key="web_tpl")
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- UPDATED ORDER: MAP -> LOT PLAN -> PHOTOS 1, 2, 3 ---
     st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
     img_types = ["png", "jpg", "jpeg"]
-    u_photo1  = dynamic_uploader_row("📸", "Property Photo 1", img_types, "web_p1")
     u_map     = dynamic_uploader_row("🗺️", "Location Map", img_types, "web_mp")
     u_lotplan = dynamic_uploader_row("📐", "Lot Plan", img_types, "web_lp")
+    u_photo1  = dynamic_uploader_row("📸", "Property Photo 1", img_types, "web_p1")
     u_photo2  = dynamic_uploader_row("📸", "Property Photo 2", img_types, "web_p2")
     u_photo3  = dynamic_uploader_row("📸", "Property Photo 3", img_types, "web_p3")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -285,12 +291,9 @@ data_inputs = {
     "{{LEASE TERM}}": lease_term, "{{HANDOVER CONDITION}}": handover
 }
 
-# --- FIXED: CONTACT TOKEN DATA PIPELINE MAPPING ---
-# Add Contact Tokens dynamically based on active selected layout slots
+# Safely inject dynamic contact parameters using explicit string concatenation
 for contact_slot in range(2):
     slot_num = contact_slot + 1
-    
-    # Construct tokens using explicit string concatenation to bypass f-string parser limits
     name_token  = "{{CONTACT_NAME_"  + str(slot_num) + "}}"
     phone_token = "{{CONTACT_PHONE_" + str(slot_num) + "}}"
     email_token = "{{CONTACT_EMAIL_" + str(slot_num) + "}}"
@@ -301,11 +304,16 @@ for contact_slot in range(2):
         data_inputs[phone_token] = contacts_database[target_name]["phone"]
         data_inputs[email_token] = contacts_database[target_name]["email"]
     else:
-        # Graceful fallbacks for empty selections to clear remaining slide tags
         data_inputs[name_token]  = ""
         data_inputs[phone_token] = ""
         data_inputs[email_token] = ""
-        
+
+image_inputs = {
+    "{{PROPERTY_PHOTO 1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map,
+    "{{PROPERTY_LOTPLAN}}": u_lotplan, "{{PROPERTY_PHOTO2}}": u_photo2,
+    "{{PROPERTY_PHOTO3}}": u_photo3
+}
+
 # --- CONTROL DESK ACTION LAYER ---
 st.markdown("<div style='margin-top: 10px; border-top: 1px solid #002B49; padding-top: 20px;'></div>", unsafe_allow_html=True)
 action_col1, action_col2 = st.columns([1, 2])
