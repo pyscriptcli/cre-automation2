@@ -7,10 +7,10 @@ from folium.plugins import MarkerCluster
 import math
 import re
 
-# Set page configuration to wide mode to emulate native wide map
+# Set page configuration to wide mode to emulate native wide map view
 st.set_page_config(layout="wide", page_title="Trade Area Scanner")
 
-# Custom CSS to mimic the original dark navy/slate theme in the sidebar
+# Custom CSS theme layout injection
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {
@@ -30,14 +30,13 @@ st.markdown("""
         text-transform: uppercase;
         border: none;
     }
-    /* Metric Card Styling Override */
     [data-testid="stMetricValue"] {
         color: #001a3d !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session State values to prevent data drop on sidebar reruns
+# Initialize Session State values to hold query metrics safely across sidebar clicks
 if "features_data" not in st.session_state:
     st.session_state.features_data = []
 if "counts_summary" not in st.session_state:
@@ -86,7 +85,7 @@ def match_feature_to_query(props, query_str):
         return bool(re.search(clean_val, prop_val, re.IGNORECASE))
     return False
 
-# Sidebar Panels
+# Sidebar Config Canvas
 st.sidebar.title("TRADE AREA SCANNER")
 
 coords_input = st.sidebar.text_input("Coordinates", value="14.6465, 121.0371")
@@ -103,7 +102,7 @@ search_term = st.sidebar.text_input("SEARCH POI:", "").lower()
 selected_queries = []
 selected_labels = {}
 
-# Process Core Categories Loop (with unique namespacing keys to avoid collisions)
+# Build Category Trees
 for cat, items in POI_CONFIG.items():
     filtered_items = [i for i in items if search_term in i[0].lower()]
     if filtered_items:
@@ -113,7 +112,6 @@ for cat, items in POI_CONFIG.items():
                 selected_queries.append(q_str)
                 selected_labels[q_str] = label
 
-# Process Advanced Section Loop
 with st.sidebar.expander("ADVANCED POI LIBRARY", expanded=bool(search_term)):
     for cat, items in ADVANCED_CONFIG.items():
         filtered_items = [i for i in items if search_term in i[0].lower()]
@@ -127,7 +125,7 @@ with st.sidebar.expander("ADVANCED POI LIBRARY", expanded=bool(search_term)):
 st.sidebar.markdown("---")
 scan_triggered = st.sidebar.button("Scan Area")
 
-# Generate Radius KML Export Payload
+# Calculate KML Polygons
 kml_str = f'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Radius Scan</name><Placemark><Polygon><outerBoundaryIs><LinearRing><coordinates>'
 for i in range(37):
     angle = (i * 10) * math.pi / 180
@@ -143,7 +141,7 @@ st.sidebar.download_button(
     mime="application/vnd.google-earth.kml+xml"
 )
 
-# --- Main Dashboard Section ---
+# Main Application Board Area
 st.title("Industrial Logistics Framework — Dashboard View")
 
 if scan_triggered:
@@ -161,7 +159,6 @@ if scan_triggered:
                     osm_data = response.json()
                     st.session_state.features_data = osm_data.get("elements", [])
                     
-                    # Compute frequencies per active selection
                     temp_counts = {}
                     for elem in st.session_state.features_data:
                         props = elem.get("tags", {})
@@ -175,7 +172,7 @@ if scan_triggered:
             except Exception as e:
                 st.error(f"Network Connection Failure: {str(e)}")
 
-# Display Data Metrics Summary Dashboard UI Cards
+# UI Analytics Metrics
 if st.session_state.counts_summary:
     st.subheader("PRIME Philippines - Trade Area Scan Summary")
     cols = st.columns(min(len(st.session_state.counts_summary), 4))
@@ -183,14 +180,15 @@ if st.session_state.counts_summary:
         col_target = cols[idx % 4]
         col_target.metric(label=label, value=f"{count} Node(s)")
     
-    with st.expander("Detailed Data Inspector Table", expanded=True):
+    with st.expander("Detailed Data Inspector Table", expanded=False):
         df_metrics = pd.DataFrame(list(st.session_state.counts_summary.items()), columns=["POI Target Type", "Detected Nodes Count"])
         st.dataframe(df_metrics, use_container_width=True)
 
-# Base Map Layer Construction
-m = folium.Map(location=[lat, lon], zoom_start=14)
+# --- MAP RENDERING ENGINE BLOCK ---
+# FIXED: Isolated namespace to 'trade_map' to eliminate script scope collisions
+trade_map = folium.Map(location=[lat, lon], zoom_start=14)
 
-# Main red core asset target marker setup
+# Main target asset marker placement
 folium.CircleMarker(
     location=[lat, lon],
     radius=8,
@@ -200,9 +198,9 @@ folium.CircleMarker(
     fill_opacity=1,
     weight=2,
     popup=f"<b>PRIME TARGET ASSET</b><br>Lat: {lat}<br>Lon: {lon}"
-).addTo(m)
+).addTo(trade_map)
 
-# Enclosing visual radius perimeter limit
+# Radius layout ring construction
 folium.Circle(
     location=[lat, lon],
     radius=radius_input,
@@ -211,22 +209,22 @@ folium.Circle(
     fill_color="#001a3d",
     fill_opacity=0.06,
     weight=1.5
-).addTo(m)
+).addTo(trade_map)
 
-# Cluster layer to efficiently organize large node sets (just like native Overpass Turbo engines)
-marker_cluster = MarkerCluster(name="Extracted POI Nodes").addTo(m)
+# Marker cluster mapping for heavy node loads
+marker_cluster = MarkerCluster(name="Extracted POI Nodes").addTo(trade_map)
 
-# Populating external OSM nodes found via engine
+# Map over elements to populate external markers
 for elem in st.session_state.features_data:
-    # Handle variations in OSM node coordinates vs way centers
-    e_lat = elem.get("lat") or elem.get("center", {}).get("lat")
-    e_lon = elem.get("lon") or elem.get("center", {}).get("lon")
+    # FIXED: Defensive lookup handling for missing/malformed center geometry objects
+    center_geometry = elem.get("center") or {}
+    e_lat = elem.get("lat") or center_geometry.get("lat")
+    e_lon = elem.get("lon") or center_geometry.get("lon")
     
     if e_lat and e_lon:
         tags = elem.get("tags", {})
         name = tags.get("name", "Unnamed Feature / Asset")
         
-        # Build clean HTML data inspection list inside popups
         popup_html = f"<b>{name}</b><hr style='margin:4px 0;'>"
         popup_html += "".join([f"<div style='font-size:11px;'><b>{k}:</b> {v}</div>" for k, v in tags.items() if k != "name"])
         
@@ -236,8 +234,8 @@ for elem in st.session_state.features_data:
             icon=folium.Icon(color="cadetblue", icon="building", prefix="fa")
         ).addTo(marker_cluster)
 
-# Render Folium map element using proper responsive parameters
-st_folium(m, width=1300, height=650, key="trade_area_map")
+# Final render invocation mapping
+st_folium(trade_map, width=1300, height=650, key="trade_area_map_canvas")
 
 with st.expander("MAPPING LINKS", expanded=False):
     st.markdown("- [uMap Dashboard](https://umap.openstreetmap.fr/en/)")
