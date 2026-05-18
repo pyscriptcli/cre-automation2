@@ -46,19 +46,13 @@ st.markdown("""
             font-weight: 900 !important;
             letter-spacing: 1px !important;
             text-transform: uppercase !important;
-            text-align: center !important;
+            text-align: left !important;
             margin-bottom: 2px !important;
             font-family: 'Arial', sans-serif !important;
         }
         
-        /* Small Hyperlink Emulation for Clear Button */
-        div.clear-link-wrapper {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: -12px;
-            margin-bottom: 8px;
-        }
-        div.clear-link-wrapper div.stButton > button {
+        /* Hyperlink Emulation for Tertiary Button */
+        button[kind="tertiary"] {
             background: transparent !important;
             border: none !important;
             color: var(--link-muted) !important;
@@ -66,12 +60,12 @@ st.markdown("""
             font-weight: 600 !important;
             font-size: 11px !important;
             padding: 0 !important;
-            width: auto !important;
+            margin-top: 10px !important;
             box-shadow: none !important;
             min-height: 0 !important;
             height: auto !important;
         }
-        div.clear-link-wrapper div.stButton > button:hover {
+        button[kind="tertiary"]:hover {
             color: var(--navy-brand) !important;
         }
         
@@ -93,7 +87,7 @@ st.markdown("""
         div[data-baseweb="input"]:focus-within { border-color: var(--navy-brand) !important; }
         div[data-baseweb="select"] { border: 1px solid var(--border-gray) !important; }
         
-        .action-tray div.stButton > button, div.stDownloadButton > button {
+        .action-tray div.stButton > button[kind="secondary"], div.stDownloadButton > button {
             background-color: var(--navy-brand) !important;
             color: var(--white-clean) !important;
             font-weight: 800 !important;
@@ -107,7 +101,7 @@ st.markdown("""
             transition: all 0.1s ease-in-out !important;
             margin-top: 5px !important;
         }
-        .action-tray div.stButton > button:hover, div.stDownloadButton > button:hover {
+        .action-tray div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
             background-color: var(--gold-accent) !important;
             color: var(--navy-brand) !important;
         }
@@ -151,20 +145,20 @@ def execute_global_purge():
 # Fully mapped taxonomy injection
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
-    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
-    "FOOD AND BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="blackery"']],
+    "RETAIL": [['Mall/Dept Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
+    "FOOD & BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Club', '"amenity"~"bar|pub|nightclub",i'], ['Bakery', '"shop"="bakery"']],
     "INDUSTRIAL & LOGISTICS": [
         ['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], 
-        ['Ports & Terminals', '"industrial"="port"'], 
-        ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'],
-        ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'],
-        ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'],
-        ['Warehouses & Depots', '"building"~"warehouse|depot",i'],
-        ['Storage Facilities', '"building"="storage"'],
-        ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']
+        ['Ports & Terms', '"industrial"="port"'], 
+        ['Mfg Plants', '"industrial"~"factory|manufacturing|processing",i'],
+        ['Cold Storage', '"warehouse"~"cold_store|cold_storage",i'],
+        ['Ind. Parks', '"landuse"~"industrial|industrial_estate",i'],
+        ['Warehouses', '"building"~"warehouse|depot",i'],
+        ['Storage Facs', '"building"="storage"'],
+        ['Truck Routes', '"hgv"~"designated|yes",i']
     ],
-    "GOVERNMENT & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i']],
-    "SCHOOLS": [['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"']]
+    "GOV & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport', '"aeroway"~"terminal|aerodrome",i']],
+    "SCHOOLS": [['University', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational', '"amenity"="learning_centre"']]
 }
 
 ADVANCED_CONFIG = {
@@ -173,7 +167,7 @@ ADVANCED_CONFIG = {
     "FOOD & BEVERAGE": [['Bar', '"amenity"="bar"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Cafe', '"amenity"="cafe"'], ['Fast food', '"amenity"="fast_food"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Restaurant', '"amenity"="restaurant"']],
     "RETAIL_ADV": [['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"']],
     "SPORTS": [['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"']],
-    "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
+    "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/exting.', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
 }
 
 # -----------------------------------------------------------------------------
@@ -200,13 +194,14 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="clear-link-wrapper">', unsafe_allow_html=True)
-    if st.button("Clear All", key="master_purge_btn"):
-        execute_global_purge()
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Header & Micro-Hyperlink Purge Button
+    head_col1, head_col2 = st.columns([3, 1])
+    with head_col1:
+        st.markdown('<div class="sidebar-title">TRADE AREA</div>', unsafe_allow_html=True)
+    with head_col2:
+        if st.button("Clear All", key="master_purge_btn", type="tertiary"):
+            execute_global_purge()
+            st.rerun()
 
     coords_val = st.text_input("Target Coordinates", key="geo_coords")
     radius_val = st.number_input("Radius (Meters)", min_value=100, max_value=50000, key="geo_radius", step=100)
@@ -218,19 +213,27 @@ with st.sidebar:
     
     selected_tags = []
     
+    # Standard POI Generation in 2-Column Grid
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
             with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                for label, tag in matched:
-                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
+                cols = st.columns(2)
+                for i, (label, tag) in enumerate(matched):
+                    with cols[i % 2]:
+                        if st.checkbox(label, key=f"chk_{cat_name}_{label}"): 
+                            selected_tags.append(tag)
 
+    # Advanced POI Generation in 2-Column Grid
     for cat_name, node_items in ADVANCED_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
             with st.expander(f"ADV - {cat_name}", expanded=(len(search_query) > 0)):
-                for label, tag in matched:
-                    if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
+                cols = st.columns(2)
+                for i, (label, tag) in enumerate(matched):
+                    with cols[i % 2]:
+                        if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): 
+                            selected_tags.append(tag)
 
     st.markdown("<hr style='margin: 10px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
     
@@ -319,3 +322,4 @@ leaflet_html = f"""
 """
 
 st.components.v1.html(leaflet_html, height=900, scrolling=False)
+```</SANDBOX_MODE_ENGAGED>
