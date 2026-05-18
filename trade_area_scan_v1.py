@@ -89,7 +89,7 @@ st.markdown("""
         iframe { height: 100vh !important; width: 100% !important; border: none !important; display: block !important; }
         
         [data-testid="stSidebarUserContent"] {
-            padding-top: 16px !important; padding-left: 12px !important; padding-right: 12px !important;
+            padding-top: 12px !important; padding-left: 12px !important; padding-right: 12px !important;
             height: 100vh !important; overflow-y: auto !important; overflow-x: hidden !important;
         }
         
@@ -173,11 +173,11 @@ st.markdown("""
             font-family: 'Cormorant Garamond', serif !important;
             font-style: italic;
             color: var(--brand-midnight);
-            font-size: 22px;
+            font-size: 30px;
             text-align: center;
             border-bottom: 1px solid var(--brand-gold);
             padding-bottom: 6px;
-            margin-bottom: 12px;
+            margin-bottom: 30px;
         }
         
         /* TEXT SIZING OVERRIDES */
