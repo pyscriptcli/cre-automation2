@@ -5,7 +5,7 @@ import math
 import json
 
 # -----------------------------------------------------------------------------
-# 1. HIGH-DENSITY LIGHT MODE & SPECIFIC VIEWPORT MAP OVERRIDES
+# 1. HIGH-DENSITY LIGHT MODE & TRUE FULL SCREEN OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -21,7 +21,6 @@ st.markdown("""
             --gold-accent: #d4af37;
             --border-gray: #cbd5e1;
             --link-muted: #64748b;
-            --bg-soft: #f8fafc;
         }
         
         /* ELIMINATE STREAMLIT HEADER ZONE */
@@ -31,22 +30,26 @@ st.markdown("""
             display: none !important;
         }
         
-        /* TARGET ONLY THE MAIN AREA CONTENT HOLDER TO FORCE IT EDGE-TO-EDGE WITHOUT CRUSHING SIDEBAR */
-        [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"] {
+        /* BRUTE FORCE ENTIRE MAIN AREA LAYOUT MATRIX TO BE 100% EDGE-TO-EDGE */
+        .main, .block-container, 
+        [data-testid="stAppViewBlockContainer"], 
+        [data-testid="stMain"], 
+        [data-testid="stAppViewMain"] {
             padding-top: 0rem !important; 
             padding-bottom: 0rem !important;
             padding-left: 0rem !important;
             padding-right: 0rem !important;
             max-width: 100% !important; 
+            width: 100% !important;
+            margin: 0px !important;
             overflow: hidden !important;
+            height: 100vh !important;
         }
         
-        /* REMOVE INNER GAP ELEMENTS ONLY INSIDE THE MAP MAIN AREA CANVAS */
-        [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"],
-        [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlockWrapper"],
-        [data-testid="stAppViewBlockContainer"] [data-testid="stVerticalBlock"], 
-        [data-testid="stAppViewBlockContainer"] [data-testid="stVerticalBlockWrapper"],
-        [data-testid="stAppViewBlockContainer"] .stElementContainer {
+        /* REMOVE INNER GAP ELEMENTS AND PADDING IN ALL STREAMLIT WRAPPER BLOCKS */
+        [data-testid="stVerticalBlock"], 
+        [data-testid="stVerticalBlockWrapper"],
+        .stElementContainer {
             gap: 0rem !important;
             padding: 0px !important;
             margin: 0px !important;
@@ -62,32 +65,36 @@ st.markdown("""
             display: block !important;
         }
         
-        /* CLEAN RIGID STABLE SIDEBAR WIDTH BLOCK STYLE */
         [data-testid="stSidebar"] {
             background-color: var(--white-clean) !important;
             color: var(--navy-brand) !important;
             border-right: 1px solid var(--border-gray) !important;
-            min-width: 320px !important;
-            max-width: 320px !important;
-            z-index: 100 !important;
-        }
-        
-        /* CLEAN RESPONSIVE SIDEBAR TOGGLE OVERRIDES */
-        [data-testid="stSidebarCollapseButton"], 
-        [data-testid="collapsedControl"] {
-            z-index: 101 !important;
+            width: 320px !important;
         }
         
         [data-testid="stSidebarUserContent"] {
-            padding-top: 14px !important;
-            padding-left: 14px !important;
-            padding-right: 14px !important;
+            padding-top: 16px !important;
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+        }
+        
+        .sidebar-title {
+            color: var(--navy-brand) !important;
+            font-size: 24px !important;
+            font-weight: 900 !important;
+            letter-spacing: 1px !important;
+            text-transform: uppercase !important;
+            text-align: center !important;
+            margin-bottom: 2px !important;
+            font-family: 'Arial', sans-serif !important;
+            display: block !important;
+            width: 100% !important;
         }
         
         .clear-link-container {
-            text-align: right !important;
-            margin-top: -6px !important;
-            margin-bottom: 10px !important;
+            text-align: center !important;
+            margin-top: -4px !important;
+            margin-bottom: 12px !important;
             width: 100% !important;
         }
         
@@ -108,15 +115,6 @@ st.markdown("""
         }
         button[kind="tertiary"]:hover {
             color: var(--navy-brand) !important;
-        }
-        
-        /* ENFORCE INNER EXPANDER INTERNAL SCROLLBAR LOCKS COVERS OLD & NEW STREAMLIT DOM */
-        [data-testid="stSidebar"] [data-testid="stExpanderDetails"] div[data-testid="stVerticalBlock"],
-        [data-testid="stSidebar"] .st-expander div[data-testid="stVerticalBlockWrapper"],
-        [data-testid="stSidebar"] .st-expander div[data-testid="stVerticalBlock"] {
-            max-height: 200px !important;
-            overflow-y: auto !important;
-            padding-right: 4px !important;
         }
         
         [data-testid="stSidebar"] label p {
@@ -147,9 +145,9 @@ st.markdown("""
             border: none !important;
             border-radius: 6px !important;
             width: 100% !important;
-            padding: 8px !important;
+            padding: 6px !important;
             transition: all 0.1s ease-in-out !important;
-            margin-top: 10px !important;
+            margin-top: 5px !important;
         }
         .action-tray div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
             background-color: var(--gold-accent) !important;
@@ -166,6 +164,8 @@ st.markdown("""
             padding-top: 4px !important;
             padding-bottom: 4px !important;
         }
+        
+        .stDeployButton, footer { display:none !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -241,6 +241,8 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
+    st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
+    
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
         execute_global_purge()
@@ -257,7 +259,6 @@ with st.sidebar:
     
     selected_tags = []
     
-    # Standard POI Generation in 2-Column Grid
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -268,7 +269,6 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_{cat_name}_{label}"): 
                             selected_tags.append(tag)
 
-    # Advanced POI Generation in 2-Column Grid
     for cat_name, node_items in ADVANCED_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -279,7 +279,8 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): 
                             selected_tags.append(tag)
 
-    # CONSOLE TRUCK ACTION TRAY
+    st.markdown("<hr style='margin: 10px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
+    
     st.markdown('<div class="action-tray">', unsafe_allow_html=True)
     if st.button("🚀 SCAN AREA", use_container_width=True):
         if not selected_tags:
@@ -308,7 +309,7 @@ with st.sidebar:
                 except Exception as e: st.sidebar.error("Timeout")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:14px; margin-bottom:4px;'>DATA EXPORTS</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:15px; margin-bottom:0;'>DATA EXPORTS</p>", unsafe_allow_html=True)
     exp_fmt = st.selectbox("Format", ["Select Format...", "Export Radius (KML)", "Export POIs (KML)"], label_visibility="collapsed")
     
     if exp_fmt == "Export Radius (KML)":
@@ -317,11 +318,11 @@ with st.sidebar:
         st.download_button("Download File", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", disabled=not st.session_state.scanned_records)
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY SPATIAL CANVAS & EMBEDDED GEOGRAPHIC SEARCH SUITE
+# 5. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
-render_lat = lat_coord
-render_lon = lon_coord
+render_lat = st.session_state.last_scan_lat
+render_lon = st.session_state.last_scan_lon
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -331,149 +332,19 @@ leaflet_template = """
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
-        #map { height: 100vh; width: 100%; position: relative; }
-        
-        /* Premium Floating Card look for Landmark Lookups */
-        .map-search-card {
-            background: #ffffff;
-            padding: 4px;
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0, 26, 61, 0.15);
-            border: 1px solid #cbd5e1;
-            display: flex;
-            align-items: center;
-            margin-top: 14px;
-            margin-right: 14px;
-            font-family: 'Arial', sans-serif;
-        }
-        #map-search-input {
-            border: none;
-            padding: 8px 12px;
-            width: 250px;
-            font-size: 13px;
-            outline: none;
-            color: #001a3d;
-            font-weight: 500;
-            border-radius: 4px;
-        }
-        #map-search-btn {
-            padding: 8px 16px;
-            background: #001a3d;
-            color: #ffffff;
-            border: none;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 800;
-            cursor: pointer;
-            margin-left: 6px;
-            letter-spacing: 0.5px;
-            transition: all 0.2s ease;
-        }
-        #map-search-btn:hover { background: #d4af37; color: #001a3d; }
-        
-        /* MINI LEAFLET BASEMAP SWITCHER CONTROL OVERRIDES */
-        .leaflet-control-layers-toggle {
-            width: 30px !important;
-            height: 30px !important;
-            background-size: 18px 18px !important;
-        }
-        .leaflet-control-layers {
-            border-radius: 6px !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
-            border: 1px solid #cbd5e1 !important;
-        }
-        
-        /* FLOATING SCAN RESULTS WINDOW (ANCHORED UNDER THE TOP-RIGHT SEARCH BAR) */
-        .results-sidebar {
-            position: absolute;
-            top: 75px;
-            right: 14px;
-            z-index: 1000;
-            background: #ffffff;
-            width: 322px; 
-            max-height: 400px;
-            border-radius: 8px;
-            box-shadow: 0 6px 20px rgba(0, 26, 61, 0.12);
-            border: 1px solid #cbd5e1;
-            font-family: 'Arial', sans-serif;
-            display: none; 
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .results-header {
-            background: #001a3d;
-            color: #ffffff;
-            padding: 10px 14px;
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            border-bottom: 1px solid #001a3d;
-        }
-        .results-list {
-            overflow-y: auto;
-            flex-grow: 1;
-            background: #ffffff;
-        }
-        .results-item {
-            padding: 8px 14px;
-            font-size: 11px;
-            border-bottom: 1px solid #f1f5f9;
-            cursor: pointer;
-            color: #334155;
-            transition: background 0.1s ease;
-        }
-        .results-item:hover {
-            background: #f8fafc;
-            color: #001a3d;
-            font-weight: bold;
-        }
+        #map { height: 100vh; width: 100%; }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    
-    <div id="results-card" class="results-sidebar">
-        <div class="results-header">Scan Analysis (<span id="results-count">0</span>)</div>
-        <div id="results-list" class="results-list"></div>
-    </div>
-
     <script>
-        // Define Structural Basemap Layer Providers
-        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
-        const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 });
-        const cartoPositron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 });
-
-        // PERSISTENCE TUNING: Intercept cached basemap identifiers inside local memory
-        const activeBasemapName = localStorage.getItem('selected_basemap') || 'OpenStreetMap';
-        let initialLayer = osm;
-        if (activeBasemapName === 'Google Satellite') initialLayer = googleSat;
-        if (activeBasemapName === 'Carto Positron') initialLayer = cartoPositron;
-
-        const map = L.map('map', { 
-            zoomControl: true, 
-            attributionControl: false,
-            layers: [initialLayer] 
-        }).setView([__LAT__, __LON__], 14);
+        const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
         
-        const baseMaps = {
-            "OpenStreetMap": osm,
-            "Google Satellite": googleSat,
-            "Carto Positron": cartoPositron
-        };
-        L.control.layers(baseMaps, null, { position: 'topleft', collapsed: true }).addTo(map);
-        
-        // Cache Layer configuration change runtime shifts
-        map.on('baselayerchange', function(e) {
-            localStorage.setItem('selected_basemap', e.name);
-        });
-        
-        // Target Node Pin Positioning Layer
         L.circleMarker([__LAT__, __LON__], {
             radius: 7, fillColor: "#e11d48", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
         }).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
         
-        // Target Radius Ring Positioning Layer
         L.circle([__LAT__, __LON__], {
             radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
         }).addTo(map);
@@ -490,70 +361,6 @@ leaflet_template = """
             map.fitBounds(bounds.pad(0.1));
         }
         
-        // ASYNCHRONOUS GEOLOCATION SEARCH CARD ENGINE (OpenStreetMap Nominatim API Integration)
-        const searchControl = L.control({ position: 'topright' });
-        searchControl.onAdd = function() {
-            const div = L.DomUtil.create('div', 'map-search-card');
-            div.innerHTML = `
-                <input type="text" id="map-search-input" placeholder="Search landmarks, malls, cities...">
-                <button id="map-search-btn">SEARCH</button>
-            `;
-            L.DomEvent.disableClickPropagation(div);
-            return div;
-        };
-        searchControl.addTo(map);
-
-        document.getElementById('map-search-btn').addEventListener('click', runMapGeocodeSearch);
-        document.getElementById('map-search-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') runMapGeocodeSearch();
-        });
-
-        function runMapGeocodeSearch() {
-            const query = document.getElementById('map-search-input').value;
-            if (!query) return;
-            
-            fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query))
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.length > 0) {
-                        const targetLoc = data[0];
-                        const lat = parseFloat(targetLoc.lat);
-                        const lon = parseFloat(targetLoc.lon);
-                        map.setView([lat, lon], 15);
-                        
-                        L.popup()
-                            .setLatLng([lat, lon])
-                            .setContent("<div style='font-family:sans-serif;font-size:11px;max-width:200px;'><b>Found Location:</b><br>" + targetLoc.display_name + "</div>")
-                            .openOn(map);
-                    } else {
-                        alert('Location parameter index could not be resolved.');
-                    }
-                }).catch(err => console.error('OSM Nominatim lookup error: ', err));
-        }
-
-        // CONDITIONAL RENDERING EXTRACTION ROUTE: Only open analytics if an active scan exists
-        if(pts.length > 0) {
-            const resultsCard = document.getElementById('results-card');
-            const resultsList = document.getElementById('results-list');
-            
-            resultsCard.style.display = 'flex'; 
-            document.getElementById('results-count').innerText = pts.length;
-            
-            pts.forEach(p => {
-                const row = document.createElement('div');
-                row.className = 'results-item';
-                row.innerHTML = `<b>${p.name}</b><br><span style="color:#64748b;font-size:10px;">${p.type}</span>`;
-                row.onclick = () => {
-                    map.setView([p.lat, p.lon], 16);
-                    L.popup()
-                        .setLatLng([p.lat, p.lon])
-                        .setContent("<b>" + p.name + "</b><br>" + p.type)
-                        .openOn(map);
-                };
-                resultsList.appendChild(row);
-            });
-        }
-
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat.toFixed(5);
             const lon = e.latlng.lng.toFixed(5);
@@ -565,7 +372,7 @@ leaflet_template = """
                     .setContent("<div style='font-family:sans-serif;font-size:11px;'>Copied to Clipboard:<br><b>" + coordString + "</b></div>")
                     .openOn(map);
             }).catch(err => {
-                console.error('Clipboard copy pipeline error: ', err);
+                console.error('Spatial coordinates extract pipeline failure: ', err);
             });
         });
         
@@ -581,4 +388,5 @@ leaflet_html = (leaflet_template
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__GEOJSON__", geojson_str))
 
+# Passed with explicit visibility configurations to lock the layout fluidly
 st.components.v1.html(leaflet_html, scrolling=False)
