@@ -3,7 +3,6 @@ import requests
 import re
 import math
 import json
-import pandas as pd
 
 # -----------------------------------------------------------------------------
 # 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
@@ -21,20 +20,18 @@ st.markdown("""
             --white-clean: #ffffff;
             --gold-accent: #d4af37;
             --border-gray: #cbd5e1;
-            --text-muted: #475569;
+            --link-muted: #64748b;
         }
         
-        /* Maximize primary viewport space */
         .block-container {
             padding: 0rem !important;
         }
         
-        /* Compressed Sidebar Styling */
         [data-testid="stSidebar"] {
             background-color: var(--white-clean) !important;
             color: var(--navy-brand) !important;
             border-right: 1px solid var(--border-gray) !important;
-            width: 320px !important; /* Force slimmer sidebar ratio */
+            width: 320px !important;
         }
         
         [data-testid="stSidebarUserContent"] {
@@ -43,7 +40,6 @@ st.markdown("""
             padding-right: 12px !important;
         }
         
-        /* Centered Header Element */
         .sidebar-title {
             color: var(--navy-brand) !important;
             font-size: 24px !important;
@@ -55,26 +51,30 @@ st.markdown("""
             font-family: 'Arial', sans-serif !important;
         }
         
-        /* Hyperlink Emulation for the Clear Button */
+        /* Small Hyperlink Emulation for Clear Button */
+        div.clear-link-wrapper {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: -12px;
+            margin-bottom: 8px;
+        }
         div.clear-link-wrapper div.stButton > button {
             background: transparent !important;
             border: none !important;
-            color: var(--text-muted) !important;
+            color: var(--link-muted) !important;
             text-decoration: underline !important;
-            font-weight: 700 !important;
-            font-size: 10px !important;
-            text-transform: uppercase !important;
+            font-weight: 600 !important;
+            font-size: 11px !important;
             padding: 0 !important;
-            width: 100% !important;
+            width: auto !important;
             box-shadow: none !important;
-            text-align: center !important;
-            margin-bottom: 15px !important;
+            min-height: 0 !important;
+            height: auto !important;
         }
         div.clear-link-wrapper div.stButton > button:hover {
             color: var(--navy-brand) !important;
         }
         
-        /* Compressed Widget Sizing */
         [data-testid="stSidebar"] label p {
             color: var(--navy-brand) !important;
             font-weight: 800 !important;
@@ -86,14 +86,13 @@ st.markdown("""
         
         div[data-baseweb="input"], div[data-baseweb="select"], .stSelectbox, .stTextInput, .stNumberInput {
             border-radius: 4px !important;
-            min-height: 32px !important; /* Squeeze vertical height */
+            min-height: 32px !important;
         }
         
         div[data-baseweb="input"] { border: 1px solid var(--border-gray) !important; }
         div[data-baseweb="input"]:focus-within { border-color: var(--navy-brand) !important; }
         div[data-baseweb="select"] { border: 1px solid var(--border-gray) !important; }
         
-        /* Primary Action Buttons */
         .action-tray div.stButton > button, div.stDownloadButton > button {
             background-color: var(--navy-brand) !important;
             color: var(--white-clean) !important;
@@ -113,7 +112,6 @@ st.markdown("""
             color: var(--navy-brand) !important;
         }
         
-        /* Compact Expander Panels */
         [data-testid="stSidebar"] .st-expander {
             border: 1px solid var(--border-gray) !important;
             background-color: #f8fafc !important;
@@ -150,11 +148,32 @@ def execute_global_purge():
     for key in list(st.session_state.keys()):
         if key.startswith("chk_"): st.session_state[key] = False
 
+# Fully mapped taxonomy injection
 POI_CONFIG = {
-    "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"']],
-    "RETAIL": [['Mall', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"']],
-    "FOOD & BEVERAGE": [['Restaurant', '"amenity"="restaurant"'], ['Cafe', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"']],
-    "LOGISTICS": [['Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports', '"industrial"="port"'], ['Manufacturing', '"industrial"~"factory|processing",i'], ['Warehouses', '"building"~"warehouse|depot",i']]
+    "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
+    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
+    "FOOD AND BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="blackery"']],
+    "INDUSTRIAL & LOGISTICS": [
+        ['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], 
+        ['Ports & Terminals', '"industrial"="port"'], 
+        ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'],
+        ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'],
+        ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'],
+        ['Warehouses & Depots', '"building"~"warehouse|depot",i'],
+        ['Storage Facilities', '"building"="storage"'],
+        ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']
+    ],
+    "GOVERNMENT & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i']],
+    "SCHOOLS": [['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"']]
+}
+
+ADVANCED_CONFIG = {
+    "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Clinic', '"amenity"="clinic"'], ['Embassy', '"amenity"="embassy"'], ['Firestation', '"amenity"="fire_station"'], ['Fuel', '"amenity"="fuel"'], ['Hospital', '"amenity"="hospital"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Parking', '"amenity"="parking"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police', '"amenity"="police"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['University', '"amenity"="university"']],
+    "PLACE OF WORSHIP": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Casino', '"amenity"="casino"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"']],
+    "FOOD & BEVERAGE": [['Bar', '"amenity"="bar"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Cafe', '"amenity"="cafe"'], ['Fast food', '"amenity"="fast_food"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Restaurant', '"amenity"="restaurant"']],
+    "RETAIL_ADV": [['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"']],
+    "SPORTS": [['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"']],
+    "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
 }
 
 # -----------------------------------------------------------------------------
@@ -178,13 +197,13 @@ def compile_features_kml(features):
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
-# 4. SIDEBAR WORKSPACE COMPRESSION
+# 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
     st.markdown('<div class="clear-link-wrapper">', unsafe_allow_html=True)
-    if st.button("Clear All Parameters", key="master_purge_btn"):
+    if st.button("Clear All", key="master_purge_btn"):
         execute_global_purge()
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -198,12 +217,20 @@ with st.sidebar:
     search_query = st.text_input("Filter Catalog", placeholder="Search tags...").lower()
     
     selected_tags = []
+    
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
             with st.expander(cat_name, expanded=(len(search_query) > 0)):
                 for label, tag in matched:
                     if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
+
+    for cat_name, node_items in ADVANCED_CONFIG.items():
+        matched = [item for item in node_items if search_query in item[0].lower()]
+        if matched:
+            with st.expander(f"ADV - {cat_name}", expanded=(len(search_query) > 0)):
+                for label, tag in matched:
+                    if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
     st.markdown("<hr style='margin: 10px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
     
@@ -218,7 +245,7 @@ with st.sidebar:
             
             with st.spinner("Extracting nodes..."):
                 try:
-                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "TradeAreaScan/3.0"}, timeout=100)
+                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "TradeAreaScan/3.1"}, timeout=100)
                     if res.status_code == 200:
                         records = []
                         for el in res.json().get('elements', []):
@@ -235,22 +262,18 @@ with st.sidebar:
                 except Exception as e: st.sidebar.error("Timeout")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Export Handlers
+    # Simplified Data Exports Tray
     st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:15px; margin-bottom:0;'>DATA EXPORTS</p>", unsafe_allow_html=True)
-    exp_fmt = st.selectbox("Format", ["Select...", "Radius (KML)", "Scanned POIs (KML)", "Scanned POIs (CSV)"], label_visibility="collapsed")
+    exp_fmt = st.selectbox("Format", ["Select Format...", "Export Radius (KML)", "Export POIs (KML)"], label_visibility="collapsed")
     
-    if exp_fmt == "Radius (KML)":
-        st.download_button("Download", compile_radius_kml(lat_coord, lon_coord, radius_val), f"Radius_{radius_val}m.kml", "application/vnd.google-earth.kml+xml")
-    elif exp_fmt == "Scanned POIs (KML)":
-        st.download_button("Download", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", disabled=not st.session_state.scanned_records)
-    elif exp_fmt == "Scanned POIs (CSV)":
-        csv_data = pd.DataFrame(st.session_state.scanned_records).to_csv(index=False).encode('utf-8') if st.session_state.scanned_records else b""
-        st.download_button("Download", csv_data, "POIs.csv", "text/csv", disabled=not st.session_state.scanned_records)
+    if exp_fmt == "Export Radius (KML)":
+        st.download_button("Download File", compile_radius_kml(lat_coord, lon_coord, radius_val), f"Radius_{radius_val}m.kml", "application/vnd.google-earth.kml+xml")
+    elif exp_fmt == "Export POIs (KML)":
+        st.download_button("Download File", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", disabled=not st.session_state.scanned_records)
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY SPATIAL CANVAS (LEAFLET NATIVE)
+# 5. ZERO-LATENCY SPATIAL CANVAS
 # -----------------------------------------------------------------------------
-# We utilize standard map tiles natively to strip the editor panel entirely.
 geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = st.session_state.last_scan_lat
 render_lon = st.session_state.last_scan_lon
@@ -269,12 +292,10 @@ leaflet_html = f"""
         const map = L.map('map', {{ zoomControl: true, attributionControl: false }}).setView([{render_lat}, {render_lon}], 14);
         L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{ maxZoom: 19 }}).addTo(map);
         
-        // Pinned Red Target Coordinate Marker
         L.circleMarker([{render_lat}, {render_lon}], {{
             radius: 7, fillColor: "#e11d48", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
         }}).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
         
-        // Meter-Accurate Radius Ring Geofence
         L.circle([{render_lat}, {render_lon}], {{
             radius: {radius_val}, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
         }}).addTo(map);
