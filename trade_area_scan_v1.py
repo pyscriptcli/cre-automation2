@@ -2,9 +2,9 @@ import streamlit as st
 import urllib.parse
 
 # Force wide-screen layout to map the workspace perfectly
-st.set_page_config(layout="wide", page_title="Overpass Trade Area Scanner")
+st.set_page_config(layout="wide", page_title="Market Study Dashboard")
 
-# Custom CSS styling to lock the sidebar to the original dark extension theme
+# Custom CSS styling to lock the sidebar to the dark theme and remove iframe borders
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {
@@ -24,6 +24,19 @@ st.markdown("""
         text-transform: uppercase;
         border: none;
         margin-top: 10px;
+    }
+    /* Remove all borders and outlines from the iframe globally */
+    iframe {
+        border: none !important;
+        outline: none !important;
+    }
+    /* Adjust spacing for the radio buttons in the navigation menu */
+    .stRadio > div {
+        gap: 12px;
+    }
+    /* Tighten up the top spacing of the main view */
+    .block-container {
+        padding-top: 2rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -60,63 +73,72 @@ ADVANCED_CONFIG = {
 if "target_url" not in st.session_state:
     st.session_state.target_url = "https://overpass-turbo.eu/"
 
-# Sidebar: Query Generator Pane
-st.sidebar.title("TRADE AREA SCANNER")
-st.sidebar.caption("Industrial Logistics Extension Framework")
-
-coords_input = st.sidebar.text_input("Coordinates", value="14.6465, 121.0371")
-radius_input = st.sidebar.number_input("Radius (M)", value=1000, step=100)
-
-try:
-    lat, lon = map(float, coords_input.split(","))
-except ValueError:
-    st.sidebar.error("Invalid format. Use: lat, lon")
-    st.stop()
-
-search_term = st.sidebar.text_input("SEARCH POI:", "").lower()
-
-selected_queries = []
-
-# Populate Category Checkboxes with unique namespacing keys
-for cat, items in POI_CONFIG.items():
-    filtered_items = [i for i in items if search_term in i[0].lower()]
-    if filtered_items:
-        st.sidebar.markdown(f"**{cat}**")
-        for label, q_str in filtered_items:
-            if st.sidebar.checkbox(label, key=f"core_{cat}_{label}"):
-                selected_queries.append(q_str)
-
-with st.sidebar.expander("ADVANCED POI LIBRARY", expanded=bool(search_term)):
-    for cat, items in ADVANCED_CONFIG.items():
-        filtered_items = [i for i in items if search_term in i[0].lower()]
-        if filtered_items:
-            st.sidebar.caption(cat)
-            for label, q_str in filtered_items:
-                if st.sidebar.checkbox(label, key=f"adv_{cat}_{label}"):
-                    selected_queries.append(q_str)
+# --- Global Navigation Sidebar ---
+st.sidebar.title("MARKET STUDY")
+app_mode = st.sidebar.radio(
+    "Navigation Options",
+    ["Trade Area Scan", "UMap", "Demographics / Population"],
+    label_visibility="collapsed"
+)
 
 st.sidebar.markdown("---")
-scan_triggered = st.sidebar.button("Run Scan in Overpass")
 
-# Generate Overpass QL Payload on trigger
-if scan_triggered:
-    if not selected_queries:
-        st.sidebar.warning("Select at least one POI option.")
-    else:
-        clauses = "\n".join([f"  nwr[{q}](around:{radius_input},{lat},{lon});" for q in selected_queries])
-        overpass_ql = f"[out:json][timeout:120];\n(\n{clauses}\n);\nout center;"
-        
-        # URL encode and append parameters exactly matching the original userscript behavior
-        encoded_query = urllib.parse.quote(overpass_ql)
-        st.session_state.target_url = f"https://overpass-turbo.eu/?Q={encoded_query}&R"
+# --- Routing Engine ---
+if app_mode == "Trade Area Scan":
+    
+    # 1. Load POI Generator strictly into the Trade Area Scan module
+    coords_input = st.sidebar.text_input("Coordinates", value="14.6465, 121.0371")
+    radius_input = st.sidebar.number_input("Radius (M)", value=1000, step=100)
 
-# --- Main Workspace Area ---
-# Action bar providing both direct breakout links and embedded workspace states
-col_title, col_action = st.columns([3, 1])
-with col_title:
-    st.subheader("Overpass Turbo Integration Canvas")
-with col_action:
-    st.markdown(f'<a href="{st.session_state.target_url}" target="_blank"><button style="width:100%; height:38px; background-color:#001a3d; color:white; border-radius:8px; font-weight:bold; border:none; cursor:pointer;">LAUNCH EXTERNAL WINDOW</button></a>', unsafe_allow_html=True)
+    try:
+        lat, lon = map(float, coords_input.split(","))
+    except ValueError:
+        st.sidebar.error("Invalid format. Use: lat, lon")
+        st.stop()
 
-# Native Workspace Embed Environment
-st.components.v1.iframe(st.session_state.target_url, height=800, scrolling=True)
+    search_term = st.sidebar.text_input("SEARCH POI:", "").lower()
+    selected_queries = []
+
+    # Build Category Checkboxes
+    for cat, items in POI_CONFIG.items():
+        filtered_items = [i for i in items if search_term in i[0].lower()]
+        if filtered_items:
+            st.sidebar.markdown(f"**{cat}**")
+            for label, q_str in filtered_items:
+                if st.sidebar.checkbox(label, key=f"core_{cat}_{label}"):
+                    selected_queries.append(q_str)
+
+    with st.sidebar.expander("ADVANCED POI LIBRARY", expanded=bool(search_term)):
+        for cat, items in ADVANCED_CONFIG.items():
+            filtered_items = [i for i in items if search_term in i[0].lower()]
+            if filtered_items:
+                st.sidebar.caption(cat)
+                for label, q_str in filtered_items:
+                    if st.sidebar.checkbox(label, key=f"adv_{cat}_{label}"):
+                        selected_queries.append(q_str)
+
+    st.sidebar.markdown("---")
+    scan_triggered = st.sidebar.button("Run Scan in Overpass")
+
+    if scan_triggered:
+        if not selected_queries:
+            st.sidebar.warning("Select at least one POI option.")
+        else:
+            clauses = "\n".join([f"  nwr[{q}](around:{radius_input},{lat},{lon});" for q in selected_queries])
+            overpass_ql = f"[out:json][timeout:120];\n(\n{clauses}\n);\nout center;"
+            encoded_query = urllib.parse.quote(overpass_ql)
+            st.session_state.target_url = f"https://overpass-turbo.eu/?Q={encoded_query}&R"
+
+    # Main Area Output
+    st.subheader("Trade Area Scan — Overpass Workspace")
+    st.components.v1.iframe(st.session_state.target_url, height=800, scrolling=True)
+
+elif app_mode == "UMap":
+    # 2. Render UMap Integration
+    st.subheader("UMap — Custom Interactive Map Editor")
+    st.components.v1.iframe("https://umap.openstreetmap.fr/en/", height=800, scrolling=True)
+
+elif app_mode == "Demographics / Population":
+    # 3. Render Coming Soon State
+    st.subheader("Demographics / Population Dashboard")
+    st.info("🚧 This module is currently under development. Data visualization components coming soon.")
