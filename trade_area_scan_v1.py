@@ -85,7 +85,7 @@ st.markdown("""
         .sidebar-scrollable-content {
             padding-top: 4px !important;
             padding-left: 14px !important;
-            padding-right: 14px !important;
+            padding-right: 24px !important;
             overflow-y: auto !important;
             flex-grow: 1 !important;
         }
@@ -124,11 +124,66 @@ st.markdown("""
             padding-top: 10px !important;
             padding-bottom: 20px !important;
             padding-left: 14px !important;
-            padding-right: 14px !important;
+            padding-right: 24px !important;
             border-top: 1px solid var(--border-gray) !important;
             box-shadow: 0px -8px 24px rgba(0, 26, 61, 0.06) !important;
             z-index: 9999 !important;
             width: 100% !important;
+        }
+        
+        /* LONG END-TO-END SIDEBAR TOGGLE TAB OVERRIDES (SIDEBAR OPEN STATE) */
+        [data-testid="stSidebarCollapseButton"] {
+            position: absolute !important;
+            right: 0px !important;
+            top: 0px !important;
+            height: 100vh !important;
+            width: 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background-color: #f1f5f9 !important;
+            border-left: 1px solid var(--border-gray) !important;
+            z-index: 99999 !important;
+        }
+        [data-testid="stSidebarCollapseButton"] button {
+            height: 100vh !important;
+            width: 100% !important;
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0px !important;
+            padding: 0px !important;
+            margin: 0px !important;
+        }
+        [data-testid="stSidebarCollapseButton"] button:hover {
+            background-color: var(--gold-accent) !important;
+        }
+        
+        /* LONG END-TO-END SIDEBAR EXPAND TAB OVERRIDES (SIDEBAR COLLAPSED STATE) */
+        [data-testid="collapsedControl"] {
+            position: fixed !important;
+            left: 0px !important;
+            top: 0px !important;
+            height: 100vh !important;
+            width: 18px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background-color: #f1f5f9 !important;
+            border-right: 1px solid var(--border-gray) !important;
+            z-index: 999999 !important;
+            padding: 0px !important;
+        }
+        [data-testid="collapsedControl"] button {
+            height: 100vh !important;
+            width: 100% !important;
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0px !important;
+            padding: 0px !important;
+            margin: 0px !important;
+        }
+        [data-testid="collapsedControl"] button:hover {
+            background-color: var(--gold-accent) !important;
         }
         
         [data-testid="stSidebar"] label p {
@@ -178,8 +233,6 @@ st.markdown("""
             padding-top: 4px !important;
             padding-bottom: 4px !important;
         }
-        
-        .stDeployButton, footer { display:none !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -255,7 +308,7 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # START OF SCROLLABLE BODY LAYER (No header element box)
+    # START OF SCROLLABLE BODY LAYER (Headers fully extracted)
     st.markdown('<div class="sidebar-scrollable-content">', unsafe_allow_html=True)
 
     # Master Purge layout configuration at the top entry parameter
@@ -395,7 +448,7 @@ leaflet_template = """
         }
         #map-search-btn:hover { background: #d4af37; color: #001a3d; }
         
-        /* DOWNSIZED LEAFLET BASEMAP BUTTON OVERRIDES */
+        /* MINI LEAFLET BASEMAP SWITCHER CONTROL OVERRIDES */
         .leaflet-control-layers-toggle {
             width: 30px !important;
             height: 30px !important;
@@ -407,23 +460,22 @@ leaflet_template = """
             border: 1px solid #cbd5e1 !important;
         }
         
-        /* FLOATING SCAN RESULTS PANEL CONTROL STYLE */
+        /* FLOATING SCAN RESULTS WINDOW (ANCHORED UNDER THE TOP-RIGHT SEARCH BAR) */
         .results-sidebar {
             position: absolute;
             top: 75px;
-            left: 14px;
+            right: 14px;
             z-index: 1000;
             background: #ffffff;
-            width: 260px;
-            max-height: 420px;
+            width: 322px; /* Perfect match scaling to mirror the look of the search block */
+            max-height: 400px;
             border-radius: 8px;
             box-shadow: 0 6px 20px rgba(0, 26, 61, 0.12);
             border: 1px solid #cbd5e1;
             font-family: 'Arial', sans-serif;
-            display: flex;
+            display: none; /* Controlled conditionally via scan execution states */
             flex-direction: column;
             overflow: hidden;
-            transition: all 0.2s ease;
         }
         .results-header {
             background: #001a3d;
@@ -464,12 +516,12 @@ leaflet_template = """
     </div>
 
     <script>
-        // Define Structural Provider Arrays
+        // Define Structural Basemap Layer Providers
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
         const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 });
         const cartoPositron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 });
 
-        // PERSISTENCE TUNING: Intercept cached basemap identifiers inside system memory
+        // PERSISTENCE TUNING: Intercept cached basemap identifiers inside local memory
         const activeBasemapName = localStorage.getItem('selected_basemap') || 'OpenStreetMap';
         let initialLayer = osm;
         if (activeBasemapName === 'Google Satellite') initialLayer = googleSat;
@@ -556,13 +608,14 @@ leaflet_template = """
                 }).catch(err => console.error('OSM Nominatim lookup error: ', err));
         }
 
-        // POPULATE DIALOG BOX DICTIONARY ARRAY DATA ELEMENTS
-        const resultsList = document.getElementById('results-list');
-        document.getElementById('results-count').innerText = pts.length;
-        
-        if(pts.length === 0) {
-            resultsList.innerHTML = '<div style="padding:16px;font-size:11px;color:#94a3b8;text-align:center;">No active records in target area.</div>';
-        } else {
+        // CONDITIONAL RENDERING EXTRACTION ROUTE: Only open analytics if an active scan exists
+        if(pts.length > 0) {
+            const resultsCard = document.getElementById('results-card');
+            const resultsList = document.getElementById('results-list');
+            
+            resultsCard.style.display = 'flex'; // Unveil box block container
+            document.getElementById('results-count').innerText = pts.length;
+            
             pts.forEach(p => {
                 const row = document.createElement('div');
                 row.className = 'results-item';
