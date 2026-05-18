@@ -48,10 +48,10 @@ LUXURY_CRE_SYSTEM = """
     
     /* 3. Minimalist Template File Uploader */
     section[data-testid="stFileUploader"] {
-        background-color: #F8FAFC !important;
-        border: 1px dashed #C5A059 !important; /* Gold dashed line for files */
+        background-color: #FFFFFF !important;
+        border: 1px solid #002B49 !important; /* Matches text rows exactly */
         border-radius: 0px !important;
-        padding: 16px !important;
+        padding: 4px 12px !important;
     }
     section[data-testid="stFileUploader"] div, section[data-testid="stFileUploader"] span {
         color: #002B49 !important;
@@ -171,6 +171,13 @@ def dynamic_form_row(icon, label_text, default_val, state_key):
     with r_col2:
         return st.text_input("", value=default_val, key=state_key, label_visibility="collapsed")
 
+def dynamic_uploader_row(icon, label_text, allowed_types, state_key):
+    r_col1, r_col2 = st.columns([9, 11])
+    with r_col1:
+        st.markdown(f'<div class="row-metric-label"><span class="large-icon">{icon}</span> {label_text}</div>', unsafe_allow_html=True)
+    with r_col2:
+        return st.file_uploader(label_text, type=allowed_types, key=state_key, label_visibility="collapsed")
+
 # --- STEP 1: COMPILER ARCHITECTURE BLUEPRINT (TEMPLATE FIRST) ---
 st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
 st.markdown('<span class="luxury-tagline">BLUEPRINT BLUEPRINT COMPILER</span>', unsafe_allow_html=True)
@@ -199,7 +206,21 @@ lease_term    = dynamic_form_row("📅", "Lease Term", "5 years", "cre_term")
 handover      = dynamic_form_row("🏗️", "Handover Condition", "As is where is", "cre_hand")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Data Mapping Containers (Image objects pass empty handles gracefully since fields are omitted)
+
+# --- STEP 3: PROPERTY IMAGES BLOCK (RESTORED SEAMLESSLY) ---
+st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+st.markdown('<span class="luxury-tagline">PROPERTY IMAGES</span>', unsafe_allow_html=True)
+
+img_types = ["png", "jpg", "jpeg"]
+u_photo1  = dynamic_uploader_row("📸", "Property Photo 1", img_types, "web_p1")
+u_map     = dynamic_uploader_row("🗺️", "Location Map", img_types, "web_mp")
+u_lotplan = dynamic_uploader_row("📐", "Lot Plan", img_types, "web_lp")
+u_photo2  = dynamic_uploader_row("📸", "Property Photo 2", img_types, "web_p2")
+u_photo3  = dynamic_uploader_row("📸", "Property Photo 3", img_types, "web_p3")
+st.markdown('</div>', unsafe_allow_html=True)
+
+
+# Data Mapping Containers
 data_inputs = {
     "{{PROPERTY_LOCATION}}": prop_location, "{{PROPERTY_SIZE}}": prop_size,
     "{{PROPERTY_TYPE}}": prop_type, "{{PROPERTY_ADDRESS}}": prop_address,
@@ -209,9 +230,9 @@ data_inputs = {
 }
 
 image_inputs = {
-    "{{PROPERTY_PHOTO 1}}": None, "{{PROPERTY_LOCATION_MAP}}": None,
-    "{{PROPERTY_LOTPLAN}}": None, "{{PROPERTY_PHOTO2}}": None,
-    "{{PROPERTY_PHOTO3}}": None
+    "{{PROPERTY_PHOTO 1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map,
+    "{{PROPERTY_LOTPLAN}}": u_lotplan, "{{PROPERTY_PHOTO2}}": u_photo2,
+    "{{PROPERTY_PHOTO3}}": u_photo3
 }
 
 # --- CONTROL DESK ACTION LAYER ---
@@ -228,7 +249,7 @@ with action_col2:
         st.markdown("<div style='padding-top:16px; font-size:12px; font-weight:700; color:#002B49; text-align:right; letter-spacing:0.04em;'>⚠️ UPLOAD A MASTER PPTX BLUEPRINT TO MOUNT GENERATION FUNCTIONS.</div>", unsafe_allow_html=True)
     else:
         if st.button("⚙️ GENERATE DECK", key="generate_btn_key", use_container_width=True):
-            with st.spinner("Processing template slide assets..."):
+            with st.spinner("Processing template slide assets and applying smart crops..."):
                 try:
                     prs = Presentation(u_template)
                     
@@ -237,13 +258,15 @@ with action_col2:
                         images_to_add = []
 
                         for shape in slide.shapes:
-                            if shape.has_text_frame:
+                            # Process standard Text placeholders
+                            if shape.has_text_frame and not any(img_token in shape.text_frame.text for img_token in image_inputs):
                                 for paragraph in shape.text_frame.paragraphs:
                                     for run in paragraph.runs:
                                         for token, value in data_inputs.items():
                                             if token in run.text:
                                                 run.text = run.text.replace(token, value)
 
+                            # Process Native PowerPoint Table fields
                             if shape.has_table:
                                 for row in shape.table.rows:
                                     for cell in row.cells:
@@ -253,12 +276,29 @@ with action_col2:
                                                     if token in run.text:
                                                         run.text = run.text.replace(token, value)
 
+                            # Find image target bounding boxes via text tokens
+                            if shape.has_text_frame:
+                                text_content = shape.text_frame.text
+                                for img_token, img_file in image_inputs.items():
+                                    if img_token in text_content and img_file is not None:
+                                        images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
+                                        shapes_to_delete.append(shape)
+
+                        # Overlay center-cropped images onto coordinates
+                        for img_file, left, top, width, height in images_to_add:
+                            processed_img = smart_crop_to_fit(img_file, width, height)
+                            slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
+
+                        # Purge original placeholder text vectors
+                        for old_shape in shapes_to_delete:
+                            sp = old_shape._element
+                            sp.getparent().remove(sp)
+
                     output_stream = io.BytesIO()
                     prs.save(output_stream)
                     output_stream.seek(0)
                     
-                    # FIXED: Secure double quotes inside the single-quoted block to prevent compilation syntax errors
-                    st.markdown("""<div style="border-left: 4px solid #C5A059; background-color: #FFFFFF; padding: 16px; border-top: 1px solid #002B49; border-right: 1px solid #002B49; border-bottom: 1px solid #002B49; margin-top: 20px; text-align: center; color: #002B49; font-weight: 700; font-size: 13px; letter-spacing: 0.05em;">🎉 PRESENTATION COMPILED SUCCESSFUL. PLATFORM BLOCKS EXTRACTED.</div>""", unsafe_allow_html=True)
+                    st.markdown("""<div style="border-left: 4px solid #C5A059; background-color: #FFFFFF; padding: 16px; border-top: 1px solid #002B49; border-right: 1px solid #002B49; border-bottom: 1px solid #002B49; margin-top: 20px; text-align: center; color: #002B49; font-weight: 700; font-size: 13px; letter-spacing: 0.05em;">🎉 PRESENTATION COMPILED SUCCESSFULLY! READY FOR PRODUCTION DOWNLOAD.</div>""", unsafe_allow_html=True)
                     st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
                     
                     st.download_button(
