@@ -1,10 +1,12 @@
 import streamlit as st
-import urllib.parse
+import requests
 import re
 import math
+import json
+import pandas as pd
 
 # -----------------------------------------------------------------------------
-# 1. GRAPHICAL SYSTEM & EMBOSS THEME INJECTION (LIGHT MODE BASELINE)
+# 1. LUXURY BRAND CSS INJECTION (ROUNDED GEOMETRICS & GLASSMORPHISM)
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -12,102 +14,139 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Implementation of specialized CSS to wrap widgets into high-contrast panels
 st.markdown("""
     <style>
-        /* Base Color System Configuration */
         :root {
-            --navy: #001a3d;
-            --white: #ffffff;
-            --gold: #d4af37;
-            --slate-light: #f4f6f9;
+            --navy-brand: #001a3d;
+            --navy-dark: #000f24;
+            --white-clean: #ffffff;
+            --gold-accent: #d4af37;
+            --glass-card: rgba(255, 255, 255, 0.06);
+            --glass-border: rgba(255, 255, 255, 0.15);
         }
         
-        /* Main Workspace Area Adjustments */
+        /* Maximize primary workspace surface footprint */
         .block-container {
             padding: 0rem !important;
         }
         
-        /* Sidebar System Architecture */
+        /* Complete Sidebar Re-skinning */
         [data-testid="stSidebar"] {
-            background-color: var(--slate-light) !important;
-            color: var(--navy) !important;
-            border-right: 3px solid var(--navy) !important;
+            background-color: var(--navy-brand) !important;
+            color: var(--white-clean) !important;
+            border-right: 2px solid var(--gold-accent) !important;
         }
         
-        /* Container Card Layer Blocks */
-        .custom-card {
-            background-color: var(--white);
-            border: 2px solid var(--navy);
-            border-radius: 8px;
+        /* Enforce elegant inner block spacing padding */
+        [data-testid="stSidebarUserContent"] {
+            padding-top: 20px !important;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+        }
+        
+        /* Rounded Custom Container Card Architecture */
+        .premium-rounded-card {
+            background: var(--glass-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
             padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 2px 2px 0px var(--navy);
+            margin-bottom: 14px;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.2);
         }
         
-        /* Typography Rules */
-        [data-testid="stSidebar"] label {
-            color: var(--navy) !important;
-            font-weight: bold !important;
-            font-family: 'Arial', sans-serif !important;
-            text-transform: uppercase;
-            font-size: 11px !important;
-            letter-spacing: 0.5px;
-        }
-        
-        /* Hyperlink Clear Action Styling */
-        .clear-link-btn {
-            color: var(--navy) !important;
-            text-decoration: underline !important;
-            font-weight: bold !important;
-            font-size: 11px !important;
-            background: none !important;
-            border: none !important;
-            padding: 0 !important;
-            cursor: pointer;
-            float: right;
-        }
-        
-        /* Unified Button Layout Specifications (White BG, Bold Navy Text) */
-        div.stButton > button, div.stDownloadButton > button {
-            background-color: var(--white) !important;
-            color: var(--navy) !important;
-            font-weight: 900 !important;
+        /* Typography Rules Override */
+        [data-testid="stSidebar"] label p {
+            color: var(--white-clean) !important;
+            font-weight: 700 !important;
+            font-size: 10px !important;
             text-transform: uppercase !important;
-            border: 2px solid var(--navy) !important;
-            border-radius: 4px !important;
+            letter-spacing: 1px !important;
+            opacity: 0.9;
+        }
+        
+        /* Strict Geometric Rounding of Streamlit Base Input Core Frames */
+        div[data-baseweb="input"], div[data-baseweb="select"], .stSelectbox, .stTextInput, .stNumberInput {
+            border-radius: 10px !important;
+            background-color: rgba(0, 15, 36, 0.6) !important;
+        }
+        
+        div[data-baseweb="input"] {
+            border: 1px solid var(--glass-border) !important;
+            border-radius: 10px !important;
+        }
+        
+        div[data-baseweb="input"]:focus-within {
+            border-color: var(--gold-accent) !important;
+        }
+        
+        /* Unifying Streamlit Selectbox Rounding Elements */
+        div[data-baseweb="select"] {
+            border: 1px solid var(--glass-border) !important;
+            border-radius: 10px !important;
+        }
+        
+        /* Smooth Rounded Styling for Expanders */
+        [data-testid="stSidebar"] .st-expander {
+            border: 1px solid var(--glass-border) !important;
+            background-color: rgba(0, 0, 0, 0.2) !important;
+            border-radius: 10px !important;
+            margin-bottom: 5px;
+        }
+        
+        /* Executive Action Button Configurations (Clean Rounded Bounds) */
+        div.stButton > button, div.stDownloadButton > button {
+            background-color: var(--white-clean) !important;
+            color: var(--navy-brand) !important;
+            font-weight: 800 !important;
+            font-size: 11px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+            border: 1px solid var(--white-clean) !important;
+            border-radius: 20px !important; /* Elegant rounded pill geometry */
             width: 100% !important;
-            box-shadow: 2px 2px 0px var(--navy) !important;
-            transition: all 0.15s ease-in-out !important;
+            padding: 6px 16px !important;
+            transition: all 0.2s ease-in-out !important;
         }
         
         div.stButton > button:hover, div.stDownloadButton > button:hover {
-            background-color: var(--navy) !important;
-            color: var(--white) !important;
-            box-shadow: 2px 2px 0px var(--gold) !important;
-            border-color: var(--navy) !important;
+            background-color: var(--gold-accent) !important;
+            color: var(--navy-dark) !important;
+            border-color: var(--gold-accent) !important;
+            box-shadow: 0px 4px 10px rgba(212, 175, 55, 0.3) !important;
         }
         
-        /* Expander Frame Enhancements */
-        [data-testid="stSidebar"] .st-expander {
-            border: 1px solid rgba(0, 26, 61, 0.2) !important;
-            background-color: var(--white) !important;
-            margin-bottom: 6px;
-        }
-
-        /* Edge-to-Edge Frame Control Layout */
-        iframe {
-            border: none !important;
-            width: 100% !important;
-            height: calc(100vh - 4px) !important;
-        }
-        
+        /* Suppress built-in platform headers and margins */
         .stDeployButton, footer, #stDecoration { display:none !important; }
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. DICTIONARY DEFINITIONS (OSM STRUCTURAL STRINGS)
+# 2. APPLICATION STATE PERSISTENCE INITIALIZATION
+# -----------------------------------------------------------------------------
+DEFAULT_COORDS = "14.6465, 121.0371"
+DEFAULT_RADIUS = 1000
+DEFAULT_SEARCH = ""
+
+if 'geo_coords' not in st.session_state:
+    st.session_state.geo_coords = DEFAULT_COORDS
+if 'geo_radius' not in st.session_state:
+    st.session_state.geo_radius = DEFAULT_RADIUS
+if 'search_filter' not in st.session_state:
+    st.session_state.search_filter = DEFAULT_SEARCH
+if 'scanned_records' not in st.session_state:
+    st.session_state.scanned_records = []
+
+def trigger_master_purge():
+    st.session_state.geo_coords = DEFAULT_COORDS
+    st.session_state.geo_radius = DEFAULT_RADIUS
+    st.session_state.search_filter = DEFAULT_SEARCH
+    st.session_state.scanned_records = []
+    for key in list(st.session_state.keys()):
+        if key.startswith("chk_") or key.startswith("input_chk_"):
+            st.session_state[key] = False
+
+# -----------------------------------------------------------------------------
+# 3. POI LAYER TAG REGISTRIES
 # -----------------------------------------------------------------------------
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"']],
@@ -124,119 +163,219 @@ POI_CONFIG = {
 }
 
 ADVANCED_CONFIG = {
-    "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"']],
-    "RETAIL_ADV": [['Beauty', '"shop"="beauty"'], ['Car', '"shop"="car"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i']]
+    "ADV - AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"']],
+    "ADV - RETAIL_ADV": [['Beauty', '"shop"="beauty"'], ['Car', '"shop"="car"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i']]
 }
 
-# Geofence Circle Boundary Calculation Math Module
-def generate_kml_radius(lat, lon, radius_meters):
-    kml_header = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Radius Scan</name><Placemark><Polygon><outerBoundaryIs><LinearRing><coordinates>'
-    kml_footer = '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>'
-    points = []
+# -----------------------------------------------------------------------------
+# 4. EXPORT ENGINE (KML AND CSV TRANSFORMATIONS)
+# -----------------------------------------------------------------------------
+def compile_radius_kml(lat, lon, r_meters):
+    kml = f'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scan Radius Geofence</name><Placemark><name>Buffer Zone</name><Style><LineStyle><color>ff3d1a00</color><width>3</width></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style><Polygon><outerBoundaryIs><LinearRing><coordinates>'
     for i in range(37):
         angle = (i * 10) * math.pi / 180
-        delta_lat = (radius_meters / 6371000) * math.cos(angle)
-        delta_lon = (radius_meters / (6371000 * math.cos(lat * math.pi / 180))) * math.sin(angle)
-        pt_lat = lat + (delta_lat * 180 / math.pi)
-        pt_lon = lon + (delta_lon * 180 / math.pi)
-        points.append(f"{pt_lon},{pt_lat},0")
-    return kml_header + " ".join(points) + kml_footer
+        d_lat = (r_meters / 6371000) * math.cos(angle)
+        d_lon = (r_meters / (6371000 * math.cos(lat * math.pi / 180))) * math.sin(angle)
+        p_lat = lat + (d_lat * 180 / math.pi)
+        p_lon = lon + (d_lon * 180 / math.pi)
+        kml += f"{p_lon},{p_lat},0 "
+    kml += '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>'
+    return kml
 
-# Base Target Configuration Assignment
-if 'target_url' not in st.session_state:
-    st.session_state.target_url = "https://overpass-turbo.eu/?C=14.6465;121.0371;14"
+def compile_features_kml(features):
+    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POI Asset Layers</name>'
+    for f in features:
+        name = f.get('name', 'Unnamed Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        class_type = f.get('type', 'POI Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        kml += f"<Placemark><name>{name}</name><description>Classification: {class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
+    kml += '</Document></kml>'
+    return kml
 
 # -----------------------------------------------------------------------------
-# 3. CONTROL PANEL GRAPHICS (SIDEBAR COMPONENT ENGINE)
+# 5. SIDEBAR WORKSPACE GRAPHICS
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # Centered Header Panel Alignment
-    st.markdown("<h2 style='color:var(--navy); text-align:center; font-family:Arial; font-weight:900; margin-top:10px; margin-bottom:20px; letter-spacing:1px;'>TRADE AREA SCAN</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:var(--white-clean); text-align:center; font-family:Arial; font-weight:900; margin-top:10px; margin-bottom:5px; letter-spacing:1.5px;'>TRADE AREA SCAN</h2>", unsafe_allow_html=True)
     
-    # CONTAINER 1: GEOGRAPHIC CONTROL PANEL CARD
-    st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-    
-    # Title & Hyperlink layout execution
-    col_lbl, col_lnk = st.columns([2, 1])
-    with col_lbl:
-        st.markdown("<span style='color:var(--navy); font-weight:900; font-size:12px;'>GEOGRAPHY</span>", unsafe_allow_html=True)
-    with col_lnk:
-        # Clear All Action execution handling via state verification loop reset
-        if st.button("CLEAR ALL", key="action_clear_state", help="Uncheck all active selection parameters"):
-            for session_key in list(st.session_state.keys()):
-                if session_key.startswith("chk_"):
-                    st.session_state[session_key] = False
+    # Clean Flush Link Configuration
+    col_void, col_clear_trigger = st.columns([1.6, 1])
+    with col_clear_trigger:
+        if st.button("✨ CLEAR ALL", key="master_purge_btn", help="Flush coordinate assets, dimensions, filters, and active points"):
+            trigger_master_purge()
             st.rerun()
-            
-    coords_input = st.text_input("Coordinates Target", value="14.6465, 121.0371", key="geo_coords_coord")
-    radius_input = st.number_input("Scan Radius (Meters)", min_value=100, max_value=100000, value=1000, step=100, key="geo_radius_val")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Coordinate validation processing
-    coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_input)
-    lat, lon = (coord_match.group(1), coord_match.group(2)) if coord_match else ("14.6465", "121.0371")
 
-    # CONTAINER 2: SELECTION & POI TREE CARD
-    st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-    st.markdown("<div style='color:var(--navy); font-weight:900; font-size:12px; margin-bottom:10px;'>POI SELECTION LIBRARY</div>", unsafe_allow_html=True)
-    
-    search_term = st.text_input("Filter Options", "", key="search_query_filter").lower()
-    
-    chosen_tags = []
-
-    # UI Core Loop Compilation
-    for category, structural_items in POI_CONFIG.items():
-        matched_items = [item for item in structural_items if search_term in item[0].lower()]
-        if matched_items:
-            with st.expander(category, expanded=(len(search_term) > 0)):
-                for labels, tag_string in matched_items:
-                    if st.checkbox(labels, key=f"chk_core_{category}_{labels}"):
-                        chosen_tags.append(tag_string)
-
-    # UI Advanced Loop Compilation
-    for category, structural_items in ADVANCED_CONFIG.items():
-        matched_items = [item for item in structural_items if search_term in item[0].lower()]
-        if matched_items:
-            with st.expander(f"ADV - {category}", expanded=(len(search_term) > 0)):
-                for labels, tag_string in matched_items:
-                    if st.checkbox(labels, key=f"chk_adv_{category}_{labels}"):
-                        chosen_tags.append(tag_string)
+    # CONTAINER CARD 1: GEOGRAPHIC CRITERIA
+    st.markdown('<div class="premium-rounded-card">', unsafe_allow_html=True)
+    st.markdown("<div style='color:var(--gold-accent); font-weight:800; font-size:11px; margin-bottom:10px; letter-spacing:0.5px;'>GEOGRAPHIC PROFILE</div>", unsafe_allow_html=True)
+    coords_val = st.text_input("Coordinates Target", key="geo_coords")
+    radius_val = st.number_input("Scan Radius (Meters)", min_value=100, max_value=50000, key="geo_radius", step=100)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ACTION FOOTER FRAME (DUAL COLUMN ACTION WORKSPACE)
-    st.markdown("<br>", unsafe_allow_html=True)
-    col_action_left, col_action_right = st.columns(2)
+    coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
+    lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.6465, 121.0371)
+
+    # CONTAINER CARD 2: BASEMAP EXTENSION PANEL
+    st.markdown('<div class="premium-rounded-card">', unsafe_allow_html=True)
+    st.markdown("<div style='color:var(--gold-accent); font-weight:800; font-size:11px; margin-bottom:10px; letter-spacing:0.5px;'>BASEMAP VIEW CONFIGURATION</div>", unsafe_allow_html=True)
+    basemap_choice = st.selectbox("Layer Engine Type", ["OpenStreetMap", "Satellite", "Carto"], index=0, label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # CONTAINER CARD 3: LOOKUP FILTER AND SELECTION TREE
+    st.markdown('<div class="premium-rounded-card">', unsafe_allow_html=True)
+    st.markdown("<div style='color:var(--gold-accent); font-weight:800; font-size:11px; margin-bottom:10px; letter-spacing:0.5px;'>POI LAYER REGISTRY</div>", unsafe_allow_html=True)
+    search_query = st.text_input("Filter Options", key="search_filter", placeholder="Type keywords here...").lower()
     
-    with col_action_left:
-        # Pre-calculate active KML text string streams to support instant download handshakes
-        try:
-            kml_payload = generate_kml_radius(float(lat), float(lon), radius_input)
-        except ValueError:
-            kml_payload = ""
-            
+    selected_osm_tags = []
+    
+    # Core Layer Mapping loop
+    for cat_name, node_items in POI_CONFIG.items():
+        matched_rows = [item for item in node_items if search_query in item[0].lower()]
+        if matched_rows:
+            with st.expander(cat_name, expanded=(len(search_query) > 0)):
+                for presentation_label, osm_tag in matched_rows:
+                    if st.checkbox(presentation_label, key=f"input_chk_core_{cat_name}_{presentation_label}"):
+                        selected_osm_tags.append(osm_tag)
+
+    # Advanced Layer Mapping loop
+    for cat_name, node_items in ADVANCED_CONFIG.items():
+        matched_rows = [item for item in node_items if search_query in item[0].lower()]
+        if matched_rows:
+            with st.expander(cat_name, expanded=(len(search_query) > 0)):
+                for presentation_label, osm_tag in matched_rows:
+                    if st.checkbox(presentation_label, key=f"input_chk_adv_{cat_name}_{presentation_label}"):
+                        selected_osm_tags.append(osm_tag)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # CONTAINER CARD 4: EXPORT MULTI-FORMAT PANEL WORKSPACE
+    st.markdown('<div class="premium-rounded-card">', unsafe_allow_html=True)
+    st.markdown("<div style='color:var(--gold-accent); font-weight:800; font-size:11px; margin-bottom:10px; letter-spacing:0.5px;'>DATA DISTRIBUTION TRAY</div>", unsafe_allow_html=True)
+    export_format = st.selectbox("Choose Export Target", ["Select Format...", "Radius (KML)", "POIs (KML)", "Attributes (CSV)"], index=0, label_visibility="collapsed")
+    
+    if export_format == "Radius (KML)":
+        radius_kml_payload = compile_radius_kml(lat_coord, lon_coord, radius_val)
         st.download_button(
-            label="Export Radius",
-            data=kml_payload,
-            file_name=f"Radius_{lat}_{lon}_{radius_input}m.kml",
-            mime="application/vnd.google-earth.kml+xml",
-            use_container_width=True,
-            key="btn_trigger_kml"
+            label="Download Radius KML",
+            data=radius_kml_payload,
+            file_name=f"Radius_Ring_{radius_val}m.kml",
+            mime="application/vnd.google-earth.kml+xml"
         )
-        
-    with col_action_right:
-        if st.button("Scan Area", type="primary", use_container_width=True, key="btn_trigger_overpass"):
-            if not chosen_tags:
-                st.error("Select at least 1 filter layer.")
-            else:
-                # Direct generation of standard Overpass QL structural code scripts
-                statement_blocks = "\n".join([f"  nwr[{tag}](around:{radius_input},{lat},{lon});" for tag in chosen_tags])
-                compiled_overpass_ql = f"[out:json][timeout:120];\n(\n{statement_blocks}\n);\nout center;\n>;\nout skel qt;"
-                encoded_ql = urllib.parse.quote(compiled_overpass_ql)
-                
-                # Append &R execution code string flag to drop code views automatically and maximize map estate
-                st.session_state.target_url = f"https://overpass-turbo.eu/?Q={encoded_ql}&R"
+    elif export_format == "POIs (KML)":
+        scanned_kml_payload = compile_features_kml(st.session_state.scanned_records)
+        st.download_button(
+            label="Download POI KML",
+            data=scanned_kml_payload,
+            file_name=f"Scanned_Area_{radius_val}m.kml",
+            mime="application/vnd.google-earth.kml+xml",
+            disabled=(len(st.session_state.scanned_records) == 0)
+        )
+    elif export_format == "Attributes (CSV)":
+        if st.session_state.scanned_records:
+            csv_dataframe = pd.DataFrame(st.session_state.scanned_records)
+            csv_payload = csv_dataframe.to_csv(index=False).encode('utf-8')
+        else:
+            csv_payload = b""
+        st.download_button(
+            label="Download Attributes CSV",
+            data=csv_payload,
+            file_name=f"Trade_Area_Nodes_{radius_val}m.csv",
+            mime="text/csv",
+            disabled=(len(st.session_state.scanned_records) == 0)
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # PRIMARY DATA EXTRACTION SCAN BUTTON TRIGGER
+    if st.button("🚀 SCAN AREA PROFILE", type="primary", use_container_width=True):
+        if not selected_osm_tags:
+            st.error("Select at least 1 layer feature to analyze.")
+        else:
+            overpass_url = "https://overpass-api.de/api/interpreter"
+            statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_osm_tags])
+            compiled_ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
+            
+            with st.spinner("Processing network queries..."):
+                try:
+                    api_response = requests.post(overpass_url, data={"data": compiled_ql}, timeout=100)
+                    if api_response.status_code == 200:
+                        raw_elements = api_response.json().get('elements', [])
+                        parsed_records = []
+                        for el in raw_elements:
+                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
+                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
+                            if e_lat and e_lon:
+                                tags = el.get('tags', {})
+                                parsed_records.append({
+                                    "lat": e_lat, "lon": e_lon,
+                                    "name": tags.get('name', 'Unnamed Node'),
+                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Asset Point'
+                                })
+                        st.session_state.scanned_records = parsed_records
+                        st.rerun()
+                    else:
+                        st.sidebar.error(f"Interpreter Exception Code: {api_response.status_code}")
+                except Exception as e:
+                    st.sidebar.error(f"Connection Timed Out: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 4. VIEWPORT CANVAS RENDERING FRAME
+# 6. EDGE-TO-EDGE GEOSPATIAL MAP CANVAS ENGINE
 # -----------------------------------------------------------------------------
-st.components.v1.iframe(st.session_state.target_url)
+TILE_DICTIONARY = {
+    "OpenStreetMap": "https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png",
+    "Satellite": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}",
+    "Carto": "https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png"
+}
+selected_tile_template = TILE_DICTIONARY[basemap_choice]
+geojson_features_string = json.dumps(st.session_state.scanned_records)
+
+leaflet_injection_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body, html, #map-canvas-container {{
+            margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; background: #000f24;
+        }}
+    </style>
+</head>
+<body>
+    <div id="map-canvas-container"></div>
+    <script>
+        // Init viewport frame
+        const map = L.map('map-canvas-container', {{ zoomControl: true, attributionControl: false }}).setView([{lat_coord}, {lon_coord}], 14);
+        L.tileLayer('{selected_tile_template}', {{ maxZoom: 19 }}).addTo(map);
+        
+        // Pinned center coordinates indicated via clean Solid Red Marker Dot
+        L.circleMarker([{lat_coord}, {lon_coord}], {{
+            radius: 8, fillColor: "#ff0000", color: "#ffffff", weight: 2.5, opacity: 1, fillOpacity: 1
+        }}).addTo(map).bindPopup("<b>TARGET FOCAL PROFILE ASSET</b>");
+        
+        // Boundary Geofence perimeter traced using brand Navy Blue with light inner fill opacity
+        L.circle([{lat_coord}, {lon_coord}], {{
+            radius: {radius_val}, color: "#001a3d", weight: 3, fillColor: "#001a3d", fillOpacity: 0.12
+        }}).addTo(map);
+        
+        // Loop and mount all loaded query target vector feature elements
+        const featurePoints = {geojson_features_string};
+        featurePoints.forEach(pt => {{
+            L.circleMarker([pt.lat, pt.lon], {{
+                radius: 6, fillColor: "#d4af37", color: "#001a3d", weight: 1.5, opacity: 1, fillOpacity: 0.9
+            }}).addTo(map).bindPopup("<b>" + pt.name + "</b><br>Classification: " + pt.type);
+        }});
+        
+        if(featurePoints.length > 0) {{
+            const group = new L.featureGroup([
+                L.marker([{lat_coord}, {lon_coord}]),
+                ...featurePoints.map(p => L.marker([p.lat, p.lon]))
+            ]);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }}
+        
+        // Handle Leaflet canvas invalidation resizing
+        setTimeout(function() {{ map.invalidateSize(); }}, 250);
+    </script>
+</body>
+</html>
+"""
+
+st.components.v1.html(leaflet_injection_html, height=920, scrolling=False)
