@@ -4,7 +4,7 @@ import re
 import json
 
 # -----------------------------------------------------------------------------
-# 1. PRIME BRANDED BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
+# 1. PRIME BRANDED THEME & TYPOGRAPHY OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN | PRIME",
@@ -14,19 +14,26 @@ st.set_page_config(
 
 st.markdown("""
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@400;600;800&display=swap');
+
         :root {
-            --midnight-blue: #003366 !important; /* PRIME Blue Anchor */
-            --prime-gold: #C9AB4C !important; /* PRIME Gold Anchor */
+            --midnight-blue: #003366 !important; 
+            --prime-gold: #C9AB4C !important; 
             --white-clean: #ffffff !important;
-            --grid-line: rgba(128, 128, 128, 0.10) !important; /* Screen grid lines */
+            --grid-line: rgba(128, 128, 128, 0.10) !important;
             --soft-shadow: 0 4px 16px rgba(0, 51, 102, 0.12) !important;
         }
         
-        /* Typography Rules: Arial / Helvetica for digital screens */
+        /* Base Typography: Arial/Helvetica for standard reading per guidelines */
         html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main, .block-container {
             background-color: var(--white-clean) !important;
             color: var(--midnight-blue) !important;
             font-family: 'Arial', 'Helvetica', sans-serif !important;
+        }
+        
+        /* Headers and UI Elements: Montserrat */
+        h1, h2, h3, h4, h5, h6, button, [data-testid="stExpander"] summary p, label {
+            font-family: 'Montserrat', sans-serif !important;
         }
         
         [data-testid="stSidebar"] {
@@ -45,10 +52,6 @@ st.markdown("""
         [data-testid="collapsedControl"] { display: none !important; }
         ::-webkit-scrollbar { width: 0px !important; background: transparent !important; }
         * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
-        
-        p, span, label, h1, h2, h3, h4, h5, h6, .stMarkdown, [data-testid="stExpander"] summary p {
-            color: var(--midnight-blue) !important;
-        }
         
         [data-testid="stHeader"], header, #stDecoration { display: none !important; }
         
@@ -80,14 +83,15 @@ st.markdown("""
         }
         div[data-baseweb="input"]:focus-within { border-bottom: 2px solid var(--midnight-blue) !important; }
         
-        /* PRIMARY & POPOVER BUTTONS - Midnight Base */
+        /* BUTTONS - Montserrat, Midnight Base with Gold Hover */
         div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button {
             background-color: var(--midnight-blue) !important; 
             border: none !important; border-radius: 4px !important; width: 100% !important; padding: 8px !important;
             box-shadow: var(--soft-shadow) !important; transition: all 0.2s ease !important;
         }
-        div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p {
-            color: var(--white-clean) !important; font-weight: 800 !important; font-size: 11px !important; text-transform: uppercase !important;
+        div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, div.stDownloadButton > button p {
+            color: var(--white-clean) !important; font-weight: 800 !important; font-size: 11px !important; 
+            text-transform: uppercase !important; font-family: 'Montserrat', sans-serif !important;
         }
         div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover {
             background-color: var(--prime-gold) !important;
@@ -98,17 +102,16 @@ st.markdown("""
             border: none !important; border-radius: 4px !important; width: 100% !important; padding: 4px !important;
             box-shadow: var(--soft-shadow) !important; transition: all 0.2s ease !important;
         }
-        div.stDownloadButton > button:hover {
-            background-color: var(--prime-gold) !important;
-        }
+        div.stDownloadButton > button:hover { background-color: var(--prime-gold) !important; }
         
-        /* HYPERLINK STYLE FOR CLEAR BUTTON */
+        /* HYPERLINK STYLE CLEAR BUTTON */
         div.stButton > button[kind="primary"] {
             background: transparent !important; border: none !important; color: var(--midnight-blue) !important;
             box-shadow: none !important; padding: 0 !important; margin-top: 4px; display: inline-flex;
         }
         div.stButton > button[kind="primary"] p {
-            color: var(--midnight-blue) !important; font-size: 11px !important; font-weight: 800 !important; text-decoration: underline !important; text-transform: uppercase;
+            color: var(--midnight-blue) !important; font-size: 11px !important; font-weight: 800 !important; 
+            text-decoration: underline !important; text-transform: uppercase; font-family: 'Montserrat', sans-serif !important;
         }
         div.stButton > button[kind="primary"]:hover p { color: var(--prime-gold) !important; }
         
@@ -133,21 +136,11 @@ if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
 
 POI_CONFIG = {
-    "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
-    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
-    "FOOD AND BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"']],
-    "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports & Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'], ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses & Depots', '"building"~"warehouse|depot",i'], ['Storage Facilities', '"building"="storage"'], ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']],
-    "GOVERNMENT & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i']],
-    "SCHOOLS": [['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"']]
-}
-
-ADVANCED_CONFIG = {
-    "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Clinic', '"amenity"="clinic"'], ['Embassy', '"amenity"="embassy"'], ['Firestation', '"amenity"="fire_station"'], ['Fuel', '"amenity"="fuel"'], ['Hospital', '"amenity"="hospital"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Parking', '"amenity"="parking"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police', '"amenity"="police"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['University', '"amenity"="university"']],
-    "PLACE OF WORSHIP": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Casino', '"amenity"="casino"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"']],
-    "FOOD & BEVERAGE": [['Bar', '"amenity"="bar"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Cafe', '"amenity"="cafe"'], ['Fast food', '"amenity"="fast_food"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Restaurant', '"amenity"="restaurant"']],
-    "RETAIL_ADV": [['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"']],
-    "SPORTS": [['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"']],
-    "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
+    "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"']],
+    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"']],
+    "FOOD AND BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"']],
+    "INDUSTRIAL": [['Ports & Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Warehouses', '"building"~"warehouse|depot",i']],
+    "GOVERNMENT": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"']]
 }
 
 def compile_features_kml(features):
@@ -162,7 +155,8 @@ def compile_features_kml(features):
 # 3. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div style="color: #003366; font-size: 20px; font-weight: 900; letter-spacing: 1px; margin-bottom: 24px; text-align: center;">TRADE AREA SCAN</div>', unsafe_allow_html=True)
+    # Title uses Cormorant Garamond for high-level editorial hierarchy
+    st.markdown('<div style="font-family: \'Cormorant Garamond\', serif; color: #003366; font-size: 24px; font-weight: 700; letter-spacing: 1px; margin-bottom: 24px; text-align: center;">PRIME TRADE SCAN</div>', unsafe_allow_html=True)
     
     coords_val = st.text_input("COORDINATES", key="geo_coords")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, key="geo_radius", step=100)
@@ -180,13 +174,6 @@ with st.sidebar:
             with st.expander(cat_name, expanded=(len(search_query) > 0)):
                 for label, tag in matched:
                     if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
-
-    for cat_name, node_items in ADVANCED_CONFIG.items():
-        matched = [item for item in node_items if search_query in item[0].lower()]
-        if matched:
-            with st.expander(f"ADV - {cat_name}", expanded=(len(search_query) > 0)):
-                for label, tag in matched:
-                    if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -222,24 +209,12 @@ with st.sidebar:
     
     col1, col2 = st.columns(2)
     with col1:
-        st.download_button("EXPORT PROJ", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
+        st.download_button("EXPORT JSON", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
     with col2:
         st.download_button("EXPORT KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
-    with st.popover("IMPORT PROJECT", use_container_width=True):
-        st.markdown("<div style='font-size:11px; font-weight:800; color:#003366; margin-bottom: 8px;'>UPLOAD SAVED PROJECT FILE</div>", unsafe_allow_html=True)
-        imported_file = st.file_uploader("Select JSON file", type=["json"], label_visibility="collapsed")
-        if imported_file is not None:
-            if st.button("EXECUTE IMPORT", type="secondary", use_container_width=True):
-                try:
-                    data = json.load(imported_file)
-                    st.session_state.scanned_records = data.get("scanned_records", data)
-                    st.rerun()
-                except Exception:
-                    st.error("Invalid File")
-
 # -----------------------------------------------------------------------------
-# 4. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
+# 4. ZERO-LATENCY SPATIAL CANVAS (HTML/JS)
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = lat_coord
@@ -250,6 +225,7 @@ leaflet_template = """
 <!DOCTYPE html>
 <html>
 <head>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -258,87 +234,62 @@ leaflet_template = """
         
         #minimal-basemap-panel {
             position: absolute; bottom: 20px; left: 10px; z-index: 1000;
-            background: #ffffff; border-radius: 4px; border: 2px solid rgba(128,128,128,0.2); background-clip: padding-box;
-            display: flex; flex-direction: column; padding: 2px;
+            background: #ffffff; border-radius: 4px; border: 1px solid rgba(128,128,128,0.1); background-clip: padding-box;
+            display: flex; flex-direction: column; padding: 2px; font-family: 'Montserrat', sans-serif;
         }
         #minimal-basemap-panel select {
-            border: none; border-bottom: 1px solid rgba(128,128,128,0.2); padding: 4px; font-size: 11px; font-weight: bold;
-            color: #333; background: transparent; outline: none; cursor: pointer; width: 100%;
+            border: none; border-bottom: 1px solid rgba(128,128,128,0.1); padding: 4px; font-size: 11px; font-weight: bold;
+            color: #003366; background: transparent; outline: none; cursor: pointer; width: 100%; font-family: 'Montserrat', sans-serif;
         }
         .minimal-label {
-            font-size: 10px; font-weight: bold; padding: 4px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #333; margin: 0;
+            font-size: 10px; font-weight: 600; padding: 4px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #333; margin: 0;
         }
-
-        #search-container { position: absolute; top: 10px; left: 54px; z-index: 1000; width: 340px; }
-        #map-search {
-            width: 100%; padding: 10px 14px; border: 2px solid rgba(128,128,128,0.2); border-radius: 4px; background-clip: padding-box;
-            font-size: 13px; font-weight: bold; color: #333; background: #ffffff; outline: none; box-sizing: border-box;
-        }
-        #search-results {
-            position: absolute; top: 45px; left: 0; width: 100%; background: #ffffff;
-            border-radius: 4px; display: none; max-height: 250px; overflow-y: auto; 
-            border: 2px solid rgba(128,128,128,0.2); box-sizing: border-box; z-index: 1001;
-        }
-        .search-item { padding: 10px 14px; font-size: 12px; cursor: pointer; border-bottom: 1px solid rgba(128,128,128,0.1); }
-        .search-item:hover { background: #f4f4f4; }
 
         #scan-results-panel {
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff;
-            width: 280px; max-height: calc(100vh - 20px); border-radius: 4px; border: 2px solid rgba(128,128,128,0.2); background-clip: padding-box;
-            display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 280px; max-height: calc(100vh - 20px); border-radius: 4px; border: 1px solid rgba(128,128,128,0.1); background-clip: padding-box;
+            display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0,51,102,0.1);
         }
         .results-header {
-            background: #003366; color: #ffffff; padding: 12px 14px; font-size: 11px; font-weight: 900;
+            background: #003366; color: #ffffff; padding: 12px 14px; font-size: 13px; font-weight: 800;
             display: flex; justify-content: space-between; align-items: center; text-transform: uppercase;
+            font-family: 'Montserrat', sans-serif;
         }
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
         .layer-category-block { border-bottom: 1px solid rgba(128,128,128,0.1); }
         .layer-category-header {
             background: #ffffff; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;
-            cursor: pointer; user-select: none;
+            cursor: pointer; user-select: none; font-family: 'Montserrat', sans-serif;
         }
         .layer-category-header:hover { background: #fafafa; }
-        .layer-header-left { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; color: #003366; }
+        .layer-header-left { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: #003366; }
         
         .layer-category-items { padding: 0; background: #fafafa; }
         .layer-category-items.collapsed { display: none !important; }
         
         .results-item {
-            padding: 8px 14px 8px 34px; font-size: 11px; font-weight: 600; color: #333;
+            padding: 8px 14px 8px 34px; font-size: 11px; color: #333;
             cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .results-item:hover { background: #eaeaea; }
 
-        .poi-text-label { background: #fff; border: 1px solid rgba(128,128,128,0.2); padding: 2px 4px; border-radius: 2px; font-size: 10px; font-weight: bold; white-space: nowrap; color: #888780; }
+        /* Typography Override per guidelines: Arial 10px, #888780 */
+        .poi-text-label { background: #fff; border: 1px solid rgba(128,128,128,0.1); padding: 2px 4px; border-radius: 2px; font-size: 10px; font-family: 'Arial', sans-serif; color: #888780; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .hide-labels .poi-text-label { display: none !important; }
-        .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.2); }
+        
+        /* 10x10px squares per Legend rules */
+        .color-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; border: none; }
 
-        #right-viewer-panel {
-            position: absolute; top: 10px; right: 300px; z-index: 1001; background: #ffffff; border-radius: 4px;
-            width: 450px; height: calc(100vh - 20px); border: 2px solid rgba(128,128,128,0.2); background-clip: padding-box;
-            display: none; flex-direction: column; box-shadow: -4px 0 20px rgba(0,0,0,0.15); overflow: hidden;
-        }
-        .viewer-header {
-            background: #003366; color: #ffffff; padding: 12px 14px; font-weight: 900; font-size: 11px;
-            display: flex; justify-content: space-between; align-items: center; text-transform: uppercase;
-        }
-        .viewer-header span.close-btn { cursor: pointer; font-size: 16px; line-height: 1; }
-        #viewer-iframe { flex-grow: 1; border: none; width: 100%; background: #f8fafc; }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    
-    <div id="search-container">
-        <input type="text" id="map-search" placeholder="Search location globally..." onkeyup="handleSearch(event)">
-        <div id="search-results"></div>
-    </div>
 
     <div id="minimal-basemap-panel">
         <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
+            <option value="carto">Carto Light</option>
             <option value="osm">OpenStreetMap</option>
             <option value="satellite">Google Satellite</option>
-            <option value="carto">Carto Light</option>
         </select>
         <label class="minimal-label" for="label-toggle-chk">
             <input type="checkbox" id="label-toggle-chk" style="margin:0; cursor: pointer;" onchange="toggleLabelsMatrix(this.checked)"> Show Labels
@@ -347,18 +298,11 @@ leaflet_template = """
 
     <div id="scan-results-panel">
         <div class="results-header">
-            <span>SCAN INDEX</span>
+            <span>INDEX</span>
             <span id="results-count">0</span>
         </div>
         <div class="results-list" id="results-list-box"></div>
-    </div>
-
-    <div id="right-viewer-panel">
-        <div class="viewer-header">
-            <span id="viewer-title">VIEWER</span>
-            <span class="close-btn" onclick="closeViewer()">✖</span>
-        </div>
-        <iframe id="viewer-iframe" src=""></iframe>
+        <div style="padding: 8px; text-align: center; font-size: 8.5px; font-style: italic; color: #999999;">PRIME Analytics Framework</div>
     </div>
 
     <script>
@@ -366,13 +310,13 @@ leaflet_template = """
         map.zoomControl.setPosition('topleft');
         
         const basemaps = {
+            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
+            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 })
         };
         
-        let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'osm';
-        if (!basemaps[activeBasemapKey]) activeBasemapKey = 'osm';
+        let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'carto';
+        if (!basemaps[activeBasemapKey]) activeBasemapKey = 'carto';
         document.getElementById('basemap-select').value = activeBasemapKey;
         basemaps[activeBasemapKey].addTo(map);
         
@@ -393,22 +337,23 @@ leaflet_template = """
             localStorage.setItem('ts_persistent_labels', isShown);
         }
         
+        /* Center point marked by PRIME Gold Anchor */
         const starIcon = L.divIcon({
             className: 'custom-center-icon',
             html: '<div style="background-color: #C9AB4C; color: #003366; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">★</div>',
             iconSize: [26, 26], iconAnchor: [13, 13]
         });
-        const centerMarker = L.marker([__LAT__, __LON__], { icon: starIcon, zIndexOffset: 10000 }).addTo(map);
+        L.marker([__LAT__, __LON__], { icon: starIcon, zIndexOffset: 10000 }).addTo(map);
         
-        const radiusCircle = L.circle([__LAT__, __LON__], {
-            radius: __RADIUS__, color: "#003366", weight: 2, fillColor: "#003366", fillOpacity: 0.1
+        L.circle([__LAT__, __LON__], {
+            radius: __RADIUS__, color: "#003366", weight: 2, fillColor: "#003366", fillOpacity: 0.05
         }).addTo(map);
         
         const pts = __GEOJSON__;
         const categoryMap = {};
         const layerGroupsRef = {};
         
-        // PRIME 10-Series Categorical Palette (S1 to S9 - Champagne excluded for data fills)
+        // PRIME 9-Series Categorical Palette (S1 to S9) - S10 Champagne Excluded
         const catPalette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F"];
         const categoryColors = {}; let colorIndex = 0;
         
@@ -425,8 +370,9 @@ leaflet_template = """
             const pColor = categoryColors[key];
             categoryMap[key].forEach(p => {
                 const marker = L.circleMarker([p.lat, p.lon], {
-                    radius: 5, fillColor: pColor, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.9
-                }).bindPopup("<b>" + p.name + "</b><br>" + p.type);
+                    radius: 5, fillColor: pColor, color: "#ffffff", weight: 1, opacity: 1, fillOpacity: 0.95
+                }).bindPopup("<div style='font-family: Montserrat; font-size: 11px;'><b>" + p.name + "</b><br>" + p.type + "</div>");
+                
                 if (p.name && p.name !== 'Unknown') {
                     marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -6], className: 'poi-text-label' });
                 }
@@ -449,7 +395,7 @@ leaflet_template = """
                                 <span class="color-dot" style="background-color: ${dotColor};"></span>
                                 <span>${catName} <span style="color: #888; font-size: 10px;">(${categoryMap[catName].length})</span></span>
                             </div>
-                            <span id="chevron-${catName}" style="font-size: 10px;">▼</span>
+                            <span id="chevron-${catName}" style="font-size: 10px; color: #003366;">▼</span>
                         </div>
                         <div class="layer-category-items" id="items-${catName}">
                 `;
@@ -471,37 +417,6 @@ leaflet_template = """
             const chev = document.getElementById('chevron-' + catKey);
             panel.classList.toggle('collapsed');
             chev.innerText = panel.classList.contains('collapsed') ? '▲' : '▼';
-        }
-
-        map.on('contextmenu', function(e) {
-            const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
-            const menuHtml = `
-                <div style="font-family: Arial; font-size: 11px; color: #333; min-width: 140px;">
-                    <div style="font-weight: 900; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 6px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP ACTIONS</div>
-                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#003366'" onmouseout="this.style.color='#333'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">📋 COPY COORDINATES</div>
-                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#003366'" onmouseout="this.style.color='#333'" onclick="openRightPanel('routes', ${lat}, ${lng}); map.closePopup();">🗺️ GOOGLE MAPS</div>
-                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#003366'" onmouseout="this.style.color='#333'" onclick="openRightPanel('streetview', ${lat}, ${lng}); map.closePopup();">🛣️ STREETVIEW</div>
-                </div>
-            `;
-            L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
-        });
-
-        function openRightPanel(type, lat, lng) {
-            const panel = document.getElementById('right-viewer-panel');
-            const iframe = document.getElementById('viewer-iframe');
-            document.getElementById('viewer-title').innerText = type === 'routes' ? 'GOOGLE MAPS' : 'STREETVIEW';
-            
-            if(type === 'routes') {
-                iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&output=embed`;
-            } else {
-                iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&layer=c&cbll=${lat},${lng}&output=svembed`;
-            }
-            panel.style.display = 'flex';
-        }
-        function closeViewer() {
-            document.getElementById('right-viewer-panel').style.display = 'none';
-            document.getElementById('viewer-iframe').src = "";
         }
 
         if (pts.length > 0 && !__IS_STALE__) {
