@@ -1,12 +1,10 @@
 import streamlit as st
-import requests
+import urllib.parse
 import re
 import math
-import json
-import pandas as pd
 
 # -----------------------------------------------------------------------------
-# 1. LIGHT MODE SYSTEM DESIGN & CORPORATE TYPOGRAPHY CONFIGURATION
+# 1. PREMIUM LIGHT MODE & GEOMETRIC PILL OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -14,7 +12,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS injection to center headers, style hyperlinks, and round elements
 st.markdown("""
     <style>
         :root {
@@ -24,12 +21,12 @@ st.markdown("""
             --border-gray: #e0e4ec;
         }
         
-        /* Maximize workspace dimensions */
+        /* Maximize primary viewport space */
         .block-container {
             padding: 0rem !important;
         }
         
-        /* Clean Light Mode Sidebar Specification */
+        /* Clean Light Mode Sidebar Re-skinning */
         [data-testid="stSidebar"] {
             background-color: var(--white-clean) !important;
             color: var(--navy-brand) !important;
@@ -42,10 +39,10 @@ st.markdown("""
             padding-right: 16px !important;
         }
         
-        /* Upscaled & Centered App Title Header */
+        /* Upscaled & Centered Header Element */
         .sidebar-title {
             color: var(--navy-brand) !important;
-            font-size: 28px !important;
+            font-size: 26px !important;
             font-weight: 900 !important;
             letter-spacing: 1.5px !important;
             text-transform: uppercase !important;
@@ -63,7 +60,7 @@ st.markdown("""
             letter-spacing: 0.5px !important;
         }
         
-        /* Precise Geometric Rounding Rules for Input Fields */
+        /* Input Field Geometry Rounding */
         div[data-baseweb="input"], div[data-baseweb="select"], .stSelectbox, .stTextInput, .stNumberInput {
             border-radius: 8px !important;
         }
@@ -80,7 +77,7 @@ st.markdown("""
             border: 1px solid var(--border-gray) !important;
         }
         
-        /* Standard Pill Buttons (Scan and Download Utilities) */
+        /* Pill Button Specifications */
         div.stButton > button, div.stDownloadButton > button {
             background-color: var(--navy-brand) !important;
             color: var(--white-clean) !important;
@@ -101,7 +98,7 @@ st.markdown("""
             border-color: var(--gold-accent) !important;
         }
         
-        /* Isolated Hyperlink Emulation Class for CLEAR ALL Triggers */
+        /* Custom Clear All Hyperlink Button Styling Wrapper */
         .clear-all-container div.stButton > button {
             background: none !important;
             border: none !important;
@@ -123,7 +120,7 @@ st.markdown("""
             background: none !important;
         }
         
-        /* Seamless Expansion Accordion Rounding */
+        /* Clean Expander Tree Styling */
         [data-testid="stSidebar"] .st-expander {
             border: 1px solid var(--border-gray) !important;
             background-color: #f8fafc !important;
@@ -131,16 +128,25 @@ st.markdown("""
             margin-bottom: 6px;
         }
         
+        /* Zero-Edge Iframe Full Workspace Scaling */
+        iframe {
+            border: none !important;
+            width: 100% !important;
+            height: calc(100vh - 5px) !important;
+        }
+        
         .stDeployButton, footer, #stDecoration { display:none !important; }
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. APPLICATION LIFECYCLE MANAGEMENT ENGINE
+# 2. STATE PERSISTENCE CORE
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.6465, 121.0371"
 DEFAULT_RADIUS = 1000
 DEFAULT_SEARCH = ""
+# Default to a centered viewing grid baseline matching your target coordinates location
+INITIAL_URL = "https://overpass-turbo.eu/?C=14.6465;121.0371;14"
 
 if 'geo_coords' not in st.session_state:
     st.session_state.geo_coords = DEFAULT_COORDS
@@ -148,20 +154,20 @@ if 'geo_radius' not in st.session_state:
     st.session_state.geo_radius = DEFAULT_RADIUS
 if 'search_filter' not in st.session_state:
     st.session_state.search_filter = DEFAULT_SEARCH
-if 'scanned_records' not in st.session_state:
-    st.session_state.scanned_records = []
+if 'target_url' not in st.session_state:
+    st.session_state.target_url = INITIAL_URL
 
 def execute_global_purge():
     st.session_state.geo_coords = DEFAULT_COORDS
     st.session_state.geo_radius = DEFAULT_RADIUS
     st.session_state.search_filter = DEFAULT_SEARCH
-    st.session_state.scanned_records = []
+    st.session_state.target_url = INITIAL_URL
     for key in list(st.session_state.keys()):
         if key.startswith("chk_") or key.startswith("input_chk_"):
             st.session_state[key] = False
 
 # -----------------------------------------------------------------------------
-# 3. SPATIAL PARAMETER TAG DICTIONARIES
+# 3. TAG COMPILER DATA STRUCTURES
 # -----------------------------------------------------------------------------
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"']],
@@ -183,7 +189,7 @@ ADVANCED_CONFIG = {
 }
 
 # -----------------------------------------------------------------------------
-# 4. DATA PACKAGING ENGINE (KML AND CSV WRITERS)
+# 4. MATH MODULES (RADIUS BUFFER GENERATOR)
 # -----------------------------------------------------------------------------
 def compile_radius_kml(lat, lon, r_meters):
     kml = f'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scan Radius Geofence</name><Placemark><name>Buffer Zone</name><Style><LineStyle><color>ff3d1a00</color><width>3</width></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style><Polygon><outerBoundaryIs><LinearRing><coordinates>'
@@ -197,39 +203,28 @@ def compile_radius_kml(lat, lon, r_meters):
     kml += '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>'
     return kml
 
-def compile_features_kml(features):
-    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POI Asset Layers</name>'
-    for f in features:
-        name = f.get('name', 'Unnamed Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        class_type = f.get('type', 'POI Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        kml += f"<Placemark><name>{name}</name><description>Classification: {class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
-    kml += '</Document></kml>'
-    return kml
-
 # -----------------------------------------------------------------------------
-# 5. CONTROL PANEL GRAPHICS (SIDEBAR COMPONENT ENGINE)
+# 5. SIDEBAR QUERY PANEL WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # Centered Title Injector
     st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
-    # Styled Clear All Hyperlink Button Anchor Block
+    # Render clear button as a hyperlink element
     st.markdown('<div class="clear-all-container">', unsafe_allow_html=True)
     col_v, col_purge = st.columns([1.6, 1])
     with col_purge:
-        if st.button("CLEAR ALL", key="master_purge_btn", help="Flush coordinate configurations, filters, and plotted layers"):
+        if st.button("CLEAR ALL", key="master_purge_btn"):
             execute_global_purge()
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Geographic Core Properties (Container card layers completely expunged)
+    # Core parameters mapping (No card containers)
     coords_val = st.text_input("Coordinates Target", key="geo_coords")
     radius_val = st.number_input("Scan Radius (Meters)", min_value=100, max_value=50000, key="geo_radius", step=100)
 
     coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
     lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.6465, 121.0371)
 
-    # Active Filter Interface
     search_query = st.text_input("Filter Options", key="search_filter", placeholder="Search categories...").lower()
     
     selected_osm_tags = []
@@ -249,8 +244,8 @@ with st.sidebar:
                     if st.checkbox(presentation_label, key=f"input_chk_adv_{cat_name}_{presentation_label}"):
                         selected_osm_tags.append(osm_tag)
 
-    # Structural Dropdown for Multi-Format Exports
-    export_format = st.selectbox("Export Options Data Dropdown", ["Select Export Format...", "Radius (KML)", "POIs (KML)", "Attributes (CSV)"], index=0)
+    # Dropdown handles localized file outputs vs remote app instructions info
+    export_format = st.selectbox("Export Options Data Dropdown", ["Select Export Format...", "Radius (KML)", "POIs & CSV Tables (Use Map Export Panel)"], index=0)
     
     if export_format == "Radius (KML)":
         radius_kml_payload = compile_radius_kml(lat_coord, lon_coord, radius_val)
@@ -260,28 +255,8 @@ with st.sidebar:
             file_name=f"Radius_Ring_{radius_val}m.kml",
             mime="application/vnd.google-earth.kml+xml"
         )
-    elif export_format == "POIs (KML)":
-        scanned_kml_payload = compile_features_kml(st.session_state.scanned_records)
-        st.download_button(
-            label="Download POI KML",
-            data=scanned_kml_payload,
-            file_name=f"Scanned_Area_{radius_val}m.kml",
-            mime="application/vnd.google-earth.kml+xml",
-            disabled=(len(st.session_state.scanned_records) == 0)
-        )
-    elif export_format == "Attributes (CSV)":
-        if st.session_state.scanned_records:
-            csv_dataframe = pd.DataFrame(st.session_state.scanned_records)
-            csv_payload = csv_dataframe.to_csv(index=False).encode('utf-8')
-        else:
-            csv_payload = b""
-        st.download_button(
-            label="Download Attributes CSV",
-            data=csv_payload,
-            file_name=f"Trade_Area_Nodes_{radius_val}m.csv",
-            mime="text/csv",
-            disabled=(len(st.session_state.scanned_records) == 0)
-        )
+    elif export_format == "POIs & CSV Tables (Use Map Export Panel)":
+        st.info("💡 To export compiled map vectors or tables, use the native 'Export' action button located inside the top menu bar of the Overpass Turbo canvas workspace.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -289,92 +264,16 @@ with st.sidebar:
         if not selected_osm_tags:
             st.error("Select at least 1 feature layer to compile data.")
         else:
-            overpass_url = "https://overpass-api.de/api/interpreter"
+            # Complete QL code construction logic script strings
             statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_osm_tags])
-            compiled_ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
+            compiled_ql = f"[out:json][timeout:120];\n(\n{statements}\n);\nout center;\n>;\nout skel qt;"
+            encoded_ql = urllib.parse.quote(compiled_ql)
             
-            with st.spinner("Executing spatial compile over backend API..."):
-                try:
-                    api_response = requests.post(overpass_url, data={"data": compiled_ql}, timeout=100)
-                    if api_response.status_code == 200:
-                        raw_elements = api_response.json().get('elements', [])
-                        parsed_records = []
-                        for el in raw_elements:
-                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                            if e_lat and e_lon:
-                                tags = el.get('tags', {})
-                                parsed_records.append({
-                                    "lat": e_lat, "lon": e_lon,
-                                    "name": tags.get('name', 'Unnamed Node'),
-                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Asset Point'
-                                })
-                        st.session_state.scanned_records = parsed_records
-                        st.rerun()
-                    else:
-                        st.sidebar.error(f"Interpreter Exception: {api_response.status_code}")
-                except Exception as e:
-                    st.sidebar.error(f"Network Connection Timeout: {str(e)}")
+            # Pass encoded script along with the execution trigger flag 'R'
+            st.session_state.target_url = f"https://overpass-turbo.eu/?Q={encoded_ql}&R"
+            st.rerun()
 
 # -----------------------------------------------------------------------------
-# 6. FIXED CANVAS SPATIAL VIEWPORT (NATIVE HIGH-PERFORMANCE LEAFLET)
+# 6. WORKSPACE VIEWPORT ENGINE (EDGE-TO-EDGE OVERPASS IFRAME LAYOUT)
 # -----------------------------------------------------------------------------
-geojson_features_string = json.dumps(st.session_state.scanned_records)
-
-# Hardcoded standard light mode OpenStreetMap layer configuration strings
-light_mode_basemap_url = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-
-leaflet_injection_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        body, html {{
-            margin: 0; padding: 0; overflow: hidden; background: #ffffff;
-        }}
-        #map-canvas-container {{
-            width: 100%;
-            height: 900px;
-        }}
-    </style>
-</head>
-<body>
-    <div id="map-canvas-container"></div>
-    <script>
-        const map = L.map('map-canvas-container', {{ zoomControl: true, attributionControl: false }}).setView([{lat_coord}, {lon_coord}], 14);
-        L.tileLayer('{light_mode_basemap_url}', {{ maxZoom: 19, noWrap: false }}).addTo(map);
-        
-        // Solid Red Pinned Target Circle Dot Marker Asset Configuration
-        L.circleMarker([{lat_coord}, {lon_coord}], {{
-            radius: 7, fillColor: "#ff0000", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
-        }}).addTo(map).bindPopup("<b>PINNED GEOGRAPHIC TARGET</b>");
-        
-        // Boundary Scan Perimeter Buffer Ring - Corporate Navy Blue with Light 12% Translucent Inner Fill Opacity
-        L.circle([{lat_coord}, {lon_coord}], {{
-            radius: {radius_val}, color: "#001a3d", weight: 2.5, fillColor: "#001a3d", fillOpacity: 0.12
-        }}).addTo(map);
-        
-        const featurePoints = {geojson_features_string};
-        featurePoints.forEach(pt => {{
-            L.circleMarker([pt.lat, pt.lon], {{
-                radius: 6, fillColor: "#d4af37", color: "#001a3d", weight: 1.5, opacity: 1, fillOpacity: 0.9
-            }}).addTo(map).bindPopup("<b>" + pt.name + "</b><br>Type: " + pt.type);
-        }});
-        
-        if(featurePoints.length > 0) {{
-            const group = new L.featureGroup([
-                L.marker([{lat_coord}, {lon_coord}]),
-                ...featurePoints.map(p => L.marker([p.lat, p.lon]))
-            ]);
-            map.fitBounds(group.getBounds().pad(0.1));
-        }}
-        
-        setTimeout(function() {{ map.invalidateSize(); }}, 200);
-    </script>
-</body>
-</html>
-"""
-
-st.components.v1.html(leaflet_injection_html, height=900, scrolling=False)
+st.components.v1.iframe(st.session_state.target_url)
