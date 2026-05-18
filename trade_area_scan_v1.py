@@ -1,11 +1,11 @@
-import streamlit as st
+import streamlit st
 import requests
 import re
 import math
 import json
 
 # -----------------------------------------------------------------------------
-# 1. HIGH-DENSITY LIGHT MODE & TRUE FULL SCREEN OVERRIDES
+# 1. HIGH-DENSITY LIGHT MODE & SPECIFIC VIEWPORT MAP OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -31,11 +31,8 @@ st.markdown("""
             display: none !important;
         }
         
-        /* BRUTE FORCE ENTIRE MAIN AREA LAYOUT MATRIX TO BE 100% EDGE-TO-EDGE */
-        .main, .block-container, 
-        [data-testid="stAppViewBlockContainer"], 
-        [data-testid="stMain"], 
-        [data-testid="stAppViewMain"] {
+        /* TARGET ONLY THE MAIN AREA CONTENT HOLDER TO FORCE IT EDGE-TO-EDGE */
+        [data-testid="stAppViewBlockContainer"] {
             padding-top: 0rem !important; 
             padding-bottom: 0rem !important;
             padding-left: 0rem !important;
@@ -44,13 +41,12 @@ st.markdown("""
             width: 100% !important;
             margin: 0px !important;
             overflow: hidden !important;
-            height: 100vh !important;
         }
         
-        /* REMOVE INNER GAP ELEMENTS AND PADDING IN ALL STREAMLIT WRAPPER BLOCKS */
-        [data-testid="stVerticalBlock"], 
-        [data-testid="stVerticalBlockWrapper"],
-        .stElementContainer {
+        /* REMOVE INNER GAP ELEMENTS ONLY INSIDE THE MAP MAIN AREA CANVAS */
+        [data-testid="stAppViewBlockContainer"] [data-testid="stVerticalBlock"], 
+        [data-testid="stAppViewBlockContainer"] [data-testid="stVerticalBlockWrapper"],
+        [data-testid="stAppViewBlockContainer"] .stElementContainer {
             gap: 0rem !important;
             padding: 0px !important;
             margin: 0px !important;
@@ -66,46 +62,33 @@ st.markdown("""
             display: block !important;
         }
         
-        /* FIXED COMFORTABLE SIDEBAR LAYOUT FRAME */
+        /* CLEAN RIGID STABLE SIDEBAR WIDTH BLOCK STYLE */
         [data-testid="stSidebar"] {
             background-color: var(--white-clean) !important;
             color: var(--navy-brand) !important;
             border-right: 1px solid var(--border-gray) !important;
-            width: 320px !important;
             min-width: 320px !important;
             max-width: 320px !important;
         }
         
-        /* LOCK SIDEBAR TO PREVENT USER COLLAPSE MISALIGNMENTS */
+        /* STRIP COLLAPSIBILITY TOGGLES TO PROTECT LAYOUT DENSITY SYMMETRY */
         [data-testid="stSidebarCollapseButton"], 
         [data-testid="collapsedControl"] {
             display: none !important;
+            width: 0px !important;
+            height: 0px !important;
         }
         
         [data-testid="stSidebarUserContent"] {
             padding-top: 14px !important;
             padding-left: 14px !important;
             padding-right: 14px !important;
-            height: 100vh !important;
-            display: flex !important;
-            flex-direction: column !important;
-        }
-        
-        .sidebar-title {
-            color: var(--navy-brand) !important;
-            font-size: 22px !important;
-            font-weight: 900 !important;
-            letter-spacing: 1px !important;
-            text-transform: uppercase !important;
-            text-align: center !important;
-            margin-bottom: 2px !important;
-            font-family: 'Arial', sans-serif !important;
         }
         
         .clear-link-container {
-            text-align: center !important;
-            margin-top: 2px !important;
-            margin-bottom: 12px !important;
+            text-align: right !important;
+            margin-top: -6px !important;
+            margin-bottom: 10px !important;
             width: 100% !important;
         }
         
@@ -128,9 +111,9 @@ st.markdown("""
             color: var(--navy-brand) !important;
         }
         
-        /* INTERNAL EXPANDER VIEWPORT SCROLL LOCKS (Keeps sidebar controls persistent) */
-        [data-testid="stSidebar"] .st-expander div[data-testid="stVerticalBlock"] {
-            max-height: 220px !important;
+        /* ENFORCE INNER EXPANDER INTERNAL SCROLLBAR LOCKS */
+        [data-testid="stSidebar"] .st-expander div[data-testid="stVerticalBlockWrapper"] {
+            max-height: 200px !important;
             overflow-y: auto !important;
             padding-right: 4px !important;
         }
@@ -165,7 +148,7 @@ st.markdown("""
             width: 100% !important;
             padding: 8px !important;
             transition: all 0.1s ease-in-out !important;
-            margin-top: 12px !important;
+            margin-top: 10px !important;
         }
         .action-tray div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
             background-color: var(--gold-accent) !important;
@@ -257,8 +240,6 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
-    
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
         execute_global_purge()
@@ -297,7 +278,7 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): 
                             selected_tags.append(tag)
 
-    # ACTION PATH CONSOLE DOCK
+    # CONSOLE TRUCK ACTION TRAY
     st.markdown('<div class="action-tray">', unsafe_allow_html=True)
     if st.button("🚀 SCAN AREA", use_container_width=True):
         if not selected_tags:
