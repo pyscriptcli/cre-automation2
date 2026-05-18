@@ -7,7 +7,7 @@ import json
 # -----------------------------------------------------------------------------
 # 0. GLOBAL DISPLAY CONFIGURATION
 # -----------------------------------------------------------------------------
-MAP_PANEL_HEIGHT = 900  # Adjust this pixel value to resize the spatial canvas
+MAP_PANEL_HEIGHT = 1200  # Adjust this pixel value to resize the spatial canvas
 
 # -----------------------------------------------------------------------------
 # 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
