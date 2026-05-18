@@ -213,26 +213,27 @@ with st.sidebar:
             statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_osm_tags])
             compiled_ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
             
-            try:
-                api_response = requests.post(overpass_url, data={"data": compiled_ql}, timeout=100)
-                if api_response.status_code == 200:
-                    raw_elements = api_response.json().get('elements', [])
-                    parsed_records = []
-                    for el in raw_elements:
-                        e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                        e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                        if e_lat and e_lon:
-                            tags = el.get('tags', {})
-                            parsed_records.append({
-                                "lat": e_lat, "lon": e_lon,
-                                "name": tags.get('name', 'Unnamed Node'),
-                                "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Asset Point'
-                            })
-                    st.session_state.scanned_records = parsed_records
-                else:
-                    st.sidebar.error(f"Server Error Status: {api_response.status_code}")
-            except Exception as e:
-                st.sidebar.error(f"Network Timeout: {str(e)}")
+            with st.spinner("Fetching map layers..."):
+                try:
+                    api_response = requests.post(overpass_url, data={"data": compiled_ql}, timeout=100)
+                    if api_response.status_code == 200:
+                        raw_elements = api_response.json().get('elements', [])
+                        parsed_records = []
+                        for el in raw_elements:
+                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
+                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
+                            if e_lat and e_lon:
+                                tags = el.get('tags', {})
+                                parsed_records.append({
+                                    "lat": e_lat, "lon": e_lon,
+                                    "name": tags.get('name', 'Unnamed Node'),
+                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Asset Point'
+                                })
+                        st.session_state.scanned_records = parsed_records
+                    else:
+                        st.sidebar.error(f"Server Error Status: {api_response.status_code}")
+                except Exception as e:
+                    st.sidebar.error(f"Network Timeout: {str(e)}")
 
     col_exp_scan, col_exp_rad = st.columns(2)
     with col_exp_scan:
@@ -306,12 +307,11 @@ leaflet_injection_html = f"""
             map.fitBounds(group.getBounds().pad(0.1));
         }}
 
-        // CRITICAL LAYOUT ARTIFACT RESOLVER: Forces Leaflet viewport recalculation on iframe handshake
-        setTimeout(function(){ map.invalidateSize(); }, 200);
+        // FIXED ENCAPSULATED EXPRESSION: Safely escaped braces inside the Python literal block
+        setTimeout(function() {{ map.invalidateSize(); }}, 200);
     </script>
 </body>
 </html>
 """
 
-# Assigned explicit integer height parameters to expand frame layout context down the page bounds
 st.components.v1.html(leaflet_injection_html, height=900, scrolling=False)
