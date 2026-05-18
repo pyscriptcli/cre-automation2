@@ -4,7 +4,7 @@ import re
 import math
 
 # -----------------------------------------------------------------------------
-# 1. PREMIUM LIGHT MODE & GEOMETRIC PILL OVERRIDES
+# 1. COMPACT LIGHT MODE & COMPONENT SCALING OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -12,21 +12,22 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Deep injection of optimized CSS rules to compress element footprints
 st.markdown("""
     <style>
         :root {
             --navy-brand: #001a3d;
             --white-clean: #ffffff;
             --gold-accent: #d4af37;
-            --border-gray: #e0e4ec;
+            --border-gray: #e2e8f0;
         }
         
-        /* Maximize primary viewport space */
+        /* Maximize primary viewport landscape real estate */
         .block-container {
             padding: 0rem !important;
         }
         
-        /* Clean Light Mode Sidebar Re-skinning */
+        /* High-Density Light Mode Sidebar Layout */
         [data-testid="stSidebar"] {
             background-color: var(--white-clean) !important;
             color: var(--navy-brand) !important;
@@ -34,62 +35,78 @@ st.markdown("""
         }
         
         [data-testid="stSidebarUserContent"] {
-            padding-top: 24px !important;
-            padding-left: 16px !important;
-            padding-right: 16px !important;
+            padding-top: 14px !important;
+            padding-left: 12px !important;
+            padding-right: 12px !important;
         }
         
-        /* Upscaled & Centered Header Element */
+        /* Compact Brand Header Typography */
         .sidebar-title {
             color: var(--navy-brand) !important;
-            font-size: 26px !important;
+            font-size: 20px !important;
             font-weight: 900 !important;
-            letter-spacing: 1.5px !important;
+            letter-spacing: 1px !important;
             text-transform: uppercase !important;
             text-align: center !important;
-            margin-top: 10px !important;
-            margin-bottom: 5px !important;
+            margin-top: 5px !important;
+            margin-bottom: 2px !important;
             font-family: 'Arial', sans-serif !important;
         }
         
+        /* Tightened Widget Input Labels */
         [data-testid="stSidebar"] label p {
             color: var(--navy-brand) !important;
             font-weight: 700 !important;
-            font-size: 11px !important;
+            font-size: 10px !important;
             text-transform: uppercase !important;
             letter-spacing: 0.5px !important;
+            margin-bottom: -4px !important;
         }
         
-        /* Input Field Geometry Rounding */
+        /* Compact Form Element Heights and Paddings */
         div[data-baseweb="input"], div[data-baseweb="select"], .stSelectbox, .stTextInput, .stNumberInput {
-            border-radius: 8px !important;
+            border-radius: 6px !important;
         }
         
         div[data-baseweb="input"] {
             border: 1px solid var(--border-gray) !important;
+            padding: 2px 4px !important;
         }
         
-        div[data-baseweb="input"]:focus-within {
-            border-color: var(--navy-brand) !important;
+        /* Custom Plain-Text Hyperlink Emulation for Clear Actions */
+        div.clear-link-container {
+            text-align: right;
+            margin-top: -10px;
+            margin-bottom: 5px;
+        }
+        div.clear-link-container button {
+            background: none !important;
+            border: none !important;
+            padding: 0 !important;
+            color: var(--navy-brand) !important;
+            text-decoration: underline !important;
+            font-weight: 700 !important;
+            font-size: 11px !important;
+            text-transform: uppercase !important;
+            cursor: pointer !important;
+        }
+        div.clear-link-container button:hover {
+            color: var(--gold-accent) !important;
         }
         
-        div[data-baseweb="select"] {
-            border: 1px solid var(--border-gray) !important;
-        }
-        
-        /* Pill Button Specifications */
+        /* Rounded Pill Design Pattern for Primary Execution Button */
         div.stButton > button, div.stDownloadButton > button {
             background-color: var(--navy-brand) !important;
             color: var(--white-clean) !important;
             font-weight: 700 !important;
             font-size: 11px !important;
             text-transform: uppercase !important;
-            letter-spacing: 1px !important;
+            letter-spacing: 0.5px !important;
             border: 1px solid var(--navy-brand) !important;
-            border-radius: 24px !important;
+            border-radius: 20px !important;
             width: 100% !important;
-            padding: 8px 16px !important;
-            transition: all 0.15s ease-in-out !important;
+            padding: 6px 12px !important;
+            transition: all 0.1s ease-in-out !important;
         }
         
         div.stButton > button:hover, div.stDownloadButton > button:hover {
@@ -98,41 +115,19 @@ st.markdown("""
             border-color: var(--gold-accent) !important;
         }
         
-        /* Custom Clear All Hyperlink Button Styling Wrapper */
-        .clear-all-container div.stButton > button {
-            background: none !important;
-            border: none !important;
-            color: var(--navy-brand) !important;
-            text-decoration: underline !important;
-            font-weight: 700 !important;
-            font-size: 11px !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.5px !important;
-            padding: 0 !important;
-            width: auto !important;
-            box-shadow: none !important;
-            border-radius: 0 !important;
-            float: right !important;
-        }
-        
-        .clear-all-container div.stButton > button:hover {
-            color: var(--gold-accent) !important;
-            background: none !important;
-        }
-        
-        /* Clean Expander Tree Styling */
+        /* Compact Expander Component Spacing */
         [data-testid="stSidebar"] .st-expander {
             border: 1px solid var(--border-gray) !important;
             background-color: #f8fafc !important;
-            border-radius: 8px !important;
-            margin-bottom: 6px;
+            border-radius: 6px !important;
+            margin-bottom: 4px;
         }
         
-        /* Zero-Edge Iframe Full Workspace Scaling */
+        /* Edge-to-Edge Full Screen Iframe Canvas Viewport */
         iframe {
             border: none !important;
             width: 100% !important;
-            height: calc(100vh - 5px) !important;
+            height: calc(100vh - 4px) !important;
         }
         
         .stDeployButton, footer, #stDecoration { display:none !important; }
@@ -140,13 +135,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE CORE
+# 2. STATE LOGIC LIFECYCLE
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.6465, 121.0371"
 DEFAULT_RADIUS = 1000
 DEFAULT_SEARCH = ""
-# Default to a centered viewing grid baseline matching your target coordinates location
-INITIAL_URL = "https://overpass-turbo.eu/?C=14.6465;121.0371;14"
+# Collapse the left sidebar panel natively by declaring sidebar=no in the startup template URL
+INITIAL_URL = "https://overpass-turbo.eu/?C=14.6465;121.0371;14&sidebar=no"
 
 if 'geo_coords' not in st.session_state:
     st.session_state.geo_coords = DEFAULT_COORDS
@@ -167,7 +162,7 @@ def execute_global_purge():
             st.session_state[key] = False
 
 # -----------------------------------------------------------------------------
-# 3. TAG COMPILER DATA STRUCTURES
+# 3. OSM FEATURE TREE DICTIONARIES
 # -----------------------------------------------------------------------------
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"']],
@@ -177,19 +172,17 @@ POI_CONFIG = {
         ['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], 
         ['Ports & Terminals', '"industrial"="port"'], 
         ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'],
-        ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'],
-        ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'],
-        ['Warehouses & Depots', '"building"~"warehouse|depot",i']
+        ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i']
     ]
 }
 
 ADVANCED_CONFIG = {
     "ADV - AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"']],
-    "ADV - RETAIL_ADV": [['Beauty', '"shop"="beauty"'], ['Car', '"shop"="car"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i']]
+    "ADV - RETAIL_ADV": [['Beauty', '"shop"="beauty"'], ['Car', '"shop"="car"']]
 }
 
 # -----------------------------------------------------------------------------
-# 4. MATH MODULES (RADIUS BUFFER GENERATOR)
+# 4. MATH MODULES (RADIUS GEOMETRY STRING COMPILER)
 # -----------------------------------------------------------------------------
 def compile_radius_kml(lat, lon, r_meters):
     kml = f'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scan Radius Geofence</name><Placemark><name>Buffer Zone</name><Style><LineStyle><color>ff3d1a00</color><width>3</width></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style><Polygon><outerBoundaryIs><LinearRing><coordinates>'
@@ -204,21 +197,19 @@ def compile_radius_kml(lat, lon, r_meters):
     return kml
 
 # -----------------------------------------------------------------------------
-# 5. SIDEBAR QUERY PANEL WORKSPACE
+# 5. CONTROL SWITCHBOARD DECK (SIDEBAR WORKSPACE)
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
-    # Render clear button as a hyperlink element
-    st.markdown('<div class="clear-all-container">', unsafe_allow_html=True)
-    col_v, col_purge = st.columns([1.6, 1])
-    with col_purge:
-        if st.button("CLEAR ALL", key="master_purge_btn"):
-            execute_global_purge()
-            st.rerun()
+    # Render pure link text element container
+    st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
+    if st.button("CLEAR ALL", key="master_purge_btn"):
+        execute_global_purge()
+        st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Core parameters mapping (No card containers)
+    # Scoped parameters mapping
     coords_val = st.text_input("Coordinates Target", key="geo_coords")
     radius_val = st.number_input("Scan Radius (Meters)", min_value=100, max_value=50000, key="geo_radius", step=100)
 
@@ -244,7 +235,7 @@ with st.sidebar:
                     if st.checkbox(presentation_label, key=f"input_chk_adv_{cat_name}_{presentation_label}"):
                         selected_osm_tags.append(osm_tag)
 
-    # Dropdown handles localized file outputs vs remote app instructions info
+    # Data distribution options selectbox dropdown
     export_format = st.selectbox("Export Options Data Dropdown", ["Select Export Format...", "Radius (KML)", "POIs & CSV Tables (Use Map Export Panel)"], index=0)
     
     if export_format == "Radius (KML)":
@@ -256,7 +247,7 @@ with st.sidebar:
             mime="application/vnd.google-earth.kml+xml"
         )
     elif export_format == "POIs & CSV Tables (Use Map Export Panel)":
-        st.info("💡 To export compiled map vectors or tables, use the native 'Export' action button located inside the top menu bar of the Overpass Turbo canvas workspace.")
+        st.info("💡 Click 'Export' at the top of the map workspace to download data attributes.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -264,16 +255,24 @@ with st.sidebar:
         if not selected_osm_tags:
             st.error("Select at least 1 feature layer to compile data.")
         else:
-            # Complete QL code construction logic script strings
+            # Overpass QL dynamic string generation loop
             statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_osm_tags])
-            compiled_ql = f"[out:json][timeout:120];\n(\n{statements}\n);\nout center;\n>;\nout skel qt;"
+            
+            # MapCSS block injection: forces a bold red marker dot over derived pin node targets
+            mapcss_style = """
+            {{style:
+              node[marker_type="center_pin"] { color: #ff0000; fill-color: #ff0000; radius: 8; opacity: 1; fill-opacity: 1; }
+            }}
+            """
+            
+            compiled_ql = f"[out:json][timeout:120];\n(\n{statements}\n  make node ::lat={lat_coord}, ::lon={lon_coord}, name='TARGET CENTER PIN', marker_type='center_pin';\n);\nout center;\n>;\nout skel qt;\n{mapcss_style}"
             encoded_ql = urllib.parse.quote(compiled_ql)
             
-            # Pass encoded script along with the execution trigger flag 'R'
-            st.session_state.target_url = f"https://overpass-turbo.eu/?Q={encoded_ql}&R"
+            # Formulate the target frame URL parameter layout with editor panels collapsed (sidebar=no)
+            st.session_state.target_url = f"https://overpass-turbo.eu/?Q={encoded_ql}&R&sidebar=no"
             st.rerun()
 
 # -----------------------------------------------------------------------------
-# 6. WORKSPACE VIEWPORT ENGINE (EDGE-TO-EDGE OVERPASS IFRAME LAYOUT)
+# 6. EDGE-TO-EDGE WORKSPACE IFRAME CANVAS
 # -----------------------------------------------------------------------------
 st.components.v1.iframe(st.session_state.target_url)
