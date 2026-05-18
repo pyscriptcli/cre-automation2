@@ -141,7 +141,7 @@ st.markdown("""
             border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important;
             border-radius: 2px !important; margin-bottom: 2px !important; overflow: hidden !important;
         }
-        [data-testid="stSidebar"] .st-expander summary p { font-size: 10px !important; font-weight: 700 !important; }
+        [data-testid="stSidebar"] .st-expander summary p { font-size: 7px !important; font-weight: 700 !important; }
         .stDeployButton, footer { display:none !important; }
         
         /* BRANDED TITLE */
@@ -149,15 +149,15 @@ st.markdown("""
             font-family: 'Cormorant Garamond', serif !important;
             font-style: italic;
             color: var(--brand-midnight);
-            font-size: 30px;
+            font-size: 50px;
             text-align: center;
             border-bottom: 1px solid var(--brand-gold);
-            padding-bottom: 6px;
-            margin-bottom: 30px;
+            padding-bottom: 15px;
+            margin-bottom: 50px;
         }
         
         /* TEXT SIZING OVERRIDES */
-        .stTextInput label p, .stNumberInput label p { font-size: 5px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
+        .stTextInput label p, .stNumberInput label p { font-size: 12px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
         .stCheckbox label p { font-size: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
