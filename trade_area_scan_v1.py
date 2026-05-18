@@ -117,7 +117,7 @@ st.markdown("""
             border-color: var(--brand-gold) !important;
         }
         div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p {
-            color: var(--white-clean) !important; font-weight: 700 !important; font-size: 9px !important; text-transform: uppercase !important; letter-spacing: 1px;
+            color: var(--white-clean) !important; font-weight: 700 !important; font-size: 7px !important; text-transform: uppercase !important; letter-spacing: 1px;
         }
         
         div.stDownloadButton > button {
@@ -149,7 +149,7 @@ st.markdown("""
             font-family: 'Cormorant Garamond', serif !important;
             font-style: italic;
             color: var(--brand-midnight);
-            font-size: 50px;
+            font-size: 30px;
             text-align: center;
             border-bottom: 1px solid var(--brand-gold);
             padding-bottom: 15px;
@@ -158,7 +158,7 @@ st.markdown("""
         
         /* TEXT SIZING OVERRIDES */
         .stTextInput label p, .stNumberInput label p { font-size: 12px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
-        .stCheckbox label p { font-size: 10px !important; }
+        .stCheckbox label p { font-size: 7px !important; }
     </style>
 """, unsafe_allow_html=True)
 
