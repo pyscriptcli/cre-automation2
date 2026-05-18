@@ -21,6 +21,7 @@ st.markdown("""
             --gold-accent: #d4af37;
             --border-gray: #cbd5e1;
             --link-muted: #64748b;
+            --bg-soft: #f8fafc;
         }
         
         /* ELIMINATE STREAMLIT HEADER ZONE */
@@ -73,28 +74,46 @@ st.markdown("""
         }
         
         [data-testid="stSidebarUserContent"] {
-            padding-top: 16px !important;
-            padding-left: 12px !important;
-            padding-right: 12px !important;
+            padding-top: 0px !important;
+            padding-left: 0px !important;
+            padding-right: 0px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            height: 100vh !important;
+        }
+        
+        /* SCROLLABLE INNER AREA FOR SIDEBAR ELEMENTS */
+        .sidebar-scrollable-content {
+            padding-top: 12px !important;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+            overflow-y: auto !important;
+            flex-grow: 1 !important;
+        }
+        
+        /* ISOLATED EXCLUSIVE HEADER CONTAINER COMPONENT */
+        .sidebar-header-card {
+            background-color: var(--bg-soft) !important;
+            border-bottom: 1px solid var(--border-gray) !important;
+            padding: 14px !important;
+            text-align: center !important;
+            width: 100% !important;
         }
         
         .sidebar-title {
             color: var(--navy-brand) !important;
-            font-size: 24px !important;
+            font-size: 22px !important;
             font-weight: 900 !important;
             letter-spacing: 1px !important;
             text-transform: uppercase !important;
-            text-align: center !important;
-            margin-bottom: 2px !important;
+            margin: 0px !important;
             font-family: 'Arial', sans-serif !important;
-            display: block !important;
-            width: 100% !important;
         }
         
         .clear-link-container {
             text-align: center !important;
-            margin-top: -4px !important;
-            margin-bottom: 12px !important;
+            margin-top: 4px !important;
+            margin-bottom: 2px !important;
             width: 100% !important;
         }
         
@@ -115,6 +134,21 @@ st.markdown("""
         }
         button[kind="tertiary"]:hover {
             color: var(--navy-brand) !important;
+        }
+        
+        /* HARDWARE ACCELERATED VIEWPORT STICKY BOTTOM CONTROL DECK */
+        .sidebar-bottom-sticky-zone {
+            position: sticky !important;
+            bottom: 0px !important;
+            background-color: var(--white-clean) !important;
+            padding-top: 10px !important;
+            padding-bottom: 20px !important;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+            border-top: 1px solid var(--border-gray) !important;
+            box-shadow: 0px -8px 24px rgba(0, 26, 61, 0.06) !important;
+            z-index: 9999 !important;
+            width: 100% !important;
         }
         
         [data-testid="stSidebar"] label p {
@@ -145,9 +179,9 @@ st.markdown("""
             border: none !important;
             border-radius: 6px !important;
             width: 100% !important;
-            padding: 6px !important;
+            padding: 8px !important;
             transition: all 0.1s ease-in-out !important;
-            margin-top: 5px !important;
+            margin-top: 2px !important;
         }
         .action-tray div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
             background-color: var(--gold-accent) !important;
@@ -241,13 +275,18 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
+    # 1. STRUCTURAL SEPARATE HEADER CARD (Title completely isolated and at the absolute top)
+    st.markdown('<div class="sidebar-header-card"><div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
+    # Clear All link row directly under the main isolated header box
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
         execute_global_purge()
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div></div>', unsafe_allow_html=True)
+
+    # 2. START OF SCROLLABLE BODY LAYER
+    st.markdown('<div class="sidebar-scrollable-content">', unsafe_allow_html=True)
 
     coords_val = st.text_input("Target Coordinates", key="geo_coords")
     radius_val = st.number_input("Radius (Meters)", min_value=100, max_value=50000, key="geo_radius", step=100)
@@ -259,6 +298,7 @@ with st.sidebar:
     
     selected_tags = []
     
+    # Standard POI Generation in 2-Column Grid
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -269,6 +309,7 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_{cat_name}_{label}"): 
                             selected_tags.append(tag)
 
+    # Advanced POI Generation in 2-Column Grid
     for cat_name, node_items in ADVANCED_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -278,8 +319,11 @@ with st.sidebar:
                     with cols[i % 2]:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): 
                             selected_tags.append(tag)
+                            
+    st.markdown('</div>', unsafe_allow_html=True) # End Scrollable Content
 
-    st.markdown("<hr style='margin: 10px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
+    # 3. FIXED VIEWPORT STICKY BOTTOM CONTROL ZONE (Stays persistent under scroll views)
+    st.markdown('<div class="sidebar-bottom-sticky-zone">', unsafe_allow_html=True)
     
     st.markdown('<div class="action-tray">', unsafe_allow_html=True)
     if st.button("🚀 SCAN AREA", use_container_width=True):
@@ -309,20 +353,24 @@ with st.sidebar:
                 except Exception as e: st.sidebar.error("Timeout")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:15px; margin-bottom:0;'>DATA EXPORTS</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:10px; margin-bottom:4px;'>DATA EXPORTS</p>", unsafe_allow_html=True)
     exp_fmt = st.selectbox("Format", ["Select Format...", "Export Radius (KML)", "Export POIs (KML)"], label_visibility="collapsed")
     
     if exp_fmt == "Export Radius (KML)":
         st.download_button("Download File", compile_radius_kml(lat_coord, lon_coord, radius_val), f"Radius_{radius_val}m.kml", "application/vnd.google-earth.kml+xml")
     elif exp_fmt == "Export POIs (KML)":
         st.download_button("Download File", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", disabled=not st.session_state.scanned_records)
+        
+    st.markdown('</div>', unsafe_allow_html=True) # End Sticky Zone
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
+# 5. ZERO-LATENCY SPATIAL CANVAS & FLOATING GOOGLE-MAPS-STYLE SEARCH ENGINE
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
-render_lat = st.session_state.last_scan_lat
-render_lon = st.session_state.last_scan_lon
+
+# INSTANT SYNC: Bind layout views directly to the current state input configurations
+render_lat = lat_coord
+render_lon = lon_coord
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -333,18 +381,77 @@ leaflet_template = """
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
         #map { height: 100vh; width: 100%; }
+        
+        /* Premium Floating Card look for Landmark Lookups */
+        .map-search-card {
+            background: #ffffff;
+            padding: 4px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 26, 61, 0.15);
+            border: 1px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            margin-top: 14px;
+            margin-right: 14px;
+            font-family: 'Arial', sans-serif;
+        }
+        #map-search-input {
+            border: none;
+            padding: 8px 12px;
+            width: 250px;
+            font-size: 13px;
+            outline: none;
+            color: #001a3d;
+            font-weight: 500;
+            border-radius: 4px;
+        }
+        #map-search-btn {
+            padding: 8px 16px;
+            background: #001a3d;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            margin-left: 6px;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+        }
+        #map-search-btn:hover {
+            background: #d4af37;
+            color: #001a3d;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <script>
-        const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        // Define Basemap Providers
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+        const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 });
+        const cartoPositron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 });
+
+        const map = L.map('map', { 
+            zoomControl: true, 
+            attributionControl: false,
+            layers: [osm] 
+        }).setView([__LAT__, __LON__], 14);
         
+        // Multi-Basemap Layer Control
+        const baseMaps = {
+            "OpenStreetMap": osm,
+            "Google Satellite": googleSat,
+            "Carto Positron": cartoPositron
+        };
+        L.control.layers(baseMaps, null, { position: 'topleft', collapsed: true }).addTo(map);
+        
+        // Active Center Marker Layer
         L.circleMarker([__LAT__, __LON__], {
             radius: 7, fillColor: "#e11d48", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
         }).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
         
+        // Active Proximity Buffer Layer
         L.circle([__LAT__, __LON__], {
             radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
         }).addTo(map);
@@ -361,6 +468,47 @@ leaflet_template = """
             map.fitBounds(bounds.pad(0.1));
         }
         
+        // REGISTER GOOGLE-MAPS LOOKALIKES ASYNCHRONOUS ENGINE CONTROL
+        const searchControl = L.control({ position: 'topright' });
+        searchControl.onAdd = function() {
+            const div = L.DomUtil.create('div', 'map-search-card');
+            div.innerHTML = `
+                <input type="text" id="map-search-input" placeholder="Search landmarks, malls, cities...">
+                <button id="map-search-btn">SEARCH</button>
+            `;
+            L.DomEvent.disableClickPropagation(div);
+            return div;
+        };
+        searchControl.addTo(map);
+
+        document.getElementById('map-search-btn').addEventListener('click', runMapGeocodeSearch);
+        document.getElementById('map-search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') runMapGeocodeSearch();
+        });
+
+        function runMapGeocodeSearch() {
+            const query = document.getElementById('map-search-input').value;
+            if (!query) return;
+            
+            fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query))
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        const targetLoc = data[0];
+                        const lat = parseFloat(targetLoc.lat);
+                        const lon = parseFloat(targetLoc.lon);
+                        map.setView([lat, lon], 15);
+                        
+                        L.popup()
+                            .setLatLng([lat, lon])
+                            .setContent("<div style='font-family:sans-serif;font-size:11px;max-width:200px;'><b>Found Landmark:</b><br>" + targetLoc.display_name + "</div>")
+                            .openOn(map);
+                    } else {
+                        alert('Location profile or landmark parameters could not be found.');
+                    }
+                }).catch(err => console.error('Geocoding pipeline fault: ', err));
+        }
+
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat.toFixed(5);
             const lon = e.latlng.lng.toFixed(5);
@@ -388,5 +536,4 @@ leaflet_html = (leaflet_template
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__GEOJSON__", geojson_str))
 
-# Passed with explicit visibility configurations to lock the layout fluidly
 st.components.v1.html(leaflet_html, scrolling=False)
