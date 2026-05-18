@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import re
 import json
+import os
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
