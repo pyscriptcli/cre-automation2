@@ -72,9 +72,8 @@ st.markdown("""
             width: 320px !important;
         }
         
-        /* ADJUST PADDING TO POSITION THE TITLE TO THE ABSOLUTE TOP EDGE */
         [data-testid="stSidebarUserContent"] {
-            padding-top: 6px !important;
+            padding-top: 16px !important;
             padding-left: 12px !important;
             padding-right: 12px !important;
         }
@@ -86,7 +85,6 @@ st.markdown("""
             letter-spacing: 1px !important;
             text-transform: uppercase !important;
             text-align: center !important;
-            margin-top: 0px !important;
             margin-bottom: 2px !important;
             font-family: 'Arial', sans-serif !important;
             display: block !important;
@@ -117,19 +115,6 @@ st.markdown("""
         }
         button[kind="tertiary"]:hover {
             color: var(--navy-brand) !important;
-        }
-        
-        /* PERSISTENT STICKY CONTROL ZONE DOCK FOR ACTION BUTTONS */
-        .sidebar-bottom-sticky-zone {
-            position: sticky !important;
-            bottom: 0px !important;
-            background-color: var(--white-clean) !important;
-            padding-top: 10px !important;
-            padding-bottom: 16px !important;
-            border-top: 1px solid var(--border-gray) !important;
-            z-index: 999 !important;
-            margin-top: 15px !important;
-            width: 100% !important;
         }
         
         [data-testid="stSidebar"] label p {
@@ -256,10 +241,8 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # Centered Header text snapped to the absolute top margin
     st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
-    # Underlined Clear All action block positioned directly underneath header text
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
         execute_global_purge()
@@ -276,7 +259,6 @@ with st.sidebar:
     
     selected_tags = []
     
-    # Standard POI Generation in 2-Column Grid
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -287,7 +269,6 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_{cat_name}_{label}"): 
                             selected_tags.append(tag)
 
-    # Advanced POI Generation in 2-Column Grid
     for cat_name, node_items in ADVANCED_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -298,8 +279,7 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): 
                             selected_tags.append(tag)
 
-    # ENCAPSULATED PERSISTENT BOTTOM ZONE (Stays visible while scrolling checkboxes)
-    st.markdown('<div class="sidebar-bottom-sticky-zone">', unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 10px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
     
     st.markdown('<div class="action-tray">', unsafe_allow_html=True)
     if st.button("🚀 SCAN AREA", use_container_width=True):
@@ -329,18 +309,16 @@ with st.sidebar:
                 except Exception as e: st.sidebar.error("Timeout")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:10px; margin-bottom:4px;'>DATA EXPORTS</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:15px; margin-bottom:0;'>DATA EXPORTS</p>", unsafe_allow_html=True)
     exp_fmt = st.selectbox("Format", ["Select Format...", "Export Radius (KML)", "Export POIs (KML)"], label_visibility="collapsed")
     
     if exp_fmt == "Export Radius (KML)":
         st.download_button("Download File", compile_radius_kml(lat_coord, lon_coord, radius_val), f"Radius_{radius_val}m.kml", "application/vnd.google-earth.kml+xml")
     elif exp_fmt == "Export POIs (KML)":
         st.download_button("Download File", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", disabled=not st.session_state.scanned_records)
-        
-    st.markdown('</div>', unsafe_allow_html=True) # End Sticky Zone
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY SPATIAL CANVAS WITH EMBEDDED GEOLOCATION SEARCH ENGINE
+# 5. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = st.session_state.last_scan_lat
@@ -355,43 +333,6 @@ leaflet_template = """
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
         #map { height: 100vh; width: 100%; }
-        
-        /* Custom UI framing for embedded Nominatim query input */
-        .map-search-container {
-            background: white;
-            padding: 4px;
-            border-radius: 6px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            display: flex;
-            align-items: center;
-            margin-top: 10px;
-            margin-right: 10px;
-        }
-        #map-search-input {
-            padding: 6px 10px;
-            width: 220px;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            font-family: 'Arial', sans-serif;
-            font-size: 12px;
-            outline: none;
-        }
-        #map-search-btn {
-            padding: 6px 12px;
-            background: #001a3d;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-left: 6px;
-            font-family: 'Arial', sans-serif;
-        }
-        #map-search-btn:hover {
-            background: #d4af37;
-            color: #001a3d;
-        }
     </style>
 </head>
 <body>
@@ -420,47 +361,6 @@ leaflet_template = """
             map.fitBounds(bounds.pad(0.1));
         }
         
-        // CUSTOM ASYNCHRONOUS LANDMARK SEARCHBOX REGISTRATION
-        const searchControl = L.control({ position: 'topright' });
-        searchControl.onAdd = function() {
-            const div = L.DomUtil.create('div', 'map-search-container');
-            div.innerHTML = `
-                <input type="text" id="map-search-input" placeholder="Search landmarks or locations...">
-                <button id="map-search-btn">GO</button>
-            `;
-            L.DomEvent.disableClickPropagation(div);
-            return div;
-        };
-        searchControl.addTo(map);
-
-        document.getElementById('map-search-btn').addEventListener('click', runMapGeocodeSearch);
-        document.getElementById('map-search-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') runMapGeocodeSearch();
-        });
-
-        function runMapGeocodeSearch() {
-            const query = document.getElementById('map-search-input').value;
-            if (!query) return;
-            
-            fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query))
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.length > 0) {
-                        const targetLoc = data[0];
-                        const lat = parseFloat(targetLoc.lat);
-                        const lon = parseFloat(targetLoc.lon);
-                        map.setView([lat, lon], 15);
-                        
-                        L.popup()
-                            .setLatLng([lat, lon])
-                            .setContent("<div style='font-family:sans-serif;font-size:11px;max-width:200px;'><b>Found Landmark:</b><br>" + targetLoc.display_name + "</div>")
-                            .openOn(map);
-                    } else {
-                        alert('Location profile or landmark parameters could not be found.');
-                    }
-                }).catch(err => console.error('Geocoding pipeline fault: ', err));
-        }
-
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat.toFixed(5);
             const lon = e.latlng.lng.toFixed(5);
@@ -488,4 +388,5 @@ leaflet_html = (leaflet_template
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__GEOJSON__", geojson_str))
 
+# Passed with explicit visibility configurations to lock the layout fluidly
 st.components.v1.html(leaflet_html, scrolling=False)
