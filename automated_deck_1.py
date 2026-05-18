@@ -285,25 +285,27 @@ data_inputs = {
     "{{LEASE TERM}}": lease_term, "{{HANDOVER CONDITION}}": handover
 }
 
+# --- FIXED: CONTACT TOKEN DATA PIPELINE MAPPING ---
 # Add Contact Tokens dynamically based on active selected layout slots
 for contact_slot in range(2):
     slot_num = contact_slot + 1
+    
+    # Construct tokens using explicit string concatenation to bypass f-string parser limits
+    name_token  = "{{CONTACT_NAME_"  + str(slot_num) + "}}"
+    phone_token = "{{CONTACT_PHONE_" + str(slot_num) + "}}"
+    email_token = "{{CONTACT_EMAIL_" + str(slot_num) + "}}"
+    
     if contact_slot < len(selected_names):
         target_name = selected_names[contact_slot]
-        data_inputs[f"{{{{CONTACT_NAME_{slot_num}}}}}}"] = target_name
-        data_inputs[f"{{{{CONTACT_PHONE_{slot_num}}}}}}"] = contacts_database[target_name]["phone"]
-        data_inputs[f"{{{{CONTACT_EMAIL_{slot_num}}}}}}"] = contacts_database[target_name]["email"]
+        data_inputs[name_token]  = target_name
+        data_inputs[phone_token] = contacts_database[target_name]["phone"]
+        data_inputs[email_token] = contacts_database[target_name]["email"]
     else:
-        data_inputs[f"{{{{CONTACT_NAME_{slot_num}}}}}}"] = ""
-        data_inputs[f"{{{{CONTACT_PHONE_{slot_num}}}}}}"] = ""
-        data_inputs[f"{{{{CONTACT_EMAIL_{slot_num}}}}}}"] = ""
-
-image_inputs = {
-    "{{PROPERTY_PHOTO 1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map,
-    "{{PROPERTY_LOTPLAN}}": u_lotplan, "{{PROPERTY_PHOTO2}}": u_photo2,
-    "{{PROPERTY_PHOTO3}}": u_photo3
-}
-
+        # Graceful fallbacks for empty selections to clear remaining slide tags
+        data_inputs[name_token]  = ""
+        data_inputs[phone_token] = ""
+        data_inputs[email_token] = ""
+        
 # --- CONTROL DESK ACTION LAYER ---
 st.markdown("<div style='margin-top: 10px; border-top: 1px solid #002B49; padding-top: 20px;'></div>", unsafe_allow_html=True)
 action_col1, action_col2 = st.columns([1, 2])
