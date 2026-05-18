@@ -178,19 +178,36 @@ def convert_pptx_to_pdf(pptx_bytes):
 st.set_page_config(page_title="Asset Engine", page_icon="🏢", layout="wide")
 st.markdown(LUXURY_CRE_SYSTEM, unsafe_allow_html=True)
 
-# Instantiate iteration key tracking if missing from active runtime cache
+# Persistent iteration running variables
 if "form_run" not in st.session_state:
     st.session_state.form_run = 0
+
+# Baseline Form profiles storage dictionary initialization
+if "form_values" not in st.session_state:
+    st.session_state.form_values = {
+        "cre_loc": "Tagaytay, Cavite",
+        "cre_size": "386",
+        "cre_type": "Commercial Space",
+        "cre_addr": "Mendez Crossing East, Tagaytay City, Cavite",
+        "cre_rates": "200,000 per month",
+        "cre_sec": "3 months",
+        "cre_adv": "3 months",
+        "cre_esc": "5%",
+        "cre_term": "5 years",
+        "cre_hand": "As is where is"
+    }
 
 run_suffix = f"__v{st.session_state.form_run}"
 
 # HIGH DENSITY STRUCTURAL ROW HELPERS
-def dynamic_form_row(icon, label_text, default_val, state_key):
+def dynamic_form_row(icon, label_text, state_key):
     r_col1, r_col2 = st.columns([9, 11])
     with r_col1:
         st.markdown(f'<div class="row-metric-label"><span class="large-icon">{icon}</span> {label_text}</div>', unsafe_allow_html=True)
     with r_col2:
-        return st.text_input("", value=default_val, key=f"{state_key}{run_suffix}", label_visibility="collapsed")
+        # Dynamically read values straight out of active state storage
+        current_val = st.session_state.form_values.get(state_key, "")
+        return st.text_input("", value=current_val, key=f"{state_key}{run_suffix}", label_visibility="collapsed")
 
 def dynamic_uploader_row(icon, label_text, allowed_types, state_key):
     r_col1, r_col2 = st.columns([9, 11])
@@ -211,16 +228,16 @@ col_left, col_right = st.columns([1, 1], gap="large")
 
 with col_left:
     st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
-    prop_location = dynamic_form_row("📍", "Property Location", "Tagaytay, Cavite", "cre_loc")
-    prop_size     = dynamic_form_row("📐", "Property Size (SQM)", "386", "cre_size")
-    prop_type     = dynamic_form_row("🏢", "Property Type", "Commercial Space", "cre_type")
-    prop_address  = dynamic_form_row("🗺️", "Full Address", "Mendez Crossing East, Tagaytay City, Cavite", "cre_addr")
-    lease_rates   = dynamic_form_row("💰", "Lease Rates", "200,000 per month", "cre_rates")
-    sec_deposit   = dynamic_form_row("🛡️", "Security Deposit", "3 months", "cre_sec")
-    adv_rent      = dynamic_form_row("💵", "Advance Rent", "3 months", "cre_adv")
-    escalation    = dynamic_form_row("📈", "Rental Escalation", "5%", "cre_esc")
-    lease_term    = dynamic_form_row("📅", "Lease Term", "5 years", "cre_term")
-    handover      = dynamic_form_row("🏗️", "Handover Condition", "As is where is", "cre_hand")
+    prop_location = dynamic_form_row("📍", "Property Location", "cre_loc")
+    prop_size     = dynamic_form_row("📐", "Property Size (SQM)", "cre_size")
+    prop_type     = dynamic_form_row("🏢", "Property Type", "cre_type")
+    prop_address  = dynamic_form_row("🗺️", "Full Address", "cre_addr")
+    lease_rates   = dynamic_form_row("💰", "Lease Rates", "cre_rates")
+    sec_deposit   = dynamic_form_row("🛡️", "Security Deposit", "cre_sec")
+    adv_rent      = dynamic_form_row("💵", "Advance Rent", "cre_adv")
+    escalation    = dynamic_form_row("📈", "Rental Escalation", "cre_esc")
+    lease_term    = dynamic_form_row("📅", "Lease Term", "cre_term")
+    handover      = dynamic_form_row("🏗️", "Handover Condition", "cre_hand")
     
     # --- SIMPLIFIED REVERTED CALL TO ACTION SECTOR ---
     cta_col1, cta_col2 = st.columns([9, 11])
@@ -313,10 +330,15 @@ st.markdown("<div style='margin-top: 10px; border-top: 1px solid #002B49; paddin
 action_col1, action_col2 = st.columns([1, 2])
 
 with action_col1:
-    # RE-ENGINEERED UNBREAKABLE CLEAR ROUTINE
+    # RE-ENGINEERED COMPREHENSIVE CLEAR SYSTEM
     if st.button("↺ Clear", key="clear_action_trigger", use_container_width=True):
         st.cache_data.clear()
-        # Increment run index to fully cycle the rendering suffix
+        
+        # Wipe out data parameters stored inside active session state tracking objects
+        for key in st.session_state.form_values.keys():
+            st.session_state.form_values[key] = ""
+            
+        # Increment execution identifier variable to completely cycle UI components
         st.session_state.form_run += 1
         st.rerun()
 
