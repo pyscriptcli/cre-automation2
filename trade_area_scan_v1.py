@@ -7,8 +7,8 @@ import json
 # -----------------------------------------------------------------------------
 # 0. GLOBAL DISPLAY CONFIGURATION
 # -----------------------------------------------------------------------------
-MAP_PANEL_HEIGHT = 900  
-MAP_PANEL_WIDTH = None  
+MAP_PANEL_HEIGHT = 820  # Optimized pixel height to fit without vertical scrollbars
+MAP_PANEL_WIDTH = None  # None for fluid 100% width, or integer (e.g. 1200) for fixed width
 
 # -----------------------------------------------------------------------------
 # 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
@@ -39,9 +39,9 @@ st.markdown("""
         [data-testid="stAppViewBlockContainer"] {
             padding-top: 0.5rem !important; 
             padding-bottom: 0rem !important;
-            padding-left: 2rem !important;
-            padding-right: 2rem !important;
-            max-width: 95% !important; 
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+            max-width: 98% !important; 
             margin: 0 auto !important; 
         }
         
@@ -65,10 +65,20 @@ st.markdown("""
             letter-spacing: 1px !important;
             text-transform: uppercase !important;
             text-align: left !important;
-            margin-bottom: 0px !important;
+            margin-bottom: 2px !important;
             font-family: 'Arial', sans-serif !important;
+            display: block !important;
+            width: 100% !important;
         }
         
+        .clear-link-container {
+            text-align: left !important;
+            margin-top: -4px !important;
+            margin-bottom: 12px !important;
+            width: 100% !important;
+        }
+        
+        /* Hyperlink Emulation for Tertiary Button */
         button[kind="tertiary"] {
             background: transparent !important;
             border: none !important;
@@ -77,11 +87,11 @@ st.markdown("""
             font-weight: 600 !important;
             font-size: 11px !important;
             padding: 0 !important;
-            margin-top: 0px !important;
+            margin: 0 !important;
             box-shadow: none !important;
             min-height: 0 !important;
             height: auto !important;
-            float: right !important;
+            display: inline-block !important;
         }
         button[kind="tertiary"]:hover {
             color: var(--navy-brand) !important;
@@ -119,12 +129,20 @@ st.markdown("""
             transition: all 0.1s ease-in-out !important;
             margin-top: 5px !important;
         }
+        .action-tray div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
+            background-color: var(--gold-accent) !important;
+            color: var(--navy-brand) !important;
+        }
         
         [data-testid="stSidebar"] .st-expander {
             border: 1px solid var(--border-gray) !important;
             background-color: #f8fafc !important;
             border-radius: 4px !important;
             margin-bottom: 2px !important;
+        }
+        [data-testid="stSidebar"] .st-expander details summary {
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
         }
         
         .stDeployButton, footer, #stDecoration { display:none !important; }
@@ -203,15 +221,15 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # Full Unbroken Width Header Layout Block
+    # Title placed directly on top
     st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
-    # Sub-row for Clean Right-Aligned Hyperlink Trigger
-    head_col1, head_col2 = st.columns([1, 1])
-    with head_col2:
-        if st.button("Clear All", key="master_purge_btn", type="tertiary"):
-            execute_global_purge()
-            st.rerun()
+    # "Clear All" positioned neatly directly underneath the title string block
+    st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
+    if st.button("Clear All", key="master_purge_btn", type="tertiary"):
+        execute_global_purge()
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
     coords_val = st.text_input("Target Coordinates", key="geo_coords")
     radius_val = st.number_input("Radius (Meters)", min_value=100, max_value=50000, key="geo_radius", step=100)
@@ -248,7 +266,7 @@ with st.sidebar:
     st.markdown("<hr style='margin: 10px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
     
     st.markdown('<div class="action-tray">', unsafe_allow_html=True)
-    if st.button("🚀 SCAN AREA PROFILE", use_container_width=True):
+    if st.button("🚀 SCAN AREA", use_container_width=True):
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
         else:
@@ -291,18 +309,22 @@ geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = st.session_state.last_scan_lat
 render_lon = st.session_state.last_scan_lon
 
-# Standard string literal to prevent f-string parser collision with JS structures
+# Clean literal template using absolute container boundaries to avoid misalignment
 leaflet_template = """
 <!DOCTYPE html>
 <html>
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; }</style>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
+        #map { height: 100%; width: 100%; }
+    </style>
 </head>
 <body>
-    <div id="map" style="height: 100vh; width: 100vw;"></div>
+    <div id="map"></div>
     <script>
+        // All central markers and radius vectors reference the updated runtime execution state
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
         
@@ -348,7 +370,7 @@ leaflet_template = """
 </html>
 """
 
-# Dynamic programmatic placeholder value mapping
+# Structural mapping replacement
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
