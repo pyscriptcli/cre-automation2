@@ -113,14 +113,14 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA MODELS
 # -----------------------------------------------------------------------------
-DEFAULT_COORDS = "0.0, 0.0"
+DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
-if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 0.0
-if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 0.0
+if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
+if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
 
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
@@ -158,7 +158,7 @@ with st.sidebar:
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, key="geo_radius", step=100)
 
     coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
-    lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (0.0, 0.0)
+    lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.5995, 120.9842)
 
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     search_query = st.text_input("SEARCH TAGS", placeholder="Search...").lower()
@@ -216,7 +216,6 @@ with st.sidebar:
     with col2:
         st.download_button("EXPORT KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
-    # TWO-STEP IMPORT WIDGET
     with st.popover("IMPORT PROJECT", use_container_width=True):
         st.markdown("<div style='font-size:11px; font-weight:800; color:#001a3d; margin-bottom: 8px;'>UPLOAD SAVED PROJECT FILE</div>", unsafe_allow_html=True)
         imported_file = st.file_uploader("Select JSON file", type=["json"], label_visibility="collapsed")
@@ -247,7 +246,6 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Arial', sans-serif; }
         #map { height: 100vh; width: 100%; }
         
-        /* MINIMAL INLINE BASEMAP TOOLBAR - MOVED TO BOTTOM LEFT */
         #minimal-basemap-panel {
             position: absolute; bottom: 20px; left: 10px; z-index: 1000;
             background: #ffffff; border-radius: 4px; border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box;
@@ -305,7 +303,6 @@ leaflet_template = """
         .hide-labels .poi-text-label { display: none !important; }
         .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.2); }
 
-        /* RIGHT PANEL VIEWER */
         #right-viewer-panel {
             position: absolute; top: 10px; right: 300px; z-index: 1001; background: #ffffff; border-radius: 4px;
             width: 450px; height: calc(100vh - 20px); border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box;
@@ -465,7 +462,6 @@ leaflet_template = """
             chev.innerText = panel.classList.contains('collapsed') ? '▲' : '▼';
         }
 
-        // TEXT-BASED RIGHT CLICK MENU
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
             const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
