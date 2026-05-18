@@ -97,7 +97,7 @@ st.markdown("""
             display: block !important;
         }
         
-        [data-testid="stSidebar"]UserContent {
+        [data-testid="stSidebarUserContent"] {
             padding-top: 24px !important;
             padding-left: 12px !important;
             padding-right: 12px !important;
@@ -331,8 +331,13 @@ with st.sidebar:
 # 5. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
-render_lat = st.session_state.last_scan_lat
-render_lon = st.session_state.last_scan_lon
+
+# FORCE MAP INTERFACE TO ZOOM TO USER-SPECIFIED PIN IMMEDIATELY ON VALUE CHANGES
+render_lat = lat_coord
+render_lon = lon_coord
+
+# DETECT IF USER HAS TYPED A NEW PIN THAT DIFFERS FROM THE ACTIVE GENERATED SCAN
+is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -343,32 +348,167 @@ leaflet_template = """
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
         #map { height: 100vh; width: 100%; }
+        
+        /* FLOATING LAYER CONTROLLER CONTROLS */
+        #map-panel-controls {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 1000;
+            background: #ffffff;
+            padding: 10px 14px;
+            border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+            font-family: 'Arial', sans-serif;
+            border: 1px solid #cbd5e1;
+            width: 140px;
+        }
+        .control-block { margin-bottom: 8px; }
+        .control-block:last-child { margin-bottom: 0; }
+        .control-block label {
+            display: block;
+            font-size: 9px;
+            font-weight: 800;
+            color: #001a3d;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .control-block select {
+            width: 100%;
+            font-size: 11px;
+            padding: 4px;
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            color: #001a3d;
+            background: #ffffff;
+            font-weight: 600;
+            outline: none;
+        }
+        .check-block {
+            display: flex !important;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .check-block input { margin: 0; cursor: pointer; }
+        .check-block span {
+            font-size: 9px;
+            font-weight: 800;
+            color: #001a3d;
+            letter-spacing: 0.5px;
+        }
+        
+        /* POI TEXT LABEL COMPONENT STYLING */
+        .poi-text-label {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #001a3d;
+            border-radius: 3px;
+            padding: 1px 4px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #001a3d;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            white-space: nowrap;
+        }
+        
+        /* STRUCTURAL VISIBILITY SWITCH FOR LABELS MATRIX */
+        .hide-labels .poi-text-label {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    
+    <div id="map-panel-controls">
+        <div class="control-block">
+            <label>Basemap</label>
+            <select id="basemap-select" onchange="applyBasemapEngine(this.value)">
+                <option value="osm">OpenStreetMap</option>
+                <option value="satellite">Google Satellite</option>
+                <option value="carto">Carto Light</option>
+            </select>
+        </div>
+        <div class="control-block">
+            <label class="check-block">
+                <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelVisibility(this.checked)">
+                <span>Show Labels</span>
+            </label>
+        </div>
+    </div>
+
     <script>
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
         
+        // BASEMAP LAYER OBJECT MATRIX Definitions
+        const basemaps = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
+            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
+        };
+        
+        // PERSISTENCE STORAGE CONTROLLER ENGINE
+        let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'osm';
+        if (!basemaps[activeBasemapKey]) activeBasemapKey = 'osm';
+        document.getElementById('basemap-select').value = activeBasemapKey;
+        basemaps[activeBasemapKey].addTo(map);
+        
+        function applyBasemapEngine(targetKey) {
+            map.removeLayer(basemaps[activeBasemapKey]);
+            basemaps[targetKey].addTo(map);
+            activeBasemapKey = targetKey;
+            localStorage.setItem('ts_persistent_basemap', targetKey);
+        }
+        
+        // POI TEXT LABEL PERSISTENCE STATE ENGINE
+        let labelsActive = localStorage.getItem('ts_persistent_labels') !== 'false';
+        document.getElementById('label-toggle-chk').checked = labelsActive;
+        if (!labelsActive) {
+            document.getElementById('map').classList.add('hide-labels');
+        }
+        
+        function toggleLabelVisibility(isShown) {
+            if (isShown) {
+                document.getElementById('map').classList.remove('hide-labels');
+            } else {
+                document.getElementById('map').classList.add('hide-labels');
+            }
+            localStorage.setItem('ts_persistent_labels', isShown);
+        }
+        
+        // PLOT CENTRAL TARGET PIN
         L.circleMarker([__LAT__, __LON__], {
             radius: 7, fillColor: "#e11d48", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
         }).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
         
+        // PLOT SCAN RADIUS BUFFER BOUNDS
         L.circle([__LAT__, __LON__], {
             radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
         }).addTo(map);
         
         const pts = __GEOJSON__;
         pts.forEach(p => {
-            L.circleMarker([p.lat, p.lon], {
+            const marker = L.circleMarker([p.lat, p.lon], {
                 radius: 5, fillColor: "#d4af37", color: "#001a3d", weight: 1, opacity: 1, fillOpacity: 0.9
             }).addTo(map).bindPopup("<b>" + p.name + "</b><br>" + p.type);
+            
+            if (p.name && p.name !== 'Unknown') {
+                marker.bindTooltip(p.name, {
+                    permanent: true,
+                    direction: 'top',
+                    offset: [0, -4],
+                    className: 'poi-text-label'
+                });
+            }
         });
         
-        if(pts.length > 0) {
+        // ONLY ADJUST CANVAS BOUNDS AUTOMATICALLY IF THE PIN HAS NOT CHANGED POSITION
+        if (pts.length > 0 && !__IS_STALE__) {
             const bounds = L.featureGroup([L.marker([__LAT__, __LON__]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
             map.fitBounds(bounds.pad(0.1));
+        } else {
+            map.setView([__LAT__, __LON__], 15);
         }
         
         map.on('contextmenu', function(e) {
@@ -396,7 +536,7 @@ leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
                 .replace("__RADIUS__", str(radius_val))
+                .replace("__IS_STALE__", is_stale)
                 .replace("__GEOJSON__", geojson_str))
 
-# Passed with explicit visibility configurations to lock the layout fluidly
 st.components.v1.html(leaflet_html, scrolling=False)
