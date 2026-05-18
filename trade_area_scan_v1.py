@@ -5,7 +5,7 @@ import math
 import json
 
 # -----------------------------------------------------------------------------
-# 1. CORE INTERFACE CONFIGURATION & EMBOSSED DESIGN OVERRIDES
+# 1. LUXURY CORPORATE NAVY & GOLD DOM STYLING ENGINE
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -13,88 +13,132 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Deep inject custom style metrics to completely rebuild Streamlit's base shell
 st.markdown("""
     <style>
+        /* Base Variables Definitions */
         :root {
-            --navy: #001a3d;
-            --white: #ffffff;
-            --gold: #d4af37;
-            --slate-bg: #f8fafc;
+            --navy-main: #001a3d;
+            --navy-dark: #001126;
+            --gold-accent: #d4af37;
+            --white-clean: #ffffff;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(212, 175, 55, 0.2);
         }
         
-        /* Eliminate top framework paddings completely */
+        /* Maximize primary workspace surface footprint */
         .block-container {
             padding: 0rem !important;
         }
         
+        /* Complete Sidebar Re-skinning */
         [data-testid="stSidebar"] {
-            background-color: var(--slate-bg) !important;
-            color: var(--navy) !important;
-            border-right: 3px solid var(--navy) !important;
+            background-color: var(--navy-main) !important;
+            color: var(--white-clean) !important;
+            border-right: 2px solid var(--gold-accent) !important;
         }
         
-        /* Ensure layout content clears the sticky bottom panel tray */
+        /* Enforce layout padding clear space above the action panel */
         [data-testid="stSidebarUserContent"] {
-            padding-bottom: 240px !important;
+            padding-bottom: 220px !important;
+            padding-left: 12px !important;
+            padding-right: 12px !important;
         }
         
-        /* Container UI Blocks */
+        /* Luxury Micro-Card Container Structuring */
         .ui-container-block {
-            background-color: var(--white);
-            border: 2px solid var(--navy);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
             border-radius: 8px;
-            padding: 14px;
-            margin-bottom: 12px;
-            box-shadow: 3px 3px 0px var(--navy);
+            padding: 16px;
+            margin-bottom: 14px;
+            transition: border-color 0.2s ease;
+        }
+        .ui-container-block:hover {
+            border-color: var(--gold-accent);
         }
         
-        [data-testid="stSidebar"] label {
-            color: var(--navy) !important;
-            font-weight: 800 !important;
-            font-family: 'Arial', sans-serif !important;
-            text-transform: uppercase;
+        /* Executive Level Typography Rules */
+        [data-testid="stSidebar"] h2 {
+            font-size: 20px !important;
+            letter-spacing: 2px !important;
+            text-transform: uppercase !important;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        [data-testid="stSidebar"] label p {
+            color: var(--white-clean) !important;
+            font-weight: 700 !important;
             font-size: 10px !important;
-            letter-spacing: 0.5px;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+            opacity: 0.85;
         }
         
-        /* Fixed Sticky Footer Layout Control Bar */
+        /* Overriding Native Streamlit Input Widgets for Brand Alignment */
+        div[data-baseweb="input"], div[data-baseweb="select"] {
+            background-color: rgba(0, 17, 38, 0.6) !important;
+            border: 1px solid var(--glass-border) !important;
+            border-radius: 4px !important;
+            color: var(--white-clean) !important;
+        }
+        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
+            border-color: var(--gold-accent) !important;
+        }
+        input {
+            color: var(--white-clean) !important;
+            font-family: 'Arial', sans-serif !important;
+        }
+        
+        /* Fixed Sticky Action Control Bar at Sidebar Root base */
         div.sticky-footer-tray {
             position: fixed;
             bottom: 0;
             left: 0;
             width: 336px;
-            background-color: var(--slate-bg);
-            border-top: 3px solid var(--navy);
+            background-color: var(--navy-dark);
+            border-top: 2px solid var(--gold-accent);
             padding: 16px;
             z-index: 999999;
+            box-shadow: 0px -5px 15px rgba(0,0,0,0.5);
         }
         
-        /* Form Interactive Action Button Framework */
+        /* Styled Clean Action Inputs (White/Gold Transitions) */
         div.stButton > button, div.stDownloadButton > button {
-            background-color: var(--white) !important;
-            color: var(--navy) !important;
-            font-weight: 900 !important;
+            background-color: var(--white-clean) !important;
+            color: var(--navy-main) !important;
+            font-weight: 800 !important;
+            font-size: 11px !important;
             text-transform: uppercase !important;
-            border: 2px solid var(--navy) !important;
+            letter-spacing: 1px !important;
+            border: 1px solid var(--white-clean) !important;
             border-radius: 4px !important;
             width: 100% !important;
-            box-shadow: 2px 2px 0px var(--navy) !important;
-            font-size: 11px !important;
-            transition: all 0.1s ease-in-out !important;
+            padding: 8px 0px !important;
+            transition: all 0.2s ease-in-out !important;
+            box-shadow: none !important;
         }
         
         div.stButton > button:hover, div.stDownloadButton > button:hover {
-            background-color: var(--navy) !important;
-            color: var(--white) !important;
-            box-shadow: 2px 2px 0px var(--gold) !important;
+            background-color: var(--gold-accent) !important;
+            color: var(--navy-dark) !important;
+            border-color: var(--gold-accent) !important;
         }
         
+        /* Custom Streamlit Accordion Polish */
+        [data-testid="stSidebar"] .st-expander {
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            background-color: rgba(0,0,0,0.2) !important;
+            margin-bottom: 4px;
+        }
+        
+        /* Hide native framework branding artifacts */
         .stDeployButton, footer, #stDecoration { display:none !important; }
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE DECLARATIONS
+# 2. STATE CAPTURE ENGINE INITIALIZATION
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.6465, 121.0371"
 DEFAULT_RADIUS = 1000
@@ -109,7 +153,6 @@ if 'search_filter' not in st.session_state:
 if 'scanned_records' not in st.session_state:
     st.session_state.scanned_records = []
 
-# State Reset Execution Loop (Clears inputs, categories, and cached layers)
 def trigger_master_purge():
     st.session_state.geo_coords = DEFAULT_COORDS
     st.session_state.geo_radius = DEFAULT_RADIUS
@@ -120,7 +163,7 @@ def trigger_master_purge():
             st.session_state[key] = False
 
 # -----------------------------------------------------------------------------
-# 3. OSM TAG CONFIGURATION REGISTRY
+# 3. GEOSPATIAL REGISTRY STRUCTURES
 # -----------------------------------------------------------------------------
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"']],
@@ -137,7 +180,7 @@ POI_CONFIG = {
 }
 
 # -----------------------------------------------------------------------------
-# 4. KML WRITER FUNCTIONS
+# 4. DATA EXPORT STORAGE WRITERS
 # -----------------------------------------------------------------------------
 def compile_radius_kml(lat, lon, r_meters):
     kml = f'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scan Radius Geofence</name><Placemark><name>Buffer Zone</name><Style><LineStyle><color>ff0000ff</color><width>3</width></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style><Polygon><outerBoundaryIs><LinearRing><coordinates>'
@@ -161,37 +204,37 @@ def compile_features_kml(features):
     return kml
 
 # -----------------------------------------------------------------------------
-# 5. CONTROL PANEL GRAPHICS (SIDEBAR COMPONENT ENGINE)
+# 5. CONTROL INTERFACE GRAPHICS (SIDEBAR WORKSPACE)
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("<h2 style='color:var(--navy); text-align:center; font-family:Arial; font-weight:900; margin-top:10px; margin-bottom:5px; letter-spacing:1px;'>TRADE AREA SCAN</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:var(--gold-accent); text-align:center; font-family:Arial; font-weight:900; margin-top:15px; margin-bottom:5px;'>TRADE AREA SCAN</h2>", unsafe_allow_html=True)
     
-    col_void, col_clear_trigger = st.columns([2, 1])
+    col_void, col_clear_trigger = st.columns([1.5, 1])
     with col_clear_trigger:
-        if st.button("❌ CLEAR ALL", key="master_purge_btn", help="Completely clear coordinates, radius values, and selection matrices"):
+        if st.button("✨ CLEAR ALL", key="master_purge_btn", help="Flush all geo configurations and selected vectors"):
             trigger_master_purge()
             st.rerun()
 
-    # CONTAINER 1: GEOGRAPHY CARD UI
+    # PANEL CARD 1: GEOGRAPHIC CRITERIA
     st.markdown('<div class="ui-container-block">', unsafe_allow_html=True)
-    st.markdown("<div style='color:var(--navy); font-weight:900; font-size:11px; margin-bottom:8px;'>GEOGRAPHIC PROFILE</div>", unsafe_allow_html=True)
-    coords_val = st.text_input("Target Center Coordinates", key="geo_coords")
-    radius_val = st.number_input("Scan Radius Boundary (M)", min_value=100, max_value=50000, key="geo_radius", step=100)
+    st.markdown("<div style='color:var(--gold-accent); font-weight:800; font-size:11px; margin-bottom:10px; letter-spacing:0.5px;'>GEOGRAPHIC PARAMETERS</div>", unsafe_allow_html=True)
+    coords_val = st.text_input("Center Coordinates", key="geo_coords")
+    radius_val = st.number_input("Buffer Radius (M)", min_value=100, max_value=50000, key="geo_radius", step=100)
     st.markdown('</div>', unsafe_allow_html=True)
 
     coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
     lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.6465, 121.0371)
 
-    # CONTAINER 2: BASEMAP OPTIONS CARD UI
+    # PANEL CARD 2: RENDER BASES
     st.markdown('<div class="ui-container-block">', unsafe_allow_html=True)
-    st.markdown("<div style='color:var(--navy); font-weight:900; font-size:11px; margin-bottom:8px;'>BASEMAP VIEW SELECTION</div>", unsafe_allow_html=True)
+    st.markdown("<div style='color:var(--gold-accent); font-weight:800; font-size:11px; margin-bottom:10px; letter-spacing:0.5px;'>BASEMAP SELECTION</div>", unsafe_allow_html=True)
     basemap_choice = st.selectbox("Layer Engine Type", ["OpenStreetMap", "Carto Light", "Satellite Real World"], index=0, label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # CONTAINER 3: SELECTION SEARCH & POIS
+    # PANEL CARD 3: QUERY MATRIX FILTER
     st.markdown('<div class="ui-container-block">', unsafe_allow_html=True)
-    st.markdown("<div style='color:var(--navy); font-weight:900; font-size:11px; margin-bottom:8px;'>TARGET LAYER QUERY LIBRARY</div>", unsafe_allow_html=True)
-    search_query = st.text_input("Search POI Categories", key="search_filter").lower()
+    st.markdown("<div style='color:var(--gold-accent); font-weight:800; font-size:11px; margin-bottom:10px; letter-spacing:0.5px;'>POI LAYER REGISTRY</div>", unsafe_allow_html=True)
+    search_query = st.text_input("Filter Categories", key="search_filter", placeholder="Type to filter...").lower()
     
     selected_osm_tags = []
     for cat_name, node_items in POI_CONFIG.items():
@@ -203,17 +246,17 @@ with st.sidebar:
                         selected_osm_tags.append(osm_tag)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # STICKY CONTROL BAR TRAY AT THE BOTTOM OF SIDEBAR
+    # FIXED PERSISTENT TRAY FOOTER OVERLAY AT SIDEBAR BASE
     st.markdown('<div class="sticky-footer-tray">', unsafe_allow_html=True)
-    if st.button("🛰️ SCAN AREA PROFILE", type="primary", use_container_width=True):
+    if st.button("🛰️ EXECUTE SURVEY SCAN", type="primary", use_container_width=True):
         if not selected_osm_tags:
-            st.error("Select at least 1 item to profile.")
+            st.error("Select at least 1 layer vector.")
         else:
             overpass_url = "https://overpass-api.de/api/interpreter"
             statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_osm_tags])
             compiled_ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
             
-            with st.spinner("Fetching map layers..."):
+            with st.spinner("Querying Overpass Nodes..."):
                 try:
                     api_response = requests.post(overpass_url, data={"data": compiled_ql}, timeout=100)
                     if api_response.status_code == 200:
@@ -231,7 +274,7 @@ with st.sidebar:
                                 })
                         st.session_state.scanned_records = parsed_records
                     else:
-                        st.sidebar.error(f"Server Error Status: {api_response.status_code}")
+                        st.sidebar.error(f"API Interface Error: {api_response.status_code}")
                 except Exception as e:
                     st.sidebar.error(f"Network Timeout: {str(e)}")
 
@@ -256,12 +299,12 @@ with st.sidebar:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 6. WORKSPACE VIEWPORT (FIXED HEIGHT MAP AND INITIALIZATION LOOP)
+# 6. WORKSPACE VIEWPORT LAYER (FULL RE-CALCULATION BLOCKS)
 # -----------------------------------------------------------------------------
 TILE_DICTIONARY = {
-    "OpenStreetMap": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    "Carto Light": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    "Satellite Real World": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    "OpenStreetMap": "https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png",
+    "Carto Light": "https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png",
+    "Satellite Real World": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{{z}}/{{y}}/{{x}}"
 }
 selected_tile_template = TILE_DICTIONARY[basemap_choice]
 geojson_features_string = json.dumps(st.session_state.scanned_records)
@@ -274,7 +317,7 @@ leaflet_injection_html = f"""
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body, html, #map-canvas-container {{
-            margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; background: #ffffff;
+            margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; background: #001126;
         }}
     </style>
 </head>
@@ -285,18 +328,18 @@ leaflet_injection_html = f"""
         L.tileLayer('{selected_tile_template}', {{ maxZoom: 19 }}).addTo(map);
         
         L.circleMarker([{lat_coord}, {lon_coord}], {{
-            radius: 8, fillColor: "#ff3333", color: "#ffffff", weight: 3, opacity: 1, fillOpacity: 1
-        }}).addTo(map).bindPopup("<b>PRIME LOGISTICS TARGET CENTER</b>");
+            radius: 9, fillColor: "#ff3333", color: "#ffffff", weight: 3, opacity: 1, fillOpacity: 1
+        }}).addTo(map).bindPopup("<b>TARGET CENTER POINT</b>");
         
         L.circle([{lat_coord}, {lon_coord}], {{
-            radius: {radius_val}, color: "#001a3d", weight: 2, fillColor: "#d4af37", fillOpacity: 0.08
+            radius: {radius_val}, color: "#d4af37", weight: 2, fillColor: "#d4af37", fillOpacity: 0.05
         }}).addTo(map);
         
         const featurePoints = {geojson_features_string};
         featurePoints.forEach(pt => {{
             L.circleMarker([pt.lat, pt.lon], {{
                 radius: 6, fillColor: "#d4af37", color: "#001a3d", weight: 1.5, opacity: 1, fillOpacity: 0.9
-            }}).addTo(map).bindPopup("<b>" + pt.name + "</b><br>Class: " + pt.type);
+            }}).addTo(map).bindPopup("<b>" + pt.name + "</b><br>Type: " + pt.type);
         }});
         
         if(featurePoints.length > 0) {{
@@ -306,12 +349,11 @@ leaflet_injection_html = f"""
             ]);
             map.fitBounds(group.getBounds().pad(0.1));
         }}
-
-        // FIXED ENCAPSULATED EXPRESSION: Safely escaped braces inside the Python literal block
+        
         setTimeout(function() {{ map.invalidateSize(); }}, 200);
     </script>
 </body>
 </html>
 """
 
-st.components.v1.html(leaflet_injection_html, height=900, scrolling=False)
+st.components.v1.html(leaflet_injection_html, height=920, scrolling=False)
