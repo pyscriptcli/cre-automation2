@@ -14,7 +14,7 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
 
         :root {
@@ -47,24 +47,20 @@ st.markdown("""
             box-shadow: 2px 0 15px rgba(0,0,0,0.03) !important;
         }
         
-        /* FIX: Hide modern Streamlit sidebar toggle to prevent text leaks */
         [data-testid="stSidebarCollapseButton"], [data-testid="collapsedControl"] { display: none !important; }
-        
         ::-webkit-scrollbar { width: 0px !important; background: transparent !important; }
         * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
         
-        /* FIX: Removed 'span' from global override to protect Streamlit native components */
         p, label, h1, h2, h3, h4, h5, h6, .stMarkdown, [data-testid="stExpander"] summary p {
             color: var(--brand-midnight) !important;
             font-family: 'Montserrat', sans-serif !important;
         }
         
-        /* FIX: Explicitly restore Material Symbols for expander arrows and icons */
         .material-symbols-rounded, span[class*="material-symbols"] {
             font-family: 'Material Symbols Rounded' !important;
             font-weight: normal !important;
             font-style: normal !important;
-            font-size: 10px !important;
+            font-size: 18px !important;
             line-height: 1 !important;
             letter-spacing: normal !important;
             text-transform: none !important;
@@ -105,7 +101,7 @@ st.markdown("""
         }
         div[data-baseweb="input"]:focus-within { border-bottom: 2px solid var(--brand-gold) !important; }
         
-        /* BUTTON RE-STYLING (NO OVERLAPS) */
+        /* BUTTON RE-STYLING */
         div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button {
             background-color: var(--brand-midnight) !important; 
             border: 1px solid var(--brand-midnight) !important; 
@@ -117,7 +113,7 @@ st.markdown("""
             border-color: var(--brand-gold) !important;
         }
         div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p {
-            color: var(--white-clean) !important; font-weight: 700 !important; font-size: 7px !important; text-transform: uppercase !important; letter-spacing: 1px;
+            color: var(--white-clean) !important; font-weight: 700 !important; font-size: 9px !important; text-transform: uppercase !important; letter-spacing: 1px;
         }
         
         div.stDownloadButton > button {
@@ -126,13 +122,12 @@ st.markdown("""
         }
         div.stDownloadButton > button:hover { background-color: var(--brand-gold) !important; }
         
-        /* HYPERLINK STYLE FOR CLEAR BUTTON */
         div.stButton > button[kind="primary"] {
             background: transparent !important; border: none !important; color: var(--text-muted) !important;
             box-shadow: none !important; padding: 0 !important; margin-top: 2px; display: inline-flex;
         }
         div.stButton > button[kind="primary"] p {
-            color: var(--text-muted) !important; font-size: 10px !important; font-weight: 600 !important; text-decoration: none !important; text-transform: uppercase;
+            color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600 !important; text-decoration: none !important; text-transform: uppercase;
         }
         div.stButton > button[kind="primary"]:hover p { color: #AA2E20 !important; }
         
@@ -141,7 +136,36 @@ st.markdown("""
             border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important;
             border-radius: 2px !important; margin-bottom: 2px !important; overflow: hidden !important;
         }
-        [data-testid="stSidebar"] .st-expander summary p { font-size: 10px !important; font-weight: 700 !important; }
+
+        /* -------------------------------------------------------------------------
+           [DIRECTIVE: EXPANDER HEADER FONT SIZE]
+           Adjust the '12px' below to make the category names (e.g. COMMERCIAL) bigger or smaller 
+           ------------------------------------------------------------------------- */
+        [data-testid="stSidebar"] .st-expander summary p { 
+            font-size: 12px !important; 
+            font-weight: 700 !important; 
+            letter-spacing: 0.5px;
+        }
+        
+        /* -------------------------------------------------------------------------
+           [DIRECTIVE: CHECKBOX LABEL FONT SIZE]
+           Adjust the '11px' below to make the POI item names (e.g. Corporate Office) bigger or smaller 
+           ------------------------------------------------------------------------- */
+        .stCheckbox label p { 
+            font-size: 11px !important; 
+            font-weight: 500 !important; 
+        }
+
+        /* -------------------------------------------------------------------------
+           [DIRECTIVE: CHECKBOX TICK COLOR OVERRIDE]
+           Forces the Streamlit checkbox to render in Brand Midnight Blue instead of default red
+           ------------------------------------------------------------------------- */
+        div[data-baseweb="checkbox"] input:checked + div,
+        div[data-baseweb="checkbox"] div[aria-checked="true"] {
+            background-color: var(--brand-midnight) !important;
+            border-color: var(--brand-midnight) !important;
+        }
+
         .stDeployButton, footer { display:none !important; }
         
         /* BRANDED TITLE */
@@ -149,16 +173,15 @@ st.markdown("""
             font-family: 'Cormorant Garamond', serif !important;
             font-style: italic;
             color: var(--brand-midnight);
-            font-size: 30px;
+            font-size: 22px;
             text-align: center;
             border-bottom: 1px solid var(--brand-gold);
-            padding-bottom: 15px;
-            margin-bottom: 50px;
+            padding-bottom: 6px;
+            margin-bottom: 12px;
         }
         
         /* TEXT SIZING OVERRIDES */
-        .stTextInput label p, .stNumberInput label p { font-size: 10px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
-        .stCheckbox label p { font-size: 7px !important; }
+        .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
     </style>
 """, unsafe_allow_html=True)
 
