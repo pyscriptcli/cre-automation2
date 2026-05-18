@@ -175,7 +175,7 @@ def convert_pptx_to_pdf(pptx_bytes):
     return None
 
 # --- STREAMLIT STATE INITIALIZATION ---
-st.set_page_config(page_title="Asset Engine", page_icon="🏢", layout="wide")
+st.set_page_config(page_title="Property Deck Generator", layout="wide")
 st.markdown(LUXURY_CRE_SYSTEM, unsafe_allow_html=True)
 
 if "form_run" not in st.session_state:
