@@ -5,6 +5,11 @@ import math
 import json
 
 # -----------------------------------------------------------------------------
+# 0. GLOBAL DISPLAY CONFIGURATION
+# -----------------------------------------------------------------------------
+MAP_PANEL_HEIGHT = 900  # Adjust this pixel value to resize the spatial canvas
+
+# -----------------------------------------------------------------------------
 # 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
@@ -183,7 +188,7 @@ def compile_radius_kml(lat, lon, r_meters):
     return kml + '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>'
 
 def compile_features_kml(features):
-    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
+    kml = 'xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -281,37 +286,38 @@ geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = st.session_state.last_scan_lat
 render_lon = st.session_state.last_scan_lon
 
-leaflet_html = f"""
+# Clean literal template to eliminate Python f-string bracket compilation limits
+leaflet_template = """
 <!DOCTYPE html>
 <html>
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>body, html, #map {{ margin: 0; padding: 0; height: 100vh; width: 100vw; background: #f8fafc; }}</style>
+    <style>body, html, #map { margin: 0; padding: 0; height: 100vh; width: 100vw; background: #f8fafc; }</style>
 </head>
 <body>
     <div id="map"></div>
     <script>
-        const map = L.map('map', {{ zoomControl: true, attributionControl: false }}).setView([{render_lat}, {render_lon}], 14);
-        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{ maxZoom: 19 }}).addTo(map);
+        const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
         
-        L.circleMarker([{render_lat}, {render_lon}], {{
+        L.circleMarker([__LAT__, __LON__], {
             radius: 7, fillColor: "#e11d48", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
-        }}).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
+        }).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
         
-        L.circle([{render_lat}, {render_lon}], {{
-            radius: {radius_val}, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
-        }}).addTo(map);
+        L.circle([__LAT__, __LON__], {
+            radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
+        }).addTo(map);
         
-        const pts = {geojson_str};
-        pts.forEach(p => {{
-            L.circleMarker([p.lat, p.lon], {{
+        const pts = __GEOJSON__;
+        pts.forEach(p => {
+            L.circleMarker([p.lat, p.lon], {
                 radius: 5, fillColor: "#d4af37", color: "#001a3d", weight: 1, opacity: 1, fillOpacity: 0.9
-            }}).addTo(map).bindPopup("<b>" + p.name + "</b><br>" + p.type);
-        }});
+            }).addTo(map).bindPopup("<b>" + p.name + "</b><br>" + p.type);
+        });
         
-    if(pts.length > 0) {
-            const bounds = L.featureGroup([L.marker([{render_lat}, {render_lon}]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
+        if(pts.length > 0) {
+            const bounds = L.featureGroup([L.marker([__LAT__, __LON__]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
             map.fitBounds(bounds.pad(0.1));
         }
         
@@ -321,5 +327,11 @@ leaflet_html = f"""
 </html>
 """
 
-st.components.v1.html(leaflet_html, height=900, scrolling=False)
-# Ensure absolutely nothing exists below this point
+# Structural programmatic token injection
+leaflet_html = (leaflet_template
+                .replace("__LAT__", str(render_lat))
+                .replace("__LON__", str(render_lon))
+                .replace("__RADIUS__", str(radius_val))
+                .replace("__GEOJSON__", geojson_str))
+
+st.components.v1.html(leaflet_html, height=MAP_PANEL_HEIGHT, scrolling=False)
