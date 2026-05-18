@@ -142,7 +142,7 @@ st.markdown("""
            Adjust the '12px' below to make the category names (e.g. COMMERCIAL) bigger or smaller 
            ------------------------------------------------------------------------- */
         [data-testid="stSidebar"] .st-expander summary p { 
-            font-size: 12px !important; 
+            font-size: 10px !important; 
             font-weight: 700 !important; 
             letter-spacing: 0.5px;
         }
@@ -152,7 +152,7 @@ st.markdown("""
            Adjust the '11px' below to make the POI item names (e.g. Corporate Office) bigger or smaller 
            ------------------------------------------------------------------------- */
         .stCheckbox label p { 
-            font-size: 11px !important; 
+            font-size: 10px !important; 
             font-weight: 500 !important; 
         }
 
