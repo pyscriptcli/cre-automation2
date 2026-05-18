@@ -93,24 +93,26 @@ search_term = st.sidebar.text_input("SEARCH POI:", "").lower()
 selected_queries = []
 selected_labels = {}
 
-# Process Core Categories
+# Process Core Categories Loop
 for cat, items in POI_CONFIG.items():
     filtered_items = [i for i in items if search_term in i[0].lower()]
     if filtered_items:
         st.sidebar.markdown(f"**{cat}**")
         for label, q_str in filtered_items:
-            if st.sidebar.checkbox(label, key=f"core_{label}"):
+            # FIXED: Appended _{cat}_ to guarantee uniqueness
+            if st.sidebar.checkbox(label, key=f"core_{cat}_{label}"):
                 selected_queries.append(q_str)
                 selected_labels[q_str] = label
 
-# Process Advanced Section
+# Process Advanced Section Loop
 with st.sidebar.expander("ADVANCED POI LIBRARY", expanded=bool(search_term)):
     for cat, items in ADVANCED_CONFIG.items():
         filtered_items = [i for i in items if search_term in i[0].lower()]
         if filtered_items:
             st.sidebar.caption(cat)
             for label, q_str in filtered_items:
-                if st.sidebar.checkbox(label, key=f"adv_{label}"):
+                # FIXED: Appended _{cat}_ to eliminate duplicate library label collisions
+                if st.sidebar.checkbox(label, key=f"adv_{cat}_{label}"):
                     selected_queries.append(q_str)
                     selected_labels[q_str] = label
 
