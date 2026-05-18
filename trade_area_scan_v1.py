@@ -4,12 +4,6 @@ import re
 import math
 import json
 
-import streamlit as st
-import requests
-import re
-import math
-import json
-
 # -----------------------------------------------------------------------------
 # 0. GLOBAL DISPLAY CONFIGURATION
 # -----------------------------------------------------------------------------
