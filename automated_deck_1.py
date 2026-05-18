@@ -50,6 +50,13 @@ LUXURY_CRE_SYSTEM = """
         padding: 10px 14px !important;
     }
     
+    /* Luxury Corporate Checkbox Overrides */
+    div[data-testid="stCheckbox"] label p {
+        color: #002B49 !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+    }
+    
     /* 3. Minimalist Template File Uploader */
     section[data-testid="stFileUploader"] {
         background-color: #FFFFFF !important;
@@ -155,23 +162,18 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
 
 # --- HEADLESS LINUX PDF GENERATION MATRIX ---
 def convert_pptx_to_pdf(pptx_bytes):
-    """Executes a headless LibreOffice binary sub-process to generate high-fidelity PDFs on Linux cloud servers."""
     with tempfile.TemporaryDirectory() as temp_dir:
         input_pptx_path = os.path.join(temp_dir, "document.pptx")
         with open(input_pptx_path, "wb") as f:
             f.write(pptx_bytes)
-        
         try:
-            # Build Linux headless conversion sequence
             command = ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, input_pptx_path]
             subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
             output_pdf_path = os.path.join(temp_dir, "document.pdf")
             if os.path.exists(output_pdf_path):
                 with open(output_pdf_path, "rb") as f:
                     return f.read()
-        except Exception as e:
-            st.error(f"PDF Build Exception: System missing headless packages. Verify your packages.txt file layer. Error: {str(e)}")
+        except Exception:
             return None
     return None
 
@@ -216,6 +218,40 @@ with col_left:
     escalation    = dynamic_form_row("📈", "Rental Escalation", "5%", "cre_esc")
     lease_term    = dynamic_form_row("📅", "Lease Term", "5 years", "cre_term")
     handover      = dynamic_form_row("🏗️", "Handover Condition", "As is where is", "cre_hand")
+    
+    # --- NEW: CALL TO ACTION SECTION (DYNAMIC MAX-2 CHECKBOX MATRIX) ---
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    cta_col1, cta_col2 = st.columns([9, 11])
+    with cta_col1:
+        st.markdown('<div class="row-metric-label"><span class="large-icon">📞</span> CALL TO ACTION</div>', unsafe_allow_html=True)
+    with cta_col2:
+        contacts_database = {
+            "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
+            "Meliza Zapata": {"phone": "0917 555 1234", "email": "meliza.zapata@primephilippines.com"},
+            "Dykstra Pineda": {"phone": "0917 555 5678", "email": "dykstra.pineda@primephilippines.com"},
+            "Cedtriz Rena": {"phone": "0917 555 9012", "email": "cedtriz.rena@primephilippines.com"},
+            "Carlo Medina": {"phone": "0920 986 2764", "email": "carlo.medina@primephilippines.com"},
+            "Dave Policarpio": {"phone": "0917 555 3456", "email": "dave.policarpio@primephilippines.com"},
+            "Irish Rena": {"phone": "0917 555 7890", "email": "irish.rena@primephilippines.com"}
+        }
+        
+        # Calculate currently selected count ahead of layout pass to enforce freezing
+        selected_names = [name for name in contacts_database if st.session_state.get(f"state_cb_{name}", False)]
+        current_checked_count = len(selected_names)
+        
+        # Split contacts array into a beautiful internal two-column layout
+        cb_sub_col1, cb_sub_col2 = st.columns(2)
+        contact_keys = list(contacts_database.keys())
+        
+        for idx, name in enumerate(contact_keys):
+            is_active = st.session_state.get(f"state_cb_{name}", False)
+            # Freeze rule: Disable if 2 elements are checked, unless it is the element currently active
+            should_freeze = (current_checked_count >= 2 and not is_active)
+            
+            target_sub_column = cb_sub_col1 if idx % 2 == 0 else cb_sub_col2
+            with target_sub_column:
+                st.checkbox(name, key=f"state_cb_{name}", disabled=should_freeze)
+                
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col_right:
@@ -236,12 +272,11 @@ with col_right:
     u_photo3  = dynamic_uploader_row("📸", "Property Photo 3", img_types, "web_p3")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # NEW: Flat, Luxurious Export Format Selector Row
     st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
     export_format = dynamic_selector_row("📄", "Export Format", ["PPTX (PowerPoint)", "PDF (Adobe Acrobat)"], "web_format")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Data Mapping Containers
+# Compile text data tokens
 data_inputs = {
     "{{PROPERTY_LOCATION}}": prop_location, "{{PROPERTY_SIZE}}": prop_size,
     "{{PROPERTY_TYPE}}": prop_type, "{{PROPERTY_ADDRESS}}": prop_address,
@@ -249,6 +284,19 @@ data_inputs = {
     "{{ADVANCE_RENT}}": adv_rent, "{{ESCALATION}}": escalation,
     "{{LEASE TERM}}": lease_term, "{{HANDOVER CONDITION}}": handover
 }
+
+# Add Contact Tokens dynamically based on active selected layout slots
+for contact_slot in range(2):
+    slot_num = contact_slot + 1
+    if contact_slot < len(selected_names):
+        target_name = selected_names[contact_slot]
+        data_inputs[f"{{{{CONTACT_NAME_{slot_num}}}}}}"] = target_name
+        data_inputs[f"{{{{CONTACT_PHONE_{slot_num}}}}}}"] = contacts_database[target_name]["phone"]
+        data_inputs[f"{{{{CONTACT_EMAIL_{slot_num}}}}}}"] = contacts_database[target_name]["email"]
+    else:
+        data_inputs[f"{{{{CONTACT_NAME_{slot_num}}}}}}"] = ""
+        data_inputs[f"{{{{CONTACT_PHONE_{slot_num}}}}}}"] = ""
+        data_inputs[f"{{{{CONTACT_EMAIL_{slot_num}}}}}}"] = ""
 
 image_inputs = {
     "{{PROPERTY_PHOTO 1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map,
@@ -263,6 +311,8 @@ action_col1, action_col2 = st.columns([1, 2])
 with action_col1:
     if st.button("↺ Clear", key="reset_btn_key", use_container_width=True):
         st.cache_data.clear()
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
         st.rerun()
 
 with action_col2:
@@ -310,7 +360,6 @@ with action_col2:
                             sp = old_shape._element
                             sp.getparent().remove(sp)
 
-                    # Save intermediate presentation structure directly to memory
                     pptx_stream = io.BytesIO()
                     prs.save(pptx_stream)
                     raw_pptx_bytes = pptx_stream.getvalue()
@@ -318,7 +367,6 @@ with action_col2:
                     st.markdown("""<div style="border-left: 4px solid #C5A059; background-color: #FFFFFF; padding: 16px; border-top: 1px solid #002B49; border-right: 1px solid #002B49; border-bottom: 1px solid #002B49; margin-top: 20px; text-align: center; color: #002B49; font-weight: 700; font-size: 13px; letter-spacing: 0.05em;">🎉 PRESENTATION COMPILED SUCCESSFULLY! READY FOR PRODUCTION DOWNLOAD.</div>""", unsafe_allow_html=True)
                     st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
                     
-                    # --- DOWNLOAD LAYER CONDITIONAL FORMAT ROUTING ---
                     safe_filename = f"PIS_{prop_location.replace(' ', '_')}"
                     
                     if "PDF" in export_format:
