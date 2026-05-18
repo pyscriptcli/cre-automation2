@@ -1,304 +1,247 @@
 import streamlit as st
-import urllib.parse
+import requests
+import pandas as pd
+import numpy as np
+import re
+import math
 
-# Enforce clean wide layout viewport mapping
-st.set_page_config(layout="wide", page_title="Market Study Deck Engine", initial_sidebar_state="expanded")
+# -----------------------------------------------------------------------------
+# 1. PAGE INITIALIZATION & THEME INJECTION
+# -----------------------------------------------------------------------------
+st.set_page_config(
+    page_title="Trade Area Scanner",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# --- Initialize Global Framework Persistence Keys ---
-if "map_fullscreen" not in st.session_state:
-    st.session_state.map_fullscreen = False
-
-if "target_url" not in st.session_state:
-    st.session_state.target_url = "https://overpass-turbo.eu/"
-
-def toggle_workspace_dimension():
-    st.session_state.map_fullscreen = not st.session_state.map_fullscreen
-
-# --- Custom Premium CSS Blueprint Engine ---
+# Custom geometric CSS styling overrides to replicate the high-performance dark/light look
 st.markdown("""
     <style>
-    /* Baseline Background Profiles */
-    .stApp {
-        background-color: #0A192F !important; /* Deep Imperial Navy Canvas */
-    }
-    
-    [data-testid="stSidebar"] {
-        background-color: #0D203D !important; /* Premium Executive Slate Blue */
-        border-right: 2px solid #1E3A63 !important;
-        box-shadow: 4px 0px 15px rgba(0, 0, 0, 0.5);
-    }
-
-    /* Core Typographic Sanitization Rules */
-    [data-testid="stSidebar"] p, 
-    [data-testid="stSidebar"] span, 
-    [data-testid="stSidebar"] label, 
-    .stMarkdown p {
-        color: #FFFFFF !important;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, Arial, sans-serif !important;
-    }
-    
-    /* Category Header Accentuation */
-    [data-testid="stSidebar"] h2, [data-testid="stSidebar"] strong {
-        color: #D4AF37 !important; /* Brushed Champagne Gold Accent */
-        font-weight: 700 !important;
-        letter-spacing: 0.5px;
-    }
-
-    /* Remove Streamlit Default Overhead Footprints */
-    header[data-testid="stHeader"] {
-        display: none !important;
-    }
-    footer {
-        display: none !important;
-    }
-
-    /* Navigation Radio Architecture - Embossed High-End Border Cards */
-    div.stRadio > div {
-        gap: 14px;
-        padding: 5px 10px;
-    }
-    div.stRadio > div > label {
-        background: linear-gradient(135deg, #132A4A 0%, #0E1E38 100%);
-        border: 1px solid #234375;
-        border-radius: 14px !important;
-        padding: 14px 12px !important;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 8px 16px rgba(0,0,0,0.3);
-        cursor: pointer;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        text-align: center;
-        margin: 0;
-    }
-    div.stRadio > div > label:hover {
-        border-color: #D4AF37 !important;
-        background: #17355E !important;
-        transform: translateY(-1px);
-    }
-    div.stRadio > div > label[data-baseweb="radio"] > div:first-child {
-        display: none !important; /* Strip default round indicator node */
-    }
-    div.stRadio > div > label > div[data-testid="stMarkdownContainer"] > p {
-        font-weight: 800 !important;
-        color: #FFFFFF !important;
-        font-size: 13px !important;
-        letter-spacing: 0.8px;
-        text-transform: uppercase;
-    }
-
-    /* Rounded Text Field Container Interfaces */
-    .stTextInput input, .stNumberInput input {
-        border-radius: 12px !important;
-        background-color: #112544 !important;
-        border: 1px solid #234375 !important;
-        color: #FFFFFF !important;
-        padding: 10px 14px !important;
-        font-size: 13px !important;
-        transition: border-color 0.2s;
-    }
-    .stTextInput input:focus, .stNumberInput input:focus {
-        border-color: #D4AF37 !important;
-        box-shadow: 0 0 0 1px #D4AF37 !important;
-    }
-
-    /* Accordion Layer Boxes (Excluding Text Collision Loops) */
-    .streamlit-expanderHeader {
-        background-color: #112544 !important;
-        border-radius: 12px !important;
-        border: 1px solid #234375 !important;
-        padding: 10px 14px !important;
-        margin-bottom: 6px;
-    }
-    .streamlit-expanderHeader:hover {
-        border-color: #D4AF37 !important;
-    }
-    .streamlit-expanderHeader p {
-        font-size: 12px !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        color: #E2E8F0 !important;
-    }
-    .streamlit-expanderContent {
-        background-color: transparent !important;
-        border: none !important;
-        padding: 8px 12px 14px 12px !important;
-    }
-
-    /* Checkbox Interface Formats */
-    .stCheckbox > label > div[role="checkbox"] {
-        border-radius: 6px !important;
-        background-color: #112544 !important;
-        border: 1px solid #2C4D7A !important;
-    }
-    .stCheckbox > label > div[role="checkbox"][aria-checked="true"] {
-        background-color: #D4AF37 !important;
-        border-color: #D4AF37 !important;
-    }
-
-    /* Sticky Sidebar Layout Control Footer Overlay */
-    .scan-btn-container {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 336px;
-        padding: 24px 20px;
-        background: linear-gradient(180deg, rgba(13,32,61,0) 0%, #0D203D 25%, #0D203D 100%);
-        z-index: 100;
-    }
-    div.scan-btn-container div[data-testid="stButton"] > button {
-        width: 100%;
-        background: #FFFFFF !important; /* Polished Pure White Solid Background */
-        color: #0A192F !important;      /* Contrast Dark Navy Text */
-        font-weight: 900 !important;
-        border-radius: 24px !important;
-        border: 2px solid #FFFFFF !important;
-        padding: 12px 0 !important;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        font-size: 13px !important;
-    }
-    div.scan-btn-container div[data-testid="stButton"] > button:hover {
-        background: #F7FAFC !important;
-        transform: translateY(-2px);
-        box-shadow: 0 12px 24px rgba(255, 255, 255, 0.15);
-    }
-
-    /* Upper-Right Corner Window Dimension Button */
-    .toggle-btn-wrapper {
-        display: flex;
-        justify-content: flex-end;
-        padding-bottom: 12px;
-        margin-top: -10px;
-    }
-    .toggle-btn-wrapper div[data-testid="stButton"] > button {
-        background: #112544 !important;
-        color: #D4AF37 !important;
-        border: 1px solid #234375 !important;
-        border-radius: 10px !important;
-        padding: 6px 14px !important;
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        transition: all 0.2s;
-    }
-    .toggle-btn-wrapper div[data-testid="stButton"] > button:hover {
-        border-color: #D4AF37 !important;
-        background: #162E54 !important;
-    }
-
-    /* Main Window Frame Structural Cleanup */
-    iframe {
-        border-radius: 16px;
-        border: 2px solid #1E3A63 !important;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-        background-color: #FFFFFF;
-    }
-    .main .block-container {
-        padding: 1.5rem 2rem !important;
-        max-width: 100% !important;
-    }
+        /* Block containment modifications */
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 0rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+        /* Custom card elements mimicking legacy input panels */
+        div[data-testid="stVerticalBlock"] > div {
+            border-radius: 8px;
+        }
+        /* Custom Scrollbar optimization */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        /* Eliminate redundant widget header spacings */
+        .stDeployButton { display:none; }
+        footer { visibility: hidden; }
+        #stDecoration { display:none; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- Balanced Dictionary Configurations Mapping ---
+# -----------------------------------------------------------------------------
+# 2. STATIC POI DICTIONARY CONFIGURATIONS
+# -----------------------------------------------------------------------------
 POI_CONFIG = {
-    "COMMERCIAL LAYER": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital Facility', '"amenity"~"hospital|clinic",i'], ['Hotel Assets', '"tourism"="hotel"']],
-    "RETAIL INFRASTRUCTURE": [['Mall/Dept Store', '"shop"~"mall|department_store",i'], ['Supermarket Hub', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Commercial Pharmacy', '"amenity"="pharmacy"'], ['Hardware & DIY', '"shop"~"hardware|doityourself",i']],
-    "FOOD & BEVERAGE LOGISTICS": [['Standard Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Venue', '"amenity"~"cafe|coffee",i'], ['Fast Food Outlet', '"amenity"="fast_food"'], ['Bar & Nightclub', '"amenity"~"bar|pub|nightclub",i']],
-    "INDUSTRIAL & LOGISTICS": [['Expressway Access Points', '"highway"~"motorway_junction|toll_gantry",i'], ['Port Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage Depots', '"warehouse"~"cold_store|cold_storage",i'], ['Industrial Estates', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses/Depots', '"building"~"warehouse|depot",i']],
-    "GOVERNMENTAL ZONES": [['City/Town Hall', '"amenity"="townhall"'], ['Police Precinct', '"amenity"="police"'], ['Fire Station Hub', '"amenity"="fire_station"'], ['Airport Terminals', '"aeroway"~"terminal|aerodrome",i']],
-    "EDUCATIONAL CENTERS": [['University Campus', '"amenity"~"university|college",i'], ['K-12 School Facility', '"amenity"="school"']]
+    "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
+    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
+    "FOOD AND BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="blackery"']],
+    "INDUSTRIAL & LOGISTICS": [
+        ['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], 
+        ['Ports & Terminals', '"industrial"="port"'], 
+        ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'],
+        ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'],
+        ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'],
+        ['Warehouses & Depots', '"building"~"warehouse|depot",i'],
+        ['Storage Facilities', '"building"="storage"'],
+        ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']
+    ],
+    "GOVERNMENT & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i']],
+    "SCHOOLS": [['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"']]
 }
 
 ADVANCED_CONFIG = {
-    "FINANCIAL & ACCESS": [['ATM Terminals', '"amenity"="atm"'], ['Banking Branches', '"amenity"="bank"'], ['Parking Structures', '"amenity"="parking"']],
-    "MACRO BOUNDARIES": [['Transit Bus Stops', '"highway"="bus_stop"'], ['City Coordinates', '"place"="city"'], ['Town Coordinates', '"place"="town"']]
+    "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Clinic', '"amenity"="clinic"'], ['Embassy', '"amenity"="embassy"'], ['Firestation', '"amenity"="fire_station"'], ['Fuel', '"amenity"="fuel"'], ['Hospital', '"amenity"="hospital"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Parking', '"amenity"="parking"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police', '"amenity"="police"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['University', '"amenity"="university"']],
+    "PLACE OF WORSHIP": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"']],
+    "FOOD & BEVERAGE": [['Bar', '"amenity"="bar"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Cafe', '"amenity"="cafe"'], ['Fast food', '"amenity"="fast_food"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Restaurant', '"amenity"="restaurant"']],
+    "RETAIL_ADV": [['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"']],
+    "SPORTS": [['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"']],
+    "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"']]
 }
 
-ICON_MAP = {
-    "COMMERCIAL LAYER": "🏢", "RETAIL INFRASTRUCTURE": "🛒", "FOOD & BEVERAGE LOGISTICS": "🍽️", 
-    "INDUSTRIAL & LOGISTICS": "🏭", "GOVERNMENTAL ZONES": "🏛️", "EDUCATIONAL CENTERS": "🎓"
-}
+# -----------------------------------------------------------------------------
+# 3. STATE MANAGEMENT ENGINE
+# -----------------------------------------------------------------------------
+if 'scan_data' not in st.session_state:
+    st.session_state.scan_data = None
+if 'active_queries' not in st.session_state:
+    st.session_state.active_queries = {}
 
-# --- Sidebar Controls Dashboard View ---
-st.sidebar.markdown("<div style='text-align: center; margin-bottom: 20px;'><h2 style='color: #FFFFFF; font-weight: 900; letter-spacing: 2px;'>MARKET STUDY</h2></div>", unsafe_allow_html=True)
+# Helper function to wipe selections
+def reset_all_states():
+    st.session_state.scan_data = None
+    st.session_state.active_queries = {}
+    st.rerun()
 
-# Navigation block acts as high-end choice panels
-app_mode = st.sidebar.radio("Module Selection", ["Trade Area Scan", "UMap Integration", "Demographics Hub"], label_visibility="collapsed")
-st.sidebar.markdown("<br>", unsafe_allow_html=True)
-
-if app_mode == "Trade Area Scan":
-    st.sidebar.markdown("<div style='padding: 0 5px;'>", unsafe_allow_html=True)
+# -----------------------------------------------------------------------------
+# 4. BACKEND BUSINESS LOGIC (KML & OVERPASS API ENGINE)
+# -----------------------------------------------------------------------------
+def generate_kml_radius(lat, lon, radius_meters):
+    """Generates KML coordinate string for localized geofences."""
+    kml_header = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Radius Scan</name><Placemark><Polygon><outerBoundaryIs><LinearRing><coordinates>'
+    kml_footer = '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>'
     
-    # Coordinate Configuration Matrix
-    col_latlon, col_rad = st.sidebar.columns([1.8, 1])
-    with col_latlon:
-        coords_input = st.text_input("Coordinates", value="14.6465, 121.0371")
-    with col_rad:
-        radius_input = st.number_input("Radius (M)", value=1000, step=100)
-
-    try:
-        lat, lon = map(float, coords_input.split(","))
-    except ValueError:
-        st.sidebar.error("Syntax Error: Use Lat, Lon")
-        st.stop()
-
-    # Search Bar Normalization Block
-    search_term = st.sidebar.text_input("Search", "").lower()
-    st.sidebar.markdown("<br>", unsafe_allow_html=True)
-    
-    selected_queries = []
-
-    # Map Layer Generators
-    for cat, items in POI_CONFIG.items():
-        filtered_items = [i for i in items if search_term in i[0].lower()]
-        if filtered_items:
-            category_icon = ICON_MAP.get(cat, "📁")
-            with st.sidebar.expander(f"{category_icon} {cat}", expanded=bool(search_term)):
-                for label, q_str in filtered_items:
-                    if st.checkbox(label, key=f"core_{cat}_{label}"):
-                        selected_queries.append(q_str)
-
-    with st.sidebar.expander("⚙️ ADVANCED ATTRIBUTES", expanded=bool(search_term)):
-        for cat, items in ADVANCED_CONFIG.items():
-            filtered_items = [i for i in items if search_term in i[0].lower()]
-            if filtered_items:
-                st.markdown(f"<div style='font-size:11px; font-weight:bold; color:#D4AF37; margin: 4px 0;'>{cat}</div>", unsafe_allow_html=True)
-                for label, q_str in filtered_items:
-                    if st.checkbox(label, key=f"adv_{cat}_{label}"):
-                        selected_queries.append(q_str)
-
-    # Protection Spacing for Fixed Footer
-    st.sidebar.markdown("<div style='height: 120px;'></div></div>", unsafe_allow_html=True)
-
-    # Fixed Sidebar Action Control Base
-    with st.sidebar.container():
-        st.markdown("<div class='scan-btn-container'>", unsafe_allow_html=True)
-        scan_triggered = st.button("Scan Area")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    if scan_triggered:
-        if not selected_queries:
-            st.sidebar.warning("Select target parameters.")
-        else:
-            clauses = "\n".join([f"  nwr[{q}](around:{radius_input},{lat},{lon});" for q in selected_queries])
-            overpass_ql = f"[out:json][timeout:120];\n(\n{clauses}\n);\nout center;"
-            encoded_query = urllib.parse.quote(overpass_ql)
-            st.session_state.target_url = f"https://overpass-turbo.eu/?Q={encoded_query}&R"
-
-    # --- Main Screen Workspace Matrix ---
-    st.markdown("<div class='toggle-btn-wrapper'>", unsafe_allow_html=True)
-    if st.button("⛶ Fullscreen" if not st.session_state.map_fullscreen else "🗗 Original Size", on_click=toggle_workspace_dimension):
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+    coordinates_points = []
+    for i in range(37):
+        angle = (i * 10) * math.pi / 180
+        delta_lat = (radius_meters / 6371000) * math.cos(angle)
+        delta_lon = (radius_meters / (6371000 * math.cos(lat * math.pi / 180))) * math.sin(angle)
+        pt_lat = lat + (delta_lat * 180 / math.pi)
+        pt_lon = lon + (delta_lon * 180 / math.pi)
+        coordinates_points.append(f"{pt_lon},{pt_lat},0")
         
-    workspace_height = 980 if st.session_state.map_fullscreen else 680
-    st.components.v1.iframe(st.session_state.target_url, height=workspace_height, scrolling=False)
+    return kml_header + " ".join(coordinates_points) + kml_footer
 
-elif app_mode == "UMap Integration":
-    st.components.v1.iframe("https://umap.openstreetmap.fr/en/", height=850, scrolling=False)
+def execute_overpass_scan(lat, lon, radius, queries):
+    """Hits Overpass API interpreter, structures raw JSON to Pandas Dataframe."""
+    if not queries:
+        return None
+        
+    url = "https://overpass-api.de/api/interpreter"
+    around_clause = f"(around:{radius},{lat},{lon})"
+    
+    compiled_statements = []
+    for q_str in queries:
+        compiled_statements.append(f"nwr[{q_str}]{around_clause};")
+        
+    query_body = f"[out:json][timeout:120];(\n" + "\n".join(compiled_statements) + "\n);\nout center;"
+    
+    try:
+        response = requests.post(url, data={"data": query_body}, timeout=130)
+        if response.status_code == 200:
+            elements = response.json().get('elements', [])
+            records = []
+            for el in elements:
+                # Handle points vs shapes with centers
+                lat_val = el.get('lat') or el.get('center', {}).get('lat')
+                lon_val = el.get('lon') or el.get('center', {}).get('lon')
+                if lat_val and lon_val:
+                    tags = el.get('tags', {})
+                    records.append({
+                        "id": el.get('id'),
+                        "latitude": lat_val,
+                        "longitude": lon_val,
+                        "name": tags.get('name', 'Unnamed Location'),
+                        "amenity": tags.get('amenity') or tags.get('shop') or tags.get('building') or tags.get('industrial', 'Other')
+                    })
+            return pd.DataFrame(records) if records else pd.DataFrame()
+        else:
+            st.error(f"API Error Code: {response.status_code}")
+            return None
+    except Exception as e:
+        st.error(f"Network Connection Failed: {str(e)}")
+        return None
 
-elif app_mode == "Demographics Hub":
-    st.markdown("<div style='padding: 60px; text-align: center;'><h2 style='color: #D4AF37; font-weight: 900; letter-spacing:1px;'>POPULATION INSIGHTS</h2><br><p style='color:#FFFFFF; font-size:14px;'>🚧 Spatial demographics models are initializing. Access parameters provisioning shortly.</p></div>", unsafe_allow_html=True)
+# -----------------------------------------------------------------------------
+# 5. CONTROL INTERFACE (SIDEBAR WORKSPACE)
+# -----------------------------------------------------------------------------
+with st.sidebar:
+    st.title("Trade Area UI Controller")
+    
+    col_reset, col_clear = st.columns(2)
+    with col_reset:
+        if st.button("RESET GEOGRAPHY", use_container_width=True):
+            reset_all_states()
+            
+    # Geolocation Inputs
+    coords_input = st.text_input("Coordinates (LAT, LON)", value="14.6465, 121.0371")
+    radius_input = st.number_input("Radius (Meters)", min_value=100, max_value=50000, value=1000, step=100)
+    
+    # Coordinates Parser Regex Match
+    coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_input)
+    if coord_match:
+        center_lat = float(coord_match.group(1))
+        center_lon = float(coord_match.group(2))
+    else:
+        st.error("Invalid coordinates signature format.")
+        center_lat, center_lon = 14.6465, 121.0371
+
+    # Real-time Filter Query Search Engine
+    search_term = st.text_input("🔍 Search Core/Advanced POIs", "").lower()
+
+    # Dynamic Filter Mapping Engine
+    chosen_queries = []
+    
+    st.subheader("Core POI Categories")
+    for category, elements in POI_CONFIG.items():
+        filtered_elements = [el for el in elements if search_term in el[0].lower() or search_term in el[1].lower()]
+        if filtered_elements:
+            with st.expander(category, expanded=(len(search_term) > 0)):
+                for name, tag_query in filtered_elements:
+                    # Maintain structural persistence via query string registry keys
+                    cb_key = f"cb_{category}_{name}"
+                    if st.checkbox(name, key=cb_key):
+                        chosen_queries.append(tag_query)
+
+    st.subheader("Advanced POI Library")
+    for category, elements in ADVANCED_CONFIG.items():
+        filtered_elements = [el for el in elements if search_term in el[0].lower() or search_term in el[1].lower()]
+        if filtered_elements:
+            with st.expander(f"ADV - {category}", expanded=(len(search_term) > 0)):
+                for name, tag_query in filtered_elements:
+                    cb_key = f"cb_adv_{category}_{name}"
+                    if st.checkbox(name, key=cb_key):
+                        chosen_queries.append(tag_query)
+
+    st.markdown("---")
+    
+    # Process Buttons Layout Frame
+    col_kml, col_scan = st.columns(2)
+    with col_kml:
+        kml_string = generate_kml_radius(center_lat, center_lon, radius_input)
+        st.download_button(
+            label="EXPORT RADIUS",
+            data=kml_string,
+            file_name=f"Radius_{center_lat}_{center_lon}_{radius_input}m.kml",
+            mime="application/vnd.google-earth.kml+xml",
+            use_container_width=True
+        )
+    with col_scan:
+        if st.button("SCAN AREA", type="primary", use_container_width=True):
+            if not chosen_queries:
+                st.warning("Please activate checkboxes.")
+            else:
+                with st.spinner("Compiling Overpass Nodes..."):
+                    st.session_state.scan_data = execute_overpass_scan(center_lat, center_lon, radius_input, chosen_queries)
+
+# -----------------------------------------------------------------------------
+# 6. WORKSPACE MAIN DISPLAY AREA
+# -----------------------------------------------------------------------------
+# Map Layer DataFrame Assembly
+target_layer = pd.DataFrame([{"latitude": center_lat, "longitude": center_lon, "name": "PRIME TARGET ASSET", "color": "#FF0000"}])
+
+if st.session_state.scan_data is not None and not st.session_state.scan_data.empty:
+    scanned_df = st.session_state.scan_data.copy()
+    scanned_df['color'] = "#001a3d"
+    map_visualization_dataframe = pd.concat([target_layer, scanned_df], ignore_index=True)
+else:
+    map_visualization_dataframe = target_layer
+
+# Viewport Rendering
+st.map(map_visualization_dataframe, latitude='latitude', longitude='longitude', size=20, use_container_width=True)
+
+# Metrics Grid Display Footer
+if st.session_state.scan_data is not None:
+    st.markdown("### Trade Area Infrastructure Breakdown")
+    if not st.session_state.scan_data.empty:
+        # Frequency counts matching legacy `displayPoiCountSummary` functional loops
+        summary_counts = st.session_state.scan_data['amenity'].value_counts().reset_index()
+        summary_counts.columns = ['Detected Node Class', 'Volume Count']
+        
+        col_metric, col_grid = st.columns([1, 2])
+        with col_metric:
+            st.metric(label="Total Volumetric POI Yield", value=int(len(st.session_state.scan_data)))
+        with col_grid:
+            st.dataframe(summary_counts, hide_index=True, use_container_width=True)
+    else:
+        st.info("Zero active nodes found inside the target viewport bounds.")
