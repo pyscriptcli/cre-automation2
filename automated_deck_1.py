@@ -178,23 +178,22 @@ def convert_pptx_to_pdf(pptx_bytes):
 st.set_page_config(page_title="Asset Engine", page_icon="🏢", layout="wide")
 st.markdown(LUXURY_CRE_SYSTEM, unsafe_allow_html=True)
 
-# Persistent iteration running variables
 if "form_run" not in st.session_state:
     st.session_state.form_run = 0
 
-# Baseline Form profiles storage dictionary initialization
+# FIXED: Default state initialized with entirely blank values instead of Tagaytay strings
 if "form_values" not in st.session_state:
     st.session_state.form_values = {
-        "cre_loc": "Tagaytay, Cavite",
-        "cre_size": "386",
-        "cre_type": "Commercial Space",
-        "cre_addr": "Mendez Crossing East, Tagaytay City, Cavite",
-        "cre_rates": "200,000 per month",
-        "cre_sec": "3 months",
-        "cre_adv": "3 months",
-        "cre_esc": "5%",
-        "cre_term": "5 years",
-        "cre_hand": "As is where is"
+        "cre_loc": "",
+        "cre_size": "",
+        "cre_type": "",
+        "cre_addr": "",
+        "cre_rates": "",
+        "cre_sec": "",
+        "cre_adv": "",
+        "cre_esc": "",
+        "cre_term": "",
+        "cre_hand": ""
     }
 
 run_suffix = f"__v{st.session_state.form_run}"
@@ -205,7 +204,6 @@ def dynamic_form_row(icon, label_text, state_key):
     with r_col1:
         st.markdown(f'<div class="row-metric-label"><span class="large-icon">{icon}</span> {label_text}</div>', unsafe_allow_html=True)
     with r_col2:
-        # Dynamically read values straight out of active state storage
         current_val = st.session_state.form_values.get(state_key, "")
         return st.text_input("", value=current_val, key=f"{state_key}{run_suffix}", label_visibility="collapsed")
 
@@ -330,15 +328,13 @@ st.markdown("<div style='margin-top: 10px; border-top: 1px solid #002B49; paddin
 action_col1, action_col2 = st.columns([1, 2])
 
 with action_col1:
-    # RE-ENGINEERED COMPREHENSIVE CLEAR SYSTEM
     if st.button("↺ Clear", key="clear_action_trigger", use_container_width=True):
         st.cache_data.clear()
         
-        # Wipe out data parameters stored inside active session state tracking objects
+        # Zero out data parameters inside state storage to guarantee an empty interface load
         for key in st.session_state.form_values.keys():
             st.session_state.form_values[key] = ""
             
-        # Increment execution identifier variable to completely cycle UI components
         st.session_state.form_run += 1
         st.rerun()
 
