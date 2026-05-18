@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import folium
 from streamlit_folium import st_folium
+from folium.plugins import MarkerCluster
 import math
 import re
 
@@ -29,8 +30,18 @@ st.markdown("""
         text-transform: uppercase;
         border: none;
     }
+    /* Metric Card Styling Override */
+    [data-testid="stMetricValue"] {
+        color: #001a3d !important;
+    }
     </style>
 """, unsafe_allow_html=True)
+
+# Initialize Session State values to prevent data drop on sidebar reruns
+if "features_data" not in st.session_state:
+    st.session_state.features_data = []
+if "counts_summary" not in st.session_state:
+    st.session_state.counts_summary = {}
 
 # Define configurations identical to the Userscript
 POI_CONFIG = {
@@ -60,7 +71,6 @@ ADVANCED_CONFIG = {
     "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
 }
 
-# Helper to verify Overpass regex filters match features locally
 def match_feature_to_query(props, query_str):
     match = re.match(r'"([^"]+)"\s*(=|~)\s*"([^"]+)"', query_str)
     if not match:
@@ -93,13 +103,12 @@ search_term = st.sidebar.text_input("SEARCH POI:", "").lower()
 selected_queries = []
 selected_labels = {}
 
-# Process Core Categories Loop
+# Process Core Categories Loop (with unique namespacing keys to avoid collisions)
 for cat, items in POI_CONFIG.items():
     filtered_items = [i for i in items if search_term in i[0].lower()]
     if filtered_items:
         st.sidebar.markdown(f"**{cat}**")
         for label, q_str in filtered_items:
-            # FIXED: Appended _{cat}_ to guarantee uniqueness
             if st.sidebar.checkbox(label, key=f"core_{cat}_{label}"):
                 selected_queries.append(q_str)
                 selected_labels[q_str] = label
@@ -111,16 +120,14 @@ with st.sidebar.expander("ADVANCED POI LIBRARY", expanded=bool(search_term)):
         if filtered_items:
             st.sidebar.caption(cat)
             for label, q_str in filtered_items:
-                # FIXED: Appended _{cat}_ to eliminate duplicate library label collisions
                 if st.sidebar.checkbox(label, key=f"adv_{cat}_{label}"):
                     selected_queries.append(q_str)
                     selected_labels[q_str] = label
 
-# Bottom Action items
 st.sidebar.markdown("---")
 scan_triggered = st.sidebar.button("Scan Area")
 
-# Calculate KML Generation Payload
+# Generate Radius KML Export Payload
 kml_str = f'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Radius Scan</name><Placemark><Polygon><outerBoundaryIs><LinearRing><coordinates>'
 for i in range(37):
     angle = (i * 10) * math.pi / 180
@@ -136,12 +143,8 @@ st.sidebar.download_button(
     mime="application/vnd.google-earth.kml+xml"
 )
 
-# Main Dashboard Frame Area
+# --- Main Dashboard Section ---
 st.title("Industrial Logistics Framework — Dashboard View")
-
-# Run Overpass engine logic synchronously on click
-features_data = []
-counts_summary = {}
 
 if scan_triggered:
     if not selected_queries:
@@ -156,33 +159,41 @@ if scan_triggered:
                 response = requests.post(url, data={"data": overpass_query}, timeout=130)
                 if response.status_code == 200:
                     osm_data = response.json()
-                    features_data = osm_data.get("elements", [])
+                    st.session_state.features_data = osm_data.get("elements", [])
                     
                     # Compute frequencies per active selection
-                    for elem in features_data:
+                    temp_counts = {}
+                    for elem in st.session_state.features_data:
                         props = elem.get("tags", {})
                         for q_str in selected_queries:
                             if match_feature_to_query(props, q_str):
                                 label = selected_labels[q_str]
-                                counts_summary[label] = counts_summary.get(label, 0) + 1
+                                temp_counts[label] = temp_counts.get(label, 0) + 1
+                    st.session_state.counts_summary = temp_counts
                 else:
                     st.error(f"Overpass API Error Status: {response.status_code}")
             except Exception as e:
-                st.error(f"Network Connection Timeout/Failure: {str(e)}")
+                st.error(f"Network Connection Failure: {str(e)}")
 
-# Display Data KPI Metrics
-if counts_summary:
+# Display Data Metrics Summary Dashboard UI Cards
+if st.session_state.counts_summary:
     st.subheader("PRIME Philippines - Trade Area Scan Summary")
-    df_metrics = pd.DataFrame(list(counts_summary.items()), columns=["POI Target Type", "Detected Nodes/Structures Count"])
-    st.table(df_metrics)
+    cols = st.columns(min(len(st.session_state.counts_summary), 4))
+    for idx, (label, count) in enumerate(st.session_state.counts_summary.items()):
+        col_target = cols[idx % 4]
+        col_target.metric(label=label, value=f"{count} Node(s)")
+    
+    with st.expander("Detailed Data Inspector Table", expanded=True):
+        df_metrics = pd.DataFrame(list(st.session_state.counts_summary.items()), columns=["POI Target Type", "Detected Nodes Count"])
+        st.dataframe(df_metrics, use_container_width=True)
 
 # Base Map Layer Construction
-m = folium.Map(location=[lat, lon], zoom_start=14, control_scale=True)
+m = folium.Map(location=[lat, lon], zoom_start=14)
 
 # Main red core asset target marker setup
 folium.CircleMarker(
     location=[lat, lon],
-    radius=7,
+    radius=8,
     color="#ffffff",
     fill=True,
     fill_color="#ff3333",
@@ -198,27 +209,35 @@ folium.Circle(
     color="#001a3d",
     fill=True,
     fill_color="#001a3d",
-    fill_opacity=0.1,
-    weight=1
+    fill_opacity=0.06,
+    weight=1.5
 ).addTo(m)
 
+# Cluster layer to efficiently organize large node sets (just like native Overpass Turbo engines)
+marker_cluster = MarkerCluster(name="Extracted POI Nodes").addTo(m)
+
 # Populating external OSM nodes found via engine
-for elem in features_data:
+for elem in st.session_state.features_data:
+    # Handle variations in OSM node coordinates vs way centers
     e_lat = elem.get("lat") or elem.get("center", {}).get("lat")
     e_lon = elem.get("lon") or elem.get("center", {}).get("lon")
+    
     if e_lat and e_lon:
         tags = elem.get("tags", {})
-        name = tags.get("name", "Unnamed Feature")
-        amenity = tags.get("amenity") or tags.get("building") or tags.get("shop") or "POI Asset"
+        name = tags.get("name", "Unnamed Feature / Asset")
+        
+        # Build clean HTML data inspection list inside popups
+        popup_html = f"<b>{name}</b><hr style='margin:4px 0;'>"
+        popup_html += "".join([f"<div style='font-size:11px;'><b>{k}:</b> {v}</div>" for k, v in tags.items() if k != "name"])
         
         folium.Marker(
             location=[e_lat, e_lon],
-            popup=f"<b>{name}</b><br>Type: {amenity}",
-            icon=folium.Icon(color="blue", icon="info-sign")
-        ).addTo(m)
+            popup=folium.Popup(popup_html, max_width=300),
+            icon=folium.Icon(color="cadetblue", icon="building", prefix="fa")
+        ).addTo(marker_cluster)
 
-# Render Folium component output inside wide frame canvas space
-st_folium(m, width="100%", height=600, returned_objects=[])
+# Render Folium map element using proper responsive parameters
+st_folium(m, width=1300, height=650, key="trade_area_map")
 
 with st.expander("MAPPING LINKS", expanded=False):
     st.markdown("- [uMap Dashboard](https://umap.openstreetmap.fr/en/)")
