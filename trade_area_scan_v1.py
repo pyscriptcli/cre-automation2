@@ -7,7 +7,8 @@ import json
 # -----------------------------------------------------------------------------
 # 0. GLOBAL DISPLAY CONFIGURATION
 # -----------------------------------------------------------------------------
-MAP_PANEL_HEIGHT = 1200  # Adjust this pixel value to resize the spatial canvas
+MAP_PANEL_HEIGHT = 900  # Adjust pixel height of the spatial canvas
+MAP_PANEL_WIDTH = None  # Set to None for fluid 100% width, or integer (e.g. 1200) for fixed width
 
 # -----------------------------------------------------------------------------
 # 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
@@ -52,7 +53,7 @@ st.markdown("""
             letter-spacing: 1px !important;
             text-transform: uppercase !important;
             text-align: left !important;
-            margin-bottom: 2px !important;
+            margin-bottom: 0px !important;
             font-family: 'Arial', sans-serif !important;
         }
         
@@ -65,10 +66,11 @@ st.markdown("""
             font-weight: 600 !important;
             font-size: 11px !important;
             padding: 0 !important;
-            margin-top: 10px !important;
+            margin-top: 0px !important;
             box-shadow: none !important;
             min-height: 0 !important;
             height: auto !important;
+            float: right !important;
         }
         button[kind="tertiary"]:hover {
             color: var(--navy-brand) !important;
@@ -147,7 +149,6 @@ def execute_global_purge():
     for key in list(st.session_state.keys()):
         if key.startswith("chk_"): st.session_state[key] = False
 
-# Fully mapped taxonomy injection
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
     "RETAIL": [['Mall/Dept Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
@@ -188,7 +189,7 @@ def compile_radius_kml(lat, lon, r_meters):
     return kml + '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>'
 
 def compile_features_kml(features):
-    kml = 'xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
+    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -199,10 +200,11 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # Header & Micro-Hyperlink Purge Button
-    head_col1, head_col2 = st.columns([3, 1])
-    with head_col1:
-        st.markdown('<div class="sidebar-title">TRADE AREA</div>', unsafe_allow_html=True)
+    # Full Unbroken Width Header Layout Block
+    st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
+    
+    # Sub-row for Clean Right-Aligned Hyperlink Trigger
+    head_col1, head_col2 = st.columns([1, 1])
     with head_col2:
         if st.button("Clear All", key="master_purge_btn", type="tertiary"):
             execute_global_purge()
@@ -286,17 +288,17 @@ geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = st.session_state.last_scan_lat
 render_lon = st.session_state.last_scan_lon
 
-# Clean literal template to eliminate Python f-string bracket compilation limits
+# Standard string literal to prevent f-string parser collision with JS structures
 leaflet_template = """
 <!DOCTYPE html>
 <html>
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>body, html, #map { margin: 0; padding: 0; height: 100vh; width: 100vw; background: #f8fafc; }</style>
+    <style>body, html, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; }</style>
 </head>
 <body>
-    <div id="map"></div>
+    <div id="map" style="height: 100vh; width: 100vw;"></div>
     <script>
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
@@ -321,17 +323,33 @@ leaflet_template = """
             map.fitBounds(bounds.pad(0.1));
         }
         
+        // Right-Click Context Coordinate Intercept and Copy Engine
+        map.on('contextmenu', function(e) {
+            const lat = e.latlng.lat.toFixed(5);
+            const lon = e.latlng.lng.toFixed(5);
+            const coordString = lat + ", " + lon;
+            
+            navigator.clipboard.writeText(coordString).then(() => {
+                L.popup()
+                    .setLatLng(e.latlng)
+                    .setContent("<div style='font-family:sans-serif;font-size:11px;'>Copied to Clipboard:<br><b>" + coordString + "</b></div>")
+                    .openOn(map);
+            }).catch(err => {
+                console.error('Spatial coordinates extract pipeline failure: ', err);
+            });
+        });
+        
         setTimeout(() => map.invalidateSize(), 200);
     </script>
 </body>
 </html>
 """
 
-# Structural programmatic token injection
+# Dynamic programmatic placeholder value mapping
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__GEOJSON__", geojson_str))
 
-st.components.v1.html(leaflet_html, height=MAP_PANEL_HEIGHT, scrolling=False)
+st.components.v1.html(leaflet_html, height=MAP_PANEL_HEIGHT, width=MAP_PANEL_WIDTH, scrolling=False)
