@@ -149,15 +149,15 @@ st.markdown("""
             font-family: 'Cormorant Garamond', serif !important;
             font-style: italic;
             color: var(--brand-midnight);
-            font-size: 22px;
+            font-size: 30px;
             text-align: center;
             border-bottom: 1px solid var(--brand-gold);
             padding-bottom: 6px;
-            margin-bottom: 12px;
+            margin-bottom: 30px;
         }
         
         /* TEXT SIZING OVERRIDES */
-        .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
+        .stTextInput label p, .stNumberInput label p { font-size: 5px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
         .stCheckbox label p { font-size: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
