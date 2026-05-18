@@ -1,4 +1,4 @@
-import streamlit st
+import streamlit as st
 import requests
 import re
 import math
@@ -31,19 +31,19 @@ st.markdown("""
             display: none !important;
         }
         
-        /* TARGET ONLY THE MAIN AREA CONTENT HOLDER TO FORCE IT EDGE-TO-EDGE */
-        [data-testid="stAppViewBlockContainer"] {
+        /* TARGET ONLY THE MAIN AREA CONTENT HOLDER TO FORCE IT EDGE-TO-EDGE WITHOUT CRUSHING SIDEBAR */
+        [data-testid="stMainBlockContainer"], [data-testid="stAppViewBlockContainer"] {
             padding-top: 0rem !important; 
             padding-bottom: 0rem !important;
             padding-left: 0rem !important;
             padding-right: 0rem !important;
             max-width: 100% !important; 
-            width: 100% !important;
-            margin: 0px !important;
             overflow: hidden !important;
         }
         
         /* REMOVE INNER GAP ELEMENTS ONLY INSIDE THE MAP MAIN AREA CANVAS */
+        [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"],
+        [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlockWrapper"],
         [data-testid="stAppViewBlockContainer"] [data-testid="stVerticalBlock"], 
         [data-testid="stAppViewBlockContainer"] [data-testid="stVerticalBlockWrapper"],
         [data-testid="stAppViewBlockContainer"] .stElementContainer {
@@ -69,14 +69,13 @@ st.markdown("""
             border-right: 1px solid var(--border-gray) !important;
             min-width: 320px !important;
             max-width: 320px !important;
+            z-index: 100 !important;
         }
         
-        /* STRIP COLLAPSIBILITY TOGGLES TO PROTECT LAYOUT DENSITY SYMMETRY */
+        /* CLEAN RESPONSIVE SIDEBAR TOGGLE OVERRIDES */
         [data-testid="stSidebarCollapseButton"], 
         [data-testid="collapsedControl"] {
-            display: none !important;
-            width: 0px !important;
-            height: 0px !important;
+            z-index: 101 !important;
         }
         
         [data-testid="stSidebarUserContent"] {
@@ -111,8 +110,10 @@ st.markdown("""
             color: var(--navy-brand) !important;
         }
         
-        /* ENFORCE INNER EXPANDER INTERNAL SCROLLBAR LOCKS */
-        [data-testid="stSidebar"] .st-expander div[data-testid="stVerticalBlockWrapper"] {
+        /* ENFORCE INNER EXPANDER INTERNAL SCROLLBAR LOCKS COVERS OLD & NEW STREAMLIT DOM */
+        [data-testid="stSidebar"] [data-testid="stExpanderDetails"] div[data-testid="stVerticalBlock"],
+        [data-testid="stSidebar"] .st-expander div[data-testid="stVerticalBlockWrapper"],
+        [data-testid="stSidebar"] .st-expander div[data-testid="stVerticalBlock"] {
             max-height: 200px !important;
             overflow-y: auto !important;
             padding-right: 4px !important;
