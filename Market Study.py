@@ -30,6 +30,8 @@ st.markdown("""
         border: none;
     }
     </style>
+""", unsafe_allow_html=True)
+    </style>
 """, unsafe_index=True)
 
 # Define configurations identical to the Userscript
