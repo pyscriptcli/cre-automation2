@@ -142,7 +142,7 @@ st.markdown("""
            Adjust the '12px' below to make the category names (e.g. COMMERCIAL) bigger or smaller 
            ------------------------------------------------------------------------- */
         [data-testid="stSidebar"] .st-expander summary p { 
-            font-size: 8px !important; 
+            font-size: 5px !important; 
             font-weight: 500 !important; 
         }
         
@@ -180,7 +180,7 @@ st.markdown("""
         }
         
         /* TEXT SIZING OVERRIDES */
-        .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 700 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
+        .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
     </style>
 """, unsafe_allow_html=True)
 
