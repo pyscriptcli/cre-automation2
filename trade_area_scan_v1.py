@@ -5,12 +5,7 @@ import math
 import json
 
 # -----------------------------------------------------------------------------
-# 0. GLOBAL DISPLAY CONFIGURATION
-# -----------------------------------------------------------------------------
-MAP_PANEL_HEIGHT = 950  # Change this value to adjust the total map panel height
-
-# -----------------------------------------------------------------------------
-# 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
+# 1. HIGH-DENSITY LIGHT MODE & FULL SCREEN OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -35,15 +30,32 @@ st.markdown("""
             display: none !important;
         }
         
-        /* FORCE MAIN CANVAS TO BE EXACTLY 100% EDGE-TO-EDGE */
+        /* BRUTE FORCE ENTIRE MAIN AREA TO BE 100% EDGE-TO-EDGE OVERRIDING MARGINS */
         [data-testid="stAppViewBlockContainer"] {
             padding-top: 0rem !important; 
             padding-bottom: 0rem !important;
             padding-left: 0rem !important;
             padding-right: 0rem !important;
             max-width: 100% !important; 
-            margin: 0 auto !important; 
+            width: 100% !important;
+            margin: 0px !important;
             overflow: hidden !important;
+        }
+        
+        /* REMOVE INTERNAL VERTICAL BLOCK GAPS AND PADDING */
+        [data-testid="stVerticalBlock"] {
+            gap: 0rem !important;
+            padding: 0px !important;
+        }
+        
+        /* FORCE STREAMLIT IFRAME SEAMLESS WRAPPING TO FILL 100% VIEWPORT EXACTLY */
+        iframe {
+            height: 100vh !important;
+            width: 100% !important;
+            border: none !important;
+            margin: 0px !important;
+            padding: 0px !important;
+            display: block !important;
         }
         
         [data-testid="stSidebar"] {
@@ -299,7 +311,7 @@ with st.sidebar:
         st.download_button("Download File", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", disabled=not st.session_state.scanned_records)
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY SPATIAL CANVAS
+# 5. ZERO-LATENCY SPATIAL CANVAS (FULL VIEWPORT SCALE)
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = st.session_state.last_scan_lat
@@ -313,7 +325,7 @@ leaflet_template = """
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
-        #map { height: 100vh; width: 100vw; }
+        #map { height: 100%; width: 100%; }
     </style>
 </head>
 <body>
@@ -369,5 +381,5 @@ leaflet_html = (leaflet_template
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__GEOJSON__", geojson_str))
 
-# Removed fixed pixel width argument to allow component container to adapt flexibly across the viewport
-st.components.v1.html(leaflet_html, height=MAP_PANEL_HEIGHT, scrolling=False)
+# Set to pass parameters completely fluidly without fixed constraints
+st.components.v1.html(leaflet_html, scrolling=False)
