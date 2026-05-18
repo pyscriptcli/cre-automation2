@@ -1,5 +1,7 @@
 import os
 import io
+import subprocess
+import tempfile
 import streamlit as st
 from pptx import Presentation
 from PIL import Image
@@ -24,25 +26,27 @@ LUXURY_CRE_SYSTEM = """
         max-width: 1200px !important; /* Expanded width for side-by-side single page execution */
     }
     
-    /* 2. Flat Luxury Input Fields (Larger Fonts, Sharp 0px Corners) */
-    div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"] {
+    /* 2. Flat Luxury Input Fields & Dropdowns (Larger Fonts, Sharp 0px Corners) */
+    div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"] {
         background-color: #FFFFFF !important;
         border: 1px solid #002B49 !important; /* Solid Navy Border Line */
         border-radius: 0px !important; /* Flat luxury edge */
         color: #002B49 !important;
         transition: border-color 0.15s ease-in-out !important;
     }
-    div[data-baseweb="input"]:focus-within {
+    div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
         border-color: #C5A059 !important; /* Corporate Gold Accent */
         box-shadow: none !important;
     }
     
     /* Scaled Input text parameters */
-    input[type="text"], .stTextInput input {
+    input[type="text"], .stTextInput input, div[data-baseweb="select"] div {
         color: #002B49 !important;
         background-color: #FFFFFF !important;
         font-size: 16px !important; /* Larger font size override */
         font-weight: 500 !important;
+    }
+    input[type="text"], .stTextInput input {
         padding: 10px 14px !important;
     }
     
@@ -149,6 +153,28 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     except Exception:
         return img_file
 
+# --- HEADLESS LINUX PDF GENERATION MATRIX ---
+def convert_pptx_to_pdf(pptx_bytes):
+    """Executes a headless LibreOffice binary sub-process to generate high-fidelity PDFs on Linux cloud servers."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        input_pptx_path = os.path.join(temp_dir, "document.pptx")
+        with open(input_pptx_path, "wb") as f:
+            f.write(pptx_bytes)
+        
+        try:
+            # Build Linux headless conversion sequence
+            command = ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, input_pptx_path]
+            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            output_pdf_path = os.path.join(temp_dir, "document.pdf")
+            if os.path.exists(output_pdf_path):
+                with open(output_pdf_path, "rb") as f:
+                    return f.read()
+        except Exception as e:
+            st.error(f"PDF Build Exception: System missing headless packages. Verify your packages.txt file layer. Error: {str(e)}")
+            return None
+    return None
+
 # --- APP CONFIGURATION ---
 st.set_page_config(page_title="Asset Engine", page_icon="🏢", layout="wide")
 st.markdown(LUXURY_CRE_SYSTEM, unsafe_allow_html=True)
@@ -168,11 +194,17 @@ def dynamic_uploader_row(icon, label_text, allowed_types, state_key):
     with r_col2:
         return st.file_uploader(label_text, type=allowed_types, key=state_key, label_visibility="collapsed")
 
+def dynamic_selector_row(icon, label_text, options, state_key):
+    r_col1, r_col2 = st.columns([9, 11])
+    with r_col1:
+        st.markdown(f'<div class="row-metric-label"><span class="large-icon">{icon}</span> {label_text}</div>', unsafe_allow_html=True)
+    with r_col2:
+        return st.selectbox(label_text, options, key=state_key, label_visibility="collapsed")
+
 # --- TWO COLUMN MASTER WORKSPACE (ONE PAGE MATRIX) ---
 col_left, col_right = st.columns([1, 1], gap="large")
 
 with col_left:
-    # Property Details Layout Section (Headers completely removed)
     st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
     prop_location = dynamic_form_row("📍", "Property Location", "Tagaytay, Cavite", "cre_loc")
     prop_size     = dynamic_form_row("📐", "Property Size (SQM)", "386", "cre_size")
@@ -187,7 +219,6 @@ with col_left:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col_right:
-    # Template Input Section (Headers completely removed)
     st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
     t_col1, t_col2 = st.columns([9, 11])
     with t_col1:
@@ -196,7 +227,6 @@ with col_right:
         u_template = st.file_uploader("Template File Input", type=["pptx"], key="web_tpl")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Property Images Section (Headers completely removed)
     st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
     img_types = ["png", "jpg", "jpeg"]
     u_photo1  = dynamic_uploader_row("📸", "Property Photo 1", img_types, "web_p1")
@@ -204,6 +234,11 @@ with col_right:
     u_lotplan = dynamic_uploader_row("📐", "Lot Plan", img_types, "web_lp")
     u_photo2  = dynamic_uploader_row("📸", "Property Photo 2", img_types, "web_p2")
     u_photo3  = dynamic_uploader_row("📸", "Property Photo 3", img_types, "web_p3")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # NEW: Flat, Luxurious Export Format Selector Row
+    st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+    export_format = dynamic_selector_row("📄", "Export Format", ["PPTX (PowerPoint)", "PDF (Adobe Acrobat)"], "web_format")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Data Mapping Containers
@@ -244,7 +279,6 @@ with action_col2:
                         images_to_add = []
 
                         for shape in slide.shapes:
-                            # Process standard Text placeholders
                             if shape.has_text_frame and not any(img_token in shape.text_frame.text for img_token in image_inputs):
                                 for paragraph in shape.text_frame.paragraphs:
                                     for run in paragraph.runs:
@@ -252,7 +286,6 @@ with action_col2:
                                             if token in run.text:
                                                 run.text = run.text.replace(token, value)
 
-                            # Process Native PowerPoint Table fields
                             if shape.has_table:
                                 for row in shape.table.rows:
                                     for cell in row.cells:
@@ -262,7 +295,6 @@ with action_col2:
                                                     if token in run.text:
                                                         run.text = run.text.replace(token, value)
 
-                            # Find image target bounding boxes via text tokens
                             if shape.has_text_frame:
                                 text_content = shape.text_frame.text
                                 for img_token, img_file in image_inputs.items():
@@ -270,30 +302,44 @@ with action_col2:
                                         images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
                                         shapes_to_delete.append(shape)
 
-                        # Overlay center-cropped images onto coordinates
                         for img_file, left, top, width, height in images_to_add:
                             processed_img = smart_crop_to_fit(img_file, width, height)
                             slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
 
-                        # Purge original placeholder text vectors
                         for old_shape in shapes_to_delete:
                             sp = old_shape._element
                             sp.getparent().remove(sp)
 
-                    output_stream = io.BytesIO()
-                    prs.save(output_stream)
-                    output_stream.seek(0)
+                    # Save intermediate presentation structure directly to memory
+                    pptx_stream = io.BytesIO()
+                    prs.save(pptx_stream)
+                    raw_pptx_bytes = pptx_stream.getvalue()
                     
                     st.markdown("""<div style="border-left: 4px solid #C5A059; background-color: #FFFFFF; padding: 16px; border-top: 1px solid #002B49; border-right: 1px solid #002B49; border-bottom: 1px solid #002B49; margin-top: 20px; text-align: center; color: #002B49; font-weight: 700; font-size: 13px; letter-spacing: 0.05em;">🎉 PRESENTATION COMPILED SUCCESSFULLY! READY FOR PRODUCTION DOWNLOAD.</div>""", unsafe_allow_html=True)
                     st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
                     
-                    st.download_button(
-                        label="📥 DOWNLOAD BRANDED PPTX DECK",
-                        data=output_stream,
-                        file_name=f"PIS_{prop_location.replace(' ', '_')}.pptx",
-                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        use_container_width=True
-                    )
+                    # --- DOWNLOAD LAYER CONDITIONAL FORMAT ROUTING ---
+                    safe_filename = f"PIS_{prop_location.replace(' ', '_')}"
+                    
+                    if "PDF" in export_format:
+                        with st.spinner("Converting OpenXML geometries to vector PDF binary streams..."):
+                            pdf_bytes = convert_pptx_to_pdf(raw_pptx_bytes)
+                        if pdf_bytes:
+                            st.download_button(
+                                label="📥 DOWNLOAD BRANDED PDF DECK",
+                                data=pdf_bytes,
+                                file_name=f"{safe_filename}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
+                    else:
+                        st.download_button(
+                            label="📥 DOWNLOAD BRANDED PPTX DECK",
+                            data=raw_pptx_bytes,
+                            file_name=f"{safe_filename}.pptx",
+                            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            use_container_width=True
+                        )
                     
                 except Exception as e:
                     st.error(f"Compilation core failure log description: {str(e)}")
