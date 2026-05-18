@@ -310,10 +310,10 @@ leaflet_html = f"""
             }}).addTo(map).bindPopup("<b>" + p.name + "</b><br>" + p.type);
         }});
         
-        if(pts.length > 0) {{
+if(pts.length > 0) {
             const bounds = L.featureGroup([L.marker([{render_lat}, {render_lon}]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
             map.fitBounds(bounds.pad(0.1));
-        }}
+        }
         
         setTimeout(() => map.invalidateSize(), 200);
     </script>
@@ -322,4 +322,4 @@ leaflet_html = f"""
 """
 
 st.components.v1.html(leaflet_html, height=900, scrolling=False)
-```</SANDBOX_MODE_ENGAGED>
+# Ensure absolutely nothing exists below this point
