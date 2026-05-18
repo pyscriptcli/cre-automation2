@@ -5,7 +5,7 @@ import math
 import json
 
 # -----------------------------------------------------------------------------
-# 1. HIGH-DENSITY LIGHT MODE & TRUE FULL SCREEN OVERRIDES
+# 1. HIGH-DENSITY LIGHT MODE & HYPERLINK OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -23,46 +23,8 @@ st.markdown("""
             --link-muted: #64748b;
         }
         
-        /* ELIMINATE STREAMLIT HEADER ZONE */
-        [data-testid="stHeader"], header, #stDecoration {
-            height: 0px !important;
-            min-height: 0px !important;
-            display: none !important;
-        }
-        
-        /* BRUTE FORCE ENTIRE MAIN AREA LAYOUT MATRIX TO BE 100% EDGE-TO-EDGE */
-        .main, .block-container, 
-        [data-testid="stAppViewBlockContainer"], 
-        [data-testid="stMain"], 
-        [data-testid="stAppViewMain"] {
-            padding-top: 0rem !important; 
-            padding-bottom: 0rem !important;
-            padding-left: 0rem !important;
-            padding-right: 0rem !important;
-            max-width: 100% !important; 
-            width: 100% !important;
-            margin: 0px !important;
-            overflow: hidden !important;
-            height: 100vh !important;
-        }
-        
-        /* REMOVE INNER GAP ELEMENTS AND PADDING IN ALL STREAMLIT WRAPPER BLOCKS */
-        [data-testid="stVerticalBlock"], 
-        [data-testid="stVerticalBlockWrapper"],
-        .stElementContainer {
-            gap: 0rem !important;
-            padding: 0px !important;
-            margin: 0px !important;
-        }
-        
-        /* FORCE STREAMLIT IFRAME COMPONENT TO MAP EXACTLY TO THE VIEWPORT WINDOW */
-        iframe {
-            height: 100vh !important;
-            width: 100% !important;
-            border: none !important;
-            margin: 0px !important;
-            padding: 0px !important;
-            display: block !important;
+        .block-container {
+            padding: 0rem !important;
         }
         
         [data-testid="stSidebar"] {
@@ -84,18 +46,9 @@ st.markdown("""
             font-weight: 900 !important;
             letter-spacing: 1px !important;
             text-transform: uppercase !important;
-            text-align: center !important;
+            text-align: left !important;
             margin-bottom: 2px !important;
             font-family: 'Arial', sans-serif !important;
-            display: block !important;
-            width: 100% !important;
-        }
-        
-        .clear-link-container {
-            text-align: center !important;
-            margin-top: -4px !important;
-            margin-bottom: 12px !important;
-            width: 100% !important;
         }
         
         /* Hyperlink Emulation for Tertiary Button */
@@ -107,11 +60,10 @@ st.markdown("""
             font-weight: 600 !important;
             font-size: 11px !important;
             padding: 0 !important;
-            margin: 0 !important;
+            margin-top: 10px !important;
             box-shadow: none !important;
             min-height: 0 !important;
             height: auto !important;
-            display: inline-block !important;
         }
         button[kind="tertiary"]:hover {
             color: var(--navy-brand) !important;
@@ -165,7 +117,7 @@ st.markdown("""
             padding-bottom: 4px !important;
         }
         
-        .stDeployButton, footer { display:none !important; }
+        .stDeployButton, footer, #stDecoration { display:none !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -190,6 +142,7 @@ def execute_global_purge():
     for key in list(st.session_state.keys()):
         if key.startswith("chk_"): st.session_state[key] = False
 
+# Fully mapped taxonomy injection
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
     "RETAIL": [['Mall/Dept Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i']],
@@ -241,13 +194,14 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
-    if st.button("Clear All", key="master_purge_btn", type="tertiary"):
-        execute_global_purge()
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Header & Micro-Hyperlink Purge Button
+    head_col1, head_col2 = st.columns([3, 1])
+    with head_col1:
+        st.markdown('<div class="sidebar-title">TRADE AREA</div>', unsafe_allow_html=True)
+    with head_col2:
+        if st.button("Clear All", key="master_purge_btn", type="tertiary"):
+            execute_global_purge()
+            st.rerun()
 
     coords_val = st.text_input("Target Coordinates", key="geo_coords")
     radius_val = st.number_input("Radius (Meters)", min_value=100, max_value=50000, key="geo_radius", step=100)
@@ -259,6 +213,7 @@ with st.sidebar:
     
     selected_tags = []
     
+    # Standard POI Generation in 2-Column Grid
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -269,6 +224,7 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_{cat_name}_{label}"): 
                             selected_tags.append(tag)
 
+    # Advanced POI Generation in 2-Column Grid
     for cat_name, node_items in ADVANCED_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -282,7 +238,7 @@ with st.sidebar:
     st.markdown("<hr style='margin: 10px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
     
     st.markdown('<div class="action-tray">', unsafe_allow_html=True)
-    if st.button("🚀 SCAN AREA", use_container_width=True):
+    if st.button("🚀 SCAN AREA PROFILE", use_container_width=True):
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
         else:
@@ -309,6 +265,7 @@ with st.sidebar:
                 except Exception as e: st.sidebar.error("Timeout")
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # Simplified Data Exports Tray
     st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:800; margin-top:15px; margin-bottom:0;'>DATA EXPORTS</p>", unsafe_allow_html=True)
     exp_fmt = st.selectbox("Format", ["Select Format...", "Export Radius (KML)", "Export POIs (KML)"], label_visibility="collapsed")
     
@@ -318,63 +275,45 @@ with st.sidebar:
         st.download_button("Download File", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", disabled=not st.session_state.scanned_records)
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
+# 5. ZERO-LATENCY SPATIAL CANVAS
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = st.session_state.last_scan_lat
 render_lon = st.session_state.last_scan_lon
 
-leaflet_template = """
+leaflet_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
-        #map { height: 100vh; width: 100%; }
-    </style>
+    <style>body, html, #map {{ margin: 0; padding: 0; height: 100vh; width: 100vw; background: #f8fafc; }}</style>
 </head>
 <body>
     <div id="map"></div>
     <script>
-        const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        const map = L.map('map', {{ zoomControl: true, attributionControl: false }}).setView([{render_lat}, {render_lon}], 14);
+        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{ maxZoom: 19 }}).addTo(map);
         
-        L.circleMarker([__LAT__, __LON__], {
+        L.circleMarker([{render_lat}, {render_lon}], {{
             radius: 7, fillColor: "#e11d48", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
-        }).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
+        }}).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
         
-        L.circle([__LAT__, __LON__], {
-            radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
-        }).addTo(map);
+        L.circle([{render_lat}, {render_lon}], {{
+            radius: {radius_val}, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
+        }}).addTo(map);
         
-        const pts = __GEOJSON__;
-        pts.forEach(p => {
-            L.circleMarker([p.lat, p.lon], {
+        const pts = {geojson_str};
+        pts.forEach(p => {{
+            L.circleMarker([p.lat, p.lon], {{
                 radius: 5, fillColor: "#d4af37", color: "#001a3d", weight: 1, opacity: 1, fillOpacity: 0.9
-            }).addTo(map).bindPopup("<b>" + p.name + "</b><br>" + p.type);
-        });
+            }}).addTo(map).bindPopup("<b>" + p.name + "</b><br>" + p.type);
+        }});
         
-        if(pts.length > 0) {
-            const bounds = L.featureGroup([L.marker([__LAT__, __LON__]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
+        if(pts.length > 0) {{
+            const bounds = L.featureGroup([L.marker([{render_lat}, {render_lon}]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
             map.fitBounds(bounds.pad(0.1));
-        }
-        
-        map.on('contextmenu', function(e) {
-            const lat = e.latlng.lat.toFixed(5);
-            const lon = e.latlng.lng.toFixed(5);
-            const coordString = lat + ", " + lon;
-            
-            navigator.clipboard.writeText(coordString).then(() => {
-                L.popup()
-                    .setLatLng(e.latlng)
-                    .setContent("<div style='font-family:sans-serif;font-size:11px;'>Copied to Clipboard:<br><b>" + coordString + "</b></div>")
-                    .openOn(map);
-            }).catch(err => {
-                console.error('Spatial coordinates extract pipeline failure: ', err);
-            });
-        });
+        }}
         
         setTimeout(() => map.invalidateSize(), 200);
     </script>
@@ -382,11 +321,5 @@ leaflet_template = """
 </html>
 """
 
-leaflet_html = (leaflet_template
-                .replace("__LAT__", str(render_lat))
-                .replace("__LON__", str(render_lon))
-                .replace("__RADIUS__", str(radius_val))
-                .replace("__GEOJSON__", geojson_str))
-
-# Passed with explicit visibility configurations to lock the layout fluidly
-st.components.v1.html(leaflet_html, scrolling=False)
+st.components.v1.html(leaflet_html, height=900, scrolling=False)
+```</SANDBOX_MODE_ENGAGED>
