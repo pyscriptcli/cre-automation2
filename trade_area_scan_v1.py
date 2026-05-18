@@ -143,8 +143,7 @@ st.markdown("""
            ------------------------------------------------------------------------- */
         [data-testid="stSidebar"] .st-expander summary p { 
             font-size: 8px !important; 
-            font-weight: 700 !important; 
-            letter-spacing: 0.5px;
+            font-weight: 500 !important; 
         }
         
         /* -------------------------------------------------------------------------
