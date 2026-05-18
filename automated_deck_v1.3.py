@@ -296,7 +296,7 @@ with action_col2:
                     prs.save(output_stream)
                     output_stream.seek(0)
                     
-                    st.markdown('<div style='border-left:4px solid #C5A059; background-color:#FFFFFF; padding:15px; border-top:1px solid #E2E8F0; border-right:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0; border-radius:2px; margin-top:15px; text-align:center; color:#002B49; font-weight:600; font-size:14px;'>🎉 Presentation compiled successfully! Ready for production download.</div>', unsafe_allow_html=True)
+                    st.markdown('<div style="border-left:4px solid #C5A059; background-color:#FFFFFF; padding:15px; border-top:1px solid #E2E8F0; border-right:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0; border-radius:2px; margin-top:15px; text-align:center; color:#002B49; font-weight:600; font-size:14px;">🎉 Presentation compiled successfully! Ready for production download.</div>', unsafe_allow_html=True)
                     
                     st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
                     st.download_button(
