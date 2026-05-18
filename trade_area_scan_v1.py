@@ -30,28 +30,55 @@ st.markdown("""
             display: none !important;
         }
         
-        /* FORCE SIDEBAR TO REMAIN NON-COLLAPSIBLE BY HIDING CHEVRON CONTROLS */
+        /* FORCE ROOT FLEX MATRIX TO PREVENT LAYOUT COLLAPSE */
+        [data-testid="stAppViewContainer"] {
+            display: flex !important;
+            flex-direction: row !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+        }
+        
+        /* FORCE SIDEBAR TO REMAIN FIXED, VISIBLE, AND UNCHANGED BY INTERNAL STATES */
+        [data-testid="stSidebar"] {
+            background-color: var(--white-clean) !important;
+            color: var(--navy-brand) !important;
+            border-right: 1px solid var(--border-gray) !important;
+            width: 320px !important;
+            min-width: 320px !important;
+            max-width: 320px !important;
+            transform: none !important;
+            visibility: visible !important;
+        }
+        
+        /* INTERCEPT AND DESTROY COLLAPSE CHEVRON CLICK TARGETS */
         [data-testid="collapsedControl"] {
             display: none !important;
         }
         
-        /* BRUTE FORCE ENTIRE MAIN AREA LAYOUT MATRIX TO BE 100% EDGE-TO-EDGE */
-        .main, .block-container, 
-        [data-testid="stAppViewBlockContainer"], 
-        [data-testid="stMain"], 
-        [data-testid="stAppViewMain"] {
+        /* LOCK MAIN AREA TO FILL THE EXACT REMAINING SPACE CLEANLY */
+        [data-testid="stMain"] {
+            flex-grow: 1 !important;
+            width: calc(100vw - 320px) !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+            margin: 0px !important;
+            padding: 0px !important;
+        }
+        
+        /* STRIP INNER PADDING FROM THE CONTENT BLOCK COMPONENT */
+        .block-container, [data-testid="stAppViewBlockContainer"] {
             padding-top: 0rem !important; 
             padding-bottom: 0rem !important;
             padding-left: 0rem !important;
             padding-right: 0rem !important;
             max-width: 100% !important; 
             width: 100% !important;
-            margin: 0px !important;
-            overflow: hidden !important;
             height: 100vh !important;
+            margin: 0px !important;
         }
         
-        /* REMOVE INNER GAP ELEMENTS AND PADDING IN ALL STREAMLIT WRAPPER BLOCKS */
+        /* REMOVE INNER GAP ELEMENTS IN ALL STREAMLIT WRAPPER BLOCKS */
         [data-testid="stVerticalBlock"], 
         [data-testid="stVerticalBlockWrapper"],
         .stElementContainer {
@@ -60,7 +87,7 @@ st.markdown("""
             margin: 0px !important;
         }
         
-        /* FORCE STREAMLIT IFRAME COMPONENT TO MAP EXACTLY TO THE VIEWPORT WINDOW */
+        /* FORCE LEAFLET IFRAME TO MAP EXACTLY TO THE VIEWPORT WINDOW */
         iframe {
             height: 100vh !important;
             width: 100% !important;
@@ -70,15 +97,8 @@ st.markdown("""
             display: block !important;
         }
         
-        [data-testid="stSidebar"] {
-            background-color: var(--white-clean) !important;
-            color: var(--navy-brand) !important;
-            border-right: 1px solid var(--border-gray) !important;
-            width: 320px !important;
-        }
-        
-        [data-testid="stSidebarUserContent"] {
-            padding-top: 24px !important; /* Adjusted up for better zero-header alignment */
+        [data-testid="stSidebar"]UserContent {
+            padding-top: 24px !important;
             padding-left: 12px !important;
             padding-right: 12px !important;
         }
@@ -233,8 +253,6 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # REMOVED: .sidebar-title HTML header element
-    
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
         execute_global_purge()
