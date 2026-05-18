@@ -5,7 +5,7 @@ import math
 import json
 
 # -----------------------------------------------------------------------------
-# 1. BICHROMATIC (NAVY/WHITE) FORCED MODE & TRUE FULL SCREEN OVERRIDES
+# 1. SOFT BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="TRADE AREA SCAN",
@@ -15,10 +15,11 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        /* FORCE STRICT BICHROMATIC THEME (NAVY & WHITE ONLY) OVERRIDING ALL SYSTEM SETTINGS */
+        /* FORCE STRICT BICHROMATIC THEME WITH MODERN TACTILE GEOMETRY */
         :root {
             --navy-brand: #001a3d !important;
             --white-clean: #ffffff !important;
+            --soft-shadow: 0 4px 16px rgba(0, 26, 61, 0.12) !important;
         }
         
         html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main, .block-container {
@@ -29,13 +30,14 @@ st.markdown("""
         [data-testid="stSidebar"] {
             background-color: var(--white-clean) !important;
             color: var(--navy-brand) !important;
-            border-right: 2px solid var(--navy-brand) !important;
+            border-right: 1px solid rgba(0, 26, 61, 0.1) !important;
             width: 320px !important;
             min-width: 320px !important;
             max-width: 320px !important;
             transform: none !important;
             visibility: visible !important;
             overflow: hidden !important;
+            box-shadow: 2px 0 10px rgba(0, 26, 61, 0.05) !important;
         }
         
         /* ELIMINATE SIDEBAR COLLAPSE CHEVRON AND SCROLLBARS */
@@ -69,30 +71,34 @@ st.markdown("""
         iframe { height: 100vh !important; width: 100% !important; border: none !important; display: block !important; }
         
         [data-testid="stSidebarUserContent"] {
-            padding-top: 24px !important; padding-left: 12px !important; padding-right: 12px !important;
+            padding-top: 24px !important; padding-left: 16px !important; padding-right: 16px !important;
             height: 100vh !important; overflow-y: auto !important; overflow-x: hidden !important;
         }
         
-        /* BICHROMATIC INPUT RE-STYLING */
+        /* ROUNDED BICHROMATIC INPUT RE-STYLING */
         div[data-baseweb="input"], div[data-baseweb="select"], input, select, .stSelectbox, .stTextInput, .stNumberInput {
             background-color: var(--white-clean) !important; color: var(--navy-brand) !important;
-            border-radius: 0px !important; border: 1px solid var(--navy-brand) !important; min-height: 32px !important;
+            border-radius: 8px !important; border: 1px solid rgba(0, 26, 61, 0.3) !important; min-height: 36px !important;
+            box-shadow: inset 0 1px 3px rgba(0, 26, 61, 0.05) !important;
         }
-        div[data-baseweb="input"]:focus-within { border: 2px solid var(--navy-brand) !important; }
+        div[data-baseweb="input"]:focus-within { border: 2px solid var(--navy-brand) !important; box-shadow: var(--soft-shadow) !important; }
         
+        /* ROUNDED BUTTONS */
         .action-tray div.stButton > button[kind="secondary"], div.stDownloadButton > button {
             background-color: var(--navy-brand) !important; color: var(--white-clean) !important;
             font-weight: 800 !important; font-size: 11px !important; text-transform: uppercase !important;
-            border: none !important; border-radius: 0px !important; width: 100% !important; padding: 6px !important;
+            border: none !important; border-radius: 8px !important; width: 100% !important; padding: 10px !important;
+            box-shadow: var(--soft-shadow) !important; transition: all 0.2s ease !important;
         }
         .action-tray div.stButton > button[kind="secondary"]:hover, div.stDownloadButton > button:hover {
-            background-color: var(--white-clean) !important; color: var(--navy-brand) !important;
-            border: 2px solid var(--navy-brand) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 26, 61, 0.2) !important;
         }
         
+        /* ROUNDED EXPANDERS */
         [data-testid="stSidebar"] .st-expander {
-            border: 1px solid var(--navy-brand) !important; background-color: var(--white-clean) !important;
-            border-radius: 0px !important; margin-bottom: 2px !important;
+            border: 1px solid rgba(0, 26, 61, 0.15) !important; background-color: var(--white-clean) !important;
+            border-radius: 8px !important; margin-bottom: 6px !important; overflow: hidden !important;
         }
         .stDeployButton, footer { display:none !important; }
     </style>
@@ -117,15 +123,6 @@ if 'map_styles' not in st.session_state:
         "poi_color": "#001a3d",
         "poi_opacity": 0.9
     }
-
-def execute_global_purge():
-    st.session_state.geo_coords = DEFAULT_COORDS
-    st.session_state.geo_radius = DEFAULT_RADIUS
-    st.session_state.scanned_records = []
-    st.session_state.last_scan_lat = 14.6465
-    st.session_state.last_scan_lon = 121.0371
-    for key in list(st.session_state.keys()):
-        if key.startswith("chk_"): st.session_state[key] = False
 
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
@@ -164,18 +161,15 @@ def compile_features_kml(features):
 # 3. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div style="text-align:center; margin-bottom:12px;">', unsafe_allow_html=True)
-    if st.button("CLEAR ALL WORKSPACE DATA", use_container_width=True):
-        execute_global_purge()
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
+    st.markdown('<div style="color: #001a3d; font-size: 22px; font-weight: 900; letter-spacing: 1px; margin-bottom: 24px; text-align: center;">TRADE AREA SCAN</div>', unsafe_allow_html=True)
+    
     coords_val = st.text_input("TARGET COORDINATES", key="geo_coords")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, key="geo_radius", step=100)
 
     coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
     lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.6465, 121.0371)
 
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     search_query = st.text_input("FILTER CATALOG", placeholder="Search tags...").lower()
     
     selected_tags = []
@@ -200,7 +194,7 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): 
                             selected_tags.append(tag)
 
-    st.markdown("<hr style='margin: 10px 0; border: 1px solid #001a3d;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 16px 0; border: 0; border-top: 1px solid rgba(0, 26, 61, 0.1);'>", unsafe_allow_html=True)
     
     st.markdown('<div class="action-tray">', unsafe_allow_html=True)
     if st.button("RUN SPATIAL SCAN", use_container_width=True):
@@ -229,9 +223,8 @@ with st.sidebar:
                 except Exception as e: st.sidebar.error("Timeout")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:900; margin-top:20px; margin-bottom:4px;'>SYSTEM CONFIGURATION</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#001a3d; font-size:10px; font-weight:900; margin-top:24px; margin-bottom:8px; text-transform: uppercase;'>System Config</p>", unsafe_allow_html=True)
     
-    # SIDE-BY-SIDE IMPORT & EXPORT MATRIX AT THE BOTTOM
     project_bundle = {
         "geo_coords": coords_val,
         "geo_radius": radius_val,
@@ -241,8 +234,11 @@ with st.sidebar:
         "map_styles": st.session_state.map_styles
     }
     
-    st.download_button("EXPORT PROJECT [JSON]", json.dumps(project_bundle, indent=2), "trade_area_scan.json", "application/json", use_container_width=True)
-    st.download_button("EXPORT DATA [KML]", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button("EXPORT PROJECT", json.dumps(project_bundle, indent=2), "trade_area_scan.json", "application/json", use_container_width=True)
+    with col2:
+        st.download_button("EXPORT KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
     
     imported_project = st.file_uploader("IMPORT PROJECT [JSON]", type=["json"], label_visibility="collapsed")
     if imported_project is not None:
@@ -253,7 +249,6 @@ with st.sidebar:
             st.session_state.scanned_records = config_payload.get("scanned_records", [])
             st.session_state.last_scan_lat = config_payload.get("last_scan_lat", 14.6465)
             st.session_state.last_scan_lon = config_payload.get("last_scan_lon", 121.0371)
-            if "map_styles" in config_payload: st.session_state.map_styles = config_payload["map_styles"]
             st.rerun()
         except: pass
 
@@ -263,9 +258,7 @@ with st.sidebar:
 geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = lat_coord
 render_lon = lon_coord
-
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
-style_bundle_str = json.dumps(st.session_state.map_styles)
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -277,99 +270,106 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Arial', sans-serif; }
         #map { height: 100vh; width: 100%; }
         
-        /* GOOGLE MAPS STYLE SEARCH BAR OVERLAY */
+        /* ROUNDED GOOGLE MAPS STYLE SEARCH BAR OVERLAY */
         #search-container {
-            position: absolute; top: 12px; left: 50px; z-index: 1000; width: 320px;
+            position: absolute; top: 16px; left: 60px; z-index: 1000; width: 340px;
         }
         #map-search {
-            width: 100%; padding: 10px 14px; border: 2px solid #001a3d; border-radius: 0px;
-            font-size: 12px; font-weight: bold; color: #001a3d; background: #ffffff; outline: none;
-            box-shadow: 0 2px 6px rgba(0,26,61,0.2); box-sizing: border-box;
+            width: 100%; padding: 12px 16px; border: 1px solid rgba(0, 26, 61, 0.2); border-radius: 8px;
+            font-size: 13px; font-weight: bold; color: #001a3d; background: #ffffff; outline: none;
+            box-shadow: 0 4px 12px rgba(0, 26, 61, 0.1); box-sizing: border-box; transition: all 0.2s ease;
         }
-        #map-search::placeholder { color: rgba(0,26,61,0.5); }
+        #map-search:focus { border: 2px solid #001a3d; box-shadow: 0 6px 16px rgba(0, 26, 61, 0.15); }
+        #map-search::placeholder { color: rgba(0,26,61,0.4); font-weight: normal; }
+        
         #search-results {
-            position: absolute; top: 38px; left: 0; width: 100%; background: #ffffff;
-            border: 2px solid #001a3d; border-top: none; display: none; max-height: 250px;
-            overflow-y: auto; box-shadow: 0 4px 8px rgba(0,26,61,0.2); box-sizing: border-box;
+            position: absolute; top: 50px; left: 0; width: 100%; background: #ffffff;
+            border-radius: 8px; display: none; max-height: 250px; overflow-y: auto; 
+            box-shadow: 0 6px 20px rgba(0, 26, 61, 0.15); border: 1px solid rgba(0, 26, 61, 0.1); margin-top: 8px;
+            box-sizing: border-box;
         }
         .search-item {
-            padding: 10px; font-size: 11px; font-weight: 600; color: #001a3d;
-            cursor: pointer; border-bottom: 1px solid rgba(0,26,61,0.1);
+            padding: 12px 16px; font-size: 12px; font-weight: 600; color: #001a3d;
+            cursor: pointer; border-bottom: 1px solid rgba(0,26,61,0.05); transition: background 0.1s;
         }
+        .search-item:last-child { border-bottom: none; }
         .search-item:hover { background: #001a3d; color: #ffffff; }
 
-        /* FLAT TOOLBAR OVERLAY */
+        /* ROUNDED FLAT TOOLBAR OVERLAY */
         #map-action-toolbar {
-            position: absolute; top: 80px; left: 12px; z-index: 1000;
-            display: flex; flex-direction: column; gap: 4px;
+            position: absolute; top: 80px; left: 16px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 8px;
         }
         .toolbar-trigger-btn {
-            background: #ffffff; width: 32px; height: 32px; border: 2px solid #001a3d;
+            background: #ffffff; width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(0, 26, 61, 0.2);
             display: flex; align-items: center; justify-content: center; cursor: pointer;
-            font-size: 16px; color: #001a3d; font-weight: bold; user-select: none;
+            font-size: 16px; color: #001a3d; font-weight: bold; user-select: none; box-shadow: 0 4px 12px rgba(0, 26, 61, 0.1);
+            transition: all 0.2s;
         }
-        .toolbar-trigger-btn:hover { background: #001a3d; color: #ffffff; }
+        .toolbar-trigger-btn:hover { background: #001a3d; color: #ffffff; transform: scale(1.05); }
         
-        /* FLOATING MENU BLOCKS */
+        /* ROUNDED FLOATING MENU BLOCKS */
         .toolbar-floating-menu {
-            position: absolute; left: 42px; background: #ffffff; border: 2px solid #001a3d;
-            padding: 12px; color: #001a3d; width: 180px; display: none; box-shadow: 0 4px 10px rgba(0,26,61,0.15);
+            position: absolute; left: 46px; background: #ffffff; border-radius: 8px; border: 1px solid rgba(0, 26, 61, 0.1);
+            padding: 16px; color: #001a3d; width: 200px; display: none; box-shadow: 0 8px 24px rgba(0, 26, 61, 0.12);
         }
         #basemap-menu-container { top: 0px; }
-        #style-menu-container { top: 35px; }
         
-        .panel-row { margin-bottom: 8px; }
-        .panel-row label { display: block; font-size: 9px; font-weight: 900; margin-bottom: 4px; text-transform: uppercase; }
-        .panel-row select, .panel-row input[type="text"] {
-            width: 100%; font-size: 10px; padding: 4px; border: 1px solid #001a3d; color: #001a3d; background: #ffffff; font-weight: bold;
+        .panel-row { margin-bottom: 12px; }
+        .panel-row:last-child { margin-bottom: 0; }
+        .panel-row label { display: block; font-size: 10px; font-weight: 900; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;}
+        .panel-row select {
+            width: 100%; font-size: 11px; padding: 6px; border-radius: 6px; border: 1px solid rgba(0, 26, 61, 0.3); color: #001a3d; background: #ffffff; font-weight: bold; cursor: pointer; outline: none;
         }
-        .style-slider-input { width: 100%; margin: 4px 0 0 0; cursor: pointer; }
+        .panel-row select:focus { border-color: #001a3d; }
 
-        /* BICHROMATIC SCAN RESULTS PANEL */
+        /* ROUNDED BICHROMATIC SCAN RESULTS PANEL */
         #scan-results-panel {
-            position: absolute; top: 12px; right: 12px; z-index: 1000; background: #ffffff;
-            width: 280px; max-height: calc(100vh - 40px); border: 2px solid #001a3d;
-            display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 15px rgba(0,26,61,0.2);
+            position: absolute; top: 16px; right: 16px; z-index: 1000; background: #ffffff;
+            width: 280px; max-height: calc(100vh - 40px); border-radius: 12px; border: 1px solid rgba(0, 26, 61, 0.1);
+            display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 8px 30px rgba(0, 26, 61, 0.15);
         }
         .results-header {
-            background: #001a3d; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 900;
-            display: flex; justify-content: space-between; align-items: center; text-transform: uppercase;
+            background: #001a3d; color: #ffffff; padding: 14px 16px; font-size: 11px; font-weight: 900;
+            display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; letter-spacing: 1px;
         }
-        .results-list { overflow-y: auto; flex-grow: 1; }
-        .layer-category-block { border-bottom: 1px solid #001a3d; }
+        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
+        .layer-category-block { border-bottom: 1px solid rgba(0, 26, 61, 0.05); }
+        .layer-category-block:last-child { border-bottom: none; }
         .layer-category-header {
-            background: #ffffff; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between;
-            cursor: pointer; user-select: none; border-bottom: 1px solid rgba(0,26,61,0.2);
+            background: #ffffff; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; user-select: none; transition: background 0.2s;
         }
-        .layer-category-header:hover { background: rgba(0,26,61,0.05); }
-        .layer-header-left { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 900; color: #001a3d; }
-        .layer-header-left input[type="checkbox"] { margin: 0; cursor: pointer; }
+        .layer-category-header:hover { background: rgba(0,26,61,0.03); }
+        .layer-header-left { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 800; color: #001a3d; }
+        .layer-header-left input[type="checkbox"] { margin: 0; cursor: pointer; transform: scale(1.1); }
         
-        .layer-category-items { padding: 0; }
+        .layer-category-items { padding: 0; background: rgba(0, 26, 61, 0.02); }
         .layer-category-items.collapsed { display: none !important; }
         
         .results-item {
-            padding: 6px 12px 6px 30px; font-size: 10px; font-weight: bold; color: #001a3d;
-            cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            padding: 8px 16px 8px 38px; font-size: 11px; font-weight: 600; color: #001a3d;
+            cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: all 0.1s;
         }
-        .results-item:hover { background: #001a3d; color: #ffffff; }
+        .results-item:hover { background: #001a3d; color: #ffffff; padding-left: 42px; }
 
         /* RIGHT CLICK CONTEXT PANEL VIEWER */
         #right-viewer-panel {
-            position: absolute; top: 12px; right: 302px; z-index: 1001; background: #ffffff;
-            width: 450px; height: calc(100vh - 24px); border: 2px solid #001a3d;
-            display: none; flex-direction: column; box-shadow: -4px 0 15px rgba(0,26,61,0.2);
+            position: absolute; top: 16px; right: 312px; z-index: 1001; background: #ffffff; border-radius: 12px;
+            width: 450px; height: calc(100vh - 32px); border: 1px solid rgba(0, 26, 61, 0.1);
+            display: none; flex-direction: column; box-shadow: -4px 0 20px rgba(0, 26, 61, 0.15); overflow: hidden;
         }
         .viewer-header {
-            background: #001a3d; color: #ffffff; padding: 10px 12px; font-weight: 900; font-size: 11px;
-            display: flex; justify-content: space-between; text-transform: uppercase;
+            background: #001a3d; color: #ffffff; padding: 14px 16px; font-weight: 900; font-size: 11px;
+            display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; letter-spacing: 1px;
         }
-        .viewer-header a { color: #ffffff !important; text-decoration: none; font-weight: 900; margin-right: 15px; border: 1px solid #ffffff; padding: 2px 6px; }
-        .viewer-header span.close-btn { cursor: pointer; font-size: 14px; }
-        #viewer-iframe { flex-grow: 1; border: none; width: 100%; }
+        .viewer-header a { color: #ffffff !important; text-decoration: none; font-weight: bold; margin-right: 15px; border: 1px solid rgba(255,255,255,0.4); padding: 4px 8px; border-radius: 4px; transition: all 0.2s;}
+        .viewer-header a:hover { background: #ffffff; color: #001a3d !important; }
+        .viewer-header span.close-btn { cursor: pointer; font-size: 16px; line-height: 1; }
+        #viewer-iframe { flex-grow: 1; border: none; width: 100%; background: #f8fafc; }
 
         .poi-text-label {
-            background: #ffffff; border: 1px solid #001a3d; padding: 2px 4px; font-size: 9px; font-weight: 900; color: #001a3d; white-space: nowrap;
+            background: #ffffff; border: 1px solid #001a3d; padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; color: #001a3d; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
         .hide-labels .poi-text-label { display: none !important; }
     </style>
@@ -383,11 +383,10 @@ leaflet_template = """
     </div>
 
     <div id="map-action-toolbar">
-        <div class="toolbar-trigger-btn" title="Basemap Settings" onclick="toggleMenuPanel('basemap-menu-container')">▤</div>
-        <div class="toolbar-trigger-btn" title="Style Controls" onclick="toggleMenuPanel('style-menu-container')">✎</div>
+        <div class="toolbar-trigger-btn" title="Basemap Settings" onclick="toggleMenuPanel(event, 'basemap-menu-container')">▤</div>
     </div>
     
-    <div id="basemap-menu-container" class="toolbar-floating-menu">
+    <div id="basemap-menu-container" class="toolbar-floating-menu" onclick="event.stopPropagation();">
         <div class="panel-row">
             <label>Map Raster View</label>
             <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
@@ -396,23 +395,9 @@ leaflet_template = """
                 <option value="carto">Carto Light</option>
             </select>
         </div>
-        <div class="panel-row" style="display:flex; align-items:center; gap:6px; margin-top:8px;">
-            <input type="checkbox" id="label-toggle-chk" style="margin:0;" onchange="toggleLabelsMatrix(this.checked)">
-            <label style="margin:0; cursor:pointer;" for="label-toggle-chk">Show Text Labels</label>
-        </div>
-    </div>
-    
-    <div id="style-menu-container" class="toolbar-floating-menu">
-        <div class="panel-row">
-            <label>Radius Visual Opacity</label>
-            <input type="range" id="opac-radius-slider" class="style-slider-input" min="0" max="1" step="0.05" oninput="setCustomElementOpacity('radius', this.value)">
-        </div>
-        <div class="panel-row">
-            <label>POI Visual Opacity</label>
-            <input type="range" id="opac-poi-slider" class="style-slider-input" min="0" max="1" step="0.05" oninput="setCustomElementOpacity('poi', this.value)">
-        </div>
-        <div class="panel-row" style="margin-top:10px; font-size:8px; font-weight:bold;">
-            * BICHROMATIC LOCK ACTIVE: All elements restricted to pure Navy & White.
+        <div class="panel-row" style="display:flex; align-items:center; gap:8px; margin-top:12px; margin-bottom: 4px;">
+            <input type="checkbox" id="label-toggle-chk" style="margin:0; transform: scale(1.1); cursor: pointer;" onchange="toggleLabelsMatrix(this.checked)">
+            <label style="margin:0; cursor:pointer; text-transform: none; font-weight: 800; font-size: 11px;" for="label-toggle-chk">Show Text Labels</label>
         </div>
     </div>
 
@@ -427,8 +412,8 @@ leaflet_template = """
     <div id="right-viewer-panel">
         <div class="viewer-header">
             <span id="viewer-title">VIEWER</span>
-            <div>
-                <a id="viewer-ext-link" href="#" target="_blank">⤢ OPEN NEW TAB</a>
+            <div style="display: flex; align-items: center;">
+                <a id="viewer-ext-link" href="#" target="_blank">⤢ NEW TAB</a>
                 <span class="close-btn" onclick="closeViewer()">✖</span>
             </div>
         </div>
@@ -438,17 +423,15 @@ leaflet_template = """
     <script>
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
         
+        // Relocate zoom control below custom tools
+        map.zoomControl.setPosition('topleft');
+        
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
             satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
             carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
         };
         
-        let p_radiusOpac = 0.1;
-        let p_poiOpac = 0.9;
-        document.getElementById('opac-radius-slider').value = p_radiusOpac;
-        document.getElementById('opac-poi-slider').value = p_poiOpac;
-
         let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'osm';
         if (!basemaps[activeBasemapKey]) activeBasemapKey = 'osm';
         document.getElementById('basemap-select').value = activeBasemapKey;
@@ -471,23 +454,34 @@ leaflet_template = """
             localStorage.setItem('ts_persistent_labels', isShown);
         }
         
-        function toggleMenuPanel(panelId) {
+        // Improved toggle with global click listener to close menu
+        function toggleMenuPanel(event, panelId) {
+            event.stopPropagation();
             const el = document.getElementById(panelId);
             const activeNow = el.style.display === 'block';
             document.querySelectorAll('.toolbar-floating-menu').forEach(p => p.style.display = 'none');
             if (!activeNow) el.style.display = 'block';
         }
         
+        document.addEventListener('click', function(event) {
+            document.querySelectorAll('.toolbar-floating-menu').forEach(p => p.style.display = 'none');
+            document.getElementById('search-results').style.display = 'none';
+        });
+        
+        document.getElementById('search-container').addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+
         let searchTimeout;
         function handleSearch(e) {
             clearTimeout(searchTimeout);
             const q = e.target.value;
-            if (q.length < 3) { document.getElementById('search-results').style.display = 'none'; return; }
+            const resDiv = document.getElementById('search-results');
+            if (q.length < 3) { resDiv.style.display = 'none'; return; }
             searchTimeout = setTimeout(() => {
                 fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`)
                 .then(res => res.json())
                 .then(data => {
-                    const resDiv = document.getElementById('search-results');
                     resDiv.innerHTML = '';
                     if(data.length > 0) {
                         data.forEach(item => {
@@ -511,10 +505,10 @@ leaflet_template = """
         
         const centerMarker = L.circleMarker([__LAT__, __LON__], {
             radius: 8, fillColor: "#ffffff", color: "#001a3d", weight: 3, opacity: 1, fillOpacity: 1
-        }).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
+        }).addTo(map).bindPopup("<b style='font-family: Arial;'>TARGET COORDINATES</b>");
         
         const radiusCircle = L.circle([__LAT__, __LON__], {
-            radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: p_radiusOpac
+            radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
         }).addTo(map);
         
         const pts = __GEOJSON__;
@@ -531,12 +525,12 @@ leaflet_template = """
             layerGroupsRef[key] = L.layerGroup().addTo(map);
             categoryMap[key].forEach(p => {
                 const marker = L.circleMarker([p.lat, p.lon], {
-                    radius: 5, fillColor: "#001a3d", color: "#ffffff", weight: 1, opacity: 1, fillOpacity: p_poiOpac
-                }).bindPopup("<b style='color:#001a3d;'>" + p.name + "</b><br>" + p.type);
+                    radius: 5, fillColor: "#001a3d", color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.9
+                }).bindPopup("<b style='color:#001a3d; font-family: Arial;'>" + p.name + "</b><br><span style='font-family: Arial; font-size: 10px;'>" + p.type + "</span>");
                 
                 if (p.name && p.name !== 'Unknown') {
                     marker.bindTooltip(p.name, {
-                        permanent: true, direction: 'top', offset: [0, -4], className: 'poi-text-label'
+                        permanent: true, direction: 'top', offset: [0, -6], className: 'poi-text-label'
                     });
                 }
                 marker.addTo(layerGroupsRef[key]);
@@ -554,9 +548,9 @@ leaflet_template = """
                         <div class="layer-category-header" onclick="toggleAccordionCollapse('${catName}')">
                             <div class="layer-header-left">
                                 <input type="checkbox" checked onclick="event.stopPropagation(); toggleCategoryVisibility('${catName}', this.checked)">
-                                <span>${catName} (${categoryMap[catName].length})</span>
+                                <span>${catName} <span style="color: #64748b; font-size: 10px;">(${categoryMap[catName].length})</span></span>
                             </div>
-                            <span id="chevron-${catName}">▼</span>
+                            <span id="chevron-${catName}" style="font-size: 10px;">▼</span>
                         </div>
                         <div class="layer-category-items" id="items-${catName}">
                 `;
@@ -589,34 +583,22 @@ leaflet_template = """
                 if (layer instanceof L.CircleMarker && layer.getLatLng) {
                     const loc = layer.getLatLng();
                     if (Math.abs(loc.lat - lat) < 0.00001 && Math.abs(loc.lng - lon) < 0.00001) {
-                        setTimeout(() => layer.openPopup(), 300);
+                        setTimeout(() => layer.openPopup(), 350);
                     }
                 }
             });
         }
-
-        function setCustomElementOpacity(layerType, val) {
-            const opac = parseFloat(val);
-            if (layerType === 'radius') {
-                radiusCircle.setStyle({ fillOpacity: opac });
-            } else if (layerType === 'poi') {
-                Object.keys(layerGroupsRef).forEach(k => {
-                    layerGroupsRef[k].eachLayer(m => m.setStyle({ fillOpacity: opac }));
-                });
-            }
-        }
         
-        // CONTEXT MENU (RIGHT CLICK)
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
             const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
             
             const menuHtml = `
-                <div style="font-family: Arial; font-size: 11px; color: #001a3d; min-width: 130px;">
-                    <div style="font-weight: 900; border-bottom: 2px solid #001a3d; padding-bottom: 5px; margin-bottom: 5px;">MAP ACTIONS</div>
-                    <div style="padding: 5px 0; cursor: pointer; font-weight: bold;" onclick="navigator.clipboard.writeText('${coordStr}'); alert('Copied: ${coordStr}'); map.closePopup();">◧ COPY COORDINATES</div>
-                    <div style="padding: 5px 0; cursor: pointer; font-weight: bold;" onclick="openRightPanel('routes', ${lat}, ${lng}); map.closePopup();">↱ OPEN ROUTES</div>
-                    <div style="padding: 5px 0; cursor: pointer; font-weight: bold;" onclick="openRightPanel('streetview', ${lat}, ${lng}); map.closePopup();">👁 OPEN STREETVIEW</div>
+                <div style="font-family: Arial; font-size: 11px; color: #001a3d; min-width: 140px;">
+                    <div style="font-weight: 900; border-bottom: 1px solid rgba(0,26,61,0.1); padding-bottom: 6px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP ACTIONS</div>
+                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#64748b'" onmouseout="this.style.color='#001a3d'" onclick="navigator.clipboard.writeText('${coordStr}'); alert('Copied: ${coordStr}'); map.closePopup();">◧ COPY COORDINATES</div>
+                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#64748b'" onmouseout="this.style.color='#001a3d'" onclick="openRightPanel('routes', ${lat}, ${lng}); map.closePopup();">↱ OPEN ROUTES</div>
+                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#64748b'" onmouseout="this.style.color='#001a3d'" onclick="openRightPanel('streetview', ${lat}, ${lng}); map.closePopup();">👁 OPEN STREETVIEW</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
