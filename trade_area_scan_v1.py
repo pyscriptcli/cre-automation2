@@ -76,13 +76,13 @@ st.markdown("""
         }
         div[data-baseweb="input"]:focus-within { border-bottom: 2px solid var(--navy-brand) !important; }
         
-        /* PRIMARY BUTTONS */
-        div.stButton > button[kind="secondary"] {
+        /* PRIMARY & POPOVER BUTTONS */
+        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button {
             background-color: var(--navy-brand) !important; 
             border: none !important; border-radius: 4px !important; width: 100% !important; padding: 8px !important;
             box-shadow: var(--soft-shadow) !important; transition: all 0.2s ease !important;
         }
-        div.stButton > button[kind="secondary"] p, div.stDownloadButton > button p {
+        div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p {
             color: var(--white-clean) !important; font-weight: 800 !important; font-size: 11px !important; text-transform: uppercase !important;
         }
         
@@ -92,7 +92,7 @@ st.markdown("""
             box-shadow: var(--soft-shadow) !important;
         }
         
-        /* HYPERLINK STYLE FOR CLEAR BUTTON (Tertiary/Primary fallback) */
+        /* HYPERLINK STYLE FOR CLEAR BUTTON */
         div.stButton > button[kind="primary"] {
             background: transparent !important; border: none !important; color: var(--navy-brand) !important;
             box-shadow: none !important; padding: 0 !important; margin-top: 4px; display: inline-flex;
@@ -113,14 +113,14 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA MODELS
 # -----------------------------------------------------------------------------
-DEFAULT_COORDS = "14.6465, 121.0371"
+DEFAULT_COORDS = "0.0, 0.0"
 DEFAULT_RADIUS = 1000
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
-if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.6465
-if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 121.0371
+if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 0.0
+if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 0.0
 
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
@@ -158,7 +158,7 @@ with st.sidebar:
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, key="geo_radius", step=100)
 
     coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
-    lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.6465, 121.0371)
+    lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (0.0, 0.0)
 
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     search_query = st.text_input("SEARCH TAGS", placeholder="Search...").lower()
@@ -204,7 +204,6 @@ with st.sidebar:
                         st.rerun()
                 except Exception as e: st.error("Timeout")
 
-    # Hyperlink-styled Clear Button
     if st.button("Clear All POIs", type="primary"):
         st.session_state.scanned_records = []
         st.rerun()
@@ -217,15 +216,18 @@ with st.sidebar:
     with col2:
         st.download_button("EXPORT KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
-    # Import Module
-    imported_file = st.file_uploader("IMPORT DATA", type=["json"], label_visibility="collapsed")
-    if imported_file is not None:
-        try:
-            data = json.load(imported_file)
-            st.session_state.scanned_records = data.get("scanned_records", data)
-            st.rerun()
-        except Exception:
-            pass
+    # TWO-STEP IMPORT WIDGET
+    with st.popover("IMPORT PROJECT", use_container_width=True):
+        st.markdown("<div style='font-size:11px; font-weight:800; color:#001a3d; margin-bottom: 8px;'>UPLOAD SAVED PROJECT FILE</div>", unsafe_allow_html=True)
+        imported_file = st.file_uploader("Select JSON file", type=["json"], label_visibility="collapsed")
+        if imported_file is not None:
+            if st.button("EXECUTE IMPORT", type="secondary", use_container_width=True):
+                try:
+                    data = json.load(imported_file)
+                    st.session_state.scanned_records = data.get("scanned_records", data)
+                    st.rerun()
+                except Exception:
+                    st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
 # 4. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
@@ -245,9 +247,9 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Arial', sans-serif; }
         #map { height: 100vh; width: 100%; }
         
-        /* MINIMAL INLINE BASEMAP TOOLBAR */
+        /* MINIMAL INLINE BASEMAP TOOLBAR - MOVED TO BOTTOM LEFT */
         #minimal-basemap-panel {
-            position: absolute; top: 80px; left: 10px; z-index: 1000;
+            position: absolute; bottom: 20px; left: 10px; z-index: 1000;
             background: #ffffff; border-radius: 4px; border: 2px solid rgba(0,0,0,0.2); background-clip: padding-box;
             display: flex; flex-direction: column; padding: 2px;
         }
@@ -384,7 +386,6 @@ leaflet_template = """
             localStorage.setItem('ts_persistent_labels', isShown);
         }
         
-        // CUSTOM STAR CENTER PIN (Z-INDEX 10000)
         const starIcon = L.divIcon({
             className: 'custom-center-icon',
             html: '<div style="background-color: #001a3d; color: #ffffff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.5);">★</div>',
@@ -400,7 +401,6 @@ leaflet_template = """
         const categoryMap = {};
         const layerGroupsRef = {};
         
-        // MUTED / PASTEL COLOR PALETTE
         const catPalette = ["#6b8ca6", "#bfa482", "#8da186", "#b095a8", "#dca77d", "#92a6af", "#d4b8b2", "#a69aa4", "#859ea8", "#adae95", "#bf929a", "#7e9c91"];
         const categoryColors = {}; let colorIndex = 0;
         
@@ -465,15 +465,16 @@ leaflet_template = """
             chev.innerText = panel.classList.contains('collapsed') ? '▲' : '▼';
         }
 
-        // ICON-ONLY RIGHT CLICK MENU
+        // TEXT-BASED RIGHT CLICK MENU
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
             const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
             const menuHtml = `
-                <div style="display:flex; gap:16px; padding: 4px 8px; justify-content:center; align-items:center;">
-                    <div title="Copy Coordinates" style="cursor:pointer; font-size:20px;" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">📋</div>
-                    <div title="Google Maps" style="cursor:pointer; font-size:20px;" onclick="openRightPanel('routes', ${lat}, ${lng}); map.closePopup();">🗺️</div>
-                    <div title="Google Streetview" style="cursor:pointer; font-size:20px;" onclick="openRightPanel('streetview', ${lat}, ${lng}); map.closePopup();">🛣️</div>
+                <div style="font-family: Arial; font-size: 11px; color: #333; min-width: 140px;">
+                    <div style="font-weight: 900; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 6px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP ACTIONS</div>
+                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#001a3d'" onmouseout="this.style.color='#333'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">📋 COPY COORDINATES</div>
+                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#001a3d'" onmouseout="this.style.color='#333'" onclick="openRightPanel('routes', ${lat}, ${lng}); map.closePopup();">🗺️ GOOGLE MAPS</div>
+                    <div style="padding: 6px 0; cursor: pointer; font-weight: bold; transition: color 0.1s;" onmouseover="this.style.color='#001a3d'" onmouseout="this.style.color='#333'" onclick="openRightPanel('streetview', ${lat}, ${lng}); map.closePopup();">🛣️ STREETVIEW</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
