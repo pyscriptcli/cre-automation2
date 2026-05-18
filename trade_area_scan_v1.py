@@ -7,7 +7,7 @@ import json
 # -----------------------------------------------------------------------------
 # 0. GLOBAL DISPLAY CONFIGURATION
 # -----------------------------------------------------------------------------
-MAP_PANEL_HEIGHT = 1100  # Optimized pixel height to fit without vertical scrollbars
+MAP_PANEL_HEIGHT = 820  # Optimized pixel height to fit without vertical scrollbars
 MAP_PANEL_WIDTH = None  # None for fluid 100% width, or integer (e.g. 1200) for fixed width
 
 # -----------------------------------------------------------------------------
@@ -64,7 +64,7 @@ st.markdown("""
             font-weight: 900 !important;
             letter-spacing: 1px !important;
             text-transform: uppercase !important;
-            text-align: left !important;
+            text-align: center !important; /* Centered layout header */
             margin-bottom: 2px !important;
             font-family: 'Arial', sans-serif !important;
             display: block !important;
@@ -72,7 +72,7 @@ st.markdown("""
         }
         
         .clear-link-container {
-            text-align: left !important;
+            text-align: center !important; /* Centered alignment symmetry */
             margin-top: -4px !important;
             margin-bottom: 12px !important;
             width: 100% !important;
@@ -221,10 +221,10 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # Title placed directly on top
+    # Title centered globally
     st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
     
-    # "Clear All" positioned neatly directly underneath the title string block
+    # "Clear All" centered block neatly underneath the title
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
         execute_global_purge()
@@ -309,7 +309,6 @@ geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = st.session_state.last_scan_lat
 render_lon = st.session_state.last_scan_lon
 
-# Clean literal template using absolute container boundaries to avoid misalignment
 leaflet_template = """
 <!DOCTYPE html>
 <html>
@@ -324,7 +323,6 @@ leaflet_template = """
 <body>
     <div id="map"></div>
     <script>
-        // All central markers and radius vectors reference the updated runtime execution state
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
         
@@ -348,7 +346,6 @@ leaflet_template = """
             map.fitBounds(bounds.pad(0.1));
         }
         
-        // Right-Click Context Coordinate Intercept and Copy Engine
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat.toFixed(5);
             const lon = e.latlng.lng.toFixed(5);
@@ -370,7 +367,6 @@ leaflet_template = """
 </html>
 """
 
-# Structural mapping replacement
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
