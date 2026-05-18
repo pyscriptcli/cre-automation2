@@ -1,94 +1,115 @@
 import os
 import io
+import sys
+import subprocess
 import streamlit as st
 from pptx import Presentation
 from PIL import Image
 
-# --- PRIME PHILIPPINES BRANDED CSS OVERRIDE ---
-BRAND_CSS = """
+# --- BULLETPROOF COMPONENT RESET LAYER ---
+PRIME_UI_ENGINE = """
 <style>
-    /* Force canvas background color */
+    /* 1. Global Canvas Reset */
     .stApp {
         background-color: #F8FAFC !important;
         color: #1E293B !important;
-        font-family: 'Inter', 'Helvetica Neue', sans-serif !important;
     }
     
-    /* Input Fields Styling: Sharp edges and corporate borders */
-    div[data-baseweb="input"] {
+    /* 2. Container Surface Cards */
+    div[data-testid="stContainer"] {
         background-color: #FFFFFF !important;
         border: 1px solid #E2E8F0 !important;
-        border-radius: 2px !important; /* Sharp corporate corners */
-        transition: border-color 0.15s ease-in-out;
+        border-radius: 4px !important;
+        padding: 24px !important;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
     }
+    
+    /* 3. Global Input Fields Reset (Fixes the dark-on-dark bug) */
+    div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 2px !important;
+        color: #1E293B !important;
+    }
+    
+    /* Target raw input text fields directly */
+    input[type="text"], .stTextInput input {
+        color: #1E293B !important;
+        background-color: #FFFFFF !important;
+        font-size: 14px !important;
+    }
+    
+    /* Input field focus state */
     div[data-baseweb="input"]:focus-within {
-        border-color: #C5A059 !important; /* Gold accent on active focus */
+        border-color: #C5A059 !important;
         box-shadow: none !important;
     }
-    input {
-        color: #1E293B !important;
-        font-size: 14px !important;
-    }
     
-    /* File Uploader styling */
-    section[data-testid="stFileUploader"] {
-        background-color: #FFFFFF !important;
-        border: 1px dashed #E2E8F0 !important;
-        border-radius: 2px !important;
-    }
-
-    /* Section Header styling */
-    .section-header {
-        font-size: 12px !important;
-        font-weight: 700 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.05em !important;
+    /* 4. Structural Form Label Typography */
+    div[data-testid="stTextInput"] label p, div[data-testid="stFileUploader"] label p {
         color: #002B49 !important;
-        border-bottom: 1px solid #E2E8F0;
-        padding-bottom: 6px;
-        margin-top: 25px;
-        margin-bottom: 15px;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        letter-spacing: 0.02em !important;
     }
     
-    /* Premium Asymmetric Left Border for Form Context */
-    .metric-card-wrapper {
-        border-left: 4px solid #C5A059 !important;
-        background-color: #FFFFFF;
-        padding: 10px;
-        border-top: 1px solid #E2E8F0;
-        border-right: 1px solid #E2E8F0;
-        border-bottom: 1px solid #E2E8F0;
-        border-radius: 2px;
+    /* 5. File Uploader Layout Adjustments */
+    section[data-testid="stFileUploader"] {
+        background-color: #FAFAFA !important;
+        border: 1px dashed #C5A059 !important; /* Gold dash border accent */
+        border-radius: 2px !important;
+    }
+    section[data-testid="stFileUploader"] div, section[data-testid="stFileUploader"] span {
+        color: #64748B !important;
     }
 
-    /* Primary Generate Button Override */
-    div.stButton > button:first-child {
-        background-color: #002B49 !important; /* Deep Navy Base */
-        color: #FFFFFF !important;
+    /* 6. Asymmetric Left Gold Accent Header Box */
+    .premium-header-box {
+        border-left: 4px solid #C5A059;
+        padding-left: 12px;
+        margin-bottom: 20px;
+        margin-top: 10px;
+    }
+    .premium-header-box h3 {
+        font-size: 13px !important;
         font-weight: 700 !important;
-        font-size: 14px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.06em !important;
+        color: #002B49 !important;
+        margin: 0 !important;
+    }
+
+    /* 7. Action Button Overrides */
+    button[data-testid="baseButton-secondary"] {
+        border-radius: 2px !important;
+        font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 0.05em !important;
-        border: none !important;
-        border-radius: 2px !important;
-        border-bottom: 3px solid #C5A059 !important; /* Rigid Gold base border line */
-        padding: 12px 24px !important;
-        width: 100% !important;
-        transition: background-color 0.15s ease;
+        font-size: 13px !important;
+        transition: all 0.2s ease !important;
     }
-    div.stButton > button:first-child:hover {
+    
+    /* Target the generate button using the specific unique markup identifier */
+    div.stButton > button {
+        background-color: #002B49 !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-bottom: 3px solid #C5A059 !important; /* Institutional Gold Edge */
+        padding: 12px 30px !important;
+    }
+    div.stButton > button:hover {
         background-color: #0F3B59 !important;
         color: #FFFFFF !important;
+        border-bottom-color: #C5A059 !important;
     }
     
-    /* Secondary Reset Button Override */
-    div.stButton > button[key="reset_btn"] {
+    /* Target the reset button layout specifically */
+    div[data-testid="stHorizontalBlock"] div.stButton > button {
         background-color: transparent !important;
         color: #64748B !important;
         border: 1px solid #E2E8F0 !important;
-        border-radius: 2px !important;
     }
-    div.stButton > button[key="reset_btn"]:hover {
+    div[data-testid="stHorizontalBlock"] div.stButton > button:hover {
         color: #1E293B !important;
         border-color: #64748B !important;
     }
@@ -121,50 +142,48 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     except Exception:
         return img_file
 
-# --- APP CONFIGURATION & RENDERING ---
-st.set_page_config(page_title="PRIME App Engine", page_icon="🏢", layout="wide")
-st.markdown(BRAND_CSS, unsafe_allow_html=True)
+# --- APP LAYOUT EXECUTION ---
+st.set_page_config(page_title="PRIME Pitch Engine", page_icon="🏢", layout="wide")
+st.markdown(PRIME_UI_ENGINE, unsafe_allow_html=True)
 
-# App Title Banner mimicking a native internal portal header
-st.markdown("<h2 style='color:#002B49; font-weight:700; font-size:22px; margin-bottom:20px;'>🏢 PRIME Philippines Asset Pitch Engine</h2>", unsafe_allow_html=True)
+# Portal Header Block
+st.markdown("<h2 style='color:#002B49; font-weight:700; font-size:24px; margin-bottom:4px;'>🏢 PRIME Philippines</h2>", unsafe_allow_html=True)
+st.markdown("<p style='color:#64748B; font-size:13px; margin-bottom:25px;'>Commercial Real Estate Automated Pitch Deck Compiler</p>", unsafe_allow_html=True)
 
-# HIGH DENSITY MATRIX FORM LAYOUT (Horizontal alignment grid)
-def dense_input_row(icon, label_text, default_val, state_key):
-    col1, col2 = st.columns([2, 3])
-    with col1:
-        st.markdown(f"<div style='padding-top: 28px; font-size: 13px; font-weight: 500; color: #64748B;'>{icon} {label_text}</div>", unsafe_allow_html=True)
-    with col2:
-        return st.text_input("", value=default_val, key=state_key, label_visibility="collapsed")
-
-# Main Split Pane Workspace
+# Main Two-Column Panel System
 left_panel, right_panel = st.columns([1, 1], gap="large")
 
 with left_panel:
-    st.markdown('<div class="section-header">--- TEXT DATA METADATA ---</div>', unsafe_allow_html=True)
-    
-    prop_location = dense_input_row("📍", "Property Location:", "Tagaytay, Cavite", "loc")
-    prop_size     = dense_input_row("📐", "Property Size (SQM):", "386", "size")
-    prop_type     = dense_input_row("🏢", "Property Type:", "Commercial Space", "type")
-    prop_address  = dense_input_row("🗺️", "Full Address:", "Mendez Crossing East, Tagaytay City, Cavite", "addr")
-    lease_rates   = dense_input_row("💰", "Lease Rates:", "200,000 per month", "rates")
-    sec_deposit   = dense_input_row("🌓", "Security Deposit:", "3 months", "sec")
-    adv_rent      = dense_input_row("💵", "Advance Rent:", "3 months", "adv")
-    escalation    = dense_input_row("📈", "Escalation:", "5%", "esc")
-    lease_term    = dense_input_row("📅", "Lease Term:", "5 years", "term")
-    handover      = dense_input_row("🏗️", "Handover Condition:", "As is where is", "hand")
+    with st.container():
+        st.markdown('<div class="premium-header-box"><h3>--- Property Text Metrics ---</h3></div>', unsafe_allow_html=True)
+        
+        prop_location = st.text_input("📍 Property Location", "Tagaytay, Cavite")
+        prop_size     = st.text_input("📐 Property Size (SQM)", "386")
+        prop_type     = st.text_input("🏢 Property Type", "Commercial Space")
+        prop_address  = st.text_input("🗺️ Full Address", "Mendez Crossing East, Tagaytay City, Cavite")
+        lease_rates   = st.text_input("💰 Lease Rates", "200,000 per month")
+        sec_deposit   = st.text_input("🌓 Security Deposit", "3 months")
+        adv_rent      = st.text_input("💵 Advance Rent", "3 months")
+        escalation    = st.text_input("📈 Escalation", "5%")
+        lease_term    = st.text_input("📅 Lease Term", "5 years")
+        handover      = st.text_input("🏗️ Handover Condition", "As is where is")
 
 with right_panel:
-    st.markdown('<div class="section-header">--- IMAGE ASSETS ARCHIVE ---</div>', unsafe_allow_html=True)
-    u_photo1  = st.file_uploader("📸 Property Photo 1", type=["png", "jpg", "jpeg"], key="p1")
-    u_map     = st.file_uploader("🗺️ Location Map", type=["png", "jpg", "jpeg"], key="mp")
-    u_lotplan = st.file_uploader("📐 Lot Plan", type=["png", "jpg", "jpeg"], key="lp")
-    u_photo2  = st.file_uploader("📸 Property Photo 2", type=["png", "jpg", "jpeg"], key="p2")
-    u_photo3  = st.file_uploader("📸 Property Photo 3", type=["png", "jpg", "jpeg"], key="p3")
+    with st.container():
+        st.markdown('<div class="premium-header-box"><h3>--- Branded Asset Archive ---</h3></div>', unsafe_allow_html=True)
+        u_photo1  = st.file_uploader("📸 Property Photo 1 Container", type=["png", "jpg", "jpeg"])
+        u_map     = st.file_uploader("🗺️ Location Map Container", type=["png", "jpg", "jpeg"])
+        u_lotplan = st.file_uploader("📐 Lot Plan Container", type=["png", "jpg", "jpeg"])
+        u_photo2  = st.file_uploader("📸 Property Photo 2 Container", type=["png", "jpg", "jpeg"])
+        u_photo3  = st.file_uploader("📸 Property Photo 3 Container", type=["png", "jpg", "jpeg"])
 
-    st.markdown('<div class="section-header">--- PRODUCTION COMPILER ARCHITECTURE ---</div>', unsafe_allow_html=True)
-    u_template = st.file_uploader("📂 Master Template PPTX Blueprint", type=["pptx"], key="tpl")
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+    
+    with st.container():
+        st.markdown('<div class="premium-header-box"><h3>--- System Blueprint ---</h3></div>', unsafe_allow_html=True)
+        u_template = st.file_uploader("📂 Upload Master Template PPTX File", type=["pptx"])
 
-# Unified Dictionaries for mapping pipelines
+# Data Processing Arrays
 data_inputs = {
     "{{PROPERTY_LOCATION}}": prop_location, "{{PROPERTY_SIZE}}": prop_size,
     "{{PROPERTY_TYPE}}": prop_type, "{{PROPERTY_ADDRESS}}": prop_address,
@@ -179,21 +198,20 @@ image_inputs = {
     "{{PROPERTY_PHOTO3}}": u_photo3
 }
 
-# --- PERSISTENT FOOTER CONTROL LAYER ---
-st.markdown("<div style='margin-top: 30px; border-t: 1px solid #E2E8F0;'></div>", unsafe_allow_html=True)
-footer_col1, footer_col2 = st.columns([1, 4])
+# --- PERSISTENT FOOTER CONTROL STRIP ---
+st.markdown("<div style='margin-top: 30px; border-top: 1px solid #E2E8F0; padding-top: 20px;'></div>", unsafe_allow_html=True)
+control_col1, control_col2 = st.columns([1, 3])
 
-with footer_col1:
-    if st.button("↺ RESET FORM", key="reset_btn", use_container_width=True):
-        st.cache_data.clear()
+with control_col1:
+    if st.button("↺ Reset Parameters", use_container_width=True):
         st.rerun()
 
-with footer_col2:
+with control_col2:
     if u_template is None:
-        st.markdown("<div style='padding-top:12px; font-size:12px; color:#64748B; text-align:right;'>⚠️ Upload a Master Template PPTX file to unlock the generation engine.</div>", unsafe_allow_html=True)
+        st.markdown("<div style='padding-top:14px; font-size:12px; color:#64748B; text-align:right;'>⚠️ Connect a Master Template blueprint file above to activate deployment functions.</div>", unsafe_allow_html=True)
     else:
-        if st.button("⚙️ GENERATE DECK", key="gen_btn", use_container_width=True):
-            with st.spinner("Executing OpenXML parsing and spatial aspect ratio image corrections..."):
+        if st.button("⚙️ GENERATE DECK BUILD", use_container_width=True):
+            with st.spinner("Parsing layout trees and applying smart graphic crops..."):
                 try:
                     prs = Presentation(u_template)
                     
@@ -237,10 +255,10 @@ with footer_col2:
                     prs.save(output_stream)
                     output_stream.seek(0)
                     
-                    st.markdown('<div class="metric-card-wrapper" style="margin-top:15px; text-align:center;"><b>🎉 Presentation Compiled Successfully!</b> Your file is optimized and cached in active application memory.</div>', unsafe_allow_html=True)
+                    st.success("🎉 Presentation compiled successfully!")
                     
                     st.download_button(
-                        label="📥 DOWNLOAD PPTX DECK",
+                        label="📥 DOWNLOAD BRANDED PPTX DECK",
                         data=output_stream,
                         file_name=f"PIS_{prop_location.replace(' ', '_')}.pptx",
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -248,4 +266,4 @@ with footer_col2:
                     )
                     
                 except Exception as e:
-                    st.error(f"Runtime execution compilation failure: {str(e)}")
+                    st.error(f"Compilation engine fault: {str(e)}")
