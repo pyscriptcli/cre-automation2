@@ -229,10 +229,10 @@ with col_left:
             "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
             "Meliza Zapata": {"phone": "0917 555 1234", "email": "meliza.zapata@primephilippines.com"},
             "Dykstra Pineda": {"phone": "0917 555 5678", "email": "dykstra.pineda@primephilippines.com"},
-            "Cedtriz Rena": {"phone": "0917 555 9012", "email": "cedtriz.rena@primephilippines.com"},
+            "Cedtrix Rena": {"phone": "0917 555 9012", "email": "cedtriz.rena@primephilippines.com"},
             "Carlo Medina": {"phone": "0920 986 2764", "email": "carlo.medina@primephilippines.com"},
             "Dave Policarpio": {"phone": "0917 555 3456", "email": "dave.policarpio@primephilippines.com"},
-            "Irish Rena": {"phone": "0917 555 7890", "email": "irish.rena@primephilippines.com"}
+            "Irish Rima": {"phone": "0917 555 7890", "email": "irish.rima@primephilippines.com"}
         }
         
         # Calculate currently selected count ahead of layout pass to enforce freezing
