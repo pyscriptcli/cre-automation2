@@ -3,6 +3,14 @@ import requests
 import re
 import json
 
+# --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
+_config_dir = ".streamlit"
+_config_file = os.path.join(_config_dir, "config.toml")
+if not os.path.exists(_config_file):
+    os.makedirs(_config_dir, exist_ok=True)
+    with open(_config_file, "w", encoding="utf-8") as f:
+        f.write("[theme]\nbase=\"light\"\n")
+
 # -----------------------------------------------------------------------------
 # 1. BRANDED BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
 # -----------------------------------------------------------------------------
