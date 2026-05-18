@@ -332,11 +332,9 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
 
-# FORCE MAP INTERFACE TO ZOOM TO USER-SPECIFIED PIN IMMEDIATELY ON VALUE CHANGES
 render_lat = lat_coord
 render_lon = lon_coord
 
-# DETECT IF USER HAS TYPED A NEW PIN THAT DIFFERS FROM THE ACTIVE GENERATED SCAN
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 
 leaflet_template = """
@@ -349,57 +347,134 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
         #map { height: 100vh; width: 100%; }
         
-        /* FLOATING LAYER CONTROLLER CONTROLS */
-        #map-panel-controls {
+        /* MINI LOGS & LAYER SELECTION TOOLBAR OVERLAY */
+        #basemap-control-container {
             position: absolute;
-            top: 12px;
-            right: 12px;
+            top: 82px;
+            left: 10px;
             z-index: 1000;
             background: #ffffff;
-            padding: 10px 14px;
-            border-radius: 6px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+            border: 1px solid rgba(0,0,0,0.2);
+            padding: 5px;
+            width: 105px;
             font-family: 'Arial', sans-serif;
-            border: 1px solid #cbd5e1;
-            width: 140px;
         }
-        .control-block { margin-bottom: 8px; }
-        .control-block:last-child { margin-bottom: 0; }
-        .control-block label {
+        .basemap-mini-block { margin-bottom: 4px; }
+        .basemap-mini-block:last-child { margin-bottom: 0; }
+        .basemap-mini-block label {
             display: block;
-            font-size: 9px;
+            font-size: 8px;
             font-weight: 800;
             color: #001a3d;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             letter-spacing: 0.5px;
             text-transform: uppercase;
         }
-        .control-block select {
+        .basemap-mini-block select {
             width: 100%;
-            font-size: 11px;
-            padding: 4px;
-            border-radius: 4px;
+            font-size: 10px;
+            padding: 2px;
+            border-radius: 3px;
             border: 1px solid #cbd5e1;
             color: #001a3d;
             background: #ffffff;
             font-weight: 600;
             outline: none;
-        }
-        .check-block {
-            display: flex !important;
-            align-items: center;
-            gap: 6px;
             cursor: pointer;
         }
-        .check-block input { margin: 0; cursor: pointer; }
-        .check-block span {
-            font-size: 9px;
+        .mini-check-block {
+            display: flex !important;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            margin-top: 2px;
+        }
+        .mini-check-block input { margin: 0; cursor: pointer; transform: scale(0.8); }
+        .mini-check-block span {
+            font-size: 8px;
             font-weight: 800;
             color: #001a3d;
             letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* SCAN DATA STREAM LIST HUB - FIXED RIGHT-EDGE WALL */
+        #scan-results-panel {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 1000;
+            background: #ffffff;
+            width: 260px;
+            max-height: calc(100vh - 40px);
+            border-radius: 6px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+            font-family: 'Arial', sans-serif;
+            border: 1px solid #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .results-header {
+            background: #001a3d;
+            color: #ffffff;
+            padding: 8px 12px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .results-badge {
+            background: #d4af37;
+            color: #001a3d;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 900;
+        }
+        .results-list {
+            overflow-y: auto;
+            flex-grow: 1;
+            max-height: calc(100vh - 90px);
+            padding: 2px 0;
+        }
+        .results-item {
+            padding: 6px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 11px;
+            color: #334155;
+        }
+        .results-item:last-child {
+            border-bottom: none;
+        }
+        .item-name {
+            font-weight: 700;
+            color: #001a3d;
+            margin-bottom: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .item-type {
+            font-size: 9px;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        .no-results {
+            padding: 24px 16px;
+            text-align: center;
+            font-size: 11px;
+            color: #64748b;
+            font-style: italic;
         }
         
-        /* POI TEXT LABEL COMPONENT STYLING */
         .poi-text-label {
             background: rgba(255, 255, 255, 0.92);
             border: 1px solid #001a3d;
@@ -412,7 +487,6 @@ leaflet_template = """
             white-space: nowrap;
         }
         
-        /* STRUCTURAL VISIBILITY SWITCH FOR LABELS MATRIX */
         .hide-labels .poi-text-label {
             display: none !important;
         }
@@ -421,34 +495,40 @@ leaflet_template = """
 <body>
     <div id="map"></div>
     
-    <div id="map-panel-controls">
-        <div class="control-block">
+    <div id="basemap-control-container">
+        <div class="basemap-mini-block">
             <label>Basemap</label>
             <select id="basemap-select" onchange="applyBasemapEngine(this.value)">
-                <option value="osm">OpenStreetMap</option>
-                <option value="satellite">Google Satellite</option>
-                <option value="carto">Carto Light</option>
+                <option value="osm">OSM</option>
+                <option value="satellite">Satellite</option>
+                <option value="carto">Carto</option>
             </select>
         </div>
-        <div class="control-block">
-            <label class="check-block">
+        <div class="basemap-mini-block">
+            <label class="mini-check-block">
                 <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelVisibility(this.checked)">
-                <span>Show Labels</span>
+                <span>Labels</span>
             </label>
         </div>
+    </div>
+
+    <div id="scan-results-panel">
+        <div class="results-header">
+            <span>Scan Results</span>
+            <div class="results-badge" id="results-count">0</div>
+        </div>
+        <div class="results-list" id="results-list-box"></div>
     </div>
 
     <script>
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
         
-        // BASEMAP LAYER OBJECT MATRIX Definitions
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
             satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
             carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
         };
         
-        // PERSISTENCE STORAGE CONTROLLER ENGINE
         let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'osm';
         if (!basemaps[activeBasemapKey]) activeBasemapKey = 'osm';
         document.getElementById('basemap-select').value = activeBasemapKey;
@@ -461,7 +541,6 @@ leaflet_template = """
             localStorage.setItem('ts_persistent_basemap', targetKey);
         }
         
-        // POI TEXT LABEL PERSISTENCE STATE ENGINE
         let labelsActive = localStorage.getItem('ts_persistent_labels') !== 'false';
         document.getElementById('label-toggle-chk').checked = labelsActive;
         if (!labelsActive) {
@@ -477,12 +556,10 @@ leaflet_template = """
             localStorage.setItem('ts_persistent_labels', isShown);
         }
         
-        // PLOT CENTRAL TARGET PIN
         L.circleMarker([__LAT__, __LON__], {
             radius: 7, fillColor: "#e11d48", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
         }).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
         
-        // PLOT SCAN RADIUS BUFFER BOUNDS
         L.circle([__LAT__, __LON__], {
             radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
         }).addTo(map);
@@ -503,7 +580,26 @@ leaflet_template = """
             }
         });
         
-        // ONLY ADJUST CANVAS BOUNDS AUTOMATICALLY IF THE PIN HAS NOT CHANGED POSITION
+        // STREAM POPULATION FOR THE RIGHT SIDE DATA OVERLAY LIST
+        const countBox = document.getElementById('results-count');
+        const listBox = document.getElementById('results-list-box');
+        countBox.innerText = pts.length;
+        
+        if (pts.length === 0) {
+            listBox.innerHTML = '<div class="no-results">No active scan data.</div>';
+        } else {
+            let htmlContent = '';
+            pts.forEach(p => {
+                htmlContent += `
+                    <div class="results-item">
+                        <div class="item-name" title="${p.name || 'Unknown'}">${p.name || 'Unknown'}</div>
+                        <div class="item-type">${p.type || 'Node'}</div>
+                    </div>
+                `;
+            });
+            listBox.innerHTML = htmlContent;
+        }
+        
         if (pts.length > 0 && !__IS_STALE__) {
             const bounds = L.featureGroup([L.marker([__LAT__, __LON__]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
             map.fitBounds(bounds.pad(0.1));
