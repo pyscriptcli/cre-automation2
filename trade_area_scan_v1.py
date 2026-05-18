@@ -30,6 +30,11 @@ st.markdown("""
             display: none !important;
         }
         
+        /* FORCE SIDEBAR TO REMAIN NON-COLLAPSIBLE BY HIDING CHEVRON CONTROLS */
+        [data-testid="collapsedControl"] {
+            display: none !important;
+        }
+        
         /* BRUTE FORCE ENTIRE MAIN AREA LAYOUT MATRIX TO BE 100% EDGE-TO-EDGE */
         .main, .block-container, 
         [data-testid="stAppViewBlockContainer"], 
@@ -73,28 +78,15 @@ st.markdown("""
         }
         
         [data-testid="stSidebarUserContent"] {
-            padding-top: 16px !important;
+            padding-top: 24px !important; /* Adjusted up for better zero-header alignment */
             padding-left: 12px !important;
             padding-right: 12px !important;
         }
         
-        .sidebar-title {
-            color: var(--navy-brand) !important;
-            font-size: 24px !important;
-            font-weight: 900 !important;
-            letter-spacing: 1px !important;
-            text-transform: uppercase !important;
-            text-align: center !important;
-            margin-bottom: 2px !important;
-            font-family: 'Arial', sans-serif !important;
-            display: block !important;
-            width: 100% !important;
-        }
-        
         .clear-link-container {
             text-align: center !important;
-            margin-top: -4px !important;
-            margin-bottom: 12px !important;
+            margin-top: 0px !important;
+            margin-bottom: 16px !important;
             width: 100% !important;
         }
         
@@ -241,7 +233,7 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
+    # REMOVED: .sidebar-title HTML header element
     
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
