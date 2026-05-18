@@ -15,6 +15,7 @@ st.set_page_config(
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
 
         :root {
             --brand-midnight: #003366 !important;
@@ -46,13 +47,31 @@ st.markdown("""
             box-shadow: 2px 0 15px rgba(0,0,0,0.03) !important;
         }
         
-        [data-testid="collapsedControl"] { display: none !important; }
+        /* FIX: Hide modern Streamlit sidebar toggle to prevent text leaks */
+        [data-testid="stSidebarCollapseButton"], [data-testid="collapsedControl"] { display: none !important; }
+        
         ::-webkit-scrollbar { width: 0px !important; background: transparent !important; }
         * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
         
-        p, span, label, h1, h2, h3, h4, h5, h6, .stMarkdown, [data-testid="stExpander"] summary p {
+        /* FIX: Removed 'span' from global override to protect Streamlit native components */
+        p, label, h1, h2, h3, h4, h5, h6, .stMarkdown, [data-testid="stExpander"] summary p {
             color: var(--brand-midnight) !important;
             font-family: 'Montserrat', sans-serif !important;
+        }
+        
+        /* FIX: Explicitly restore Material Symbols for expander arrows and icons */
+        .material-symbols-rounded, span[class*="material-symbols"] {
+            font-family: 'Material Symbols Rounded' !important;
+            font-weight: normal !important;
+            font-style: normal !important;
+            font-size: 18px !important;
+            line-height: 1 !important;
+            letter-spacing: normal !important;
+            text-transform: none !important;
+            display: inline-block !important;
+            white-space: nowrap !important;
+            word-wrap: normal !important;
+            direction: ltr !important;
         }
         
         [data-testid="stHeader"], header, #stDecoration { display: none !important; }
@@ -440,7 +459,6 @@ leaflet_template = """
         const categoryMap = {};
         const layerGroupsRef = {};
         
-        // Exact 10-Series Categorical Palette from Brand Guide
         const catPalette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"];
         const categoryColors = {}; let colorIndex = 0;
         
