@@ -70,11 +70,10 @@ st.markdown("""
             background-color: var(--white-clean) !important;
             color: var(--navy-brand) !important;
             border-right: 1px solid var(--border-gray) !important;
-            width: 320px !important;
         }
         
         [data-testid="stSidebarUserContent"] {
-            padding-top: 0px !important;
+            padding-top: 12px !important;
             padding-left: 0px !important;
             padding-right: 0px !important;
             display: flex !important;
@@ -84,36 +83,17 @@ st.markdown("""
         
         /* SCROLLABLE INNER AREA FOR SIDEBAR ELEMENTS */
         .sidebar-scrollable-content {
-            padding-top: 12px !important;
+            padding-top: 4px !important;
             padding-left: 14px !important;
             padding-right: 14px !important;
             overflow-y: auto !important;
             flex-grow: 1 !important;
         }
         
-        /* ISOLATED EXCLUSIVE HEADER CONTAINER COMPONENT */
-        .sidebar-header-card {
-            background-color: var(--bg-soft) !important;
-            border-bottom: 1px solid var(--border-gray) !important;
-            padding: 14px !important;
-            text-align: center !important;
-            width: 100% !important;
-        }
-        
-        .sidebar-title {
-            color: var(--navy-brand) !important;
-            font-size: 22px !important;
-            font-weight: 900 !important;
-            letter-spacing: 1px !important;
-            text-transform: uppercase !important;
-            margin: 0px !important;
-            font-family: 'Arial', sans-serif !important;
-        }
-        
         .clear-link-container {
-            text-align: center !important;
-            margin-top: 4px !important;
-            margin-bottom: 2px !important;
+            text-align: right !important;
+            margin-top: 0px !important;
+            margin-bottom: 12px !important;
             width: 100% !important;
         }
         
@@ -275,18 +255,15 @@ def compile_features_kml(features):
 # 4. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    # 1. STRUCTURAL SEPARATE HEADER CARD (Title completely isolated and at the absolute top)
-    st.markdown('<div class="sidebar-header-card"><div class="sidebar-title">TRADE AREA SCAN</div>', unsafe_allow_html=True)
-    
-    # Clear All link row directly under the main isolated header box
+    # START OF SCROLLABLE BODY LAYER (No header element box)
+    st.markdown('<div class="sidebar-scrollable-content">', unsafe_allow_html=True)
+
+    # Master Purge layout configuration at the top entry parameter
     st.markdown('<div class="clear-link-container">', unsafe_allow_html=True)
     if st.button("Clear All", key="master_purge_btn", type="tertiary"):
         execute_global_purge()
         st.rerun()
-    st.markdown('</div></div>', unsafe_allow_html=True)
-
-    # 2. START OF SCROLLABLE BODY LAYER
-    st.markdown('<div class="sidebar-scrollable-content">', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     coords_val = st.text_input("Target Coordinates", key="geo_coords")
     radius_val = st.number_input("Radius (Meters)", min_value=100, max_value=50000, key="geo_radius", step=100)
@@ -322,7 +299,7 @@ with st.sidebar:
                             
     st.markdown('</div>', unsafe_allow_html=True) # End Scrollable Content
 
-    # 3. FIXED VIEWPORT STICKY BOTTOM CONTROL ZONE (Stays persistent under scroll views)
+    # FIXED VIEWPORT STICKY BOTTOM CONTROL ZONE (Stays persistent under scroll views)
     st.markdown('<div class="sidebar-bottom-sticky-zone">', unsafe_allow_html=True)
     
     st.markdown('<div class="action-tray">', unsafe_allow_html=True)
@@ -364,11 +341,9 @@ with st.sidebar:
     st.markdown('</div>', unsafe_allow_html=True) # End Sticky Zone
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY SPATIAL CANVAS & FLOATING GOOGLE-MAPS-STYLE SEARCH ENGINE
+# 5. ZERO-LATENCY SPATIAL CANVAS & EMBEDDED GEOGRAPHIC SEARCH SUITE
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
-
-# INSTANT SYNC: Bind layout views directly to the current state input configurations
 render_lat = lat_coord
 render_lon = lon_coord
 
@@ -380,7 +355,7 @@ leaflet_template = """
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #f8fafc; overflow: hidden; }
-        #map { height: 100vh; width: 100%; }
+        #map { height: 100vh; width: 100%; position: relative; }
         
         /* Premium Floating Card look for Landmark Lookups */
         .map-search-card {
@@ -418,27 +393,94 @@ leaflet_template = """
             letter-spacing: 0.5px;
             transition: all 0.2s ease;
         }
-        #map-search-btn:hover {
-            background: #d4af37;
+        #map-search-btn:hover { background: #d4af37; color: #001a3d; }
+        
+        /* DOWNSIZED LEAFLET BASEMAP BUTTON OVERRIDES */
+        .leaflet-control-layers-toggle {
+            width: 30px !important;
+            height: 30px !important;
+            background-size: 18px 18px !important;
+        }
+        .leaflet-control-layers {
+            border-radius: 6px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+        
+        /* FLOATING SCAN RESULTS PANEL CONTROL STYLE */
+        .results-sidebar {
+            position: absolute;
+            top: 75px;
+            left: 14px;
+            z-index: 1000;
+            background: #ffffff;
+            width: 260px;
+            max-height: 420px;
+            border-radius: 8px;
+            box-shadow: 0 6px 20px rgba(0, 26, 61, 0.12);
+            border: 1px solid #cbd5e1;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+        .results-header {
+            background: #001a3d;
+            color: #ffffff;
+            padding: 10px 14px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            border-bottom: 1px solid #001a3d;
+        }
+        .results-list {
+            overflow-y: auto;
+            flex-grow: 1;
+            background: #ffffff;
+        }
+        .results-item {
+            padding: 8px 14px;
+            font-size: 11px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+            color: #334155;
+            transition: background 0.1s ease;
+        }
+        .results-item:hover {
+            background: #f8fafc;
             color: #001a3d;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    
+    <div id="results-card" class="results-sidebar">
+        <div class="results-header">Scan Analysis (<span id="results-count">0</span>)</div>
+        <div id="results-list" class="results-list"></div>
+    </div>
+
     <script>
-        // Define Basemap Providers
+        // Define Structural Provider Arrays
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
         const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 });
         const cartoPositron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 });
 
+        // PERSISTENCE TUNING: Intercept cached basemap identifiers inside system memory
+        const activeBasemapName = localStorage.getItem('selected_basemap') || 'OpenStreetMap';
+        let initialLayer = osm;
+        if (activeBasemapName === 'Google Satellite') initialLayer = googleSat;
+        if (activeBasemapName === 'Carto Positron') initialLayer = cartoPositron;
+
         const map = L.map('map', { 
             zoomControl: true, 
             attributionControl: false,
-            layers: [osm] 
+            layers: [initialLayer] 
         }).setView([__LAT__, __LON__], 14);
         
-        // Multi-Basemap Layer Control
         const baseMaps = {
             "OpenStreetMap": osm,
             "Google Satellite": googleSat,
@@ -446,12 +488,17 @@ leaflet_template = """
         };
         L.control.layers(baseMaps, null, { position: 'topleft', collapsed: true }).addTo(map);
         
-        // Active Center Marker Layer
+        // Cache Layer configuration change runtime shifts
+        map.on('baselayerchange', function(e) {
+            localStorage.setItem('selected_basemap', e.name);
+        });
+        
+        // Target Node Pin Positioning Layer
         L.circleMarker([__LAT__, __LON__], {
             radius: 7, fillColor: "#e11d48", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
         }).addTo(map).bindPopup("<b>TARGET COORDINATES</b>");
         
-        // Active Proximity Buffer Layer
+        // Target Radius Ring Positioning Layer
         L.circle([__LAT__, __LON__], {
             radius: __RADIUS__, color: "#001a3d", weight: 2, fillColor: "#001a3d", fillOpacity: 0.1
         }).addTo(map);
@@ -468,7 +515,7 @@ leaflet_template = """
             map.fitBounds(bounds.pad(0.1));
         }
         
-        // REGISTER GOOGLE-MAPS LOOKALIKES ASYNCHRONOUS ENGINE CONTROL
+        // ASYNCHRONOUS GEOLOCATION SEARCH CARD ENGINE (OpenStreetMap Nominatim API Integration)
         const searchControl = L.control({ position: 'topright' });
         searchControl.onAdd = function() {
             const div = L.DomUtil.create('div', 'map-search-card');
@@ -501,12 +548,34 @@ leaflet_template = """
                         
                         L.popup()
                             .setLatLng([lat, lon])
-                            .setContent("<div style='font-family:sans-serif;font-size:11px;max-width:200px;'><b>Found Landmark:</b><br>" + targetLoc.display_name + "</div>")
+                            .setContent("<div style='font-family:sans-serif;font-size:11px;max-width:200px;'><b>Found Location:</b><br>" + targetLoc.display_name + "</div>")
                             .openOn(map);
                     } else {
-                        alert('Location profile or landmark parameters could not be found.');
+                        alert('Location parameter index could not be resolved.');
                     }
-                }).catch(err => console.error('Geocoding pipeline fault: ', err));
+                }).catch(err => console.error('OSM Nominatim lookup error: ', err));
+        }
+
+        // POPULATE DIALOG BOX DICTIONARY ARRAY DATA ELEMENTS
+        const resultsList = document.getElementById('results-list');
+        document.getElementById('results-count').innerText = pts.length;
+        
+        if(pts.length === 0) {
+            resultsList.innerHTML = '<div style="padding:16px;font-size:11px;color:#94a3b8;text-align:center;">No active records in target area.</div>';
+        } else {
+            pts.forEach(p => {
+                const row = document.createElement('div');
+                row.className = 'results-item';
+                row.innerHTML = `<b>${p.name}</b><br><span style="color:#64748b;font-size:10px;">${p.type}</span>`;
+                row.onclick = () => {
+                    map.setView([p.lat, p.lon], 16);
+                    L.popup()
+                        .setLatLng([p.lat, p.lon])
+                        .setContent("<b>" + p.name + "</b><br>" + p.type)
+                        .openOn(map);
+                };
+                resultsList.appendChild(row);
+            });
         }
 
         map.on('contextmenu', function(e) {
@@ -520,7 +589,7 @@ leaflet_template = """
                     .setContent("<div style='font-family:sans-serif;font-size:11px;'>Copied to Clipboard:<br><b>" + coordString + "</b></div>")
                     .openOn(map);
             }).catch(err => {
-                console.error('Spatial coordinates extract pipeline failure: ', err);
+                console.error('Clipboard copy pipeline error: ', err);
             });
         });
         
