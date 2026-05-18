@@ -322,4 +322,3 @@ leaflet_html = f"""
 """
 
 st.components.v1.html(leaflet_html, height=900, scrolling=False)
-```</SANDBOX_MODE_ENGAGED>
