@@ -139,11 +139,18 @@ if st.button("HIDDEN_EDIT_TRIGGER", key="hidden_edit_trigger_btn"):
     st.rerun()
 
 # -----------------------------------------------------------------------------
-# 3. INTERFACE DECOUPLING LAYER
+# 3. INTERFACE DECOUPLING LAYER (CONNECTOR FIXED)
 # -----------------------------------------------------------------------------
 if st.session_state.active_module == "EDITOR":
+    import sys, os, importlib
+    
+    # 1. Force the engine to recognize the current directory
+    sys.path.append(os.path.dirname(os.path.abspath(__file__))) 
+    
     try:
         import trade_area_editor
+        # 2. Obliterate the cache so the editor module reads fresh Session State
+        importlib.reload(trade_area_editor) 
         trade_area_editor.render_editor_workspace()
     except ModuleNotFoundError:
         st.error("Engine Error: trade_area_editor.py not found within project directory cluster.")
