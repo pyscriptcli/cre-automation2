@@ -104,7 +104,40 @@ st.markdown("""
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 30px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
         
-        /* OVERRIDES REMOVED: Scan Area and Clear Canvas are now standard document flow */
+        /* MODULE TOGGLE BUTTON STYLES */
+        .module-toggle-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .module-toggle-btn {
+            flex: 1;
+            text-align: center;
+            padding: 10px 0;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: transparent;
+            border: 1px solid var(--brand-midnight);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+        .module-toggle-btn.active {
+            background: var(--brand-midnight);
+            color: var(--white-clean);
+            border-color: var(--brand-midnight);
+        }
+        .module-toggle-btn.inactive {
+            background: transparent;
+            color: var(--brand-midnight);
+            border-color: rgba(0, 51, 102, 0.3);
+        }
+        .module-toggle-btn.inactive:hover {
+            background: rgba(0, 51, 102, 0.05);
+            border-color: var(--brand-midnight);
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -119,7 +152,7 @@ if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_R
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
-if 'active_module' not in st.session_state: st.session_state.active_module = "SCAN"
+if 'active_module' not in st.session_state: st.session_state.active_module = "SCANNER"
 
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
@@ -141,32 +174,33 @@ ADVANCED_CONFIG = {
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
-        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
-        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
-# 3. SIDEBAR WORKSPACE & OSM GEOCODING LOGIC
+# 3. SIDEBAR WORKSPACE WITH MODULE TOGGLE & SCANNER UI
 # -----------------------------------------------------------------------------
 with st.sidebar:
+    # Module Toggle Buttons
     st.markdown('<div class="brand-title">Trade Area Scan</div>', unsafe_allow_html=True)
-
-    # BICHROMATIC MODULE SELECTOR
-    btn_col1, btn_col2 = st.columns(2)
-    with btn_col1:
-        if st.button("SCAN", use_container_width=True, type="secondary" if st.session_state.active_module == "SCAN" else "primary"):
-            st.session_state.active_module = "SCAN"
+    
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("SCAN", use_container_width=True, type="secondary" if st.session_state.active_module == "EDITOR" else "primary"):
+            st.session_state.active_module = "SCANNER"
             st.rerun()
-    with btn_col2:
-        if st.button("EDIT", use_container_width=True, type="secondary" if st.session_state.active_module == "EDITOR" else "primary"):
+    with col_b:
+        if st.button("EDIT", use_container_width=True, type="secondary" if st.session_state.active_module == "SCANNER" else "primary"):
             st.session_state.active_module = "EDITOR"
             st.rerun()
-
-    st.markdown("<hr style='margin: 15px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.1);'>", unsafe_allow_html=True)
-
-    if st.session_state.active_module == "SCAN":
-        
+    
+    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+    
+    # Conditionally render Scanner UI or Editor UI in sidebar
+    if st.session_state.active_module == "SCANNER":
+        # --- SCANNER MODULE SIDEBAR UI (PRESERVED ORIGINAL) ---
         # Dual-purpose Location Search & Coordinates Input
         location_input = st.text_input("LOCATION SEARCH OR COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input", label_visibility="visible")
         radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
@@ -284,16 +318,46 @@ with st.sidebar:
                         st.rerun()
                     except Exception:
                         st.error("Invalid File")
-
-    # -----------------------------------------------------------------------------
-
+    
     else:
-        st.markdown("<div style='font-size:10px; font-weight:600; color:#888780; text-transform:uppercase; text-align:center;'>Vector Editing Environment Active</div>", unsafe_allow_html=True)
-# Main Canvas Router Section
+        # --- EDITOR MODULE SIDEBAR UI ---
+        st.markdown(
+            "<div style='font-size: 10px; font-weight:600; color:#888780; margin-bottom:15px; text-align:center; text-transform:uppercase; letter-spacing:0.5px;'>"
+            "Vector Engineering Workspace Mode"
+            "</div>", 
+            unsafe_allow_html=True
+        )
+        
+        st.markdown(
+            "<div style='font-size: 9px; font-weight: 500; color: #888780; line-height: 1.4; text-align: justify;'>"
+            "Select assets directly on the map canvas or results log block to trigger the contextual styling control board overlay."
+            "</div>", 
+            unsafe_allow_html=True
+        )
+        
+        st.markdown("<hr style='margin: 20px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
+        
+        # Export buttons for Editor mode
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button("JSON", json.dumps(st.session_state.scanned_records), "editor_export.json", "application/json", use_container_width=True)
+        with col2:
+            st.download_button("KML", compile_features_kml(st.session_state.scanned_records), "editor_POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
-if st.session_state.active_module == "SCAN":
-    # 4. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
-    # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# 4. ZERO-LATENCY SPATIAL CANVAS (CONDITIONAL RENDERING BASED ON MODULE)
+# -----------------------------------------------------------------------------
+# Extract coordinates for rendering
+coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+if coord_match:
+    lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
+else:
+    lat_coord, lon_coord = 14.5995, 120.9842
+
+radius_val = st.session_state.geo_radius
+
+if st.session_state.active_module == "SCANNER":
+    # --- SCANNER MODULE MAP (PRESERVED ORIGINAL) ---
     geojson_str = json.dumps(st.session_state.scanned_records)
     render_lat = lat_coord
     render_lon = lon_coord
@@ -328,545 +392,4 @@ if st.session_state.active_module == "SCAN":
             }
             #map-search:focus { border-bottom: 2px solid #C9AB4C; }
             #search-results { position: absolute; top: 38px; left: 0; width: 100%; background: #ffffff; border-radius: 2px; display: none; max-height: 250px; overflow-x: hidden; overflow-y: auto; border: 1px solid rgba(0, 51, 102, 0.1); box-sizing: border-box; z-index: 1001; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
-            .search-item { padding: 8px 12px; font-size: 10px; font-weight: 600; cursor: pointer; border-bottom: 1px solid #f8fafc; color: #003366; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .search-item:hover { background: #f8fafc; color: #C9AB4C; }
-
-            #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 250px; max-height: calc(100vh - 20px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
-            .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
-            .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
-            .layer-category-block { border-bottom: 1px solid #f0f0f0; }
-            .layer-category-header { background: #ffffff; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; transition: background 0.2s; }
-            .layer-category-header:hover { background: #f8fafc; }
-            .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase;}
-            .layer-category-items { padding: 0; background: #f8fafc; }
-            .layer-category-items.collapsed { display: none !important; }
-            .results-item { padding: 6px 12px 6px 28px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
-            .results-item:hover { background: #ffffff; color: #003366; }
-            .results-item .delete-poi-icon { cursor: pointer; padding: 2px; display: flex; }
-            .results-item .delete-poi-icon svg { fill: #888780; transition: fill 0.2s; }
-            .results-item .delete-poi-icon:hover svg { fill: #AA2E20; }
-
-            .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-            .hide-labels .poi-text-label { display: none !important; }
-            .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
-            
-            .leaflet-control-custom-stack { background: #fff; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
-            .leaflet-control-custom-stack a { display: flex !important; align-items: center; justify-content: center; background: #fff; text-decoration: none; width: 34px; height: 34px; border-bottom: 1px solid #ccc; cursor: pointer;}
-            .leaflet-control-custom-stack a:last-child { border-bottom: none; }
-            .leaflet-control-custom-stack a:hover { background: #f4f4f4; }
-            .custom-pin-container { display: flex; align-items: center; justify-content: center; }
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        
-        <div id="search-container">
-            <input type="text" id="map-search" placeholder="Search coordinates or addresses..." onkeyup="handleSearch(event)">
-            <div id="search-results"></div>
-        </div>
-
-        <div id="minimal-basemap-panel">
-            <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
-                <option value="osm">OpenStreetMap</option>
-                <option value="satellite">Satellite</option>
-                <option value="carto">Carto Light</option>
-            </select>
-            <label class="minimal-label" for="label-toggle-chk">
-                <input type="checkbox" id="label-toggle-chk" style="margin:0; cursor: pointer;" onchange="toggleLabelsMatrix(this.checked)"> Show Labels
-            </label>
-        </div>
-
-        <div id="scan-results-panel">
-            <div class="results-header">
-                <span>SEARCH RESULTS</span>
-                <span id="results-count" style="color:#C9AB4C;">0</span>
-            </div>
-            <div class="results-list" id="results-list-box"></div>
-        </div>
-
-        <script>
-            const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
-            map.zoomControl.setPosition('topleft');
-
-            // MAP SEARCH LOGIC WITH NOMINATIM TYPEAHEAD
-            let searchTimeout = null;
-            function handleSearch(e) {
-                clearTimeout(searchTimeout);
-                const query = e.target.value;
-                const resultsDiv = document.getElementById('search-results');
-                
-                if (query.length < 3) {
-                    resultsDiv.style.display = 'none';
-                    return;
-                }
-                
-                searchTimeout = setTimeout(() => {
-                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.length > 0) {
-                                resultsDiv.innerHTML = '';
-                                data.forEach(item => {
-                                    const div = document.createElement('div');
-                                    div.className = 'search-item';
-                                    div.innerText = item.display_name;
-                                    div.title = item.display_name;
-                                    div.onclick = () => {
-                                        map.flyTo([item.lat, item.lon], 16);
-                                        resultsDiv.style.display = 'none';
-                                        document.getElementById('map-search').value = item.display_name;
-                                    };
-                                    resultsDiv.appendChild(div);
-                                });
-                                resultsDiv.style.display = 'block';
-                            } else {
-                                resultsDiv.style.display = 'none';
-                            }
-                        })
-                        .catch(err => console.error(err));
-                }, 500);
-            }
-
-            // Close search results when clicking outside
-            document.addEventListener('click', function(e) {
-                if (!document.getElementById('search-container').contains(e.target)) {
-                    document.getElementById('search-results').style.display = 'none';
-                }
-            });
-
-            const toolbarControl = L.control({position: 'topleft'});
-            toolbarControl.onAdd = function (map) {
-                const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom-stack');
-                const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="#003366"><path d="M720-80q-50 0-85-35t-35-85q0-7 1-14.5t3-13.5L322-392q-17 15-38 23.5t-44 8.5q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 44 8.5t38 23.5l282-164q-2-6-2.5-13.5T600-760q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-44-8.5T638-672L356-508q2 6 2.5 13.5t.5 14.5q0 7-.5 14.5T356-452l282 164q17-15 38-23.5t44-8.5q50 0 85 35t35 85q0 50-35 85t-85 35Z"/></svg>`;
-                const layersIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="m116-435 364-199 364 199-364 199-364-199Zm0 157 364 199 364-199-47-26-317 173-317-173-47 26Zm364-257 267-146-267-146-267 146 267 146Z"/></svg>`;
-                const saveIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM480-240q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>`;
-
-                div.innerHTML = `
-                    <a title="Copy View-Only Link" onclick="generateShareLink(event)">${shareIcon}</a>
-                    <a title="Toggle Layers" onclick="toggleLayerMenu(event)">${layersIcon}</a>
-                    <a title="Save Project Settings" onclick="saveProjectSettings(event)">${saveIcon}</a>
-                `;
-                return div;
-            };
-            toolbarControl.addTo(map);
-
-            function generateShareLink(e) {
-                e.preventDefault();
-                const baseUrl = (window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) ? window.location.ancestorOrigins[0] : window.location.origin + window.location.pathname;
-                const link = baseUrl + "?c=__LAT__,__LON__&r=__RADIUS__";
-                navigator.clipboard.writeText(link).then(() => {
-                    alert("View-only coordinates link copied to clipboard!");
-                });
-            }
-
-            function toggleLayerMenu(e) {
-                e.preventDefault();
-                const panel = document.getElementById('minimal-basemap-panel');
-                panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
-            }
-
-            function saveProjectSettings(e) {
-                e.preventDefault();
-                const projectData = {
-                    coords: "__LAT__, __LON__",
-                    radius: __RADIUS__,
-                    scanned_records: __GEOJSON__
-                };
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData));
-                const a = document.createElement('a');
-                a.href = dataStr;
-                a.download = 'TradeArea_Project.json';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            }
-            
-            const basemaps = {
-                osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-                satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-                carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
-            };
-            
-            let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'osm';
-            if (!basemaps[activeBasemapKey]) activeBasemapKey = 'osm';
-            document.getElementById('basemap-select').value = activeBasemapKey;
-            basemaps[activeBasemapKey].addTo(map);
-            
-            function switchActiveBasemap(targetKey) {
-                map.removeLayer(basemaps[activeBasemapKey]);
-                basemaps[targetKey].addTo(map);
-                activeBasemapKey = targetKey;
-                localStorage.setItem('ts_persistent_basemap', targetKey);
-            }
-            
-            let labelsActive = localStorage.getItem('ts_persistent_labels') !== 'false';
-            document.getElementById('label-toggle-chk').checked = labelsActive;
-            if (!labelsActive) document.getElementById('map').classList.add('hide-labels');
-            
-            function toggleLabelsMatrix(isShown) {
-                if (isShown) document.getElementById('map').classList.remove('hide-labels');
-                else document.getElementById('map').classList.add('hide-labels');
-                localStorage.setItem('ts_persistent_labels', isShown);
-            }
-            
-            const starIcon = L.divIcon({
-                className: 'custom-center-icon',
-                html: '<div style="background-color: #003366; color: #C9AB4C; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);">★</div>',
-                iconSize: [24, 24], iconAnchor: [12, 12]
-            });
-            const centerMarker = L.marker([__LAT__, __LON__], { icon: starIcon, zIndexOffset: 10000 }).addTo(map);
-            
-            const radiusCircle = L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.08 }).addTo(map);
-            
-            let pts = __GEOJSON__;
-            let globalIdCounter = 0;
-            pts.forEach(p => p._uid = globalIdCounter++);
-
-            const categoryMap = {};
-            const layerGroupsRef = {};
-            
-            const catPalette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"];
-            const categoryColors = {}; let colorIndex = 0;
-            
-            pts.forEach(p => {
-                const layerKey = p.type || 'Unclassified';
-                if (!categoryMap[layerKey]) {
-                    categoryMap[layerKey] = []; categoryColors[layerKey] = catPalette[colorIndex % catPalette.length]; colorIndex++;
-                }
-                categoryMap[layerKey].push(p);
-            });
-            
-            const createPinIcon = (color) => {
-                const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
-                return L.divIcon({ html: `<div class="custom-pin-container">${svg}</div>`, className: '', iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24] });
-            };
-
-            Object.keys(categoryMap).forEach(key => {
-                layerGroupsRef[key] = L.layerGroup().addTo(map);
-                const pColor = categoryColors[key];
-                const catPin = createPinIcon(pColor);
-                
-                categoryMap[key].forEach(p => {
-                    const marker = L.marker([p.lat, p.lon], { icon: catPin })
-                                    .bindPopup("<b style='color:#003366; font-family:Montserrat;'>" + p.name + "</b><br><span style='color:#888780; font-size:9px;'>" + p.type + "</span>");
-                    if (p.name && p.name !== 'Unknown') {
-                        marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -18], className: 'poi-text-label' });
-                    }
-                    p._marker = marker;
-                    marker.addTo(layerGroupsRef[key]);
-                });
-            });
-
-            const listBox = document.getElementById('results-list-box');
-            document.getElementById('results-count').innerText = pts.length;
-            
-            if (pts.length > 0) {
-                let htmlPayload = '';
-                const trashSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="14" viewBox="0 -960 960 960" width="14"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>`;
-
-                Object.keys(categoryMap).forEach(catName => {
-                    const dotColor = categoryColors[catName];
-                    htmlPayload += `
-                        <div class="layer-category-block" id="cat-block-${catName}">
-                            <div class="layer-category-header" onclick="toggleAccordionCollapse('${catName}')">
-                                <div class="layer-header-left">
-                                    <input type="checkbox" checked onclick="event.stopPropagation(); toggleCategoryVisibility('${catName}', this.checked)">
-                                    <span class="color-dot" style="background-color: ${dotColor};"></span>
-                                    <span>${catName} <span id="count-${catName}" style="color: #C9AB4C; font-size: 8px;">(${categoryMap[catName].length})</span></span>
-                                </div>
-                                <span id="chevron-${catName}" style="font-size: 8px; color:#C9AB4C;">▼</span>
-                            </div>
-                            <div class="layer-category-items" id="items-${catName}">
-                    `;
-                    categoryMap[catName].forEach(p => {
-                        htmlPayload += `
-                        <div class="results-item" id="res-item-${p._uid}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
-                            <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}">${p.name || 'Unknown'}</div>
-                            <div class="delete-poi-icon" title="Remove POI" onclick="event.stopPropagation(); removePoiInstance(${p._uid}, '${catName}')">
-                                ${trashSvg}
-                            </div>
-                        </div>`;
-                    });
-                    htmlPayload += '</div></div>';
-                });
-                listBox.innerHTML = htmlPayload;
-            }
-
-            function removePoiInstance(uid, catKey) {
-                const index = pts.findIndex(item => item._uid === uid);
-                if (index > -1) {
-                    const p = pts[index];
-                    if(p._marker) layerGroupsRef[catKey].removeLayer(p._marker);
-                    pts.splice(index, 1);
-                }
-                const el = document.getElementById('res-item-' + uid);
-                if(el) el.remove();
-                
-                const countEl = document.getElementById('count-' + catKey);
-                if(countEl) {
-                    const match = countEl.innerText.match(/\\d+/);
-                    if(match) {
-                        const newCount = parseInt(match[0]) - 1;
-                        countEl.innerText = `(${newCount})`;
-                        if (newCount === 0) { document.getElementById('cat-block-' + catKey).style.display = 'none'; }
-                    }
-                }
-                const totalEl = document.getElementById('results-count');
-                if(totalEl) totalEl.innerText = parseInt(totalEl.innerText) - 1;
-            }
-
-            function toggleCategoryVisibility(catKey, isVisible) {
-                if (isVisible) map.addLayer(layerGroupsRef[catKey]);
-                else map.removeLayer(layerGroupsRef[catKey]);
-            }
-
-            function toggleAccordionCollapse(catKey) {
-                const panel = document.getElementById('items-' + catKey);
-                const chev = document.getElementById('chevron-' + catKey);
-                panel.classList.toggle('collapsed');
-                chev.innerText = panel.classList.contains('collapsed') ? '▲' : '▼';
-            }
-
-            map.on('contextmenu', function(e) {
-                const lat = e.latlng.lat; const lng = e.latlng.lng;
-                const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
-                const menuHtml = `
-                    <div style="font-family: Montserrat, sans-serif; font-size: 9px; color: #003366; min-width: 140px;">
-                        <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">ACTIONS</div>
-                        <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">Copy Coordinates</div>
-                        <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?q=${lat},${lng}', '_blank'); map.closePopup();">Google Maps</div>
-                        <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Google Streetview</div>
-                    </div>
-                `;
-                L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
-            });
-
-            if (pts.length > 0 && !__IS_STALE__) {
-                const bounds = L.featureGroup([L.marker([__LAT__, __LON__]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
-                map.fitBounds(bounds.pad(0.1));
-            }
-        </script>
-    </body>
-    </html>
-    """
-
-    leaflet_html = (leaflet_template
-                    .replace("__LAT__", str(render_lat))
-                    .replace("__LON__", str(render_lon))
-                    .replace("__RADIUS__", str(radius_val))
-                    .replace("__IS_STALE__", is_stale)
-                    .replace("__GEOJSON__", geojson_str))
-
-    st.components.v1.html(leaflet_html, height=850, scrolling=False)
-
-else:
-    coords_val = st.session_state.get("geo_coords", "14.5995, 120.9842")
-    radius_val = st.session_state.get("geo_radius", 1000)
-    scanned_records = st.session_state.get("scanned_records", [])
-
-    coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
-    lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.5995, 120.9842)
-
-    render_lat = lat_coord
-    render_lon = lon_coord
-
-    for idx, record in enumerate(scanned_records):
-        if "_uid" not in record: record["_uid"] = idx
-        if "visible" not in record: record["visible"] = True
-        if "style" not in record:
-            record["style"] = {
-                "color": "#003366",
-                "icon_shape": "circle",
-                "icon_size": 24,
-                "icon_symbol": "location_on",
-                "icon_opacity": 1.0,
-                "fill_color": "#C9AB4C",
-                "fill_opacity": 0.4,
-                "weight": 2.0,
-                "fill": True
-            }
-
-    geojson_str = json.dumps(scanned_records)
-
-    editor_leaflet_template = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
-        <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-        <style>
-            body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: 'Montserrat', sans-serif; }
-            #map { height: 100vh; width: 100%; z-index: 1; }
-            
-            #scan-results-panel { position: absolute; top: 15px; right: 15px; z-index: 1000; background: #ffffff; width: 280px; max-height: calc(50vh - 20px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 51, 102, 0.15); }
-            .results-header { background: #003366; color: #ffffff; padding: 12px; font-size: 11px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
-            .results-list { overflow-y: auto; flex-grow: 1; background: #ffffff; }
-            .layer-category-block { border-bottom: 1px solid #f1f5f9; }
-            .layer-category-header { background: #f8fafc; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
-            .layer-header-left { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; color: #003366; text-transform: uppercase;}
-            
-            .results-item { padding: 8px 12px; font-size: 10px; font-weight: 600; color: #475569; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f8fafc; }
-            .results-item:hover { background: #f1f5f9; color: #003366; }
-            .visibility-toggle-icon { cursor: pointer; display: flex; align-items: center; color: #94a3b8; }
-            .visibility-toggle-icon:hover { color: #003366; }
-            .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.15); }
-            
-            #feature-properties-panel { position: absolute; bottom: 15px; right: 15px; z-index: 1000; background: #ffffff; width: 280px; height: calc(50vh - 20px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); box-shadow: 0 -4px 20px rgba(0, 51, 102, 0.15); display: none; flex-direction: column; overflow: hidden; }
-            .panel-header { background: #003366; color: #ffffff; padding: 12px; font-size: 11px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 0.5px;}
-            .panel-body { padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-            .control-group { display: flex; flex-direction: column; gap: 4px; }
-            .control-group label { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; }
-            .control-group input[type="text"], .control-group select, .control-group input[type="number"] { padding: 6px; font-size: 11px; font-family: 'Montserrat', sans-serif; color: #003366; border: 1px solid #e2e8f0; border-radius: 3px; outline: none; }
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        
-        <div id="scan-results-panel">
-            <div class="results-header">
-                <span>Active Workspace Grid</span>
-                <span id="results-count" style="background:#C9AB4C; color:#003366; padding:2px 8px; border-radius:10px; font-size:9px;">0</span>
-            </div>
-            <div class="results-list" id="results-list-box"></div>
-        </div>
-
-        <div id="feature-properties-panel">
-            <div class="panel-header">
-                <span>Mutate Geometric Attributes</span>
-                <span style="cursor:pointer;color:#C9AB4C;" onclick="dismissPropertiesPanel()">✖</span>
-            </div>
-            <div class="panel-body">
-                <div class="control-group">
-                    <label>Feature Title</label>
-                    <input type="text" id="prop-name" onblur="commitActiveStyleModifications()">
-                </div>
-                <div class="control-group">
-                    <label>Hex Color Target</label>
-                    <input type="text" id="prop-color" onblur="commitActiveStyleModifications()">
-                </div>
-                <div class="control-group" id="group-icon-shape">
-                    <label>Icon Canvas Shape</label>
-                    <select id="prop-icon-shape" onchange="commitActiveStyleModifications()">
-                        <option value="pin">PIN EMBLEM</option>
-                        <option value="circle">RADIUS CIRCLE</option>
-                    </select>
-                </div>
-                <div class="control-group" id="group-icon-size">
-                    <label>Scale Bounds (PX)</label>
-                    <input type="number" id="prop-icon-size" min="12" max="64" value="24" onchange="commitActiveStyleModifications()">
-                </div>
-            </div>
-        </div>
-
-        <script>
-            const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-
-            map.pm.addControls({ position: 'topleft', drawMarker: true, drawPolygon: true, editMode: true, removalMode: true });
-            L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.03 }).addTo(map);
-
-            let pts = __GEOJSON__;
-            let selectedFeatureReference = null;
-            let selectedLayerReference = null;
-
-            function renderVectorPinIcon(color, shape, size) {
-                const baseSize = size || 24;
-                let svg = shape === 'circle' 
-                    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${baseSize}" height="${baseSize}"><circle cx="12" cy="12" r="10" fill="${color}" stroke="#ffffff" stroke-width="2"/></svg>`
-                    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${baseSize}" height="${baseSize}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
-                return L.divIcon({ html: `<div style="display:flex;align-items:center;justify-content:center;">${svg}</div>`, className: '', iconSize: [baseSize, baseSize], iconAnchor: [baseSize/2, baseSize] });
-            }
-
-            function initializeFeaturesOnCanvas() {
-                pts.forEach(p => {
-                    let layerInstance = L.marker([p.lat, p.lon], { icon: renderVectorPinIcon(p.style.color, p.style.icon_shape, p.style.icon_size) });
-                    p._layer = layerInstance;
-                    layerInstance._uid = p._uid;
-                    if (p.visible) { layerInstance.addTo(map); }
-
-                    layerInstance.on('click', function(e) {
-                        L.DomEvent.stopPropagation(e);
-                        loadFeatureToPropertiesPanel(p, layerInstance);
-                    });
-                });
-                generateAccordionWorkspaceList();
-            }
-
-            function loadFeatureToPropertiesPanel(feature, layer) {
-                selectedFeatureReference = feature;
-                selectedLayerReference = layer;
-                document.getElementById('prop-name').value = feature.name;
-                document.getElementById('prop-color').value = feature.style.color;
-                document.getElementById('prop-icon-shape').value = feature.style.icon_shape;
-                document.getElementById('prop-icon-size').value = feature.style.icon_size;
-                document.getElementById('feature-properties-panel').style.display = 'flex';
-            }
-
-            function dismissPropertiesPanel() {
-                document.getElementById('feature-properties-panel').style.display = 'none';
-            }
-
-            function commitActiveStyleModifications() {
-                if (!selectedFeatureReference) return;
-                const f = selectedFeatureReference;
-                f.name = document.getElementById('prop-name').value;
-                f.style.color = document.getElementById('prop-color').value;
-                f.style.icon_shape = document.getElementById('prop-icon-shape').value;
-                f.style.icon_size = parseInt(document.getElementById('prop-icon-size').value);
-
-                if (selectedLayerReference.setIcon) {
-                    selectedLayerReference.setIcon(renderVectorPinIcon(f.style.color, f.style.icon_shape, f.style.icon_size));
-                }
-                generateAccordionWorkspaceList();
-            }
-
-            function generateAccordionWorkspaceList() {
-                const listBox = document.getElementById('results-list-box');
-                document.getElementById('results-count').innerText = pts.length;
-                
-                const categorizedData = {};
-                pts.forEach(p => {
-                    const catKey = p.type || 'Custom Structural Layer';
-                    if (!categorizedData[catKey]) categorizedData[catKey] = [];
-                    categorizedData[catKey].push(p);
-                });
-
-                let listHtml = '';
-                Object.keys(categorizedData).forEach(catName => {
-                    listHtml += `
-                        <div class="layer-category-block">
-                            <div class="layer-category-header">
-                                <div class="layer-header-left">
-                                    <span class="color-dot" style="background:${categorizedData[catName][0].style.color};"></span>
-                                    <span>${catName} (${categorizedData[catName].length})</span>
-                                </div>
-                            </div>
-                            <div class="layer-category-items">
-                    `;
-                    categorizedData[catName].forEach(p => {
-                        listHtml += `
-                        <div class="results-item" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
-                            <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.name}</div>
-                        </div>`;
-                    });
-                    listHtml += '</div></div>';
-                });
-                listBox.innerHTML = listHtml;
-            }
-
-            window.onload = () => { initializeFeaturesOnCanvas(); };
-        </script>
-    </body>
-    </html>
-    """
-
-    leaflet_html_rendered = (editor_leaflet_template
-                             .replace("__LAT__", str(render_lat))
-                             .replace("__LON__", str(render_lon))
-                             .replace("__RADIUS__", str(radius_val))
-                             .replace("__GEOJSON__", geojson_str))
-
-    st.components.v1.html(leaflet_html_rendered, height=850, scrolling=False)
+            .search-item { padding: 8px 12px; font-size: 10px; font-weight: 600; cursor: pointer; border-bottom: 1px solid #f8fafc;
