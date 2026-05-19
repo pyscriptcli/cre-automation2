@@ -13,7 +13,13 @@ if not os.path.exists(_config_file):
         f.write("[theme]\nbase=\"light\"\n")
 
 # -----------------------------------------------------------------------------
-# 1. BRANDED BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
+# 1. ORCHESTRATION ROUTER ENGINE
+# -----------------------------------------------------------------------------
+if "active_module" not in st.session_state:
+    st.session_state.active_module = "SCANNER"  # Options: "SCANNER", "EDITOR"
+
+# -----------------------------------------------------------------------------
+# 2. BRANDED BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Trade Area Scan",
@@ -103,13 +109,26 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 30px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
-        
-        /* OVERRIDES REMOVED: Scan Area and Clear Canvas are now standard document flow */
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE & DATA MODELS
+# 3. INTERFACE DECOUPLING LAYER
+# -----------------------------------------------------------------------------
+if st.session_state.active_module == "EDITOR":
+    # Transfer complete layout state control over to the editor sub-module
+    try:
+        import trade_area_editor
+        trade_area_editor.render_editor_workspace()
+    except ModuleNotFoundError:
+        st.error("Engine Error: trade_area_editor.py not found within project directory cluster.")
+        if st.button("RESET TO CORE SCANNER"):
+            st.session_state.active_module = "SCANNER"
+            st.rerun()
+    st.stop()  # Terminate top-level loop context execution immediately to let editor render cleanly
+
+# -----------------------------------------------------------------------------
+# 4. STATE PERSISTENCE & DATA MODELS
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
@@ -119,6 +138,13 @@ if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_R
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
+
+# Catch runtime messaging inputs back from the Leaflet Component Context
+query_params = st.query_params
+if "action" in query_params and query_params["action"] == "open_editor":
+    st.query_params.clear()
+    st.session_state.active_module = "EDITOR"
+    st.rerun()
 
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
@@ -146,12 +172,11 @@ def compile_features_kml(features):
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
-# 3. SIDEBAR WORKSPACE & OSM GEOCODING LOGIC
+# 5. SIDEBAR WORKSPACE & OSM GEOCODING LOGIC
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Trade Area Scan</div>', unsafe_allow_html=True)
     
-    # Dual-purpose Location Search & Coordinates Input
     location_input = st.text_input("LOCATION SEARCH OR COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input", label_visibility="visible")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
 
@@ -214,7 +239,6 @@ with st.sidebar:
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # ACTION BUTTONS (NON-PERSISTENT)
     if st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn"):
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -270,7 +294,7 @@ with st.sidebar:
                     st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# 4. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
+# 6. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
 # -----------------------------------------------------------------------------
 geojson_str = json.dumps(st.session_state.scanned_records)
 render_lat = lat_coord
@@ -330,7 +354,6 @@ leaflet_template = """
         
         .leaflet-control-custom-stack { background: #fff; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
         .leaflet-control-custom-stack a { display: flex !important; align-items: center; justify-content: center; background: #fff; text-decoration: none; width: 34px; height: 34px; border-bottom: 1px solid #ccc; cursor: pointer;}
-        .leaflet-control-custom-stack a:last-child { border-bottom: none; }
         .leaflet-control-custom-stack a:hover { background: #f4f4f4; }
         .custom-pin-container { display: flex; align-items: center; justify-content: center; }
     </style>
@@ -366,7 +389,6 @@ leaflet_template = """
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
         map.zoomControl.setPosition('topleft');
 
-        // MAP SEARCH LOGIC WITH NOMINATIM TYPEAHEAD
         let searchTimeout = null;
         function handleSearch(e) {
             clearTimeout(searchTimeout);
@@ -405,7 +427,6 @@ leaflet_template = """
             }, 500);
         }
 
-        // Close search results when clicking outside
         document.addEventListener('click', function(e) {
             if (!document.getElementById('search-container').contains(e.target)) {
                 document.getElementById('search-results').style.display = 'none';
@@ -417,16 +438,24 @@ leaflet_template = """
             const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom-stack');
             const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="#003366"><path d="M720-80q-50 0-85-35t-35-85q0-7 1-14.5t3-13.5L322-392q-17 15-38 23.5t-44 8.5q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 44 8.5t38 23.5l282-164q-2-6-2.5-13.5T600-760q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-44-8.5T638-672L356-508q2 6 2.5 13.5t.5 14.5q0 7-.5 14.5T356-452l282 164q17-15 38-23.5t44-8.5q50 0 85 35t35 85q0 50-35 85t-85 35Z"/></svg>`;
             const layersIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="m116-435 364-199 364 199-364 199-364-199Zm0 157 364 199 364-199-47-26-317 173-317-173-47 26Zm364-257 267-146-267-146-267 146 267 146Z"/></svg>`;
+            const editIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="#003366"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>`;
             const saveIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM480-240q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>`;
 
             div.innerHTML = `
                 <a title="Copy View-Only Link" onclick="generateShareLink(event)">${shareIcon}</a>
                 <a title="Toggle Layers" onclick="toggleLayerMenu(event)">${layersIcon}</a>
-                <a title="Save Project Settings" onclick="saveProjectSettings(event)">${saveIcon}</a>
+                <a title="Open Feature Editor Module" onclick="triggerEditorRoute(event)" style="background: #f8fafc; border-left: 2px solid #C9AB4C;">${editIcon}</a>
+                <a title="Save Project Settings" onclick="saveProjectSettings(event)" style="border-top: 1px solid #ccc;">${saveIcon}</a>
             `;
             return div;
         };
         toolbarControl.addTo(map);
+
+        function triggerEditorRoute(e) {
+            e.preventDefault();
+            // Force parameter string injection to gracefully bypass sandbox limitations and alert Streamlit engine
+            window.location.search = "?action=open_editor";
+        }
 
         function generateShareLink(e) {
             e.preventDefault();
