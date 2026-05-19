@@ -150,7 +150,7 @@ if st.session_state.get("active_module") == "EDITOR":
         trade_area_editor.render_editor_workspace()
     except ModuleNotFoundError:
         st.error("Engine Error: trade_area_editor.py not found.")
-    st.stop() # Bulletproof halt to stop Scanner HTML from leaking
+        st.stop() # Bulletproof halt to stop Scanner HTML from leaking
         if st.button("RESET TO CORE SCANNER"):
             st.session_state.active_module = "SCANNER"
             st.rerun()
