@@ -386,7 +386,7 @@ with action_col2:
                     prs.save(pptx_stream)
                     raw_pptx_bytes = pptx_stream.getvalue()
                     
-                    st.markdown("""<div style="border-left: 4px solid #C5A059; background-color: #FFFFFF; padding: 16px; border-top: 1px solid #002B49; border-right: 1px solid #002B49; border-bottom: 1px solid #002B49; margin-top: 20px; text-align: center; color: #002B49; font-weight: 700; font-size: 13px; letter-spacing: 0.05em;">🎉 PRESENTATION COMPILED SUCCESSFULLY! READY FOR PRODUCTION DOWNLOAD.</div>""", unsafe_allow_html=True)
+                    st.markdown("""<div style="border-left: 4px solid #C5A059; background-color: #FFFFFF; padding: 16px; border-top: 1px solid #002B49; border-right: 1px solid #002B49; border-bottom: 1px solid #002B49; margin-top: 20px; text-align: center; color: #002B49; font-weight: 700; font-size: 13px; letter-spacing: 0.05em;">PRESENTATION GENERATED SUCCESSFULLY!</div>""", unsafe_allow_html=True)
                     st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
                     
                     safe_filename = f"PIS_{prop_location.replace(' ', '_')}"
@@ -396,7 +396,7 @@ with action_col2:
                             pdf_bytes = convert_pptx_to_pdf(raw_pptx_bytes)
                         if pdf_bytes:
                             st.download_button(
-                                label="📥 DOWNLOAD BRANDED PDF DECK",
+                                label="DOWNLOAD PPTX",
                                 data=pdf_bytes,
                                 file_name=f"{safe_filename}.pdf",
                                 mime="application/pdf",
@@ -404,7 +404,7 @@ with action_col2:
                             )
                     else:
                         st.download_button(
-                            label="📥 DOWNLOAD BRANDED PPTX DECK",
+                            label="DOWNLOAD PDF",
                             data=raw_pptx_bytes,
                             file_name=f"{safe_filename}.pptx",
                             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
