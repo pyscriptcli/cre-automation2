@@ -16,7 +16,7 @@ if not os.path.exists(_config_file):
 # 1. BRANDED BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Trade Area Scan",
+    page_title="Trade Area Scan Staging",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -42,7 +42,6 @@ st.markdown("""
             font-family: 'Montserrat', sans-serif !important;
         }
         
-        /* SLEEK, COMPRESSED SIDEBAR */
         [data-testid="stSidebar"] {
             background-color: var(--bg-offwhite) !important;
             color: var(--brand-midnight) !important;
@@ -66,118 +65,48 @@ st.markdown("""
         }
         
         .material-symbols-rounded, span[class*="material-symbols"] {
-            font-family: 'Material Symbols Rounded' !important;
-            font-weight: normal !important;
-            font-style: normal !important;
-            font-size: 18px !important;
-            line-height: 1 !important;
-            letter-spacing: normal !important;
-            text-transform: none !important;
-            display: inline-block !important;
-            white-space: nowrap !important;
-            word-wrap: normal !important;
-            direction: ltr !important;
+            font-family: 'Material Symbols Rounded' !important; font-weight: normal !important; font-style: normal !important; font-size: 18px !important; line-height: 1 !important; letter-spacing: normal !important; text-transform: none !important; display: inline-block !important; white-space: nowrap !important; word-wrap: normal !important; direction: ltr !important;
         }
         
         [data-testid="stHeader"], header, #stDecoration { display: none !important; }
         
-        [data-testid="stAppViewContainer"] {
-            display: flex !important; flex-direction: row !important;
-            width: 100vw !important; height: 100vh !important; overflow: hidden !important;
-        }
-        
-        [data-testid="stMain"] {
-            flex-grow: 1 !important; width: calc(100vw - 280px) !important;
-            height: 100vh !important; overflow: hidden !important; margin: 0px !important; padding: 0px !important;
-        }
-        
-        .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer {
-            padding: 0px !important; margin: 0px !important; max-width: 100% !important; gap: 0rem !important;
-        }
-        
+        [data-testid="stAppViewContainer"] { display: flex !important; flex-direction: row !important; width: 100vw !important; height: 100vh !important; overflow: hidden !important; }
+        [data-testid="stMain"] { flex-grow: 1 !important; width: calc(100vw - 280px) !important; height: 100vh !important; overflow: hidden !important; margin: 0px !important; padding: 0px !important; }
+        .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer { padding: 0px !important; margin: 0px !important; max-width: 100% !important; gap: 0rem !important; }
         iframe { height: 100vh !important; width: 100% !important; border: none !important; display: block !important; }
         
         [data-testid="stSidebarUserContent"] {
-            padding-top: 12px !important; padding-left: 12px !important; padding-right: 12px !important;
-            height: 100vh !important; overflow-y: auto !important; overflow-x: hidden !important;
+            padding-top: 12px !important; padding-left: 12px !important; padding-right: 12px !important; height: 100vh !important; overflow-y: auto !important; overflow-x: hidden !important;
         }
         
-        /* MINIMALIST INPUTS */
-        div[data-baseweb="input"], div[data-baseweb="select"] {
-            background-color: transparent !important;
-            border: none !important; border-bottom: 1px solid rgba(201, 171, 76, 0.5) !important;
-            border-radius: 0px !important; box-shadow: none !important;
-        }
+        div[data-baseweb="input"], div[data-baseweb="select"] { background-color: transparent !important; border: none !important; border-bottom: 1px solid rgba(201, 171, 76, 0.5) !important; border-radius: 0px !important; box-shadow: none !important; }
         div[data-baseweb="input"]:focus-within { border-bottom: 2px solid var(--brand-gold) !important; }
         
-        /* BUTTON RE-STYLING */
-        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button {
-            background-color: var(--brand-midnight) !important; 
-            border: 1px solid var(--brand-midnight) !important; 
-            border-radius: 2px !important; width: 100% !important; padding: 6px !important;
-            box-shadow: var(--soft-shadow) !important; transition: all 0.3s ease !important;
-        }
-        div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover {
-            background-color: var(--brand-gold) !important;
-            border-color: var(--brand-gold) !important;
-        }
-        div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p {
-            color: var(--white-clean) !important; font-weight: 700 !important; font-size: 9px !important; text-transform: uppercase !important; letter-spacing: 1px;
-        }
+        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button { background-color: var(--brand-midnight) !important; border: 1px solid var(--brand-midnight) !important; border-radius: 2px !important; width: 100% !important; padding: 6px !important; box-shadow: var(--soft-shadow) !important; transition: all 0.3s ease !important; }
+        div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover { background-color: var(--brand-gold) !important; border-color: var(--brand-gold) !important; }
+        div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p { color: var(--white-clean) !important; font-weight: 700 !important; font-size: 9px !important; text-transform: uppercase !important; letter-spacing: 1px; }
         
-        div.stDownloadButton > button {
-            background-color: var(--brand-midnight) !important; 
-            border: none !important; border-radius: 2px !important; width: 100% !important; padding: 4px !important;
-        }
+        div.stDownloadButton > button { background-color: var(--brand-midnight) !important; border: none !important; border-radius: 2px !important; width: 100% !important; padding: 4px !important; }
         div.stDownloadButton > button:hover { background-color: var(--brand-gold) !important; }
         
-        div.stButton > button[kind="primary"] {
-            background: transparent !important; border: none !important; color: var(--text-muted) !important;
-            box-shadow: none !important; padding: 0 !important; margin-top: 2px; display: inline-flex;
-        }
-        div.stButton > button[kind="primary"] p {
-            color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600 !important; text-decoration: none !important; text-transform: uppercase;
-        }
+        div.stButton > button[kind="primary"] { background: transparent !important; border: none !important; color: var(--text-muted) !important; box-shadow: none !important; padding: 0 !important; margin-top: 2px; display: inline-flex; }
+        div.stButton > button[kind="primary"] p { color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600 !important; text-decoration: none !important; text-transform: uppercase; }
         div.stButton > button[kind="primary"]:hover p { color: #AA2E20 !important; }
         
-        /* COMPACT EXPANDERS */
-        [data-testid="stSidebar"] .st-expander {
-            border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important;
-            border-radius: 2px !important; margin-bottom: 2px !important; overflow: hidden !important;
-        }
-
-        [data-testid="stSidebar"] .st-expander summary p { 
-            font-size: 5px !important; 
-            font-weight: 500 !important; 
-        }
+        [data-testid="stSidebar"] .st-expander { border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important; border-radius: 2px !important; margin-bottom: 2px !important; overflow: hidden !important; }
+        [data-testid="stSidebar"] .st-expander summary p { font-size: 5px !important; font-weight: 500 !important; }
+        .stCheckbox label p { font-size: 10px !important; font-weight: 500 !important; }
         
-        .stCheckbox label p { 
-            font-size: 10px !important; 
-            font-weight: 500 !important; 
-        }
-
-        div[data-baseweb="checkbox"] input:checked + div,
-        div[data-baseweb="checkbox"] div[aria-checked="true"] {
-            background-color: var(--brand-midnight) !important;
-            border-color: var(--brand-midnight) !important;
-        }
-
+        div[data-baseweb="checkbox"] input:checked + div, div[data-baseweb="checkbox"] div[aria-checked="true"] { background-color: var(--brand-midnight) !important; border-color: var(--brand-midnight) !important; }
+        
         .stDeployButton, footer { display:none !important; }
         
-        /* BRANDED TITLE */
-        .brand-title {
-            font-family: 'Cormorant Garamond', serif !important;
-            font-style: italic;
-            color: var(--brand-midnight);
-            font-size: 30px;
-            text-align: center;
-            border-bottom: 1px solid var(--brand-gold);
-            padding-bottom: 6px;
-            margin-bottom: 30px;
-        }
-        
-        /* TEXT SIZING OVERRIDES */
+        .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 30px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
+
+        /* STICKY BUTTON OVERRIDES */
+        .st-key-scan_btn { position: sticky !important; bottom: 35px !important; z-index: 100 !important; background-color: var(--bg-offwhite) !important; padding-top: 10px !important; }
+        .st-key-clear_btn { position: sticky !important; bottom: 0px !important; z-index: 100 !important; background-color: var(--bg-offwhite) !important; padding-bottom: 20px !important; margin-top: -10px !important; border-top: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -225,8 +154,12 @@ def compile_features_kml(features):
 with st.sidebar:
     st.markdown('<div class="brand-title">Trade Area Scan</div>', unsafe_allow_html=True)
     
-    coords_val = st.text_input("COORDINATES", key="geo_coords", label_visibility="visible")
-    radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, key="geo_radius", step=100)
+    coords_val = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input", label_visibility="visible")
+    radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
+
+    # Sync back inputs to session state
+    st.session_state.geo_coords = coords_val
+    st.session_state.geo_radius = radius_val
 
     coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
     lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.5995, 120.9842)
@@ -256,7 +189,7 @@ with st.sidebar:
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    if st.button("SCAN AREA", type="secondary", use_container_width=True):
+    if st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn"):
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
         else:
@@ -280,8 +213,12 @@ with st.sidebar:
                         st.rerun()
                 except Exception as e: st.error("Timeout")
 
-    if st.button("CLEAR CANVAS", type="primary"):
+    if st.button("CLEAR ALL", type="primary", key="clear_btn"):
         st.session_state.scanned_records = []
+        # Clear all checkbox states systematically
+        for key in list(st.session_state.keys()):
+            if key.startswith("chk_"):
+                st.session_state[key] = False
         st.rerun()
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
@@ -300,7 +237,10 @@ with st.sidebar:
             if st.button("LOAD", type="secondary", use_container_width=True):
                 try:
                     data = json.load(imported_file)
+                    # Support both old format and new project structure
                     st.session_state.scanned_records = data.get("scanned_records", data)
+                    st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
+                    st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
                     st.rerun()
                 except Exception:
                     st.error("Invalid File")
@@ -325,60 +265,36 @@ leaflet_template = """
         #map { height: 100vh; width: 100%; }
         
         #minimal-basemap-panel {
-            position: absolute; bottom: 20px; left: 10px; z-index: 1000;
-            background: #ffffff; border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); background-clip: padding-box;
-            display: flex; flex-direction: column; padding: 4px; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
+            position: absolute; top: 110px; left: 50px; z-index: 1000;
+            background: #ffffff; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); background-clip: padding-box;
+            display: none; flex-direction: column; padding: 4px; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); width: 150px;
         }
         #minimal-basemap-panel select {
-            border: none; border-bottom: 1px solid #f0f0f0; padding: 4px; font-size: 10px; font-weight: 700; font-family: 'Montserrat', sans-serif;
+            border: none; border-bottom: 1px solid #f0f0f0; padding: 6px; font-size: 10px; font-weight: 700; font-family: 'Montserrat', sans-serif;
             color: #003366; background: transparent; outline: none; cursor: pointer; width: 100%; text-transform: uppercase;
         }
-        .minimal-label {
-            font-size: 9px; font-weight: 700; padding: 4px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #888780; margin: 0; text-transform: uppercase;
-        }
+        .minimal-label { font-size: 9px; font-weight: 700; padding: 6px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #888780; margin: 0; text-transform: uppercase; border-top: 1px solid #f8fafc;}
 
         #search-container { position: absolute; top: 10px; left: 54px; z-index: 1000; width: 300px; }
         #map-search {
-            width: 100%; padding: 8px 12px; border: 1px solid rgba(0, 51, 102, 0.1); border-radius: 2px; background-clip: padding-box;
-            font-size: 11px; font-family: 'Montserrat', sans-serif; font-weight: 600; color: #003366; background: #ffffff; outline: none; box-sizing: border-box;
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
+            width: 100%; padding: 8px 12px; border: 1px solid rgba(0, 51, 102, 0.1); border-radius: 4px; background-clip: padding-box;
+            font-size: 11px; font-family: 'Montserrat', sans-serif; font-weight: 600; color: #003366; background: #ffffff; outline: none; box-sizing: border-box; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
         }
         #map-search:focus { border-bottom: 2px solid #C9AB4C; }
-        #search-results {
-            position: absolute; top: 38px; left: 0; width: 100%; background: #ffffff;
-            border-radius: 2px; display: none; max-height: 250px; overflow-y: auto; 
-            border: 1px solid rgba(0, 51, 102, 0.1); box-sizing: border-box; z-index: 1001;
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
-        }
+        #search-results { position: absolute; top: 38px; left: 0; width: 100%; background: #ffffff; border-radius: 2px; display: none; max-height: 250px; overflow-y: auto; border: 1px solid rgba(0, 51, 102, 0.1); box-sizing: border-box; z-index: 1001; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
         .search-item { padding: 8px 12px; font-size: 10px; font-weight: 600; cursor: pointer; border-bottom: 1px solid #f8fafc; color: #003366; }
         .search-item:hover { background: #f8fafc; color: #C9AB4C; }
 
-        #scan-results-panel {
-            position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff;
-            width: 250px; max-height: calc(100vh - 20px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); background-clip: padding-box;
-            display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
-        }
-        .results-header {
-            background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800;
-            display: flex; justify-content: space-between; align-items: center; text-transform: uppercase;
-            border-bottom: 2px solid #C9AB4C; letter-spacing: 1px;
-        }
+        #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 250px; max-height: calc(100vh - 20px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
+        .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
         .layer-category-block { border-bottom: 1px solid #f0f0f0; }
-        .layer-category-header {
-            background: #ffffff; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;
-            cursor: pointer; user-select: none; transition: background 0.2s;
-        }
+        .layer-category-header { background: #ffffff; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; transition: background 0.2s; }
         .layer-category-header:hover { background: #f8fafc; }
         .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase;}
-        
         .layer-category-items { padding: 0; background: #f8fafc; }
         .layer-category-items.collapsed { display: none !important; }
-        
-        .results-item {
-            padding: 6px 12px 6px 28px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center;
-            cursor: pointer; border-bottom: 1px solid #f0f0f0;
-        }
+        .results-item { padding: 6px 12px 6px 28px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
         .results-item:hover { background: #ffffff; color: #003366; }
         .results-item .delete-poi-icon { cursor: pointer; padding: 2px; display: flex; }
         .results-item .delete-poi-icon svg { fill: #888780; transition: fill 0.2s; }
@@ -388,8 +304,11 @@ leaflet_template = """
         .hide-labels .poi-text-label { display: none !important; }
         .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
         
-        .leaflet-control-custom a { display: flex !important; align-items: center; justify-content: center; background: #fff; text-decoration: none; width: 30px; height: 30px; border-bottom: 1px solid #ccc; cursor: pointer;}
-        .leaflet-control-custom a:hover { background: #f4f4f4; }
+        .leaflet-control-custom-stack { background: #fff; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
+        .leaflet-control-custom-stack a { display: flex !important; align-items: center; justify-content: center; background: #fff; text-decoration: none; width: 34px; height: 34px; border-bottom: 1px solid #ccc; cursor: pointer;}
+        .leaflet-control-custom-stack a:last-child { border-bottom: none; }
+        .leaflet-control-custom-stack a:hover { background: #f4f4f4; }
+        .custom-pin-container { display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
@@ -423,28 +342,56 @@ leaflet_template = """
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
         map.zoomControl.setPosition('topleft');
 
-        // CUSTOM SHARE/EXPORT CONTROL
-        const exportControl = L.control({position: 'topleft'});
-        exportControl.onAdd = function (map) {
-            const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-            const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="#003366"><path d="M720-80q-50 0-85-35t-35-85q0-7 1-14.5t3-13.5L322-392q-17 15-38 23.5t-44 8.5q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 44 8.5t38 23.5l282-164q-2-6-2.5-13.5T600-760q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-44-8.5T638-672L356-508q2 6 2.5 13.5t.5 14.5q0 7-.5 14.5T356-452l282 164q17-15 38-23.5t44-8.5q50 0 85 35t35 85q0 50-35 85t-85 35Z"/></svg>`;
-            div.innerHTML = `<a title="Export Interactive HTML" onclick="exportHTML(event)">${svgIcon}</a>`;
+        // VERTICAL TOOLBAR: Share -> Layers -> Save
+        const toolbarControl = L.control({position: 'topleft'});
+        toolbarControl.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom-stack');
+            
+            // Share SVG
+            const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="#003366"><path d="M720-80q-50 0-85-35t-35-85q0-7 1-14.5t3-13.5L322-392q-17 15-38 23.5t-44 8.5q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 44 8.5t38 23.5l282-164q-2-6-2.5-13.5T600-760q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-44-8.5T638-672L356-508q2 6 2.5 13.5t.5 14.5q0 7-.5 14.5T356-452l282 164q17-15 38-23.5t44-8.5q50 0 85 35t35 85q0 50-35 85t-85 35Z"/></svg>`;
+            // Layers SVG
+            const layersIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="m116-435 364-199 364 199-364 199-364-199Zm0 157 364 199 364-199-47-26-317 173-317-173-47 26Zm364-257 267-146-267-146-267 146 267 146Z"/></svg>`;
+            // Save SVG
+            const saveIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM480-240q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>`;
+
+            div.innerHTML = `
+                <a title="Copy View-Only Link" onclick="generateShareLink(event)">${shareIcon}</a>
+                <a title="Toggle Layers" onclick="toggleLayerMenu(event)">${layersIcon}</a>
+                <a title="Save Project Settings" onclick="saveProjectSettings(event)">${saveIcon}</a>
+            `;
             return div;
         };
-        exportControl.addTo(map);
+        toolbarControl.addTo(map);
 
-        function exportHTML(e) {
+        function generateShareLink(e) {
             e.preventDefault();
-            const htmlContent = "<!DOCTYPE html>\\n<html>\\n" + document.documentElement.innerHTML + "\\n</html>";
-            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
+            const baseUrl = (window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) ? window.location.ancestorOrigins[0] : window.location.origin + window.location.pathname;
+            const link = baseUrl + "?c=__LAT__,__LON__&r=__RADIUS__";
+            navigator.clipboard.writeText(link).then(() => {
+                alert("View-only coordinates link copied to clipboard!");
+            });
+        }
+
+        function toggleLayerMenu(e) {
+            e.preventDefault();
+            const panel = document.getElementById('minimal-basemap-panel');
+            panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function saveProjectSettings(e) {
+            e.preventDefault();
+            const projectData = {
+                coords: "__LAT__, __LON__",
+                radius: __RADIUS__,
+                scanned_records: __GEOJSON__
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData));
             const a = document.createElement('a');
-            a.href = url;
-            a.download = 'Interactive_Trade_Area.html';
+            a.href = dataStr;
+            a.download = 'TradeArea_Project.json';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            URL.revokeObjectURL(url);
         }
         
         const basemaps = {
@@ -482,9 +429,7 @@ leaflet_template = """
         });
         const centerMarker = L.marker([__LAT__, __LON__], { icon: starIcon, zIndexOffset: 10000 }).addTo(map);
         
-        const radiusCircle = L.circle([__LAT__, __LON__], {
-            radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.08
-        }).addTo(map);
+        const radiusCircle = L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.08 }).addTo(map);
         
         let pts = __GEOJSON__;
         let globalIdCounter = 0;
@@ -504,15 +449,21 @@ leaflet_template = """
             categoryMap[layerKey].push(p);
         });
         
+        const createPinIcon = (color) => {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
+            return L.divIcon({ html: `<div class="custom-pin-container">${svg}</div>`, className: '', iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24] });
+        };
+
         Object.keys(categoryMap).forEach(key => {
             layerGroupsRef[key] = L.layerGroup().addTo(map);
             const pColor = categoryColors[key];
+            const catPin = createPinIcon(pColor);
+            
             categoryMap[key].forEach(p => {
-                const marker = L.circleMarker([p.lat, p.lon], {
-                    radius: 4.5, fillColor: pColor, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.95
-                }).bindPopup("<b style='color:#003366; font-family:Montserrat;'>" + p.name + "</b><br><span style='color:#888780; font-size:9px;'>" + p.type + "</span>");
+                const marker = L.marker([p.lat, p.lon], { icon: catPin })
+                                .bindPopup("<b style='color:#003366; font-family:Montserrat;'>" + p.name + "</b><br><span style='color:#888780; font-size:9px;'>" + p.type + "</span>");
                 if (p.name && p.name !== 'Unknown') {
-                    marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -6], className: 'poi-text-label' });
+                    marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -18], className: 'poi-text-label' });
                 }
                 p._marker = marker;
                 marker.addTo(layerGroupsRef[key]);
@@ -570,9 +521,7 @@ leaflet_template = """
                 if(match) {
                     const newCount = parseInt(match[0]) - 1;
                     countEl.innerText = `(${newCount})`;
-                    if (newCount === 0) {
-                        document.getElementById('cat-block-' + catKey).style.display = 'none';
-                    }
+                    if (newCount === 0) { document.getElementById('cat-block-' + catKey).style.display = 'none'; }
                 }
             }
             const totalEl = document.getElementById('results-count');
