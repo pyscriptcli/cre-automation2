@@ -27,15 +27,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CROSS-FRAME MESSAGE INTERCEPTOR FOR ZERO-LATENCY MODE SWITCHING
+# BULLETPROOF IFRAME ESCAPE HANDLER VIA ONLOAD INLINE INTERCEPTOR
 st.markdown("""
-    <script>
+    <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" onload="
         if (!window.hasEditMessageListener) {
             window.addEventListener('message', function(event) {
                 if (event.data && event.data.action === 'open_editor') {
                     const buttons = document.querySelectorAll('button');
                     for (let btn of buttons) {
-                        if (btn.textContent && btn.textContent.trim() === 'HIDDEN_EDIT_TRIGGER') {
+                        if (btn.textContent && btn.textContent.includes('HIDDEN_EDIT_TRIGGER')) {
                             btn.click();
                             break;
                         }
@@ -44,24 +44,7 @@ st.markdown("""
             });
             window.hasEditMessageListener = true;
         }
-
-        const hideInterval = setInterval(() => {
-            const buttons = document.querySelectorAll('button');
-            for (let btn of buttons) {
-                if (btn.textContent && btn.textContent.trim() === 'HIDDEN_EDIT_TRIGGER') {
-                    const parentDiv = btn.closest('.stButton');
-                    if (parentDiv) {
-                        parentDiv.style.position = 'absolute';
-                        parentDiv.style.top = '-9999px';
-                        parentDiv.style.left = '-9999px';
-                        parentDiv.style.opacity = '0';
-                        parentDiv.style.pointerEvents = 'none';
-                        clearInterval(hideInterval);
-                    }
-                }
-            }
-        }, 100);
-    </script>
+    " style="display:none;">
 """, unsafe_allow_html=True)
 
 st.markdown("""
@@ -146,6 +129,8 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 30px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
+        
+        .st-key-hidden_edit_trigger_btn { position: absolute !important; top: -9999px !important; left: -9999px !important; opacity: 0 !important; pointer-events: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -191,7 +176,7 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {
     "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Clinic', '"amenity"="clinic"'], ['Embassy', '"amenity"="embassy"'], ['Firestation', '"amenity"="fire_station"'], ['Fuel', '"amenity"="fuel"'], ['Hospital', '"amenity"="hospital"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Parking', '"amenity"="parking"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police', '"amenity"="police"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['University', '"amenity"="university"']],
-    "PLACE OF WORSHIP": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Casino', '"amenity"="casino"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"']],
+    "PLACE OF WORSHIP": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hotel"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Casino', '"amenity"="casino"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"']],
     "SPORTS": [['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"']],
     "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
 }
@@ -475,10 +460,10 @@ leaflet_template = """
             const saveIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM480-240q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>`;
 
             div.innerHTML = `
-                <a title="Copy View-Only Link" onclick="generateShareLink(event)">${shareIcon}</a>
-                <a title="Toggle Layers" onclick="toggleLayerMenu(event)">${layersIcon}</a>
-                <a title="Open Feature Editor Module" onclick="triggerEditorRoute(event)" style="background: #f8fafc; border-left: 2px solid #C9AB4C;">${editIcon}</a>
-                <a title="Save Project Settings" onclick="saveProjectSettings(event)" style="border-top: 1px solid #ccc;">${saveIcon}</a>
+                <a title="Copy View-Only Link" onclick="generateShareLink(event)">\${shareIcon}</a>
+                <a title="Toggle Layers" onclick="toggleLayerMenu(event)">\${layersIcon}</a>
+                <a title="Open Feature Editor Module" onclick="triggerEditorRoute(event)" style="background: #f8fafc; border-left: 2px solid #C9AB4C;">\${editIcon}</a>
+                <a title="Save Project Settings" onclick="saveProjectSettings(event)" style="border-top: 1px solid #ccc;">\${saveIcon}</a>
             `;
             return div;
         };
@@ -576,8 +561,8 @@ leaflet_template = """
         });
         
         const createPinIcon = (color) => {
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
-            return L.divIcon({ html: `<div class="custom-pin-container">${svg}</div>`, className: '', iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24] });
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="\${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
+            return L.divIcon({ html: `<div class="custom-pin-container">\${svg}</div>`, className: '', iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24] });
         };
 
         Object.keys(categoryMap).forEach(key => {
@@ -606,23 +591,23 @@ leaflet_template = """
             Object.keys(categoryMap).forEach(catName => {
                 const dotColor = categoryColors[catName];
                 htmlPayload += `
-                    <div class="layer-category-block" id="cat-block-${catName}">
-                        <div class="layer-category-header" onclick="toggleAccordionCollapse('${catName}')">
+                    <div class="layer-category-block" id="cat-block-\${catName}">
+                        <div class="layer-category-header" onclick="toggleAccordionCollapse('\${catName}')">
                             <div class="layer-header-left">
-                                <input type="checkbox" checked onclick="event.stopPropagation(); toggleCategoryVisibility('${catName}', this.checked)">
-                                <span class="color-dot" style="background-color: ${dotColor};"></span>
-                                <span>${catName} <span id="count-${catName}" style="color: #C9AB4C; font-size: 8px;">(${categoryMap[catName].length})</span></span>
+                                <input type="checkbox" checked onclick="event.stopPropagation(); toggleCategoryVisibility('\${catName}', this.checked)">
+                                <span class="color-dot" style="background-color: \${dotColor};"></span>
+                                <span>\${catName} <span id="count-\${catName}" style="color: #C9AB4C; font-size: 8px;">(\${categoryMap[catName].length})</span></span>
                             </div>
-                            <span id="chevron-${catName}" style="font-size: 8px; color:#C9AB4C;">▼</span>
+                            <span id="chevron-\${catName}" style="font-size: 8px; color:#C9AB4C;">▼</span>
                         </div>
-                        <div class="layer-category-items" id="items-${catName}">
+                        <div class="layer-category-items" id="items-\${catName}">
                 `;
                 categoryMap[catName].forEach(p => {
                     htmlPayload += `
-                    <div class="results-item" id="res-item-${p._uid}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
-                        <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}">${p.name || 'Unknown'}</div>
-                        <div class="delete-poi-icon" title="Remove POI" onclick="event.stopPropagation(); removePoiInstance(${p._uid}, '${catName}')">
-                            ${trashSvg}
+                    <div class="results-item" id="res-item-\${p._uid}" onclick="map.flyTo([\${p.lat}, \${p.lon}], 17);">
+                        <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="\${p.name || 'Unknown'}">\${p.name || 'Unknown'}</div>
+                        <div class="delete-poi-icon" title="Remove POI" onclick="event.stopPropagation(); removePoiInstance(\${p._uid}, '\text{\${catName}}')">
+                            \${trashSvg}
                         </div>
                     </div>`;
                 });
@@ -646,7 +631,7 @@ leaflet_template = """
                 const match = countEl.innerText.match(/\\\\d+/);
                 if(match) {
                     const newCount = parseInt(match[0]) - 1;
-                    countEl.innerText = `(${newCount})`;
+                    countEl.innerText = `(\${newCount})`;
                     if (newCount === 0) { document.getElementById('cat-block-' + catKey).style.display = 'none'; }
                 }
             }
@@ -672,9 +657,9 @@ leaflet_template = """
             const menuHtml = `
                 <div style="font-family: Montserrat, sans-serif; font-size: 9px; color: #003366; min-width: 140px;">
                     <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">ACTIONS</div>
-                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">Copy Coordinates</div>
-                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?q=${lat},${lng}', '_blank'); map.closePopup();">Google Maps</div>
-                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Google Streetview</div>
+                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="navigator.clipboard.writeText('\th{\${coordStr}}'); map.closePopup();">Copy Coordinates</div>
+                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?q=${lat},\${lng}', '_blank'); map.closePopup();">Google Maps</div>
+                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},\${lng}', '_blank'); map.closePopup();">Google Streetview</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
