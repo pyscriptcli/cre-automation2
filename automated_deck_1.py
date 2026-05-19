@@ -248,35 +248,22 @@ with col_left:
     prop_high1    = dynamic_form_row("✨", "Property Highlight 1", "cre_high1")
     prop_high2    = dynamic_form_row("✨", "Property Highlight 2", "cre_high2")
     
-    # --- SIMPLIFIED REVERTED CALL TO ACTION SECTOR ---
-    cta_col1, cta_col2 = st.columns([9, 11])
-    with cta_col1:
-        st.markdown('<div class="row-metric-label"><span class="large-icon">📞</span> CALL TO ACTION</div>', unsafe_allow_html=True)
-    with cta_col2:
-        contacts_database = {
-            "Sondi Tuazon": {"phone": "0917 843 6128/ 02 7959 3561", "email": "sondi.tuazon@primephilippines.com"},
-            "Meliza Zapata": {"phone": "0917 555 1234", "email": "meliza.zapata@primephilippines.com"},
-            "Dykstra Pineda": {"phone": "0917 555 5678", "email": "dykstra.pineda@primephilippines.com"},
-            "Cedtriz Rena": {"phone": "0917 555 9012", "email": "cedtriz.rena@primephilippines.com"},
-            "Carlo Medina": {"phone": "0920 986 2764", "email": "carlo.medina@primephilippines.com"},
-            "Dave Policarpio": {"phone": "0917 555 3456", "email": "dave.policarpio@primephilippines.com"},
-            "Irish Rima": {"phone": "0000 000 0000", "email": "irish.rima@primephilippines.com"}
-        }
+    # --- NEW CALL TO ACTION DROPDOWN LAYER ---
+    contacts_database = {
+        "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
+        "Meliza Zapata": {"phone": "0917 555 1234", "email": "meliza.zapata@primephilippines.com"},
+        "Dykstra Pineda": {"phone": "0917 555 5678", "email": "dykstra.pineda@primephilippines.com"},
+        "Cedtriz Rena": {"phone": "0917 555 9012", "email": "cedtriz.rena@primephilippines.com"},
+        "Carlo Medina": {"phone": "0920 986 2764", "email": "carlo.medina@primephilippines.com"},
+        "Dave Policarpio": {"phone": "0917 555 3456", "email": "dave.policarpio@primephilippines.com"},
+        "Irish Rena": {"phone": "0917 555 7890", "email": "irish.rena@primephilippines.com"}
+    }
+    
+    dropdown_options = ["None"] + list(contacts_database.keys())
+    
+    cta1_selection = dynamic_selector_row("📞", "CTA 1 - Dropdown", dropdown_options, "web_cta1")
+    cta2_selection = dynamic_selector_row("📞", "CTA 2 - Dropdown", dropdown_options, "web_cta2")
         
-        selected_names = [name for name in contacts_database if st.session_state.get(f"state_cb_{name}{run_suffix}", False)]
-        current_checked_count = len(selected_names)
-        
-        cb_sub_col1, cb_sub_col2 = st.columns(2)
-        contact_keys = list(contacts_database.keys())
-        
-        for idx, name in enumerate(contact_keys):
-            is_active = st.session_state.get(f"state_cb_{name}{run_suffix}", False)
-            should_freeze = (current_checked_count >= 2 and not is_active)
-            
-            target_sub_column = cb_sub_col1 if idx % 2 == 0 else cb_sub_col2
-            with target_sub_column:
-                st.checkbox(name, key=f"state_cb_{name}{run_suffix}", disabled=should_freeze)
-                
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col_right:
@@ -313,17 +300,15 @@ data_inputs = {
 }
 
 # Dynamic Contact parameters mapping aligned to CTA template naming conventions
-for contact_slot in range(2):
-    slot_num = contact_slot + 1
-    name_token  = f"{{{{CTA{slot_num}_NAME}}}}"
-    phone_token = f"{{{{CTA{slot_num}_CONTACT_NUMBER}}}}"
-    email_token = f"{{{{CTA{slot_num}_EMAIL_ADDRESS}}}}"
+for i, selection in enumerate([cta1_selection, cta2_selection], start=1):
+    name_token  = f"{{{{CTA{i}_NAME}}}}"
+    phone_token = f"{{{{CTA{i}_CONTACT_NUMBER}}}}"
+    email_token = f"{{{{CTA{i}_EMAIL_ADDRESS}}}}"
     
-    if contact_slot < len(selected_names):
-        target_name = selected_names[contact_slot]
-        data_inputs[name_token]  = target_name
-        data_inputs[phone_token] = contacts_database[target_name]["phone"]
-        data_inputs[email_token] = contacts_database[target_name]["email"]
+    if selection and selection != "None":
+        data_inputs[name_token]  = selection
+        data_inputs[phone_token] = contacts_database[selection]["phone"]
+        data_inputs[email_token] = contacts_database[selection]["email"]
     else:
         data_inputs[name_token]  = ""
         data_inputs[phone_token] = ""
