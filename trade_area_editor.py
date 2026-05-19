@@ -7,7 +7,6 @@ def render_editor_workspace():
     Decoupled Feature Editing Module Workspace.
     Inherits active spatial arrays from global system session states.
     """
-    # --- SIDEBAR INTERFACE NAVIGATION CONTROL ---
     with st.sidebar:
         st.markdown('<div class="brand-title">Feature Editor</div>', unsafe_allow_html=True)
         
@@ -18,7 +17,6 @@ def render_editor_workspace():
             unsafe_allow_html=True
         )
         
-        # Core Navigation Module Loop Reset
         if st.button("← BACK TO SCANNER", type="secondary", use_container_width=True):
             st.session_state.active_module = "SCANNER"
             st.rerun()
@@ -31,7 +29,6 @@ def render_editor_workspace():
             unsafe_allow_html=True
         )
 
-    # --- RETRIEVE ACTIVE RENDERING COORDINATES AND TARGET DATASETS ---
     coords_val = st.session_state.get("geo_coords", "14.5995, 120.9842")
     radius_val = st.session_state.get("geo_radius", 1000)
     scanned_records = st.session_state.get("scanned_records", [])
@@ -39,7 +36,6 @@ def render_editor_workspace():
     coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
     lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.5995, 120.9842)
 
-    # Normalize records to ensure uniform structural safety keys exist
     for idx, record in enumerate(scanned_records):
         if "_uid" not in record: record["_uid"] = idx
         if "visible" not in record: record["visible"] = True
@@ -58,7 +54,6 @@ def render_editor_workspace():
 
     geojson_str = json.dumps(scanned_records)
 
-    # --- ADVANCED LEAFLET INTERACTIVE CORE ENGINE TEMPLATE ---
     editor_leaflet_template = """
     <!DOCTYPE html>
     <html>
@@ -75,7 +70,6 @@ def render_editor_workspace():
             body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
             #map { height: 100vh; width: 100%; z-index: 1; }
             
-            /* RESULT LOG PANEL ACCORDION ACCENTS */
             #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 250px; max-height: calc(50vh - 20px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
             .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
             .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
@@ -92,7 +86,6 @@ def render_editor_workspace():
             .visibility-toggle-icon:hover { color: #003366; }
             .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
             
-            /* CONTEXT-AWARE SLIDING LAYER PROP CONTROL PANEL */
             #feature-properties-panel {
                 position: absolute; bottom: 10px; right: 10px; z-index: 1000; background: #ffffff;
                 width: 250px; height: calc(50vh - 10px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1);
@@ -205,7 +198,6 @@ def render_editor_workspace():
             
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-            // INITIALIZE LEAFLET GEOMAN PACK WITH COMPLIANT CONFIG (IMAGE 1 EXPLICIT)
             map.pm.addControls({
                 position: 'topleft',
                 drawMarker: true,
@@ -216,15 +208,12 @@ def render_editor_workspace():
                 removalMode: true
             });
 
-            // Anchor Core Anchor Ring Settings
             L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.05 }).addTo(map);
 
             let pts = __GEOJSON__;
             let selectedFeatureReference = null;
             let selectedLayerReference = null;
-            const categoryMetaMap = {};
 
-            // Dynamic Custom Vector Pin Generator
             function renderVectorPinIcon(color, shape, size, symbol) {
                 let svgContent = '';
                 const baseSize = size || 24;
@@ -233,7 +222,7 @@ def render_editor_workspace():
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${baseSize}" height="${baseSize}"><circle cx="12" cy="12" r="10" fill="${color}" stroke="#ffffff" stroke-width="1.5"/><text x="12" y="15" font-family="Material Symbols Rounded" font-size="10px" fill="#ffffff" text-anchor="middle">${symbol || ''}</text></svg>`;
                 } else if (shape === 'square') {
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${baseSize}" height="${baseSize}"><rect x="2" y="2" width="20" height="20" rx="4" fill="${color}" stroke="#ffffff" stroke-width="1.5"/><text x="12" y="15" font-family="Material Symbols Rounded" font-size="10px" fill="#ffffff" text-anchor="middle">${symbol || ''}</text></svg>`;
-                } else { // Standard Geometric Tail Pin
+                } else {
                     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${baseSize}" height="${baseSize}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/><text x="12" y="10" font-family="Material Symbols Rounded" font-size="8px" fill="#ffffff" text-anchor="middle">${symbol || ''}</text></svg>`;
                 }
 
@@ -246,7 +235,6 @@ def render_editor_workspace():
                 });
             }
 
-            // Bind Vector Geometries to Canvas Context Loop
             function initializeFeaturesOnCanvas() {
                 pts.forEach(p => {
                     let layerInstance;
@@ -256,7 +244,6 @@ def render_editor_workspace():
                     } else if (p.geom_type === 'Polyline') {
                         layerInstance = L.polyline(p.coordinates, { color: p.style.color, weight: p.style.weight });
                     } else {
-                        // Standard Point Asset Configuration Type
                         const customIcon = renderVectorPinIcon(p.style.color, p.style.icon_shape, p.style.icon_size, p.style.icon_symbol);
                         layerInstance = L.marker([p.lat, p.lon], { icon: customIcon });
                     }
@@ -266,7 +253,6 @@ def render_editor_workspace():
 
                     if (p.visible) { layerInstance.addTo(map); }
 
-                    // Apply Dynamic Inward Event Selection Binding Hooks
                     layerInstance.on('click', function(e) {
                         L.DomEvent.stopPropagation(e);
                         loadFeatureToPropertiesPanel(p, layerInstance);
@@ -276,7 +262,6 @@ def render_editor_workspace():
                 generateAccordionWorkspaceList();
             }
 
-            // Geoman Geometry Vector Instantiation Hook Listener (Directive 1 Compliance)
             map.on('pm:create', function(e) {
                 const layer = e.layer;
                 const shapeType = e.shape;
@@ -324,12 +309,10 @@ def render_editor_workspace():
                 loadFeatureToPropertiesPanel(recordPayload, layer);
             });
 
-            // Listen to edits on drawn tracking nodes to intercept coordinate adjustments
             map.on('pm:edit', function(e) {
                 generateAccordionWorkspaceList();
             });
 
-            // Context Layout Properties Slider Population Protocol (Directive 2 Variant UI Sync)
             function loadFeatureToPropertiesPanel(feature, layer) {
                 selectedFeatureReference = feature;
                 selectedLayerReference = layer;
@@ -372,7 +355,6 @@ def render_editor_workspace():
                 selectedLayerReference = null;
             }
 
-            // Real-time Style Commit Handler Pipeline
             function commitActiveStyleModifications() {
                 if (!selectedFeatureReference) return;
 
@@ -416,7 +398,6 @@ def render_editor_workspace():
                 }
             }
 
-            // Render Layer Toggles & Accordions (Directive 3 Granular Compliance)
             function generateAccordionWorkspaceList() {
                 const listBox = document.getElementById('results-list-box');
                 document.getElementById('results-count').innerText = pts.length;
@@ -482,7 +463,6 @@ def render_editor_workspace():
                 }
             }
 
-            // Execution Visibility Matrix Core Logic Layer (Directive 3 Checkbox Parity)
             function executeVisibilityMatrixToggle(uid) {
                 const feature = pts.find(p => p._uid === uid);
                 if (!feature) return;
@@ -499,7 +479,6 @@ def render_editor_workspace():
                 generateAccordionWorkspaceList();
             }
 
-            // Global Folder Renaming Controller
             function globallyRenameFolder(inputElement, analyticalOldKey) {
                 const cleanNewKey = inputElement.value.trim();
                 if (!cleanNewKey || cleanNewKey === analyticalOldKey) return;
@@ -520,12 +499,10 @@ def render_editor_workspace():
     </html>
     """
 
-    # Format execution overrides cleanly passing string matrices
     leaflet_html_rendered = (editor_leaflet_template
                              .replace("__LAT__", str(render_lat))
                              .replace("__LON__", str(render_lon))
                              .replace("__RADIUS__", str(radius_val))
                              .replace("__GEOJSON__", geojson_str))
 
-    # Output full bleed workspace mapping structure frame
     st.components.v1.html(leaflet_html_rendered, height=850, scrolling=False)
