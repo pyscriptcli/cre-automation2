@@ -197,10 +197,21 @@ def compile_features_kml(features):
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
-# 5. SIDEBAR WORKSPACE & OSM GEOCODING LOGIC
+# 5. SIDEBAR WORKSPACE
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Trade Area Scan</div>', unsafe_allow_html=True)
+    
+    # NATIVE CONTROL WORKSPACE ROUTER (Replaces JavaScript Triggers)
+    workspace_mode = st.radio(
+        "WORKSPACE ENGINE MODE",
+        options=["SCANNER MODE", "VECTOR EDITOR MODE"],
+        index=0 if st.session_state.active_module == "SCANNER" else 1,
+        key="workspace_mode_selector"
+    )
+    
+    # Sync radio state directly to operational state
+    st.session_state.active_module = "SCANNER" if workspace_mode == "SCANNER MODE" else "EDITOR"
     
     location_input = st.text_input("LOCATION SEARCH OR COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input", label_visibility="visible")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
