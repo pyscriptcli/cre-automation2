@@ -104,9 +104,9 @@ st.markdown("""
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 30px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
 
-        /* STICKY BUTTON OVERRIDES */
-        .st-key-scan_btn { position: sticky !important; bottom: 35px !important; z-index: 100 !important; background-color: var(--bg-offwhite) !important; padding-top: 10px !important; }
-        .st-key-clear_btn { position: sticky !important; bottom: 0px !important; z-index: 100 !important; background-color: var(--bg-offwhite) !important; padding-bottom: 20px !important; margin-top: -10px !important; border-top: none !important; }
+        /* STICKY BUTTON OVERRIDES - FIXED OVERLAP */
+        .st-key-scan_btn { position: sticky !important; bottom: 38px !important; z-index: 100 !important; background-color: var(--bg-offwhite) !important; padding-top: 15px !important; margin-bottom: 0px !important; border-top: 10px solid var(--bg-offwhite) !important;}
+        .st-key-clear_btn { position: sticky !important; bottom: 0px !important; z-index: 100 !important; background-color: var(--bg-offwhite) !important; padding-bottom: 25px !important; padding-top: 5px !important; margin-top: 0px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -126,7 +126,7 @@ POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
     "RESIDENTIAL": [['Apartments', '"building"="apartments"'], ['House', '"building"="house"'], ['Residential Area', '"landuse"="residential"'], ['Condominium', '"building"="residential"']],
     "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i'], ['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"']],
-    "FOOD AND BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"']],
+    "FOOD AND BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"']],
     "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports & Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'], ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses & Depots', '"building"~"warehouse|depot",i'], ['Storage Facilities', '"building"="storage"'], ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']],
     "GOVERNMENT & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i']],
     "SCHOOLS": [['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"']]
@@ -135,7 +135,6 @@ POI_CONFIG = {
 ADVANCED_CONFIG = {
     "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Clinic', '"amenity"="clinic"'], ['Embassy', '"amenity"="embassy"'], ['Firestation', '"amenity"="fire_station"'], ['Fuel', '"amenity"="fuel"'], ['Hospital', '"amenity"="hospital"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Parking', '"amenity"="parking"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police', '"amenity"="police"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['University', '"amenity"="university"']],
     "PLACE OF WORSHIP": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Casino', '"amenity"="casino"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"']],
-    "FOOD & BEVERAGE": [['Bar', '"amenity"="bar"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Cafe', '"amenity"="cafe"'], ['Fast food', '"amenity"="fast_food"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Restaurant', '"amenity"="restaurant"']],
     "SPORTS": [['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"']],
     "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
 }
@@ -149,20 +148,48 @@ def compile_features_kml(features):
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
-# 3. SIDEBAR WORKSPACE
+# 3. SIDEBAR WORKSPACE & OSM GEOCODING LOGIC
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Trade Area Scan</div>', unsafe_allow_html=True)
     
-    coords_val = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input", label_visibility="visible")
+    # Dual-purpose Location Search & Coordinates Input
+    location_input = st.text_input("LOCATION SEARCH OR COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input", label_visibility="visible")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
 
-    # Sync back inputs to session state
-    st.session_state.geo_coords = coords_val
     st.session_state.geo_radius = radius_val
 
-    coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
-    lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.5995, 120.9842)
+    coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
+    
+    if coord_match:
+        lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
+        st.session_state.geo_coords = location_input
+    else:
+        if location_input and location_input != st.session_state.get('last_geocoded_query', ''):
+            with st.spinner("Locating via OpenStreetMap..."):
+                try:
+                    headers = {'User-Agent': 'TradeAreaScan/3.1'}
+                    osm_url = f"https://nominatim.openstreetmap.org/search?q={location_input}&format=json&limit=1"
+                    resp = requests.get(osm_url, headers=headers, timeout=10).json()
+                    
+                    if resp:
+                        new_lat = float(resp[0]['lat'])
+                        new_lon = float(resp[0]['lon'])
+                        st.session_state.geo_coords = f"{new_lat:.5f}, {new_lon:.5f}"
+                        st.session_state.last_geocoded_query = location_input
+                        st.rerun()
+                    else:
+                        st.error("Location not found.")
+                        lat_coord, lon_coord = 14.5995, 120.9842 
+                except Exception:
+                    st.error("API Error: Nominatim Timeout")
+                    lat_coord, lon_coord = 14.5995, 120.9842
+        else:
+            fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+            if fallback_match:
+                lat_coord, lon_coord = float(fallback_match.group(1)), float(fallback_match.group(2))
+            else:
+                lat_coord, lon_coord = 14.5995, 120.9842
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
@@ -189,6 +216,7 @@ with st.sidebar:
 
     st.markdown("<br>", unsafe_allow_html=True)
     
+    # STICKY ACTION BUTTONS
     if st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn"):
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -215,7 +243,6 @@ with st.sidebar:
 
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
         st.session_state.scanned_records = []
-        # Clear all checkbox states systematically
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"):
                 st.session_state[key] = False
@@ -237,7 +264,6 @@ with st.sidebar:
             if st.button("LOAD", type="secondary", use_container_width=True):
                 try:
                     data = json.load(imported_file)
-                    # Support both old format and new project structure
                     st.session_state.scanned_records = data.get("scanned_records", data)
                     st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
                     st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
@@ -342,16 +368,11 @@ leaflet_template = """
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
         map.zoomControl.setPosition('topleft');
 
-        // VERTICAL TOOLBAR: Share -> Layers -> Save
         const toolbarControl = L.control({position: 'topleft'});
         toolbarControl.onAdd = function (map) {
             const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom-stack');
-            
-            // Share SVG
             const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="#003366"><path d="M720-80q-50 0-85-35t-35-85q0-7 1-14.5t3-13.5L322-392q-17 15-38 23.5t-44 8.5q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 44 8.5t38 23.5l282-164q-2-6-2.5-13.5T600-760q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-44-8.5T638-672L356-508q2 6 2.5 13.5t.5 14.5q0 7-.5 14.5T356-452l282 164q17-15 38-23.5t44-8.5q50 0 85 35t35 85q0 50-35 85t-85 35Z"/></svg>`;
-            // Layers SVG
             const layersIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="m116-435 364-199 364 199-364 199-364-199Zm0 157 364 199 364-199-47-26-317 173-317-173-47 26Zm364-257 267-146-267-146-267 146 267 146Z"/></svg>`;
-            // Save SVG
             const saveIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM480-240q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>`;
 
             div.innerHTML = `
