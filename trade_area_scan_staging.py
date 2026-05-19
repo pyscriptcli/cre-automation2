@@ -27,6 +27,45 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# CROSS-FRAME MESSAGE INTERCEPTOR FOR ZERO-LATENCY MODE SWITCHING
+st.markdown("""
+    <script>
+        if (!window.hasEditMessageListener) {
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.action === 'open_editor') {
+                    // Search parent DOM for native hidden trigger button and dispatch click event
+                    const buttons = document.querySelectorAll('button');
+                    for (let btn of buttons) {
+                        if (btn.textContent && btn.textContent.trim() === 'HIDDEN_EDIT_TRIGGER') {
+                            btn.click();
+                            break;
+                        }
+                    }
+                }
+            });
+            window.hasEditMessageListener = true;
+        }
+
+        // Periodically verify and shift the hidden button position completely offscreen
+        const hideInterval = setInterval(() => {
+            const buttons = document.querySelectorAll('button');
+            for (let btn of buttons) {
+                if (btn.textContent && btn.textContent.trim() === 'HIDDEN_EDIT_TRIGGER') {
+                    const parentDiv = btn.closest('.stButton');
+                    if (parentDiv) {
+                        parentDiv.style.position = 'absolute';
+                        parentDiv.style.top = '-9999px';
+                        parentDiv.style.left = '-9999px';
+                        parentDiv.style.opacity = '0';
+                        parentDiv.style.pointerEvents = 'none';
+                        clearInterval(hideInterval);
+                    }
+                }
+            }
+        }, 100);
+    </script>
+""", unsafe_allow_html=True)
+
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
@@ -112,11 +151,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# NATIVE STREAMLIT BACKEND TRIGGER FOR DECOUPLED CROSS-FRAME INVOCATION
+if st.button("HIDDEN_EDIT_TRIGGER", key="hidden_edit_trigger_btn"):
+    st.session_state.active_module = "EDITOR"
+    st.rerun()
+
 # -----------------------------------------------------------------------------
 # 3. INTERFACE DECOUPLING LAYER
 # -----------------------------------------------------------------------------
 if st.session_state.active_module == "EDITOR":
-    # Transfer complete layout state control over to the editor sub-module
     try:
         import trade_area_editor
         trade_area_editor.render_editor_workspace()
@@ -125,7 +168,7 @@ if st.session_state.active_module == "EDITOR":
         if st.button("RESET TO CORE SCANNER"):
             st.session_state.active_module = "SCANNER"
             st.rerun()
-    st.stop()  # Terminate top-level loop context execution immediately to let editor render cleanly
+    st.stop()
 
 # -----------------------------------------------------------------------------
 # 4. STATE PERSISTENCE & DATA MODELS
@@ -138,13 +181,6 @@ if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_R
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
-
-# Catch runtime messaging inputs back from the Leaflet Component Context
-query_params = st.query_params
-if "action" in query_params and query_params["action"] == "open_editor":
-    st.query_params.clear()
-    st.session_state.active_module = "EDITOR"
-    st.rerun()
 
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
@@ -307,7 +343,7 @@ leaflet_template = """
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2 family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map { height: 100vh; width: 100%; }
@@ -442,10 +478,10 @@ leaflet_template = """
             const saveIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM480-240q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>`;
 
             div.innerHTML = `
-                <a title="Copy View-Only Link" onclick="generateShareLink(event)">${shareIcon}</a>
-                <a title="Toggle Layers" onclick="toggleLayerMenu(event)">${layersIcon}</a>
-                <a title="Open Feature Editor Module" onclick="triggerEditorRoute(event)" style="background: #f8fafc; border-left: 2px solid #C9AB4C;">${editIcon}</a>
-                <a title="Save Project Settings" onclick="saveProjectSettings(event)" style="border-top: 1px solid #ccc;">${saveIcon}</a>
+                <a title="Copy View-Only Link" onclick="generateShareLink(event)">\${shareIcon}</a>
+                <a title="Toggle Layers" onclick="toggleLayerMenu(event)">\${layersIcon}</a>
+                <a title="Open Feature Editor Module" onclick="triggerEditorRoute(event)" style="background: #f8fafc; border-left: 2px solid #C9AB4C;">\${editIcon}</a>
+                <a title="Save Project Settings" onclick="saveProjectSettings(event)" style="border-top: 1px solid #ccc;">\${saveIcon}</a>
             `;
             return div;
         };
@@ -453,8 +489,8 @@ leaflet_template = """
 
         function triggerEditorRoute(e) {
             e.preventDefault();
-            // Force parameter string injection to gracefully bypass sandbox limitations and alert Streamlit engine
-            window.location.search = "?action=open_editor";
+            // Dispatches secure postMessage notification packet directly to the root Streamlit application container
+            window.parent.postMessage({ action: 'open_editor' }, '*');
         }
 
         function generateShareLink(e) {
@@ -544,8 +580,8 @@ leaflet_template = """
         });
         
         const createPinIcon = (color) => {
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
-            return L.divIcon({ html: `<div class="custom-pin-container">${svg}</div>`, className: '', iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24] });
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="\${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
+            return L.divIcon({ html: `<div class="custom-pin-container">\text{\${svg}}</div>`, className: '', iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24] });
         };
 
         Object.keys(categoryMap).forEach(key => {
@@ -574,23 +610,23 @@ leaflet_template = """
             Object.keys(categoryMap).forEach(catName => {
                 const dotColor = categoryColors[catName];
                 htmlPayload += `
-                    <div class="layer-category-block" id="cat-block-${catName}">
-                        <div class="layer-category-header" onclick="toggleAccordionCollapse('${catName}')">
+                    <div class="layer-category-block" id="cat-block-\${catName}">
+                        <div class="layer-category-header" onclick="toggleAccordionCollapse('\${catName}')">
                             <div class="layer-header-left">
-                                <input type="checkbox" checked onclick="event.stopPropagation(); toggleCategoryVisibility('${catName}', this.checked)">
-                                <span class="color-dot" style="background-color: ${dotColor};"></span>
-                                <span>${catName} <span id="count-${catName}" style="color: #C9AB4C; font-size: 8px;">(${categoryMap[catName].length})</span></span>
+                                <input type="checkbox" checked onclick="event.stopPropagation(); toggleCategoryVisibility('\${catName}', this.checked)">
+                                <span class="color-dot" style="background-color: \text{\${dotColor}};"></span>
+                                <span>\${catName} <span id="count-\${catName}" style="color: #C9AB4C; font-size: 8px;">(\${categoryMap[catName].length})</span></span>
                             </div>
-                            <span id="chevron-${catName}" style="font-size: 8px; color:#C9AB4C;">▼</span>
+                            <span id="chevron-\${catName}" style="font-size: 8px; color:#C9AB4C;">▼</span>
                         </div>
-                        <div class="layer-category-items" id="items-${catName}">
+                        <div class="layer-category-items" id="items-\${catName}">
                 `;
                 categoryMap[catName].forEach(p => {
                     htmlPayload += `
-                    <div class="results-item" id="res-item-${p._uid}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
-                        <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}">${p.name || 'Unknown'}</div>
-                        <div class="delete-poi-icon" title="Remove POI" onclick="event.stopPropagation(); removePoiInstance(${p._uid}, '${catName}')">
-                            ${trashSvg}
+                    <div class="results-item" id="res-item-\${p._uid}" onclick="map.flyTo([\${p.lat}, \text{\${p.lon}}], 17);">
+                        <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="\${p.name || 'Unknown'}">\${p.name || 'Unknown'}</div>
+                        <div class="delete-poi-icon" title="Remove POI" onclick="event.stopPropagation(); removePoiInstance(\${p._uid}, '\${catName}')">
+                            \${trashSvg}
                         </div>
                     </div>`;
                 });
@@ -611,10 +647,10 @@ leaflet_template = """
             
             const countEl = document.getElementById('count-' + catKey);
             if(countEl) {
-                const match = countEl.innerText.match(/\\d+/);
+                const match = countEl.innerText.match(/\\\\d+/);
                 if(match) {
                     const newCount = parseInt(match[0]) - 1;
-                    countEl.innerText = `(${newCount})`;
+                    countEl.innerText = `(\${newCount})`;
                     if (newCount === 0) { document.getElementById('cat-block-' + catKey).style.display = 'none'; }
                 }
             }
@@ -640,9 +676,9 @@ leaflet_template = """
             const menuHtml = `
                 <div style="font-family: Montserrat, sans-serif; font-size: 9px; color: #003366; min-width: 140px;">
                     <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">ACTIONS</div>
-                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">Copy Coordinates</div>
-                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?q=${lat},${lng}', '_blank'); map.closePopup();">Google Maps</div>
-                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Google Streetview</div>
+                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="navigator.clipboard.writeText('\text{\${coordStr}}'); map.closePopup();">Copy Coordinates</div>
+                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?q=${lat},\${lng}', '_blank'); map.closePopup();">Google Maps</div>
+                    <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},\${lng}', '_blank'); map.closePopup();">Google Streetview</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
