@@ -103,10 +103,8 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 30px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
-
-        /* STICKY BUTTON OVERRIDES - FIXED OVERLAP */
-        .st-key-scan_btn { position: sticky !important; bottom: 38px !important; z-index: 100 !important; background-color: var(--bg-offwhite) !important; padding-top: 15px !important; margin-bottom: 0px !important; border-top: 10px solid var(--bg-offwhite) !important;}
-        .st-key-clear_btn { position: sticky !important; bottom: 0px !important; z-index: 100 !important; background-color: var(--bg-offwhite) !important; padding-bottom: 25px !important; padding-top: 5px !important; margin-top: 0px !important; }
+        
+        /* OVERRIDES REMOVED: Scan Area and Clear Canvas are now standard document flow */
     </style>
 """, unsafe_allow_html=True)
 
@@ -216,7 +214,7 @@ with st.sidebar:
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # STICKY ACTION BUTTONS
+    # ACTION BUTTONS (NON-PERSISTENT)
     if st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn"):
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -307,8 +305,8 @@ leaflet_template = """
             font-size: 11px; font-family: 'Montserrat', sans-serif; font-weight: 600; color: #003366; background: #ffffff; outline: none; box-sizing: border-box; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
         }
         #map-search:focus { border-bottom: 2px solid #C9AB4C; }
-        #search-results { position: absolute; top: 38px; left: 0; width: 100%; background: #ffffff; border-radius: 2px; display: none; max-height: 250px; overflow-y: auto; border: 1px solid rgba(0, 51, 102, 0.1); box-sizing: border-box; z-index: 1001; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
-        .search-item { padding: 8px 12px; font-size: 10px; font-weight: 600; cursor: pointer; border-bottom: 1px solid #f8fafc; color: #003366; }
+        #search-results { position: absolute; top: 38px; left: 0; width: 100%; background: #ffffff; border-radius: 2px; display: none; max-height: 250px; overflow-x: hidden; overflow-y: auto; border: 1px solid rgba(0, 51, 102, 0.1); box-sizing: border-box; z-index: 1001; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
+        .search-item { padding: 8px 12px; font-size: 10px; font-weight: 600; cursor: pointer; border-bottom: 1px solid #f8fafc; color: #003366; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .search-item:hover { background: #f8fafc; color: #C9AB4C; }
 
         #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 250px; max-height: calc(100vh - 20px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
@@ -341,7 +339,7 @@ leaflet_template = """
     <div id="map"></div>
     
     <div id="search-container">
-        <input type="text" id="map-search" placeholder="Search coordinates..." onkeyup="handleSearch(event)">
+        <input type="text" id="map-search" placeholder="Search coordinates or addresses..." onkeyup="handleSearch(event)">
         <div id="search-results"></div>
     </div>
 
@@ -367,6 +365,52 @@ leaflet_template = """
     <script>
         const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
         map.zoomControl.setPosition('topleft');
+
+        // MAP SEARCH LOGIC WITH NOMINATIM TYPEAHEAD
+        let searchTimeout = null;
+        function handleSearch(e) {
+            clearTimeout(searchTimeout);
+            const query = e.target.value;
+            const resultsDiv = document.getElementById('search-results');
+            
+            if (query.length < 3) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.length > 0) {
+                            resultsDiv.innerHTML = '';
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'search-item';
+                                div.innerText = item.display_name;
+                                div.title = item.display_name;
+                                div.onclick = () => {
+                                    map.flyTo([item.lat, item.lon], 16);
+                                    resultsDiv.style.display = 'none';
+                                    document.getElementById('map-search').value = item.display_name;
+                                };
+                                resultsDiv.appendChild(div);
+                            });
+                            resultsDiv.style.display = 'block';
+                        } else {
+                            resultsDiv.style.display = 'none';
+                        }
+                    })
+                    .catch(err => console.error(err));
+            }, 500);
+        }
+
+        // Close search results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!document.getElementById('search-container').contains(e.target)) {
+                document.getElementById('search-results').style.display = 'none';
+            }
+        });
 
         const toolbarControl = L.control({position: 'topleft'});
         toolbarControl.onAdd = function (map) {
