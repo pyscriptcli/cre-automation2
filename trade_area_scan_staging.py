@@ -16,7 +16,7 @@ if not os.path.exists(_config_file):
 # 1. BRANDED BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Trade Area Scan Staging",
+    page_title="Trade Area Scan",
     layout="wide",
     initial_sidebar_state="expanded"
 )
