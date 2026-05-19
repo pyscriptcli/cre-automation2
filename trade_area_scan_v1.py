@@ -264,7 +264,7 @@ with st.sidebar:
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    if st.button("EXECUTE SCAN", type="secondary", use_container_width=True):
+    if st.button("SCAN AREA", type="secondary", use_container_width=True):
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
         else:
