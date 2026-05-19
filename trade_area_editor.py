@@ -36,6 +36,14 @@ def render_editor_workspace():
     coord_match = re.match(r"(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", coords_val)
     lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.5995, 120.9842)
 
+    # --- FIX: INJECT MISSING CONNECTOR VARIABLES ---
+    render_lat = lat_coord
+    render_lon = lon_coord
+
+    for idx, record in enumerate(scanned_records):
+        if "_uid" not in record: record["_uid"] = idx
+        if "visible" not in record: record["visible"] = True
+
     for idx, record in enumerate(scanned_records):
         if "_uid" not in record: record["_uid"] = idx
         if "visible" not in record: record["visible"] = True
