@@ -183,7 +183,7 @@ def convert_pptx_to_pdf(pptx_bytes):
     return None
 
 # --- STREAMLIT STATE INITIALIZATION ---
-st.set_page_config(page_title="Property Deck Generator", layout="wide")
+st.set_page_config(page_title="Presentation Generator", layout="wide")
 st.markdown(LUXURY_CRE_SYSTEM, unsafe_allow_html=True)
 
 if "form_run" not in st.session_state:
@@ -261,8 +261,8 @@ with col_left:
     
     dropdown_options = ["None"] + list(contacts_database.keys())
     
-    cta1_selection = dynamic_selector_row("📞", "CTA 1 - Dropdown", dropdown_options, "web_cta1")
-    cta2_selection = dynamic_selector_row("📞", "CTA 2 - Dropdown", dropdown_options, "web_cta2")
+    cta1_selection = dynamic_selector_row("📞", "CTA 1", dropdown_options, "web_cta1")
+    cta2_selection = dynamic_selector_row("📞", "CTA 2", dropdown_options, "web_cta2")
         
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -342,7 +342,7 @@ with action_col2:
         if st.button("GENERATE", key="generate_btn_key", use_container_width=True):
             with st.spinner("Processing template slide assets and applying smart crops..."):
                 try:
-                    prs = Presentation(u_template)
+                    prs = (u_template)
                     
                     for slide in prs.slides:
                         shapes_to_delete = []
@@ -384,7 +384,7 @@ with action_col2:
                     prs.save(pptx_stream)
                     raw_pptx_bytes = pptx_stream.getvalue()
                     
-                    st.markdown("""<div style="border-left: 4px solid #C5A059; background-color: #FFFFFF; padding: 16px; border-top: 1px solid #002B49; border-right: 1px solid #002B49; border-bottom: 1px solid #002B49; margin-top: 20px; text-align: center; color: #002B49; font-weight: 700; font-size: 13px; letter-spacing: 0.05em;">🎉 PRESENTATION COMPILED SUCCESSFULLY! READY FOR PRODUCTION DOWNLOAD.</div>""", unsafe_allow_html=True)
+                    st.markdown("""<div style="border-left: 4px solid #C5A059; background-color: #FFFFFF; padding: 16px; border-top: 1px solid #002B49; border-right: 1px solid #002B49; border-bottom: 1px solid #002B49; margin-top: 20px; text-align: center; color: #002B49; font-weight: 700; font-size: 13px; letter-spacing: 0.05em;">GENERATED SUCCESSFULLY!</div>""", unsafe_allow_html=True)
                     st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
                     
                     safe_filename = f"PIS_{prop_location.replace(' ', '_')}"
@@ -402,7 +402,7 @@ with action_col2:
                             )
                     else:
                         st.download_button(
-                            label="📥 DOWNLOAD BRANDED PPTX DECK",
+                            label="DOWNLOAD",
                             data=raw_pptx_bytes,
                             file_name=f"{safe_filename}.pptx",
                             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
