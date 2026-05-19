@@ -244,6 +244,9 @@ with col_left:
     escalation    = dynamic_form_row("📈", "Rental Escalation", "cre_esc")
     lease_term    = dynamic_form_row("📅", "Lease Term", "cre_term")
     handover      = dynamic_form_row("🏗️", "Handover Condition", "cre_hand")
+    # --- NEW PROPERTY HIGHLIGHTS CAPTURE ROWS ---
+    prop_high1    = dynamic_form_row("✨", "Property Highlight 1", "cre_high1")
+    prop_high2    = dynamic_form_row("✨", "Property Highlight 2", "cre_high2")
     
     # --- SIMPLIFIED REVERTED CALL TO ACTION SECTOR ---
     cta_col1, cta_col2 = st.columns([9, 11])
@@ -251,13 +254,13 @@ with col_left:
         st.markdown('<div class="row-metric-label"><span class="large-icon">📞</span> CALL TO ACTION</div>', unsafe_allow_html=True)
     with cta_col2:
         contacts_database = {
-            "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
+            "Sondi Tuazon": {"phone": "0917 843 6128/ 02 7959 3561", "email": "sondi.tuazon@primephilippines.com"},
             "Meliza Zapata": {"phone": "0917 555 1234", "email": "meliza.zapata@primephilippines.com"},
             "Dykstra Pineda": {"phone": "0917 555 5678", "email": "dykstra.pineda@primephilippines.com"},
             "Cedtriz Rena": {"phone": "0917 555 9012", "email": "cedtriz.rena@primephilippines.com"},
             "Carlo Medina": {"phone": "0920 986 2764", "email": "carlo.medina@primephilippines.com"},
             "Dave Policarpio": {"phone": "0917 555 3456", "email": "dave.policarpio@primephilippines.com"},
-            "Irish Rena": {"phone": "0917 555 7890", "email": "irish.rena@primephilippines.com"}
+            "Irish Rima": {"phone": "0000 000 0000", "email": "irish.rima@primephilippines.com"}
         }
         
         selected_names = [name for name in contacts_database if st.session_state.get(f"state_cb_{name}{run_suffix}", False)]
@@ -299,21 +302,22 @@ with col_right:
     export_format = dynamic_selector_row("📄", "Export Format", ["PPTX (PowerPoint)", "PDF (Adobe Acrobat)"], "web_format")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Compile text data tokens
+# Compile text data tokens including new slide highlights
 data_inputs = {
     "{{PROPERTY_LOCATION}}": prop_location, "{{PROPERTY_SIZE}}": prop_size,
     "{{PROPERTY_TYPE}}": prop_type, "{{PROPERTY_ADDRESS}}": prop_address,
     "{{LEASE_RATES}}": lease_rates, "{{SECURITY_DEPOSIT}}": sec_deposit,
     "{{ADVANCE_RENT}}": adv_rent, "{{ESCALATION}}": escalation,
-    "{{LEASE TERM}}": lease_term, "{{HANDOVER CONDITION}}": handover
+    "{{LEASE TERM}}": lease_term, "{{HANDOVER CONDITION}}": handover,
+    "{{PROPERTY_HIGHLIGHTS1}}": prop_high1, "{{PROPERTY_HIGHLIGHTS2}}": prop_high2
 }
 
-# Dynamic Contact parameters mapping utilizing pure string concatenation loops
+# Dynamic Contact parameters mapping aligned to CTA template naming conventions
 for contact_slot in range(2):
     slot_num = contact_slot + 1
-    name_token  = "{{CONTACT_NAME_"  + str(slot_num) + "}}"
-    phone_token = "{{CONTACT_PHONE_" + str(slot_num) + "}}"
-    email_token = "{{CONTACT_EMAIL_" + str(slot_num) + "}}"
+    name_token  = f"{{{{CTA{slot_num}_NAME}}}}"
+    phone_token = f"{{{{CTA{slot_num}_CONTACT_NUMBER}}}}"
+    email_token = f"{{{{CTA{slot_num}_EMAIL_ADDRESS}}}}"
     
     if contact_slot < len(selected_names):
         target_name = selected_names[contact_slot]
@@ -324,9 +328,9 @@ for contact_slot in range(2):
         data_inputs[name_token]  = ""
         data_inputs[phone_token] = ""
         data_inputs[email_token] = ""
-
+        
 image_inputs = {
-    "{{PROPERTY_PHOTO 1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map,
+    "{{PROPERTY_PHOTO1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map,
     "{{PROPERTY_LOTPLAN}}": u_lotplan, "{{PROPERTY_PHOTO2}}": u_photo2,
     "{{PROPERTY_PHOTO3}}": u_photo3
 }
@@ -350,7 +354,7 @@ with action_col2:
     if u_template is None:
         st.markdown("<div style='padding-top:16px; font-size:12px; font-weight:700; color:#002B49; text-align:right; letter-spacing:0.04em;'>⚠️ UPLOAD A MASTER PPTX BLUEPRINT TO MOUNT GENERATION FUNCTIONS.</div>", unsafe_allow_html=True)
     else:
-        if st.button("⚙️ GENERATE DECK", key="generate_btn_key", use_container_width=True):
+        if st.button("GENERATE", key="generate_btn_key", use_container_width=True):
             with st.spinner("Processing template slide assets and applying smart crops..."):
                 try:
                     prs = Presentation(u_template)
