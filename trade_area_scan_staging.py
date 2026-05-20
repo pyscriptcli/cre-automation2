@@ -364,7 +364,7 @@ def get_unified_leaflet_template() -> str:
 
             /* Map UI Controls & State Toggle Pill */
             .mode-toggle-container { display: flex; background: #ffffff; border-radius: 30px; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.15); overflow: hidden; border: 2px solid #003366; pointer-events: auto; }
-            .mode-toggle-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 11px; font-weight: 800; font-family: 'Montserrat', sans-serif; color: #003366; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; }
+            .mode-toggle-btn { display: flex; align-items: center; gap: 6px;}} padding: 8px 16px; font-size: 11px; font-weight: 800; font-family: 'Montserrat', sans-serif; color: #003366; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; }}
             .mode-toggle-btn.active { background: #003366; color: #C9AB4C; }
             .mode-toggle-btn:not(.active):hover { background: #f8fafc; }
             .mode-toggle-btn span { font-size: 18px; }
