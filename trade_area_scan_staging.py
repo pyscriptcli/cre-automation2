@@ -356,11 +356,11 @@ ADVANCED_CONFIG: Dict[str, List[List[str]]] = {
 def escape_xml(text: str) -> str:
     """Escape XML/KML special characters safely."""
     return (
-        text.replace("&", "&")
-        .replace("<", "<")
-        .replace(">", ">")
-        .replace('"', """)
-        .replace("'", "'")
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
     )
 
 
