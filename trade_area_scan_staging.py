@@ -83,6 +83,7 @@ st.set_page_config(
 # =====================================================================
 def apply_global_styles() -> None:
     """Apply branded CSS styles to the entire app."""
+    # NOTE: Double curly braces {{ }} are used here to escape CSS for Python's f-string
     st.markdown(f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
@@ -694,6 +695,7 @@ def render_sidebar() -> None:
 # =====================================================================
 def get_leaflet_unified_template() -> str:
     """Return unified Leaflet map HTML with both Scanning POIs and Geoman Drawing Tools."""
+    # NOTE: Strictly using a standard raw string (no 'f' prefix) to prevent Python from parsing CSS as f-string logic.
     return """
     <!DOCTYPE html>
     <html>
