@@ -800,7 +800,7 @@ def render_sidebar_editor() -> None:
 # =====================================================================
 def get_leaflet_combined_template() -> str:
     """Return Unified Leaflet map HTML supporting both SCAN and EDITOR client-side toggling."""
-    return
+    return """
     <!DOCTYPE html>
     <html>
     <head>
