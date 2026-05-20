@@ -354,14 +354,17 @@ ADVANCED_CONFIG: Dict[str, List[List[str]]] = {
 # =====================================================================
 
 def escape_xml(text: str) -> str:
-    """Escape XML/KML special characters safely."""
-    return (
-        text.replace("&", "&")
-        .replace("<", "<")
-        .replace(">", ">")
-        .replace('"', """)
-        .replace("'", "'")
-    )
+    """Escape XML/KML special characters safely.
+    Uses string concatenation to prevent Markdown UI renderer stripping entities and breaking Python parity."""
+    if not isinstance(text, str):
+        text = str(text)
+    text = text.replace("&", "&" + "amp;")
+    text = text.replace("<", "&" + "lt;")
+    text = text.replace(">", "&" + "gt;")
+    text = text.replace('"', "&" + "quot;")
+    text = text.replace("'", "&" + "apos;")
+    return text
+
 
 def escape_javascript(text: str) -> str:
     """Escape text for safe injection into JavaScript."""
@@ -695,7 +698,7 @@ def render_sidebar() -> None:
 # =====================================================================
 def get_leaflet_unified_template() -> str:
     """Return unified Leaflet map HTML with both Scanning POIs and Geoman Drawing Tools."""
-    # NOTE: Strictly using a standard raw string (no 'f' prefix) to prevent Python from parsing CSS as f-string logic.
+    # NOTE: Using standard triple quotes. 
     return """
     <!DOCTYPE html>
     <html>
@@ -1314,12 +1317,12 @@ def get_leaflet_unified_template() -> str:
             
             // Map Context Menu
             map.on('contextmenu', function(e) {
-                const coordStr = e.latlng.lat.toFixed(5) + ', ' + e.latlng.lng.toFixed(5);
+                const coordStr = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
                 const menuHtml = `
                     <div style="font-family: Montserrat, sans-serif; font-size: 9px; color: #003366; min-width: 140px;">
                         <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP ACTIONS</div>
                         <div style="padding: 4px 0; cursor: pointer; font-weight: 700;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">Copy Coordinates</div>
-                        <div style="padding: 4px 0; cursor: pointer; font-weight: 700;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?q=${e.latlng.lat},${e.latlng.lng}', '_blank'); map.closePopup();">Google Maps</div>
+                        <div style="padding: 4px 0; cursor: pointer; font-weight: 700;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?q=$${e.latlng.lat},${e.latlng.lng}', '_blank'); map.closePopup();">Google Maps</div>
                     </div>`;
                 L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
             });
