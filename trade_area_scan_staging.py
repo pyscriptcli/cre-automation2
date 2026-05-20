@@ -85,14 +85,14 @@ st.markdown("""
 # [ CONFIGURATION BLOCK: SESSION STATE INITIALIZATION ]
 # Change DEFAULT_COORDS to change the default starting location of the app.
 # =============================================================================
-DEFAULT_COORDS = "14.5995, 120.9842"
-DEFAULT_RADIUS = 1000
+#DEFAULT_COORDS = "14.5995, 120.9842"
+#DEFAULT_RADIUS = 1000
 
-if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
-if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
-if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
-if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
-if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
+#if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
+#if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
+#if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
+#if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
+#if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
 
 # =============================================================================
 # [ CONFIGURATION BLOCK: OVERPASS POI DICTIONARY ]
@@ -199,7 +199,7 @@ with st.sidebar:
 
     if st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn"):
         if not selected_tags:
-            st.error("Select ≥ 1 layer.")
+            st.error("Select ≥ 1 .")
         else:
             statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
             ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
@@ -237,7 +237,7 @@ with st.sidebar:
 # =============================================================================
 # [ CONFIGURATION BLOCK: LEAFLET ENGINE (HTML/JS) ]
 # This is the core spatial brain. It handles Geoman drawing, SortableJS, 
-# dynamic layers, OSRM routing, and inline pop-up style editing.
+# dynamic s, OSRM routing, and inline pop-up style editing.
 # =============================================================================
 geojson_str = json.dumps(st.session_state.scanned_records)
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
@@ -281,16 +281,16 @@ leaflet_template = """
         #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 280px; max-height: calc(100vh - 20px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
         .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; }
         
-        .manage-layers-btn { background: #f8fafc; color: #003366; padding: 6px; text-align: center; font-size: 9px; font-weight: 800; border-bottom: 1px solid #e0e0e0; cursor: pointer; text-transform: uppercase; transition: background 0.2s;}
-        .manage-layers-btn:hover { background: #e0e0e0; }
+        .manage-s-btn { background: #f8fafc; color: #003366; padding: 6px; text-align: center; font-size: 9px; font-weight: 800; border-bottom: 1px solid #e0e0e0; cursor: pointer; text-transform: uppercase; transition: background 0.2s;}
+        .manage-s-btn:hover { background: #e0e0e0; }
 
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
-        .layer-category-block { border-bottom: 1px solid #f0f0f0; background: #fff;}
-        .layer-category-header { background: #ffffff; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; user-select: none; border-left: 3px solid transparent;}
-        .layer-category-header:hover { background: #f8fafc; border-left: 3px solid #C9AB4C;}
-        .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase;}
-        .layer-category-items { padding: 0; background: #f8fafc; min-height: 10px;}
-        .layer-category-items.collapsed { display: none !important; }
+        .-category-block { border-bottom: 1px solid #f0f0f0; background: #fff;}
+        .-category-header { background: #ffffff; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; user-select: none; border-left: 3px solid transparent;}
+        .-category-header:hover { background: #f8fafc; border-left: 3px solid #C9AB4C;}
+        .-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase;}
+        .-category-items { padding: 0; background: #f8fafc; min-height: 10px;}
+        .-category-items.collapsed { display: none !important; }
         
         .results-item { padding: 6px 12px 6px 28px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0; background: #fff;}
         .results-item:hover { background: #f0f4f8; color: #003366; }
@@ -347,8 +347,8 @@ leaflet_template = """
     </div>
 
     <div id="scan-results-panel">
-        <div class="results-header"><span>LAYERS & ASSETS</span><span id="results-count" style="color:#C9AB4C;">0</span></div>
-        <div class="manage-layers-btn" onclick="toggleManageLayers()">⚙️ Manage Layers</div>
+        <div class="results-header"><span>LAYERS</span><span id="results-count" style="color:#C9AB4C;">0</span></div>
+        <div class="manage-layers-btn" onclick="toggleManageLayers()">Manage Layers</div>
         <div class="results-list" id="results-list-box"></div>
         <div class="add-layer-btn" onclick="createNewLayer()">+ Add Custom Layer</div>
     </div>
