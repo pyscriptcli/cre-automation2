@@ -152,7 +152,7 @@ with st.sidebar:
     st.markdown('<div class="brand-title">Trade Area Scan</div>', unsafe_allow_html=True)
     
     # Dual-purpose Location Search & Coordinates Input
-    location_input = st.text_input("LOCATION SEARCH OR COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input", label_visibility="visible")
+    location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input", label_visibility="visible")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
 
     st.session_state.geo_radius = radius_val
