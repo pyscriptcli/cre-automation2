@@ -15,7 +15,7 @@ if not os.path.exists(_config_file):
     with open(_config_file, "w", encoding="utf-8") as f:
         f.write("[theme]\nbase=\"light\"\n")
 
-st.set_page_config(page_title="Trade Area Scan Pro", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Trade Area Scan Playground", layout="wide", initial_sidebar_state="expanded")
 
 # =============================================================================
 # [ CONFIGURATION BLOCK: GLOBAL CSS STYLES ]
@@ -85,14 +85,14 @@ st.markdown("""
 # [ CONFIGURATION BLOCK: SESSION STATE INITIALIZATION ]
 # Change DEFAULT_COORDS to change the default starting location of the app.
 # =============================================================================
-#DEFAULT_COORDS = "14.5995, 120.9842"
-#DEFAULT_RADIUS = 1000
+DEFAULT_COORDS = "14.5995, 120.9842"
+DEFAULT_RADIUS = 1000
 
-#if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
-#if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
-#if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
-#if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
-#if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
+if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
+if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
+if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
+if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
+if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
 
 # =============================================================================
 # [ CONFIGURATION BLOCK: OVERPASS POI DICTIONARY ]
