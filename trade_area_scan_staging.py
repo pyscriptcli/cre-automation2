@@ -1,6 +1,6 @@
 """
-Trade Area Scan - Complete Version with Leaflet Geoman Integration
-Features: SCAN module (POI discovery) + EDITOR module (drawing with Leaflet Geoman)
+Trade Area Scan - Unified Version with Leaflet Geoman Integration
+Features: SCAN module (POI discovery) + EDITOR module (drawing) on ONE Map
 All critical bugs fixed, fully modular, production-ready.
 """
 
@@ -49,8 +49,6 @@ def init_session_state() -> None:
         st.session_state.last_scan_lon = DEFAULT_LON
     if "last_geocoded_query" not in st.session_state:
         st.session_state.last_geocoded_query = ""
-    if "active_module" not in st.session_state:
-        st.session_state.active_module = "SCAN"
     if "editor_layers" not in st.session_state:
         st.session_state.editor_layers = []
     if "active_editor_layer" not in st.session_state:
@@ -174,12 +172,13 @@ def apply_global_styles() -> None:
         }}
         div.stButton > button[kind="primary"]:hover p {{ color: #AA2E20 !important; }}
         
+        /* SCALED DOWN FONTS FOR DROPDOWN POIS */
         [data-testid="stSidebar"] .st-expander {{ 
             border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important; 
             border-radius: 2px !important; margin-bottom: 2px !important; overflow: hidden !important; 
         }}
-        [data-testid="stSidebar"] .st-expander summary p {{ font-size: 9px !important; font-weight: 500 !important; }}
-        .stCheckbox label p {{ font-size: 10px !important; font-weight: 500 !important; }}
+        [data-testid="stSidebar"] .st-expander summary p {{ font-size: 8px !important; font-weight: 600 !important; }}
+        .stCheckbox label p {{ font-size: 8px !important; font-weight: 500 !important; line-height: 1.2 !important; }}
         
         div[data-baseweb="checkbox"] input:checked + div, div[data-baseweb="checkbox"] div[aria-checked="true"] {{ 
             background-color: var(--brand-midnight) !important; border-color: var(--brand-midnight) !important; 
@@ -193,7 +192,7 @@ def apply_global_styles() -> None:
             border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 20px; 
         }}
         .stTextInput label p, .stNumberInput label p {{ 
-            font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; 
+            font-size: 8px !important; font-weight: 600 !important; letter-spacing: 0.5px; 
             color: var(--text-muted) !important; 
         }}
     </style>
@@ -353,17 +352,15 @@ ADVANCED_CONFIG: Dict[str, List[List[str]]] = {
 # 6. UTILITY FUNCTIONS
 # =====================================================================
 
-
 def escape_xml(text: str) -> str:
     """Escape XML/KML special characters safely."""
     return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&apos;")
+        text.replace("&", "&")
+        .replace("<", "<")
+        .replace(">", ">")
+        .replace('"', """)
+        .replace("'", "'")
     )
-
 
 def escape_javascript(text: str) -> str:
     """Escape text for safe injection into JavaScript."""
@@ -376,14 +373,12 @@ def escape_javascript(text: str) -> str:
         .replace("</", "<\\/")
     )
 
-
 def parse_coordinates(coords_str: str) -> Optional[Tuple[float, float]]:
     """Parse coordinate string to (lat, lon) tuple. Returns None if invalid."""
     match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", coords_str)
     if match:
         return float(match.group(1)), float(match.group(2))
     return None
-
 
 def geocode_location(location_input: str) -> Optional[Tuple[float, float]]:
     """Geocode a location string using OpenStreetMap Nominatim API."""
@@ -406,7 +401,6 @@ def geocode_location(location_input: str) -> Optional[Tuple[float, float]]:
         st.error("Invalid response from geocoding service")
         return None
 
-
 def compile_features_kml(features: List[Dict[str, Any]]) -> str:
     """Compile features into valid KML format with proper XML escaping."""
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
@@ -418,7 +412,6 @@ def compile_features_kml(features: List[Dict[str, Any]]) -> str:
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{lon},{lat},0</coordinates></Point></Placemark>"
     kml += "</Document></kml>"
     return kml
-
 
 def query_overpass(
     lat: float, lon: float, radius: int, selected_tags: List[str]
@@ -470,457 +463,333 @@ def query_overpass(
 
 
 # =====================================================================
-# 7. SIDEBAR UI (NO DUPLICATES)
+# 7. UNIFIED SIDEBAR UI
 # =====================================================================
 def render_sidebar() -> None:
-    """Render sidebar with location input, layer selection, and action buttons."""
+    """Render unified sidebar with location input, scan parameters, and layer management."""
     with st.sidebar:
         st.markdown(
             '<div class="brand-title">Trade Area Scan</div>', unsafe_allow_html=True
         )
 
-        # Module toggle buttons
-        btn_col1, btn_col2 = st.columns(2)
-        with btn_col1:
-            if st.button(
-                "SCAN",
-                use_container_width=True,
-                type="secondary" if st.session_state.active_module == "SCAN" else "primary",
-                key="btn_scan",
-            ):
-                st.session_state.active_module = "SCAN"
-                st.rerun()
-        with btn_col2:
-            if st.button(
-                "EDIT",
-                use_container_width=True,
-                type="secondary" if st.session_state.active_module == "EDITOR" else "primary",
-                key="btn_editor",
-            ):
-                st.session_state.active_module = "EDITOR"
-                st.rerun()
-
-        st.markdown(
-            "<hr style='margin: 15px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.1);'>",
-            unsafe_allow_html=True,
+        # Location & Coordinates Input
+        location_input = st.text_input(
+            "LOCATION SEARCH OR COORDINATES",
+            value=st.session_state.geo_coords,
+            key="geo_coords_input",
+            label_visibility="visible",
         )
 
-        if st.session_state.active_module == "SCAN":
-            render_sidebar_scan()
+        radius_val = st.number_input(
+            "RADIUS (METERS)",
+            min_value=100,
+            max_value=50000,
+            value=st.session_state.geo_radius,
+            key="geo_radius_input",
+            step=100,
+        )
+        st.session_state.geo_radius = radius_val
+
+        # Parse coordinates or geocode
+        coords = parse_coordinates(location_input)
+        if coords:
+            lat_coord, lon_coord = coords
+            st.session_state.geo_coords = location_input
         else:
-            render_sidebar_editor()
-
-
-def render_sidebar_scan() -> None:
-    """Render SCAN module sidebar with location input and layer selection."""
-    # Location & Coordinates Input
-    location_input = st.text_input(
-        "LOCATION SEARCH OR COORDINATES",
-        value=st.session_state.geo_coords,
-        key="geo_coords_input",
-        label_visibility="visible",
-    )
-
-    radius_val = st.number_input(
-        "RADIUS (METERS)",
-        min_value=100,
-        max_value=50000,
-        value=st.session_state.geo_radius,
-        key="geo_radius_input",
-        step=100,
-    )
-    st.session_state.geo_radius = radius_val
-
-    # Parse coordinates or geocode
-    coords = parse_coordinates(location_input)
-    if coords:
-        lat_coord, lon_coord = coords
-        st.session_state.geo_coords = location_input
-    else:
-        if (
-            location_input
-            and location_input != st.session_state.get("last_geocoded_query", "")
-        ):
-            with st.spinner("Locating via OpenStreetMap..."):
-                geocoded = geocode_location(location_input)
-                if geocoded:
-                    lat_coord, lon_coord = geocoded
-                    st.session_state.geo_coords = f"{lat_coord:.5f}, {lon_coord:.5f}"
-                    st.session_state.last_geocoded_query = location_input
-                    st.rerun()
+            if (
+                location_input
+                and location_input != st.session_state.get("last_geocoded_query", "")
+            ):
+                with st.spinner("Locating via OpenStreetMap..."):
+                    geocoded = geocode_location(location_input)
+                    if geocoded:
+                        lat_coord, lon_coord = geocoded
+                        st.session_state.geo_coords = f"{lat_coord:.5f}, {lon_coord:.5f}"
+                        st.session_state.last_geocoded_query = location_input
+                        st.rerun()
+                    else:
+                        lat_coord, lon_coord = DEFAULT_LAT, DEFAULT_LON
+            else:
+                fallback = parse_coordinates(st.session_state.geo_coords)
+                if fallback:
+                    lat_coord, lon_coord = fallback
                 else:
                     lat_coord, lon_coord = DEFAULT_LAT, DEFAULT_LON
-        else:
-            fallback = parse_coordinates(st.session_state.geo_coords)
-            if fallback:
-                lat_coord, lon_coord = fallback
+
+        # Search query filter
+        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+        search_query = st.text_input(
+            "SEARCH TAGS", placeholder="Search parameters...", key="search_query_input"
+        ).lower()
+        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+
+        # Layer selection with search filtering
+        selected_tags = []
+        for cat_name, node_items in POI_CONFIG.items():
+            matched = [
+                item for item in node_items if search_query in item[0].lower()
+            ]
+            if matched:
+                with st.expander(cat_name, expanded=(len(search_query) > 0)):
+                    for label, tag in matched:
+                        if st.checkbox(label, key=f"chk_{cat_name}_{label}"):
+                            selected_tags.append(tag)
+
+        st.markdown(
+            "<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>",
+            unsafe_allow_html=True,
+        )
+
+        for cat_name, node_items in ADVANCED_CONFIG.items():
+            matched = [
+                item for item in node_items if search_query in item[0].lower()
+            ]
+            if matched:
+                with st.expander(cat_name, expanded=(len(search_query) > 0)):
+                    for label, tag in matched:
+                        if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"):
+                            selected_tags.append(tag)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Action buttons
+        if st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn"):
+            if not selected_tags:
+                st.error("Select at least 1 layer.")
             else:
-                lat_coord, lon_coord = DEFAULT_LAT, DEFAULT_LON
+                with st.spinner("Extracting nodes..."):
+                    records = query_overpass(lat_coord, lon_coord, radius_val, selected_tags)
+                    if records:
+                        st.session_state.scanned_records = records
+                        st.session_state.last_scan_lat = lat_coord
+                        st.session_state.last_scan_lon = lon_coord
+                        st.rerun()
 
-    # Search query filter
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-    search_query = st.text_input(
-        "SEARCH TAGS", placeholder="Search parameters...", key="search_query_input"
-    ).lower()
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-
-    # Layer selection with search filtering
-    selected_tags = []
-    for cat_name, node_items in POI_CONFIG.items():
-        matched = [
-            item for item in node_items if search_query in item[0].lower()
-        ]
-        if matched:
-            with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                for label, tag in matched:
-                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"):
-                        selected_tags.append(tag)
-
-    st.markdown(
-        "<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>",
-        unsafe_allow_html=True,
-    )
-
-    for cat_name, node_items in ADVANCED_CONFIG.items():
-        matched = [
-            item for item in node_items if search_query in item[0].lower()
-        ]
-        if matched:
-            with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                for label, tag in matched:
-                    if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"):
-                        selected_tags.append(tag)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Action buttons
-    if st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn"):
-        if not selected_tags:
-            st.error("Select at least 1 layer.")
-        else:
-            with st.spinner("Extracting nodes..."):
-                records = query_overpass(lat_coord, lon_coord, radius_val, selected_tags)
-                if records:
-                    st.session_state.scanned_records = records
-                    st.session_state.last_scan_lat = lat_coord
-                    st.session_state.last_scan_lon = lon_coord
-                    st.rerun()
-
-    if st.button("CLEAR ALL", type="primary", key="clear_btn", use_container_width=True):
-        st.session_state.scanned_records = []
-        for key in list(st.session_state.keys()):
-            if key.startswith("chk_"):
-                st.session_state[key] = False
-        st.rerun()
-
-    st.markdown(
-        "<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>",
-        unsafe_allow_html=True,
-    )
-
-    # Export buttons
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button(
-            "JSON",
-            json.dumps(st.session_state.scanned_records),
-            "scan.json",
-            "application/json",
-            use_container_width=True,
-        )
-    with col2:
-        st.download_button(
-            "KML",
-            compile_features_kml(st.session_state.scanned_records),
-            "POIs.kml",
-            "application/vnd.google-earth.kml+xml",
-            use_container_width=True,
-        )
-
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-
-    # Import file
-    with st.popover("IMPORT FILE", use_container_width=True):
-        imported_file = st.file_uploader(
-            "Select JSON", type=["json"], label_visibility="collapsed"
-        )
-        if imported_file is not None:
-            if st.button("LOAD", type="secondary", use_container_width=True):
-                try:
-                    data = json.load(imported_file)
-                    st.session_state.scanned_records = data.get(
-                        "scanned_records", data
-                    )
-                    st.session_state.geo_coords = data.get(
-                        "coords", st.session_state.geo_coords
-                    )
-                    st.session_state.geo_radius = data.get(
-                        "radius", st.session_state.geo_radius
-                    )
-                    st.rerun()
-                except json.JSONDecodeError:
-                    st.error("Invalid JSON file")
-                except Exception as e:
-                    st.error(f"Error loading file: {type(e).__name__}")
-
-
-def render_sidebar_editor() -> None:
-    """Render EDITOR module sidebar with layer management."""
-    st.markdown(
-        "<div style='font-size:10px; font-weight:600; color:#888780; text-transform:uppercase; text-align:center; margin-bottom:12px;'>Layer Management</div>",
-        unsafe_allow_html=True,
-    )
-
-    new_layer_name = st.text_input(
-        "NEW LAYER NAME", placeholder="e.g. Trade Zone A", key="new_layer_name"
-    )
-    if st.button("ADD LAYER", type="secondary", use_container_width=True, key="add_layer_btn"):
-        if new_layer_name.strip():
-            layer_id = f"layer_{len(st.session_state.editor_layers)}_{int(time.time())}"
-            st.session_state.editor_layers.append(
-                {
-                    "id": layer_id,
-                    "name": new_layer_name.strip(),
-                    "visible": True,
-                    "color": COLOR_MIDNIGHT,
-                    "fill_color": COLOR_GOLD,
-                    "fill_opacity": 0.4,
-                    "weight": 2.0,
-                    "icon_shape": "pin",
-                    "icon_size": 24,
-                }
-            )
-            st.session_state.active_editor_layer = layer_id
+        if st.button("CLEAR ALL", type="primary", key="clear_btn", use_container_width=True):
+            st.session_state.scanned_records = []
+            for key in list(st.session_state.keys()):
+                if key.startswith("chk_"):
+                    st.session_state[key] = False
             st.rerun()
 
-    st.markdown(
-        "<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>",
-        unsafe_allow_html=True,
-    )
-
-    # Active layers list
-    if st.session_state.editor_layers:
-        st.markdown(
-            "<div style='font-size:9px; font-weight:700; color:#003366; text-transform:uppercase; margin-bottom:8px;'>Active Layers</div>",
-            unsafe_allow_html=True,
-        )
-
-        for idx, layer in enumerate(st.session_state.editor_layers):
-            with st.expander(f"{layer['name']}", expanded=False):
-                layer["visible"] = st.checkbox(
-                    "Visible", value=layer["visible"], key=f"vis_{layer['id']}"
-                )
-
-                col1, col2 = st.columns(2)
-                with col1:
-                    layer["color"] = st.color_picker(
-                        "Stroke", layer["color"], key=f"col_{layer['id']}"
-                    )
-                with col2:
-                    layer["fill_color"] = st.color_picker(
-                        "Fill", layer["fill_color"], key=f"fill_{layer['id']}"
-                    )
-
-                layer["fill_opacity"] = st.slider(
-                    "Fill Opacity",
-                    0.0,
-                    1.0,
-                    layer["fill_opacity"],
-                    0.1,
-                    key=f"op_{layer['id']}",
-                )
-                layer["weight"] = st.slider(
-                    "Stroke Weight",
-                    0.5,
-                    5.0,
-                    layer["weight"],
-                    0.5,
-                    key=f"wt_{layer['id']}",
-                )
-
-                layer["icon_shape"] = st.selectbox(
-                    "Icon Shape",
-                    ["pin", "circle"],
-                    index=0 if layer["icon_shape"] == "pin" else 1,
-                    key=f"shape_{layer['id']}",
-                )
-                layer["icon_size"] = st.slider(
-                    "Icon Size",
-                    12,
-                    48,
-                    layer["icon_size"],
-                    2,
-                    key=f"size_{layer['id']}",
-                )
-
-                if st.button(
-                    "DELETE LAYER",
-                    type="primary",
-                    use_container_width=True,
-                    key=f"del_{layer['id']}",
-                ):
-                    st.session_state.editor_layers.pop(idx)
-                    if st.session_state.get("active_editor_layer") == layer["id"]:
-                        st.session_state.active_editor_layer = None
-                    st.rerun()
-    else:
-        st.markdown(
-            "<div style='font-size:10px; color:#888780; text-align:center; padding:20px 0;'>No layers yet.<br>Add a layer to start drawing.</div>",
-            unsafe_allow_html=True,
-        )
-
-    if st.session_state.editor_layers:
         st.markdown(
             "<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>",
             unsafe_allow_html=True,
         )
 
-        layer_names = [l["name"] for l in st.session_state.editor_layers]
-        layer_ids = [l["id"] for l in st.session_state.editor_layers]
-        active_idx = 0
-        if st.session_state.get("active_editor_layer") in layer_ids:
-            active_idx = layer_ids.index(st.session_state.active_editor_layer)
-        selected = st.selectbox(
-            "DRAW TO LAYER",
-            layer_names,
-            index=active_idx,
-            key="active_layer_select",
+        # Export buttons (JSON & KML)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                "JSON",
+                json.dumps(st.session_state.scanned_records),
+                "scan.json",
+                "application/json",
+                use_container_width=True,
+            )
+        with col2:
+            st.download_button(
+                "KML",
+                compile_features_kml(st.session_state.scanned_records),
+                "POIs.kml",
+                "application/vnd.google-earth.kml+xml",
+                use_container_width=True,
+            )
+
+        st.markdown(
+            "<hr style='margin: 15px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.1);'>",
+            unsafe_allow_html=True,
         )
-        st.session_state.active_editor_layer = layer_ids[layer_names.index(selected)]
+        
+        # --- LAYER MANAGEMENT (EDITOR LOGIC INCLUDED) ---
+        st.markdown(
+            "<div style='font-size:10px; font-weight:600; color:#888780; text-transform:uppercase; text-align:center; margin-bottom:12px;'>Custom Draw Layers</div>",
+            unsafe_allow_html=True,
+        )
 
-    st.markdown(
-        "<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>",
-        unsafe_allow_html=True,
-    )
+        new_layer_name = st.text_input(
+            "NEW LAYER NAME", placeholder="e.g. Trade Zone A", key="new_layer_name"
+        )
+        if st.button("ADD LAYER", type="secondary", use_container_width=True, key="add_layer_btn"):
+            if new_layer_name.strip():
+                layer_id = f"layer_{len(st.session_state.editor_layers)}_{int(time.time())}"
+                st.session_state.editor_layers.append(
+                    {
+                        "id": layer_id,
+                        "name": new_layer_name.strip(),
+                        "visible": True,
+                        "color": COLOR_MIDNIGHT,
+                        "fill_color": COLOR_GOLD,
+                        "fill_opacity": 0.4,
+                        "weight": 2.0,
+                        "icon_shape": "pin",
+                        "icon_size": 24,
+                    }
+                )
+                st.session_state.active_editor_layer = layer_id
+                st.rerun()
 
-    # Project export
-    editor_export = {
-        "coords": st.session_state.geo_coords,
-        "radius": st.session_state.geo_radius,
-        "layers": st.session_state.editor_layers,
-        "scanned_records": st.session_state.scanned_records,
-        "drawings": st.session_state.editor_drawings,
-    }
-    st.download_button(
-        "EXPORT PROJECT",
-        json.dumps(editor_export),
-        "TradeArea_Project.json",
-        "application/json",
-        use_container_width=True,
-    )
+        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+
+        if st.session_state.editor_layers:
+            for idx, layer in enumerate(st.session_state.editor_layers):
+                with st.expander(f"⚙ {layer['name']}", expanded=False):
+                    layer["visible"] = st.checkbox(
+                        "Visible", value=layer["visible"], key=f"vis_{layer['id']}"
+                    )
+                    col_l, col_r = st.columns(2)
+                    with col_l:
+                        layer["color"] = st.color_picker("Stroke", layer["color"], key=f"col_{layer['id']}")
+                    with col_r:
+                        layer["fill_color"] = st.color_picker("Fill", layer["fill_color"], key=f"fill_{layer['id']}")
+
+                    layer["fill_opacity"] = st.slider("Fill Opacity", 0.0, 1.0, layer["fill_opacity"], 0.1, key=f"op_{layer['id']}")
+                    layer["weight"] = st.slider("Stroke Weight", 0.5, 5.0, layer["weight"], 0.5, key=f"wt_{layer['id']}")
+                    layer["icon_shape"] = st.selectbox("Icon Shape", ["pin", "circle"], index=0 if layer["icon_shape"] == "pin" else 1, key=f"shape_{layer['id']}")
+                    layer["icon_size"] = st.slider("Icon Size", 12, 48, layer["icon_size"], 2, key=f"size_{layer['id']}")
+
+                    if st.button("DELETE LAYER", type="primary", use_container_width=True, key=f"del_{layer['id']}"):
+                        st.session_state.editor_layers.pop(idx)
+                        if st.session_state.get("active_editor_layer") == layer["id"]:
+                            st.session_state.active_editor_layer = None
+                        st.rerun()
+
+            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            layer_names = [l["name"] for l in st.session_state.editor_layers]
+            layer_ids = [l["id"] for l in st.session_state.editor_layers]
+            active_idx = 0
+            if st.session_state.get("active_editor_layer") in layer_ids:
+                active_idx = layer_ids.index(st.session_state.active_editor_layer)
+            selected = st.selectbox("DRAW TO LAYER", layer_names, index=active_idx, key="active_layer_select")
+            st.session_state.active_editor_layer = layer_ids[layer_names.index(selected)]
+        else:
+            st.markdown(
+                "<div style='font-size:10px; color:#888780; text-align:center; padding:10px 0;'>Add a layer to start drawing.</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(
+            "<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>",
+            unsafe_allow_html=True,
+        )
+
+        editor_export = {
+            "coords": st.session_state.geo_coords,
+            "radius": st.session_state.geo_radius,
+            "layers": st.session_state.editor_layers,
+            "scanned_records": st.session_state.scanned_records,
+            "drawings": st.session_state.editor_drawings,
+        }
+        st.download_button(
+            "EXPORT FULL PROJECT",
+            json.dumps(editor_export),
+            "TradeArea_Project.json",
+            "application/json",
+            use_container_width=True,
+        )
 
 
 # =====================================================================
-# 8. LEAFLET MAP TEMPLATES (SCAN & EDITOR)
+# 8. UNIFIED LEAFLET MAP TEMPLATE
 # =====================================================================
-def get_leaflet_scan_template() -> str:
-    """Return Leaflet map HTML for SCAN module (read-only POI viewing)."""
+def get_leaflet_unified_template() -> str:
+    """Return unified Leaflet map HTML with both Scanning POIs and Geoman Drawing Tools."""
     return """
     <!DOCTYPE html>
     <html>
     <head>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+        <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+        <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <style>
-            body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
-            #map { height: 100vh; width: 100%; }
-
-            #minimal-basemap-panel {
-                position: absolute; top: 110px; left: 50px; z-index: 1000;
-                background: #ffffff; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); 
-                display: none; flex-direction: column; padding: 4px; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); 
-                width: 150px;
-            }
-            #minimal-basemap-panel select {
-                border: none; border-bottom: 1px solid #f0f0f0; padding: 6px; font-size: 10px; 
-                font-weight: 700; font-family: 'Montserrat', sans-serif; color: #003366; 
-                background: transparent; outline: none; cursor: pointer; width: 100%; text-transform: uppercase;
-            }
-            .minimal-label { 
-                font-size: 9px; font-weight: 700; padding: 6px; display: flex; align-items: center; 
-                gap: 4px; cursor: pointer; color: #888780; margin: 0; text-transform: uppercase; 
-                border-top: 1px solid #f8fafc;
-            }
-
-            #search-container { position: absolute; top: 10px; left: 54px; z-index: 1000; width: 300px; }
-            #map-search {
-                width: 100%; padding: 8px 12px; border: 1px solid rgba(0, 51, 102, 0.1); 
-                border-radius: 4px; background-clip: padding-box; font-size: 11px; 
-                font-family: 'Montserrat', sans-serif; font-weight: 600; color: #003366; 
-                background: #ffffff; outline: none; box-sizing: border-box; 
-                box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
-            }
-            #map-search:focus { border-bottom: 2px solid #C9AB4C; }
+            body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: 'Montserrat', sans-serif; background: #ffffff; }
+            #map { height: 100vh; width: 100%; z-index: 1; }
             
-            #search-results { 
-                position: absolute; top: 38px; left: 0; width: 100%; background: #ffffff; 
-                border-radius: 2px; display: none; max-height: 250px; overflow-x: hidden; 
-                overflow-y: auto; border: 1px solid rgba(0, 51, 102, 0.1); box-sizing: border-box; 
-                z-index: 1001; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
-            }
-            .search-item { 
-                padding: 8px 12px; font-size: 10px; font-weight: 600; cursor: pointer; 
-                border-bottom: 1px solid #f8fafc; color: #003366; white-space: nowrap; 
-                overflow: hidden; text-overflow: ellipsis;
-            }
+            /* Basemap and Toolbar Settings */
+            #minimal-basemap-panel { position: absolute; top: 110px; left: 50px; z-index: 1000; background: #ffffff; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: none; flex-direction: column; padding: 4px; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); width: 160px; }
+            #minimal-basemap-panel select { border: none; border-bottom: 1px solid #f0f0f0; padding: 6px; font-size: 10px; font-weight: 700; font-family: 'Montserrat', sans-serif; color: #003366; background: transparent; outline: none; cursor: pointer; width: 100%; text-transform: uppercase; }
+            .minimal-label { font-size: 9px; font-weight: 700; padding: 6px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #888780; margin: 0; text-transform: uppercase; border-top: 1px solid #f8fafc; }
+            .minimal-label:hover { color: #003366; background: #f8fafc; }
+
+            /* Nominatim Search container */
+            #search-container { position: absolute; top: 10px; left: 54px; z-index: 1000; width: 300px; }
+            #map-search { width: 100%; padding: 8px 12px; border: 1px solid rgba(0, 51, 102, 0.1); border-radius: 4px; background-clip: padding-box; font-size: 11px; font-family: 'Montserrat', sans-serif; font-weight: 600; color: #003366; background: #ffffff; outline: none; box-sizing: border-box; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
+            #map-search:focus { border-bottom: 2px solid #C9AB4C; }
+            #search-results { position: absolute; top: 38px; left: 0; width: 100%; background: #ffffff; border-radius: 2px; display: none; max-height: 250px; overflow-x: hidden; overflow-y: auto; border: 1px solid rgba(0, 51, 102, 0.1); box-sizing: border-box; z-index: 1001; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
+            .search-item { padding: 8px 12px; font-size: 10px; font-weight: 600; cursor: pointer; border-bottom: 1px solid #f8fafc; color: #003366; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .search-item:hover { background: #f8fafc; color: #C9AB4C; }
 
-            #scan-results-panel { 
-                position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; 
-                width: 250px; max-height: calc(100vh - 20px); border-radius: 2px; 
-                border: 1px solid rgba(0, 51, 102, 0.1); background-clip: padding-box; 
-                display: flex; flex-direction: column; overflow: hidden; 
-                box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
-            }
-            .results-header { 
-                background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; 
-                font-weight: 800; display: flex; justify-content: space-between; align-items: center; 
-                text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px;
-            }
-            .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
+            /* SCAN POIs RESULTS PANEL (Top Right) */
+            #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 250px; height: calc(50vh - 15px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
+            .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
+            .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; font-size: 8px;}
             .layer-category-block { border-bottom: 1px solid #f0f0f0; }
-            .layer-category-header { 
-                background: #ffffff; padding: 8px 12px; display: flex; align-items: center; 
-                justify-content: space-between; cursor: pointer; user-select: none; 
-                transition: background 0.2s;
-            }
+            .layer-category-header { background: #ffffff; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; transition: background 0.2s; }
             .layer-category-header:hover { background: #f8fafc; }
-            .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; 
-                font-weight: 700; color: #003366; text-transform: uppercase;}
+            .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 8px; font-weight: 700; color: #003366; text-transform: uppercase;}
             .layer-category-items { padding: 0; background: #f8fafc; }
             .layer-category-items.collapsed { display: none !important; }
-            .results-item { 
-                padding: 6px 12px 6px 28px; font-size: 9px; font-weight: 600; 
-                color: #888780; display: flex; justify-content: space-between; 
-                align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0;
-            }
+            .results-item { padding: 4px 12px 4px 28px; font-size: 8px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
             .results-item:hover { background: #ffffff; color: #003366; }
             .results-item .delete-poi-icon { cursor: pointer; padding: 2px; display: flex; }
             .results-item .delete-poi-icon svg { fill: #888780; transition: fill 0.2s; }
             .results-item .delete-poi-icon:hover svg { fill: #AA2E20; }
 
-            .poi-text-label { 
-                background: #fff; border: 1px solid #003366; padding: 2px 4px; 
-                border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; 
-                font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .hide-labels .poi-text-label { display: none !important; }
-            .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; 
-                border: 1px solid rgba(0,0,0,0.1);
-            }
+            /* EDITOR DRAWING LAYERS PANEL (Bottom Right) */
+            #layer-panel { position: absolute; top: calc(50vh + 5px); right: 10px; z-index: 1000; background: #ffffff; width: 250px; height: calc(50vh - 20px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 51, 102, 0.15); }
+            .layer-panel-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
+            .layer-list { overflow-y: auto; flex-grow: 1; background: #ffffff; }
+            .layer-row { padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background 0.15s; }
+            .layer-row:hover { background: #f8fafc; }
+            .layer-row.active { background: #e0e7ff; border-left: 3px solid #003366; }
+            .layer-color-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0; }
+            .layer-name { font-size: 10px; font-weight: 600; color: #003366; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .layer-count { font-size: 9px; font-weight: 700; color: #C9AB4C; background: rgba(0,51,102,0.05); padding: 2px 6px; border-radius: 10px; }
+            .layer-visibility { cursor: pointer; color: #94a3b8; font-size: 12px; }
+            .layer-visibility:hover { color: #003366; }
 
-            .leaflet-control-custom-stack { 
-                background: #fff; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; 
-                overflow: hidden; display: flex; flex-direction: column;
-            }
-            .leaflet-control-custom-stack a { 
-                display: flex !important; align-items: center; justify-content: center; 
-                background: #fff; text-decoration: none; width: 34px; height: 34px; 
-                border-bottom: 1px solid #ccc; cursor: pointer;
-            }
+            /* EDITOR PROPERTIES & CONTEXT MENU */
+            #context-menu { position: absolute; z-index: 10000; background: #ffffff; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.15); box-shadow: 0 4px 20px rgba(0, 51, 102, 0.15); display: none; min-width: 160px; font-family: 'Montserrat', sans-serif; }
+            .ctx-header { background: #003366; color: #ffffff; padding: 8px 12px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #C9AB4C; }
+            .ctx-item { padding: 8px 12px; font-size: 10px; font-weight: 600; color: #003366; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.15s; }
+            .ctx-item:hover { background: #f8fafc; color: #C9AB4C; }
+            .ctx-item.danger { color: #AA2E20; }
+            .ctx-item.danger:hover { background: #fef2f2; }
+
+            .shape-tooltip { background: #003366; color: #C9AB4C; padding: 4px 8px; border-radius: 3px; font-size: 10px; font-weight: 700; font-family: 'Montserrat', sans-serif; white-space: nowrap; border: 1px solid #C9AB4C; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+            .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 8px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .hide-labels .poi-text-label { display: none !important; }
+
+            #feature-properties-panel { position: absolute; bottom: 15px; left: 10px; z-index: 1000; background: #ffffff; width: 300px; max-height: calc(60vh); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); box-shadow: 0 -4px 20px rgba(0, 51, 102, 0.15); display: none; flex-direction: column; overflow: hidden; }
+            .panel-header { background: #003366; color: #ffffff; padding: 12px; font-size: 11px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 0.5px;}
+            .panel-body { padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+            .control-group { display: flex; flex-direction: column; gap: 3px; }
+            .control-group label { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+            .control-group input[type="text"], .control-group select, .control-group input[type="number"] { padding: 6px; font-size: 11px; font-family: 'Montserrat', sans-serif; color: #003366; border: 1px solid #e2e8f0; border-radius: 3px; outline: none; }
+            .control-group input[type="color"] { width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 3px; cursor: pointer; }
+            .panel-actions { display: flex; gap: 6px; margin-top: 8px; }
+            .panel-btn { flex: 1; padding: 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border: none; border-radius: 2px; cursor: pointer; font-family: 'Montserrat', sans-serif; }
+            .panel-btn-primary { background: #003366; color: #ffffff; }
+            .panel-btn-primary:hover { background: #C9AB4C; color: #003366; }
+            .panel-btn-danger { background: #fef2f2; color: #AA2E20; border: 1px solid #fecaca; }
+            .panel-btn-danger:hover { background: #AA2E20; color: #ffffff; }
+
+            /* LEAFLET CUSTOM TOOLBAR (Share, Layers) */
+            .leaflet-control-custom-stack { background: #fff; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
+            .leaflet-control-custom-stack a { display: flex !important; align-items: center; justify-content: center; background: #fff; text-decoration: none; width: 34px; height: 34px; border-bottom: 1px solid #ccc; cursor: pointer; }
             .leaflet-control-custom-stack a:last-child { border-bottom: none; }
             .leaflet-control-custom-stack a:hover { background: #f4f4f4; }
+            
+            /* GEOMAN PROFESSIONAL STYLING */
+            .leaflet-pm-toolbar { display: none; } /* Hidden until toggled */
+            .leaflet-pm-toolbar .leaflet-buttons-control-button { background: #ffffff !important; border-color: rgba(0,51,102,0.15) !important; }
+            .leaflet-pm-toolbar .leaflet-buttons-control-button:hover { background: #f8fafc !important; }
+            .leaflet-pm-toolbar .leaflet-pm-icon { filter: invert(17%) sepia(52%) saturate(2000%) hue-rotate(190deg); }
+            .leaflet-pm-toolbar .active .leaflet-buttons-control-button { background: #003366 !important; }
+            .leaflet-pm-toolbar .active .leaflet-pm-icon { filter: invert(80%) sepia(40%) saturate(500%) hue-rotate(10deg); }
         </style>
     </head>
     <body>
@@ -940,358 +809,34 @@ def get_leaflet_scan_template() -> str:
             <label class="minimal-label" for="label-toggle-chk">
                 <input type="checkbox" id="label-toggle-chk" style="margin:0; cursor: pointer;" onchange="toggleLabelsMatrix(this.checked)"> Show Labels
             </label>
+            <label class="minimal-label" for="edit-toggle-chk">
+                <input type="checkbox" id="edit-toggle-chk" style="margin:0; cursor: pointer;" onchange="toggleGeomanTools(this.checked)"> Enable Edit Tools
+            </label>
         </div>
 
         <div id="scan-results-panel">
             <div class="results-header">
-                <span>SEARCH RESULTS</span>
+                <span>SCANNED POIs</span>
                 <span id="results-count" style="color:#C9AB4C;">0</span>
             </div>
             <div class="results-list" id="results-list-box"></div>
         </div>
 
-        <script>
-            const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
-            map.zoomControl.setPosition('topleft');
+        <div id="layer-panel">
+            <div class="layer-panel-header">
+                <span>Drawn Layers</span>
+                <span id="layer-total-count" style="color:#C9AB4C; font-size:9px;">0</span>
+            </div>
+            <div class="layer-list" id="layer-list-box"></div>
+        </div>
 
-            let searchTimeout = null;
-            function handleSearch(e) {
-                clearTimeout(searchTimeout);
-                const query = e.target.value;
-                const resultsDiv = document.getElementById('search-results');
-
-                if (query.length < 3) {
-                    resultsDiv.style.display = 'none';
-                    return;
-                }
-
-                searchTimeout = setTimeout(() => {
-                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.length > 0) {
-                                resultsDiv.innerHTML = '';
-                                data.forEach(item => {
-                                    const div = document.createElement('div');
-                                    div.className = 'search-item';
-                                    div.innerText = item.display_name;
-                                    div.title = item.display_name;
-                                    div.onclick = () => {
-                                        map.flyTo([item.lat, item.lon], 16);
-                                        resultsDiv.style.display = 'none';
-                                        document.getElementById('map-search').value = item.display_name;
-                                    };
-                                    resultsDiv.appendChild(div);
-                                });
-                                resultsDiv.style.display = 'block';
-                            } else {
-                                resultsDiv.style.display = 'none';
-                            }
-                        })
-                        .catch(err => console.error(err));
-                }, 500);
-            }
-
-            document.addEventListener('click', function(e) {
-                if (!document.getElementById('search-container').contains(e.target)) {
-                    document.getElementById('search-results').style.display = 'none';
-                }
-            });
-
-            const toolbarControl = L.control({position: 'topleft'});
-            toolbarControl.onAdd = function (map) {
-                const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom-stack');
-                const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="#003366"><path d="M720-80q-50 0-85-35t-35-85q0-7 1-14.5t3-13.5L322-392q-17 15-38 23.5t-44 8.5q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 44 8.5t38 23.5l282-164q-2-6-2.5-13.5T600-760q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-44-8.5T638-672L356-508q2 6 2.5 13.5t.5 14.5q0 7-.5 14.5T356-452l282 164q17-15 38-23.5t44-8.5q50 0 85 35t35 85q0 50-35 85t-85 35Z"/></svg>`;
-                const layersIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="m116-435 364-199 364 199-364 199-364-199Zm0 157 364 199 364-199-47-26-317 173-317-173-47 26Zm364-257 267-146-267-146-267 146 267 146Z"/></svg>`;
-                const saveIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM480-240q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>`;
-
-                div.innerHTML = `
-                    <a title="Copy View-Only Link" onclick="generateShareLink(event)">${shareIcon}</a>
-                    <a title="Toggle Layers" onclick="toggleLayerMenu(event)">${layersIcon}</a>
-                    <a title="Save Project Settings" onclick="saveProjectSettings(event)">${saveIcon}</a>
-                `;
-                return div;
-            };
-            toolbarControl.addTo(map);
-
-            function generateShareLink(e) {
-                e.preventDefault();
-                const link = window.location.href.split('?')[0] + "?c=__LAT__,__LON__&r=__RADIUS__";
-                navigator.clipboard.writeText(link).then(() => {
-                    alert("View-only link copied!");
-                });
-            }
-
-            function toggleLayerMenu(e) {
-                e.preventDefault();
-                const panel = document.getElementById('minimal-basemap-panel');
-                panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
-            }
-
-            function saveProjectSettings(e) {
-                e.preventDefault();
-                const projectData = {
-                    coords: "__LAT__, __LON__",
-                    radius: __RADIUS__,
-                    scanned_records: __GEOJSON__
-                };
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData));
-                const a = document.createElement('a');
-                a.href = dataStr;
-                a.download = 'TradeArea_Project.json';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            }
-
-            const basemaps = {
-                osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-                satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-                carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
-            };
-
-            let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'osm';
-            if (!basemaps[activeBasemapKey]) activeBasemapKey = 'osm';
-            document.getElementById('basemap-select').value = activeBasemapKey;
-            basemaps[activeBasemapKey].addTo(map);
-
-            function switchActiveBasemap(targetKey) {
-                map.removeLayer(basemaps[activeBasemapKey]);
-                basemaps[targetKey].addTo(map);
-                activeBasemapKey = targetKey;
-                localStorage.setItem('ts_persistent_basemap', targetKey);
-            }
-
-            let labelsActive = localStorage.getItem('ts_persistent_labels') !== 'false';
-            document.getElementById('label-toggle-chk').checked = labelsActive;
-            if (!labelsActive) document.getElementById('map').classList.add('hide-labels');
-
-            function toggleLabelsMatrix(isShown) {
-                if (isShown) document.getElementById('map').classList.remove('hide-labels');
-                else document.getElementById('map').classList.add('hide-labels');
-                localStorage.setItem('ts_persistent_labels', isShown);
-            }
-
-            const starIcon = L.divIcon({
-                className: 'custom-center-icon',
-                html: '<div style="background-color: #003366; color: #C9AB4C; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);">★</div>',
-                iconSize: [24, 24], iconAnchor: [12, 12]
-            });
-            const centerMarker = L.marker([__LAT__, __LON__], { icon: starIcon, zIndexOffset: 10000 }).addTo(map);
-            const radiusCircle = L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.08 }).addTo(map);
-
-            let pts = __GEOJSON__;
-            let globalIdCounter = 0;
-            pts.forEach(p => p._uid = globalIdCounter++);
-
-            const categoryMap = {};
-            const layerGroupsRef = {};
-            const catPalette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"];
-            const categoryColors = {}; 
-            let colorIndex = 0;
-
-            pts.forEach(p => {
-                const layerKey = p.type || 'Unclassified';
-                if (!categoryMap[layerKey]) {
-                    categoryMap[layerKey] = []; 
-                    categoryColors[layerKey] = catPalette[colorIndex % catPalette.length]; 
-                    colorIndex++;
-                }
-                categoryMap[layerKey].push(p);
-            });
-
-            const createPinIcon = (color) => {
-                const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
-                return L.divIcon({ html: `<div style="display:flex;align-items:center;justify-content:center;">${svg}</div>`, className: '', iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24] });
-            };
-
-            Object.keys(categoryMap).forEach(key => {
-                layerGroupsRef[key] = L.layerGroup().addTo(map);
-                const pColor = categoryColors[key];
-                const catPin = createPinIcon(pColor);
-
-                categoryMap[key].forEach(p => {
-                    const marker = L.marker([p.lat, p.lon], { icon: catPin })
-                                    .bindPopup("<b style='color:#003366; font-family:Montserrat;'>" + p.name + "</b><br><span style='color:#888780; font-size:9px;'>" + p.type + "</span>");
-                    if (p.name && p.name !== 'Unknown') {
-                        marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -18], className: 'poi-text-label' });
-                    }
-                    p._marker = marker;
-                    marker.addTo(layerGroupsRef[key]);
-                });
-            });
-
-            const listBox = document.getElementById('results-list-box');
-            document.getElementById('results-count').innerText = pts.length;
-
-            if (pts.length > 0) {
-                let htmlPayload = '';
-                const trashSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="14" viewBox="0 -960 960 960" width="14"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>`;
-
-                Object.keys(categoryMap).forEach(catName => {
-                    const dotColor = categoryColors[catName];
-                    htmlPayload += `
-                        <div class="layer-category-block" id="cat-block-${catName}">
-                            <div class="layer-category-header" onclick="toggleAccordionCollapse('${catName}')">
-                                <div class="layer-header-left">
-                                    <input type="checkbox" checked onclick="event.stopPropagation(); toggleCategoryVisibility('${catName}', this.checked)">
-                                    <span class="color-dot" style="background-color: ${dotColor};"></span>
-                                    <span>${catName} <span id="count-${catName}" style="color: #C9AB4C; font-size: 8px;">(${categoryMap[catName].length})</span></span>
-                                </div>
-                                <span id="chevron-${catName}" style="font-size: 8px; color:#C9AB4C;">▼</span>
-                            </div>
-                            <div class="layer-category-items" id="items-${catName}">
-                    `;
-                    categoryMap[catName].forEach(p => {
-                        htmlPayload += `
-                        <div class="results-item" id="res-item-${p._uid}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
-                            <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}">${p.name || 'Unknown'}</div>
-                            <div class="delete-poi-icon" title="Remove POI" onclick="event.stopPropagation(); removePoiInstance(${p._uid}, '${catName}')">
-                                ${trashSvg}
-                            </div>
-                        </div>`;
-                    });
-                    htmlPayload += '</div></div>';
-                });
-                listBox.innerHTML = htmlPayload;
-            }
-
-            function removePoiInstance(uid, catKey) {
-                const index = pts.findIndex(item => item._uid === uid);
-                if (index > -1) {
-                    const p = pts[index];
-                    if(p._marker) layerGroupsRef[catKey].removeLayer(p._marker);
-                    pts.splice(index, 1);
-                }
-                const el = document.getElementById('res-item-' + uid);
-                if(el) el.remove();
-
-                const countEl = document.getElementById('count-' + catKey);
-                if(countEl) {
-                    const match = countEl.innerText.match(/\\d+/);
-                    if(match) {
-                        const newCount = parseInt(match[0]) - 1;
-                        countEl.innerText = `(${newCount})`;
-                        if (newCount === 0) { document.getElementById('cat-block-' + catKey).style.display = 'none'; }
-                    }
-                }
-                const totalEl = document.getElementById('results-count');
-                if(totalEl) totalEl.innerText = parseInt(totalEl.innerText) - 1;
-            }
-
-            function toggleCategoryVisibility(catKey, isVisible) {
-                if (isVisible) map.addLayer(layerGroupsRef[catKey]);
-                else map.removeLayer(layerGroupsRef[catKey]);
-            }
-
-            function toggleAccordionCollapse(catKey) {
-                const panel = document.getElementById('items-' + catKey);
-                const chev = document.getElementById('chevron-' + catKey);
-                panel.classList.toggle('collapsed');
-                chev.innerText = panel.classList.contains('collapsed') ? '▲' : '▼';
-            }
-
-            map.on('contextmenu', function(e) {
-                const lat = e.latlng.lat; const lng = e.latlng.lng;
-                const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
-                const menuHtml = `
-                    <div style="font-family: Montserrat, sans-serif; font-size: 9px; color: #003366; min-width: 140px;">
-                        <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">ACTIONS</div>
-                        <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">Copy Coordinates</div>
-                        <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?q=${lat},${lng}', '_blank'); map.closePopup();">Google Maps</div>
-                        <div style="padding: 4px 0; cursor: pointer; font-weight: 700; transition: color 0.1s;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Google Streetview</div>
-                    </div>
-                `;
-                L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
-            });
-
-            if (pts.length > 0 && !__IS_STALE__) {
-                const bounds = L.featureGroup([L.marker([__LAT__, __LON__]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
-                map.fitBounds(bounds.pad(0.1));
-            }
-        </script>
-    </body>
-    </html>
-    """
-
-
-def get_leaflet_editor_template() -> str:
-    """Return Leaflet map HTML for EDITOR module with Geoman drawing tools."""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
-        <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
-        <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-        <style>
-            body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: 'Montserrat', sans-serif; }
-            #map { height: 100vh; width: 100%; z-index: 1; }
-            
-            #context-menu { position: absolute; z-index: 10000; background: #ffffff; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.15); box-shadow: 0 4px 20px rgba(0, 51, 102, 0.15); display: none; min-width: 160px; font-family: 'Montserrat', sans-serif; }
-            .ctx-header { background: #003366; color: #ffffff; padding: 8px 12px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #C9AB4C; }
-            .ctx-item { padding: 8px 12px; font-size: 10px; font-weight: 600; color: #003366; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.15s; }
-            .ctx-item:hover { background: #f8fafc; color: #C9AB4C; }
-            .ctx-item.danger { color: #AA2E20; }
-            .ctx-item.danger:hover { background: #fef2f2; }
-            
-            .shape-tooltip { background: #003366; color: #C9AB4C; padding: 4px 8px; border-radius: 3px; font-size: 10px; font-weight: 700; font-family: 'Montserrat', sans-serif; white-space: nowrap; border: 1px solid #C9AB4C; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-            
-            #feature-properties-panel { position: absolute; bottom: 15px; right: 15px; z-index: 1000; background: #ffffff; width: 300px; max-height: calc(60vh); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); box-shadow: 0 -4px 20px rgba(0, 51, 102, 0.15); display: none; flex-direction: column; overflow: hidden; }
-            .panel-header { background: #003366; color: #ffffff; padding: 12px; font-size: 11px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 0.5px;}
-            .panel-body { padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-            .control-group { display: flex; flex-direction: column; gap: 3px; }
-            .control-group label { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; }
-            .control-group input[type="text"], .control-group select, .control-group input[type="number"] { padding: 6px; font-size: 11px; font-family: 'Montserrat', sans-serif; color: #003366; border: 1px solid #e2e8f0; border-radius: 3px; outline: none; }
-            .control-group input[type="color"] { width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 3px; cursor: pointer; }
-            .panel-actions { display: flex; gap: 6px; margin-top: 8px; }
-            .panel-btn { flex: 1; padding: 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border: none; border-radius: 2px; cursor: pointer; font-family: 'Montserrat', sans-serif; }
-            .panel-btn-primary { background: #003366; color: #ffffff; }
-            .panel-btn-primary:hover { background: #C9AB4C; color: #003366; }
-            .panel-btn-danger { background: #fef2f2; color: #AA2E20; border: 1px solid #fecaca; }
-            .panel-btn-danger:hover { background: #AA2E20; color: #ffffff; }
-            
-            #layer-panel { position: absolute; top: 15px; right: 15px; z-index: 1000; background: #ffffff; width: 260px; max-height: calc(50vh - 20px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 51, 102, 0.15); }
-            .layer-panel-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
-            .layer-list { overflow-y: auto; flex-grow: 1; background: #ffffff; }
-            .layer-row { padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background 0.15s; }
-            .layer-row:hover { background: #f8fafc; }
-            .layer-row.active { background: #e0e7ff; border-left: 3px solid #003366; }
-            .layer-color-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0; }
-            .layer-name { font-size: 10px; font-weight: 600; color: #003366; flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .layer-count { font-size: 9px; font-weight: 700; color: #C9AB4C; background: rgba(0,51,102,0.05); padding: 2px 6px; border-radius: 10px; }
-            .layer-visibility { cursor: pointer; color: #94a3b8; font-size: 12px; }
-            .layer-visibility:hover { color: #003366; }
-            
-            /* Professional styling for Geoman Toolbar */
-            .leaflet-pm-toolbar .leaflet-buttons-control-button { background: #ffffff !important; border-color: rgba(0,51,102,0.15) !important; }
-            .leaflet-pm-toolbar .leaflet-buttons-control-button:hover { background: #f8fafc !important; }
-            .leaflet-pm-toolbar .leaflet-pm-icon { filter: invert(17%) sepia(52%) saturate(2000%) hue-rotate(190deg); }
-            .leaflet-pm-toolbar .active .leaflet-buttons-control-button { background: #003366 !important; }
-            .leaflet-pm-toolbar .active .leaflet-pm-icon { filter: invert(80%) sepia(40%) saturate(500%) hue-rotate(10deg); }
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        
         <div id="context-menu">
             <div class="ctx-header" id="ctx-header">Actions</div>
             <div class="ctx-item" onclick="ctxEditFeature()">✎ Edit Geometry</div>
             <div class="ctx-item" onclick="ctxEditProperties()">⚙ Edit Properties</div>
             <div class="ctx-item danger" onclick="ctxDeleteFeature()">✕ Delete Feature</div>
         </div>
-        
-        <div id="layer-panel">
-            <div class="layer-panel-header">
-                <span>Layers</span>
-                <span id="layer-total-count" style="color:#C9AB4C; font-size:9px;">0</span>
-            </div>
-            <div class="layer-list" id="layer-list-box"></div>
-        </div>
-        
+
         <div id="feature-properties-panel">
             <div class="panel-header">
                 <span id="prop-panel-title">Feature Properties</span>
@@ -1302,7 +847,7 @@ def get_leaflet_editor_template() -> str:
                     <label>Feature Name</label>
                     <input type="text" id="prop-name">
                 </div>
-                <div class="control-group">
+                <div class="control-group" id="group-layer-select">
                     <label>Layer Assignment</label>
                     <select id="prop-layer"></select>
                 </div>
@@ -1310,15 +855,15 @@ def get_leaflet_editor_template() -> str:
                     <label>Stroke Color</label>
                     <input type="color" id="prop-color">
                 </div>
-                <div class="control-group">
+                <div class="control-group" id="group-fill-color">
                     <label>Fill Color</label>
                     <input type="color" id="prop-fill-color">
                 </div>
-                <div class="control-group">
+                <div class="control-group" id="group-fill-opacity">
                     <label>Fill Opacity</label>
                     <input type="range" id="prop-fill-opacity" min="0" max="1" step="0.1">
                 </div>
-                <div class="control-group">
+                <div class="control-group" id="group-stroke-weight">
                     <label>Stroke Weight</label>
                     <input type="number" id="prop-weight" min="0.5" max="5" step="0.5">
                 </div>
@@ -1341,67 +886,118 @@ def get_leaflet_editor_template() -> str:
         </div>
 
         <script>
-            // 1. Initialize Base Map
+            // ================== INIT ==================
             const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-
-            // 2. Global Geoman Editor Settings (Best Practice: Snapping & Consistency)
-            map.pm.setGlobalOptions({
-                snappable: true,
-                snapDistance: 20, 
-                allowSelfIntersection: false,
-                hintlineStyle: { color: '#C9AB4C', dashArray: '5,5' },
-                templineStyle: { color: '#003366', weight: 2 }
-            });
-
-            map.pm.addControls({
-                position: 'topleft',
-                drawMarker: true,
-                drawPolygon: true,
-                drawPolyline: true,
-                drawCircle: true,
-                drawRectangle: true,
-                drawCircleMarker: false, 
-                editMode: true,
-                dragMode: true,
-                cutPolygon: true,
-                removalMode: true,
-                rotateMode: true
-            });
+            map.zoomControl.setPosition('topleft');
             
+            // Base Maps
+            const basemaps = {
+                osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
+                satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+                carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
+            };
+
+            let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'osm';
+            if (!basemaps[activeBasemapKey]) activeBasemapKey = 'osm';
+            document.getElementById('basemap-select').value = activeBasemapKey;
+            basemaps[activeBasemapKey].addTo(map);
+
+            function switchActiveBasemap(targetKey) {
+                map.removeLayer(basemaps[activeBasemapKey]);
+                basemaps[targetKey].addTo(map);
+                activeBasemapKey = targetKey;
+                localStorage.setItem('ts_persistent_basemap', targetKey);
+            }
+
+            // Label Toggles
+            let labelsActive = localStorage.getItem('ts_persistent_labels') !== 'false';
+            document.getElementById('label-toggle-chk').checked = labelsActive;
+            if (!labelsActive) document.getElementById('map').classList.add('hide-labels');
+
+            function toggleLabelsMatrix(isShown) {
+                if (isShown) document.getElementById('map').classList.remove('hide-labels');
+                else document.getElementById('map').classList.add('hide-labels');
+                localStorage.setItem('ts_persistent_labels', isShown);
+            }
+
+            // Custom Leaflet TopLeft Stack (Layers toggle)
+            const toolbarControl = L.control({position: 'topleft'});
+            toolbarControl.onAdd = function (map) {
+                const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom-stack');
+                const layersIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="m116-435 364-199 364 199-364 199-364-199Zm0 157 364 199 364-199-47-26-317 173-317-173-47 26Zm364-257 267-146-267-146-267 146 267 146Z"/></svg>`;
+                div.innerHTML = `<a title="Toggle Map Settings" onclick="toggleLayerMenu(event)">${layersIcon}</a>`;
+                return div;
+            };
+            toolbarControl.addTo(map);
+
+            function toggleLayerMenu(e) {
+                e.preventDefault();
+                const panel = document.getElementById('minimal-basemap-panel');
+                panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+            }
+
+            // ================== SEARCH ==================
+            let searchTimeout = null;
+            function handleSearch(e) {
+                clearTimeout(searchTimeout);
+                const query = e.target.value;
+                const resultsDiv = document.getElementById('search-results');
+
+                if (query.length < 3) { resultsDiv.style.display = 'none'; return; }
+                searchTimeout = setTimeout(() => {
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.length > 0) {
+                                resultsDiv.innerHTML = '';
+                                data.forEach(item => {
+                                    const div = document.createElement('div'); div.className = 'search-item'; div.innerText = item.display_name;
+                                    div.onclick = () => { map.flyTo([item.lat, item.lon], 16); resultsDiv.style.display = 'none'; document.getElementById('map-search').value = item.display_name; };
+                                    resultsDiv.appendChild(div);
+                                });
+                                resultsDiv.style.display = 'block';
+                            } else { resultsDiv.style.display = 'none'; }
+                        }).catch(err => console.error(err));
+                }, 500);
+            }
+            document.addEventListener('click', function(e) {
+                if (!document.getElementById('search-container').contains(e.target)) { document.getElementById('search-results').style.display = 'none'; }
+                const ctxMenu = document.getElementById('context-menu');
+                if (!ctxMenu.contains(e.target)) ctxMenu.style.display = 'none';
+            });
+
+            // ================== GEOMAN & STATE ==================
+            map.pm.setGlobalOptions({ snappable: true, snapDistance: 20, allowSelfIntersection: false, hintlineStyle: { color: '#C9AB4C', dashArray: '5,5' }, templineStyle: { color: '#003366', weight: 2 }});
+            map.pm.addControls({ position: 'topleft', drawMarker: true, drawPolygon: true, drawPolyline: true, drawCircle: true, drawRectangle: true, drawCircleMarker: false, editMode: true, dragMode: true, cutPolygon: true, removalMode: true, rotateMode: true });
+
+            function toggleGeomanTools(show) {
+                const container = document.querySelector('.leaflet-pm-toolbar');
+                if (container) { container.style.display = show ? 'block' : 'none'; }
+            }
+
+            // Static Map Elements
+            const starIcon = L.divIcon({ className: 'custom-center-icon', html: '<div style="background-color: #003366; color: #C9AB4C; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);">★</div>', iconSize: [24, 24], iconAnchor: [12, 12]});
+            L.marker([__LAT__, __LON__], { icon: starIcon, zIndexOffset: 10000 }).addTo(map);
             L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.03 }).addTo(map);
 
+            // App State
             let pts = __GEOJSON__;
             let layerConfigs = __LAYER_CONFIG__;
             let activeLayerId = __ACTIVE_LAYER__;
             let allFeatures = [];
+            let scannedFeatures = []; // Separate tracking for POIs
             let selectedFeature = null;
-            let selectedLayer = null;
             let ctxTargetFeature = null;
             let featureCounter = 0;
+            let globalIdCounter = 0;
             
             if (layerConfigs.length === 0) {
-                layerConfigs = [{
-                    id: 'default_layer',
-                    name: 'Default Layer',
-                    visible: true,
-                    color: '#003366',
-                    fill_color: '#C9AB4C',
-                    fill_opacity: 0.4,
-                    weight: 2.0,
-                    icon_shape: 'pin',
-                    icon_size: 24
-                }];
+                layerConfigs = [{ id: 'default_layer', name: 'Default Layer', visible: true, color: '#003366', fill_color: '#C9AB4C', fill_opacity: 0.4, weight: 2.0, icon_shape: 'pin', icon_size: 24 }];
                 activeLayerId = 'default_layer';
             }
             
-            function getLayerConfig(id) {
-                return layerConfigs.find(l => l.id === id) || layerConfigs[0];
-            }
-            
-            function getActiveLayerConfig() {
-                return getLayerConfig(activeLayerId) || layerConfigs[0];
-            }
+            function getLayerConfig(id) { return layerConfigs.find(l => l.id === id) || layerConfigs[0]; }
+            function getActiveLayerConfig() { return getLayerConfig(activeLayerId) || layerConfigs[0]; }
 
             function renderVectorPinIcon(color, shape, size) {
                 const baseSize = size || 24;
@@ -1410,245 +1006,102 @@ def get_leaflet_editor_template() -> str:
                     : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${baseSize}" height="${baseSize}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
                 return L.divIcon({ html: `<div style="display:flex;align-items:center;justify-content:center;">${svg}</div>`, className: '', iconSize: [baseSize, baseSize], iconAnchor: [baseSize/2, baseSize] });
             }
-            
-            function applyStyleToLayer(leafletLayer, style, shapeType) {
-                if (!leafletLayer) return;
-                if (shapeType === 'marker' || shapeType === 'circlemarker') {
-                    if (leafletLayer.setIcon) {
-                        leafletLayer.setIcon(renderVectorPinIcon(style.color, style.icon_shape || 'pin', style.icon_size || 24));
-                    }
-                } else {
-                    leafletLayer.setStyle({
-                        color: style.color,
-                        fillColor: style.fill_color,
-                        fillOpacity: style.fill_opacity,
-                        weight: style.weight
-                    });
-                }
-            }
 
             function syncGeometryState(featObj) {
-                // Best Practice: Update the underlying data model whenever the UI changes.
                 const l = featObj.layer;
-                if (featObj.type === 'circle') {
-                    featObj.data.radius = l.getRadius();
-                    featObj.data.latlng = l.getLatLng();
-                } else if (featObj.type === 'marker') {
-                    featObj.data.latlng = l.getLatLng();
-                } else {
-                    featObj.data.latlngs = l.getLatLngs();
-                }
+                if (featObj.type === 'circle') { featObj.data.radius = l.getRadius(); featObj.data.latlng = l.getLatLng(); } 
+                else if (featObj.type === 'marker') { featObj.data.latlng = l.getLatLng(); } 
+                else { featObj.data.latlngs = l.getLatLngs(); }
             }
 
             function updateShapeTooltip(leafletLayer, shapeType) {
-                // Best Practice: Contextual measurements for shapes
                 let label = '';
-                
                 try {
-                    if (shapeType === 'circle') {
-                        const r = leafletLayer.getRadius();
-                        label = r >= 1000 ? (r / 1000).toFixed(2) + ' km' : Math.round(r) + ' m';
-                    } else if (shapeType === 'polygon' && typeof turf !== 'undefined') {
-                        const geojson = leafletLayer.toGeoJSON();
-                        const area = turf.area(geojson);
-                        label = area >= 1000000 ? (area / 1000000).toFixed(2) + ' km²' : Math.round(area) + ' m²';
-                    } else if (shapeType === 'polyline' && typeof turf !== 'undefined') {
-                        const geojson = leafletLayer.toGeoJSON();
-                        const length = turf.length(geojson, {units: 'meters'});
-                        label = length >= 1000 ? (length / 1000).toFixed(2) + ' km' : Math.round(length) + ' m';
-                    }
+                    if (shapeType === 'circle') { const r = leafletLayer.getRadius(); label = r >= 1000 ? (r / 1000).toFixed(2) + ' km' : Math.round(r) + ' m'; } 
+                    else if (shapeType === 'polygon' && typeof turf !== 'undefined') { const area = turf.area(leafletLayer.toGeoJSON()); label = area >= 1000000 ? (area / 1000000).toFixed(2) + ' km²' : Math.round(area) + ' m²'; } 
+                    else if (shapeType === 'polyline' && typeof turf !== 'undefined') { const length = turf.length(leafletLayer.toGeoJSON(), {units: 'meters'}); label = length >= 1000 ? (length / 1000).toFixed(2) + ' km' : Math.round(length) + ' m'; }
                 } catch(e) { label = ''; }
-                
                 if(!label) return;
-
-                // Tooltip placement logic
                 let centerPoint = leafletLayer.getBounds ? leafletLayer.getBounds().getCenter() : leafletLayer.getLatLng();
-
-                if (leafletLayer._shapeTooltip) {
-                    leafletLayer._shapeTooltip.setContent(label);
-                    leafletLayer._shapeTooltip.setLatLng(centerPoint);
-                } else {
-                    leafletLayer._shapeTooltip = L.tooltip({
-                        permanent: true,
-                        direction: 'center',
-                        className: 'shape-tooltip',
-                        offset: [0, 0]
-                    }).setContent(label).setLatLng(centerPoint).addTo(map);
-                }
+                if (leafletLayer._shapeTooltip) { leafletLayer._shapeTooltip.setContent(label); leafletLayer._shapeTooltip.setLatLng(centerPoint); } 
+                else { leafletLayer._shapeTooltip = L.tooltip({ permanent: true, direction: 'center', className: 'shape-tooltip', offset: [0, 0] }).setContent(label).setLatLng(centerPoint).addTo(map); }
             }
 
-            function initializeFeaturesOnCanvas() {
+            // ================== INIT POIs & FEATURES ==================
+            const categoryMap = {};
+            const layerGroupsRef = {};
+            const catPalette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"];
+            const categoryColors = {}; 
+            let colorIndex = 0;
+
+            function initializeData() {
+                // Initialize Scanned POIs
                 pts.forEach(p => {
-                    const cfg = getLayerConfig(p.layer_id) || getActiveLayerConfig();
-                    let layerInstance;
-                    if (p.lat && p.lon) {
-                        layerInstance = L.marker([p.lat, p.lon], { 
-                            icon: renderVectorPinIcon(cfg.color, cfg.icon_shape, cfg.icon_size) 
-                        });
-                    }
-                    if (layerInstance) {
-                        const feat = {
-                            layer: layerInstance,
-                            type: 'marker',
-                            data: p,
-                            featureId: 'scanned_' + (p._uid || featureCounter++),
-                            layerId: p.layer_id || activeLayerId
-                        };
-                        allFeatures.push(feat);
-                        layerInstance._featureId = feat.featureId;
-                        layerInstance._layerId = feat.layerId;
-                        if (p.visible !== false) layerInstance.addTo(map);
-                        attachLifecycleHooks(layerInstance, feat);
-                    }
-                });
-                renderLayerPanel();
-            }
-            
-            function attachLifecycleHooks(leafletLayer, featureObj) {
-                // 1. Context Menu Binding
-                leafletLayer.on('contextmenu', function(e) {
-                    L.DomEvent.stopPropagation(e);
-                    ctxTargetFeature = featureObj;
-                    showContextMenu(e.originalEvent.pageX, e.originalEvent.pageY, featureObj);
+                    p._uid = globalIdCounter++;
+                    const layerKey = p.type || 'Unclassified';
+                    if (!categoryMap[layerKey]) { categoryMap[layerKey] = []; categoryColors[layerKey] = catPalette[colorIndex % catPalette.length]; colorIndex++; layerGroupsRef[layerKey] = L.layerGroup().addTo(map); }
+                    
+                    const pColor = categoryColors[layerKey];
+                    const marker = L.marker([p.lat, p.lon], { icon: renderVectorPinIcon(pColor, 'pin', 24) });
+                    
+                    if (p.name && p.name !== 'Unknown') marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -18], className: 'poi-text-label' });
+                    
+                    categoryMap[layerKey].push(p);
+                    marker.addTo(layerGroupsRef[layerKey]);
+                    
+                    // Make it an editable feature object
+                    const feat = { layer: marker, type: 'marker', data: p, featureId: 'scanned_' + p._uid, isScanned: true, category: layerKey };
+                    scannedFeatures.push(feat);
+                    attachLifecycleHooks(marker, feat);
                 });
                 
-                // 2. Selection Binding
-                leafletLayer.on('click', function(e) {
-                    L.DomEvent.stopPropagation(e);
-                    selectFeature(featureObj);
-                });
+                renderScanPanel();
+                renderLayerPanel();
+                
+                if (pts.length > 0) {
+                    const bounds = L.featureGroup([L.marker([__LAT__, __LON__]), ...pts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
+                    map.fitBounds(bounds.pad(0.1));
+                }
+            }
 
-                // 3. Edit & Drag Handlers for Synchronization
-                leafletLayer.on('pm:edit', function(e) {
-                    syncGeometryState(featureObj);
-                    updateShapeTooltip(leafletLayer, featureObj.type);
+            // ================== UI RENDERING ==================
+            function renderScanPanel() {
+                const listBox = document.getElementById('results-list-box');
+                document.getElementById('results-count').innerText = pts.length;
+                let htmlPayload = '';
+                const trashSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="12" viewBox="0 -960 960 960" width="12"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>`;
+
+                Object.keys(categoryMap).forEach(catName => {
+                    const count = categoryMap[catName].length;
+                    if(count === 0) return;
+                    const dotColor = categoryColors[catName];
+                    htmlPayload += `
+                        <div class="layer-category-block" id="cat-block-${catName}">
+                            <div class="layer-category-header" onclick="toggleAccordionCollapse('${catName}')">
+                                <div class="layer-header-left">
+                                    <input type="checkbox" checked onclick="event.stopPropagation(); toggleCategoryVisibility('${catName}', this.checked)">
+                                    <span class="color-dot" style="background-color: ${dotColor}; width:8px; height:8px; border-radius:50%; display:inline-block;"></span>
+                                    <span>${catName} <span id="count-${catName}" style="color: #C9AB4C; font-size: 8px;">(${count})</span></span>
+                                </div>
+                                <span id="chevron-${catName}" style="font-size: 8px; color:#C9AB4C;">▼</span>
+                            </div>
+                            <div class="layer-category-items" id="items-${catName}">`;
+                    categoryMap[catName].forEach(p => {
+                        htmlPayload += `
+                        <div class="results-item" id="res-item-${p._uid}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
+                            <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}">${p.name || 'Unknown'}</div>
+                            <div class="delete-poi-icon" title="Remove POI" onclick="event.stopPropagation(); removeScannedFeature(${p._uid})">${trashSvg}</div>
+                        </div>`;
+                    });
+                    htmlPayload += '</div></div>';
                 });
-                leafletLayer.on('pm:dragend', function(e) {
-                    syncGeometryState(featureObj);
-                    updateShapeTooltip(leafletLayer, featureObj.type);
-                });
-                leafletLayer.on('pm:rotateend', function(e) {
-                    syncGeometryState(featureObj);
-                });
+                listBox.innerHTML = htmlPayload;
             }
-            
-            function showContextMenu(x, y, feature) {
-                const menu = document.getElementById('context-menu');
-                const header = document.getElementById('ctx-header');
-                header.innerText = feature.data.name || 'Feature';
-                menu.style.display = 'block';
-                menu.style.left = x + 'px';
-                menu.style.top = y + 'px';
-            }
-            
-            document.addEventListener('click', function(e) {
-                const menu = document.getElementById('context-menu');
-                if (!menu.contains(e.target)) menu.style.display = 'none';
-            });
-            
-            function ctxEditFeature() {
-                document.getElementById('context-menu').style.display = 'none';
-                if (ctxTargetFeature && ctxTargetFeature.layer && ctxTargetFeature.layer.pm) {
-                    // Activate global edit mode, but specifically target this layer
-                    ctxTargetFeature.layer.pm.enable();
-                }
-            }
-            
-            function ctxEditProperties() {
-                document.getElementById('context-menu').style.display = 'none';
-                if (ctxTargetFeature) selectFeature(ctxTargetFeature);
-            }
-            
-            function ctxDeleteFeature() {
-                document.getElementById('context-menu').style.display = 'none';
-                if (ctxTargetFeature) deleteFeature(ctxTargetFeature);
-            }
-            
-            function selectFeature(featureObj) {
-                selectedFeature = featureObj;
-                selectedLayer = featureObj.layer;
-                const d = featureObj.data;
-                const cfg = getLayerConfig(featureObj.layerId);
-                
-                document.getElementById('prop-name').value = d.name || '';
-                document.getElementById('prop-color').value = d.color || cfg.color;
-                document.getElementById('prop-fill-color').value = d.fill_color || cfg.fill_color;
-                document.getElementById('prop-fill-opacity').value = d.fill_opacity !== undefined ? d.fill_opacity : cfg.fill_opacity;
-                document.getElementById('prop-weight').value = d.weight !== undefined ? d.weight : cfg.weight;
-                document.getElementById('prop-icon-shape').value = d.icon_shape || cfg.icon_shape || 'pin';
-                document.getElementById('prop-icon-size').value = d.icon_size || cfg.icon_size || 24;
-                
-                const layerSelect = document.getElementById('prop-layer');
-                layerSelect.innerHTML = '';
-                layerConfigs.forEach(lc => {
-                    const opt = document.createElement('option');
-                    opt.value = lc.id;
-                    opt.innerText = lc.name;
-                    if (lc.id === featureObj.layerId) opt.selected = true;
-                    layerSelect.appendChild(opt);
-                });
-                
-                const isMarker = featureObj.type === 'marker' || featureObj.type === 'circlemarker';
-                document.getElementById('group-icon-shape').style.display = isMarker ? 'flex' : 'none';
-                document.getElementById('group-icon-size').style.display = isMarker ? 'flex' : 'none';
-                
-                document.getElementById('feature-properties-panel').style.display = 'flex';
-            }
-            
-            function dismissPropertiesPanel() {
-                document.getElementById('feature-properties-panel').style.display = 'none';
-                selectedFeature = null;
-                selectedLayer = null;
-            }
-            
-            function commitFeatureChanges() {
-                if (!selectedFeature) return;
-                const f = selectedFeature;
-                const d = f.data;
-                
-                d.name = document.getElementById('prop-name').value;
-                d.color = document.getElementById('prop-color').value;
-                d.fill_color = document.getElementById('prop-fill-color').value;
-                d.fill_opacity = parseFloat(document.getElementById('prop-fill-opacity').value);
-                d.weight = parseFloat(document.getElementById('prop-weight').value);
-                d.icon_shape = document.getElementById('prop-icon-shape').value;
-                d.icon_size = parseInt(document.getElementById('prop-icon-size').value);
-                
-                const newLayerId = document.getElementById('prop-layer').value;
-                if (newLayerId !== f.layerId) {
-                    f.layerId = newLayerId;
-                    f.layer._layerId = newLayerId;
-                }
-                
-                applyStyleToLayer(f.layer, d, f.type);
-                renderLayerPanel();
-            }
-            
-            function deleteSelectedFeature() {
-                if (selectedFeature) {
-                    deleteFeature(selectedFeature);
-                    dismissPropertiesPanel();
-                }
-            }
-            
-            function deleteFeature(featureObj) {
-                if (featureObj.layer) {
-                    map.removeLayer(featureObj.layer);
-                    if (featureObj.layer._shapeTooltip) {
-                        map.removeLayer(featureObj.layer._shapeTooltip);
-                    }
-                }
-                const idx = allFeatures.indexOf(featureObj);
-                if (idx > -1) allFeatures.splice(idx, 1);
-                renderLayerPanel();
-            }
-            
+
             function renderLayerPanel() {
                 const listBox = document.getElementById('layer-list-box');
                 const counts = {};
-                allFeatures.forEach(f => {
-                    counts[f.layerId] = (counts[f.layerId] || 0) + 1;
-                });
+                allFeatures.forEach(f => { counts[f.layerId] = (counts[f.layerId] || 0) + 1; });
                 
                 let html = '';
                 layerConfigs.forEach(lc => {
@@ -1659,120 +1112,205 @@ def get_leaflet_editor_template() -> str:
                             <span class="layer-color-dot" style="background:${lc.color};"></span>
                             <span class="layer-name">${lc.name}</span>
                             <span class="layer-count">${count}</span>
-                            <span class="layer-visibility" onclick="event.stopPropagation(); toggleLayerVisibility('${lc.id}')">
-                                ${lc.visible !== false ? '👁' : '👁‍🗨'}
-                            </span>
-                        </div>
-                    `;
+                            <span class="layer-visibility" onclick="event.stopPropagation(); toggleCustomLayerVisibility('${lc.id}')">${lc.visible !== false ? '👁' : '👁‍🗨'}</span>
+                        </div>`;
                 });
                 listBox.innerHTML = html;
-                
-                const total = allFeatures.length;
-                document.getElementById('layer-total-count').innerText = total;
+                document.getElementById('layer-total-count').innerText = allFeatures.length;
             }
-            
-            function setActiveLayer(layerId) {
-                activeLayerId = layerId;
-                renderLayerPanel();
+
+            // ================== TOGGLES & ACTIONS ==================
+            function toggleAccordionCollapse(catKey) {
+                const panel = document.getElementById('items-' + catKey);
+                const chev = document.getElementById('chevron-' + catKey);
+                panel.classList.toggle('collapsed');
+                chev.innerText = panel.classList.contains('collapsed') ? '▲' : '▼';
             }
-            
-            function toggleLayerVisibility(layerId) {
+
+            function toggleCategoryVisibility(catKey, isVisible) {
+                if (isVisible) map.addLayer(layerGroupsRef[catKey]);
+                else map.removeLayer(layerGroupsRef[catKey]);
+            }
+
+            function toggleCustomLayerVisibility(layerId) {
                 const cfg = getLayerConfig(layerId);
                 if (cfg) {
                     cfg.visible = cfg.visible === false ? true : false;
                     allFeatures.forEach(f => {
                         if (f.layerId === layerId) {
-                            if (cfg.visible) {
-                                map.addLayer(f.layer);
-                                if(f.layer._shapeTooltip) map.addLayer(f.layer._shapeTooltip);
-                            } else {
-                                map.removeLayer(f.layer);
-                                if(f.layer._shapeTooltip) map.removeLayer(f.layer._shapeTooltip);
-                            }
+                            if (cfg.visible) { map.addLayer(f.layer); if(f.layer._shapeTooltip) map.addLayer(f.layer._shapeTooltip); } 
+                            else { map.removeLayer(f.layer); if(f.layer._shapeTooltip) map.removeLayer(f.layer._shapeTooltip); }
                         }
                     });
                     renderLayerPanel();
                 }
             }
+            function setActiveLayer(layerId) { activeLayerId = layerId; renderLayerPanel(); }
+
+            // ================== LIFECYCLE HOOKS ==================
+            function attachLifecycleHooks(leafletLayer, featureObj) {
+                leafletLayer.on('contextmenu', function(e) { L.DomEvent.stopPropagation(e); ctxTargetFeature = featureObj; showContextMenu(e.originalEvent.pageX, e.originalEvent.pageY, featureObj); });
+                leafletLayer.on('click', function(e) { L.DomEvent.stopPropagation(e); selectFeature(featureObj); });
+                leafletLayer.on('pm:edit', function(e) { syncGeometryState(featureObj); updateShapeTooltip(leafletLayer, featureObj.type); });
+                leafletLayer.on('pm:dragend', function(e) { syncGeometryState(featureObj); updateShapeTooltip(leafletLayer, featureObj.type); });
+                leafletLayer.on('pm:rotateend', function(e) { syncGeometryState(featureObj); });
+            }
+
+            // ================== PROPERTIES & EDITING ==================
+            function showContextMenu(x, y, feature) {
+                const menu = document.getElementById('context-menu');
+                document.getElementById('ctx-header').innerText = feature.data.name || 'Feature';
+                menu.style.display = 'block'; menu.style.left = x + 'px'; menu.style.top = y + 'px';
+            }
+            function ctxEditFeature() { document.getElementById('context-menu').style.display = 'none'; if (ctxTargetFeature && ctxTargetFeature.layer.pm) { ctxTargetFeature.layer.pm.enable(); } }
+            function ctxEditProperties() { document.getElementById('context-menu').style.display = 'none'; if (ctxTargetFeature) selectFeature(ctxTargetFeature); }
+            function ctxDeleteFeature() { document.getElementById('context-menu').style.display = 'none'; if (ctxTargetFeature) deleteFeatureEngine(ctxTargetFeature); }
+
+            function selectFeature(featureObj) {
+                selectedFeature = featureObj;
+                const d = featureObj.data;
+                const isScanned = featureObj.isScanned;
+                
+                document.getElementById('prop-name').value = d.name || '';
+                
+                if(isScanned) {
+                    const pColor = categoryColors[featureObj.category];
+                    document.getElementById('prop-color').value = d.color || pColor;
+                    document.getElementById('group-layer-select').style.display = 'none';
+                    document.getElementById('group-fill-color').style.display = 'none';
+                    document.getElementById('group-fill-opacity').style.display = 'none';
+                    document.getElementById('group-stroke-weight').style.display = 'none';
+                    document.getElementById('prop-icon-shape').value = 'pin';
+                    document.getElementById('prop-icon-size').value = 24;
+                } else {
+                    const cfg = getLayerConfig(featureObj.layerId);
+                    document.getElementById('prop-color').value = d.color || cfg.color;
+                    document.getElementById('prop-fill-color').value = d.fill_color || cfg.fill_color;
+                    document.getElementById('prop-fill-opacity').value = d.fill_opacity !== undefined ? d.fill_opacity : cfg.fill_opacity;
+                    document.getElementById('prop-weight').value = d.weight !== undefined ? d.weight : cfg.weight;
+                    document.getElementById('prop-icon-shape').value = d.icon_shape || cfg.icon_shape || 'pin';
+                    document.getElementById('prop-icon-size').value = d.icon_size || cfg.icon_size || 24;
+                    
+                    const layerSelect = document.getElementById('prop-layer');
+                    layerSelect.innerHTML = '';
+                    layerConfigs.forEach(lc => { const opt = document.createElement('option'); opt.value = lc.id; opt.innerText = lc.name; if (lc.id === featureObj.layerId) opt.selected = true; layerSelect.appendChild(opt); });
+                    
+                    document.getElementById('group-layer-select').style.display = 'flex';
+                    document.getElementById('group-fill-color').style.display = 'flex';
+                    document.getElementById('group-fill-opacity').style.display = 'flex';
+                    document.getElementById('group-stroke-weight').style.display = 'flex';
+                }
+                
+                const isMarker = featureObj.type === 'marker' || featureObj.type === 'circlemarker';
+                document.getElementById('group-icon-shape').style.display = isMarker ? 'flex' : 'none';
+                document.getElementById('group-icon-size').style.display = isMarker ? 'flex' : 'none';
+                document.getElementById('feature-properties-panel').style.display = 'flex';
+            }
+
+            function dismissPropertiesPanel() { document.getElementById('feature-properties-panel').style.display = 'none'; selectedFeature = null; }
+
+            function commitFeatureChanges() {
+                if (!selectedFeature) return;
+                const f = selectedFeature; const d = f.data;
+                d.name = document.getElementById('prop-name').value;
+                d.color = document.getElementById('prop-color').value;
+                
+                if(f.isScanned) {
+                    if (f.layer.setIcon) f.layer.setIcon(renderVectorPinIcon(d.color, 'pin', 24));
+                    if (d.name && d.name !== 'Unknown') { f.layer.unbindTooltip(); f.layer.bindTooltip(d.name, { permanent: true, direction: 'top', offset: [0, -18], className: 'poi-text-label' }); }
+                    
+                    // Update list text
+                    const el = document.getElementById('res-item-' + d._uid);
+                    if(el) el.querySelector('div').innerText = d.name;
+                    
+                } else {
+                    d.fill_color = document.getElementById('prop-fill-color').value;
+                    d.fill_opacity = parseFloat(document.getElementById('prop-fill-opacity').value);
+                    d.weight = parseFloat(document.getElementById('prop-weight').value);
+                    d.icon_shape = document.getElementById('prop-icon-shape').value;
+                    d.icon_size = parseInt(document.getElementById('prop-icon-size').value);
+                    
+                    const newLayerId = document.getElementById('prop-layer').value;
+                    if (newLayerId !== f.layerId) { f.layerId = newLayerId; f.layer._layerId = newLayerId; }
+                    
+                    if (f.type === 'marker' || f.type === 'circlemarker') { if (f.layer.setIcon) f.layer.setIcon(renderVectorPinIcon(d.color, d.icon_shape, d.icon_size)); } 
+                    else { f.layer.setStyle({ color: d.color, fillColor: d.fill_color, fillOpacity: d.fill_opacity, weight: d.weight }); }
+                    renderLayerPanel();
+                }
+            }
+
+            function deleteSelectedFeature() { if (selectedFeature) { deleteFeatureEngine(selectedFeature); dismissPropertiesPanel(); } }
             
-            // Core Geoman Creation Event 
+            function removeScannedFeature(uid) {
+                const idx = scannedFeatures.findIndex(item => item.data._uid === uid);
+                if (idx > -1) { deleteFeatureEngine(scannedFeatures[idx]); }
+            }
+
+            function deleteFeatureEngine(featureObj) {
+                if (featureObj.layer) {
+                    map.removeLayer(featureObj.layer);
+                    if (featureObj.layer._shapeTooltip) map.removeLayer(featureObj.layer._shapeTooltip);
+                }
+                if(featureObj.isScanned) {
+                    const idx = scannedFeatures.indexOf(featureObj);
+                    if (idx > -1) scannedFeatures.splice(idx, 1);
+                    
+                    const el = document.getElementById('res-item-' + featureObj.data._uid);
+                    if(el) el.remove();
+                    
+                    const catKey = featureObj.category;
+                    const catArr = categoryMap[catKey];
+                    if(catArr) {
+                        const pIdx = catArr.findIndex(p => p._uid === featureObj.data._uid);
+                        if(pIdx > -1) catArr.splice(pIdx, 1);
+                        const countEl = document.getElementById('count-' + catKey);
+                        if(countEl) { countEl.innerText = `(${catArr.length})`; if (catArr.length === 0) document.getElementById('cat-block-' + catKey).style.display = 'none'; }
+                    }
+                    const totalEl = document.getElementById('results-count');
+                    if(totalEl) totalEl.innerText = parseInt(totalEl.innerText) - 1;
+                } else {
+                    const idx = allFeatures.indexOf(featureObj);
+                    if (idx > -1) allFeatures.splice(idx, 1);
+                    renderLayerPanel();
+                }
+            }
+
+            // ================== GEOMAN CREATION ==================
             map.on('pm:create', function(e) {
-                const shape = e.shape;
-                const layer = e.layer;
+                const shape = e.shape; const layer = e.layer;
                 const cfg = getActiveLayerConfig();
                 const featId = 'drawn_' + featureCounter++;
                 
-                let data = {
-                    name: shape.charAt(0).toUpperCase() + shape.slice(1) + ' ' + featureCounter,
-                    color: cfg.color,
-                    fill_color: cfg.fill_color,
-                    fill_opacity: cfg.fill_opacity,
-                    weight: cfg.weight,
-                    icon_shape: cfg.icon_shape,
-                    icon_size: cfg.icon_size
-                };
-                
+                let data = { name: shape.charAt(0).toUpperCase() + shape.slice(1) + ' ' + featureCounter, color: cfg.color, fill_color: cfg.fill_color, fill_opacity: cfg.fill_opacity, weight: cfg.weight, icon_shape: cfg.icon_shape, icon_size: cfg.icon_size };
                 let type = shape.toLowerCase();
-                if (shape === 'Marker') type = 'marker';
-                if (shape === 'CircleMarker') type = 'circlemarker';
-                if (shape === 'Circle') {
-                    type = 'circle';
-                    data.radius = layer.getRadius();
-                }
+                if (shape === 'Marker') type = 'marker'; if (shape === 'CircleMarker') type = 'circlemarker';
+                if (shape === 'Circle') { type = 'circle'; data.radius = layer.getRadius(); }
                 if (shape === 'Polygon' || shape === 'Rectangle') type = 'polygon';
                 if (shape === 'Line' || shape === 'Polyline') type = 'polyline';
                 
-                // Initialize Styles
-                if (type === 'circle' || type === 'polygon' || type === 'polyline') {
-                    layer.setStyle({
-                        color: cfg.color,
-                        fillColor: cfg.fill_color,
-                        fillOpacity: cfg.fill_opacity,
-                        weight: cfg.weight
-                    });
-                } else if (type === 'marker' || type === 'circlemarker') {
-                    if (layer.setIcon) {
-                        layer.setIcon(renderVectorPinIcon(cfg.color, cfg.icon_shape, cfg.icon_size));
-                    }
-                }
+                if (type === 'circle' || type === 'polygon' || type === 'polyline') { layer.setStyle({ color: cfg.color, fillColor: cfg.fill_color, fillOpacity: cfg.fill_opacity, weight: cfg.weight }); } 
+                else if (type === 'marker' || type === 'circlemarker') { if (layer.setIcon) layer.setIcon(renderVectorPinIcon(cfg.color, cfg.icon_shape, cfg.icon_size)); }
                 
-                const feat = {
-                    layer: layer,
-                    type: type,
-                    data: data,
-                    featureId: featId,
-                    layerId: activeLayerId
-                };
-                
-                layer._featureId = featId;
-                layer._layerId = activeLayerId;
+                const feat = { layer: layer, type: type, data: data, featureId: featId, layerId: activeLayerId, isScanned: false };
+                layer._featureId = featId; layer._layerId = activeLayerId;
                 
                 allFeatures.push(feat);
+                syncGeometryState(feat); updateShapeTooltip(layer, type); attachLifecycleHooks(layer, feat);
                 
-                // Sync underlying state immediately 
-                syncGeometryState(feat);
-                updateShapeTooltip(layer, type);
-                
-                // Attach strict edit handlers to the newly drawn layer
-                attachLifecycleHooks(layer, feat);
-                
-                renderLayerPanel();
-                selectFeature(feat); // Auto-select to prompt user to name it
+                renderLayerPanel(); selectFeature(feat);
             });
             
-            // Clean up memory if removed via global Geoman trash tool
             map.on('pm:remove', function(e) {
                 const layer = e.layer;
                 const idx = allFeatures.findIndex(f => f.layer === layer);
-                if (idx > -1) {
-                    if (allFeatures[idx].layer._shapeTooltip) {
-                        map.removeLayer(allFeatures[idx].layer._shapeTooltip);
-                    }
-                    allFeatures.splice(idx, 1);
-                    renderLayerPanel();
-                }
+                if (idx > -1) { if (allFeatures[idx].layer._shapeTooltip) map.removeLayer(allFeatures[idx].layer._shapeTooltip); allFeatures.splice(idx, 1); renderLayerPanel(); }
+                
+                // Check if user native deleted a Scanned POI
+                const scIdx = scannedFeatures.findIndex(f => f.layer === layer);
+                if (scIdx > -1) removeScannedFeature(scannedFeatures[scIdx].data._uid);
             });
             
+            // Map Context Menu
             map.on('contextmenu', function(e) {
                 const coordStr = e.latlng.lat.toFixed(5) + ', ' + e.latlng.lng.toFixed(5);
                 const menuHtml = `
@@ -1780,51 +1318,18 @@ def get_leaflet_editor_template() -> str:
                         <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP ACTIONS</div>
                         <div style="padding: 4px 0; cursor: pointer; font-weight: 700;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="navigator.clipboard.writeText('${coordStr}'); map.closePopup();">Copy Coordinates</div>
                         <div style="padding: 4px 0; cursor: pointer; font-weight: 700;" onmouseover="this.style.color='#C9AB4C'" onmouseout="this.style.color='#003366'" onclick="window.open('https://www.google.com/maps?q=${e.latlng.lat},${e.latlng.lng}', '_blank'); map.closePopup();">Google Maps</div>
-                    </div>
-                `;
+                    </div>`;
                 L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
             });
             
-            window.onload = () => {
-                initializeFeaturesOnCanvas();
-            };
+            window.onload = () => { initializeData(); };
         </script>
     </body>
     </html>
     """
 
-
-def render_scan_map() -> None:
-    """Render the SCAN module Leaflet map."""
-    coords = parse_coordinates(st.session_state.geo_coords)
-    if coords:
-        lat_coord, lon_coord = coords
-    else:
-        lat_coord, lon_coord = DEFAULT_LAT, DEFAULT_LON
-
-    render_lat = lat_coord
-    render_lon = lon_coord
-    is_stale = (
-        lat_coord != st.session_state.last_scan_lat
-        or lon_coord != st.session_state.last_scan_lon
-    )
-
-    geojson_escaped = escape_javascript(json.dumps(st.session_state.scanned_records))
-    
-    template = get_leaflet_scan_template()
-    leaflet_html = (
-        template.replace("__LAT__", str(render_lat))
-        .replace("__LON__", str(render_lon))
-        .replace("__RADIUS__", str(st.session_state.geo_radius))
-        .replace("__IS_STALE__", "false" if not is_stale else "true")
-        .replace("__GEOJSON__", geojson_escaped)
-    )
-
-    st.components.v1.html(leaflet_html, height=850, scrolling=False)
-
-
-def render_editor_map() -> None:
-    """Render the EDITOR module Leaflet map with Geoman drawing tools."""
+def render_unified_map() -> None:
+    """Render the single unified map module."""
     coords = parse_coordinates(st.session_state.geo_coords)
     if coords:
         lat_coord, lon_coord = coords
@@ -1833,19 +1338,10 @@ def render_editor_map() -> None:
 
     layer_config = json.dumps(st.session_state.editor_layers)
     active_layer = st.session_state.get("active_editor_layer", "")
-    
-    # Enrich scanned records with layer_id for editor visualization
-    for idx, record in enumerate(st.session_state.scanned_records):
-        if "_uid" not in record:
-            record["_uid"] = idx
-        if "visible" not in record:
-            record["visible"] = True
-        if "layer_id" not in record:
-            record["layer_id"] = active_layer if active_layer else ""
 
     geojson_escaped = escape_javascript(json.dumps(st.session_state.scanned_records))
     
-    template = get_leaflet_editor_template()
+    template = get_leaflet_unified_template()
     leaflet_html = (
         template.replace("__LAT__", str(lat_coord))
         .replace("__LON__", str(lon_coord))
@@ -1866,13 +1362,7 @@ def main() -> None:
     init_session_state()
     apply_global_styles()
     render_sidebar()
-
-    # Render appropriate module
-    if st.session_state.active_module == "SCAN":
-        render_scan_map()
-    else:
-        render_editor_map()
-
+    render_unified_map()
 
 if __name__ == "__main__":
     main()
