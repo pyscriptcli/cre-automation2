@@ -674,7 +674,7 @@ leaflet_template = """
         // [ CONFIGURATION BLOCK: INITIALIZATION ]
         // =============================================================================
         L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.08 }).addTo(map);
-        L.marker([__LAT__, __LON__], { icon: L.divIcon({ html: '<div style="background:#003366; color:#C9AB4C; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; border:2px solid #fff;">★</div>', className:'', iconSize:[20,20] }), zIndexOffset: 10000 }).addTo(map);
+        L.marker([__LAT__, __LON__], { icon: L.divIcon({ html: '<div style="background:#003366; color:#C9AB4C; width:16px; height:16px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; border:2px solid #fff;">★</div>', className:'', iconSize:[30,30] }), zIndexOffset: 10000 }).addTo(map);
 
         renderSidebar(); 
         if (pts.length > 0 && !__IS_STALE__) {
