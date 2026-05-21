@@ -21,7 +21,7 @@ LUXURY_CRE_SYSTEM = """
 <style>
     .stApp { background-color: #FFFFFF !important; color: #002B49 !important; font-family: 'Inter', -apple-system, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; }
-    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width: 1400px !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width: 1800px !important; }
     
     /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
@@ -36,7 +36,7 @@ LUXURY_CRE_SYSTEM = """
     section[data-testid="stFileUploader"] div, section[data-testid="stFileUploader"] span { color: #002B49 !important; font-size: 13px !important; font-weight: 500 !important; }
     
     /* Typography & Cards */
-    .row-metric-label { font-size: 14px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; color: #002B49 !important; display: flex; align-items: center; padding-top: 12px; }
+    .row-metric-label { font-size: 13px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; color: #002B49 !important; display: flex; align-items: center; padding-top: 12px; }
     .luxury-workspace-card { background-color: #FFFFFF; border-top: 4px solid #002B49; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .config-card { background-color: #F8FAFC; border: 1px solid #CBD5E1; border-top: 4px solid #C5A059; padding: 25px; margin-bottom: 20px; }
     
@@ -44,7 +44,7 @@ LUXURY_CRE_SYSTEM = """
     div.stButton > button { background-color: #002B49 !important; color: #FFFFFF !important; font-weight: 700 !important; font-size: 14px !important; text-transform: uppercase !important; border: none !important; border-radius: 0px !important; border-bottom: 4px solid #C5A059 !important; padding: 12px 24px !important; width: 100% !important; transition: background-color 0.15s ease; }
     div.stButton > button:hover { background-color: #0A3352 !important; border-bottom-color: #C5A059 !important; color: #FFFFFF !important; }
     
-    div[data-testid="stDownloadButton"] > button { background-color: #C5A059 !important; border-bottom: 4px solid #002B49 !important; }
+    div[data-testid="stDownloadButton"] > button { background-color: #C5A059 !important; border-bottom: 4px solid #002B49 !important; border-radius: 0px !important; color: #FFFFFF !important; font-weight: 700 !important; text-transform: uppercase !important; padding: 12px 24px !important; width: 100% !important; }
     div[data-testid="stDownloadButton"] > button:hover { background-color: #B08D4D !important; border-bottom-color: #002B49 !important; }
 
     /* Minimalist Radio Toggle Fix */
@@ -112,7 +112,6 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
         shapes_to_delete, images_to_add = [], []
 
         for shape in slide.shapes:
-            # Process Images first
             if shape.has_text_frame:
                 text_content = shape.text
                 for img_token, img_file in image_inputs.items():
@@ -120,7 +119,6 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                         images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
                         shapes_to_delete.append(shape)
 
-            # Process Text & Tables
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
@@ -151,7 +149,7 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
 
 # --- UI HELPERS ---
 def dynamic_form_row(icon, label_text, key):
-    r_col1, r_col2 = st.columns([9, 11])
+    r_col1, r_col2 = st.columns([1, 1.5])
     with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
     with r_col2: return st.text_input("", key=key, label_visibility="collapsed")
 
@@ -160,12 +158,12 @@ def dynamic_textarea_row(icon, label_text, key):
     return st.text_area("", key=key, label_visibility="collapsed", height=100)
 
 def dynamic_uploader_row(icon, label_text, allowed_types, key):
-    r_col1, r_col2 = st.columns([9, 11])
+    r_col1, r_col2 = st.columns([1, 1.5])
     with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
     with r_col2: return st.file_uploader(label_text, type=allowed_types, key=key, label_visibility="collapsed")
 
 def dynamic_selector_row(icon, label_text, options, key):
-    r_col1, r_col2 = st.columns([9, 11])
+    r_col1, r_col2 = st.columns([1, 1.5])
     with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
     with r_col2: return st.selectbox(label_text, options, key=key, label_visibility="collapsed")
 
@@ -183,19 +181,22 @@ st.markdown("### WORKSPACE PROTOCOL")
 app_mode = st.radio("Select Generation Mode:", ["Standard PIS (Legacy Specs)", "Custom Adaptive Template"], horizontal=True, label_visibility="collapsed")
 st.markdown("<hr style='margin-top:0px; border-color:#002B49;'>", unsafe_allow_html=True)
 
-col_left, col_right = st.columns([1.3, 1], gap="large")
+# 3-COLUMN ARCHITECTURE (2 for Input, 1 for Export/Config)
+col_in1, col_in2, col_out = st.columns([1, 1, 1.2], gap="large")
 
 text_data = {}
 image_data = {}
 
-with col_left:
+# Global PPTX Upload accessible across modes
+with col_in1:
     st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
     u_template = st.file_uploader("📂 UPLOAD MASTER BLUEPRINT (PPTX)", type=["pptx"])
     st.markdown('</div>', unsafe_allow_html=True)
 
-    if app_mode == "Standard PIS (Legacy Specs)":
-        # --- FULL LEGACY PIS SPECIFICATION ROWS ---
+if app_mode == "Standard PIS (Legacy Specs)":
+    with col_in1:
         st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+        st.markdown("#### PRIMARY SPECS")
         prop_location = dynamic_form_row("📍", "Property Location", "cre_loc")
         prop_size     = dynamic_form_row("📐", "Property Size (SQM)", "cre_size")
         prop_type     = dynamic_form_row("🏢", "Property Type", "cre_type")
@@ -203,96 +204,92 @@ with col_left:
         lease_rates   = dynamic_form_row("💰", "Lease Rates", "cre_rates")
         sec_deposit   = dynamic_form_row("🛡️", "Security Deposit", "cre_sec")
         adv_rent      = dynamic_form_row("💵", "Advance Rent", "cre_adv")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    with col_in2:
+        st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+        st.markdown("#### SECONDARY SPECS & MEDIA")
         escalation    = dynamic_form_row("📈", "Rental Escalation", "cre_esc")
         lease_term    = dynamic_form_row("📅", "Lease Term", "cre_term")
         handover      = dynamic_form_row("🏗️", "Handover Condition", "cre_hand")
         prop_high1    = dynamic_form_row("✨", "Property Highlight 1", "cre_high1")
         prop_high2    = dynamic_form_row("✨", "Property Highlight 2", "cre_high2")
         
-        # Contacts Database
         contacts_database = {
             "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
             "Meliza Zapata": {"phone": "0996 880 5399", "email": "meliza.zapata@primephilippines.com"},
             "Dykstra Pineda": {"phone": "0920 986 2748", "email": "dykstra.pineda@primephilippines.com"},
             "Cedtrix Rena": {"phone": "0977 653 1494", "email": "cedtriz.rena@primephilippines.com"},
             "Carlo Medina": {"phone": "0920 986 2763", "email": "carlo.medina@primephilippines.com"},
-            "Dave Policarpio": {"phone": "0908 865 8945", "email": "dave.policarpio@primephilippines.com"},
-            "Irish Rima": {"phone": "0917 000 0000", "email": "irish.rima@primephilippines.com"}
+            "Dave Policarpio": {"phone": "0908 865 8945", "email": "dave.policarpio@primephilippines.com"}
         }
         dropdown_options = ["None"] + list(contacts_database.keys())
         cta1_selection = dynamic_selector_row("📞", "CTA 1", dropdown_options, "web_cta1")
-        cta2_selection = dynamic_selector_row("📞", "CTA 2", dropdown_options, "web_cta2")
-        st.markdown('</div>', unsafe_allow_html=True)
         
-        # Media Pipelines
-        st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
         img_types = ["png", "jpg", "jpeg"]
         u_map     = dynamic_uploader_row("🗺️", "Location Map", img_types, "web_mp")
         u_lotplan = dynamic_uploader_row("📐", "Lot Plan", img_types, "web_lp")
         u_photo1  = dynamic_uploader_row("📸", "Property Photo 1", img_types, "web_p1")
-        u_photo2  = dynamic_uploader_row("📸", "Property Photo 2", img_types, "web_p2")
-        u_photo3  = dynamic_uploader_row("📸", "Property Photo 3", img_types, "web_p3")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        text_data = {
-            "{{PROPERTY_LOCATION}}": prop_location, "{{PROPERTY_SIZE}}": prop_size,
-            "{{PROPERTY_TYPE}}": prop_type, "{{PROPERTY_ADDRESS}}": prop_address,
-            "{{LEASE_RATES}}": lease_rates, "{{SECURITY_DEPOSIT}}": sec_deposit,
-            "{{ADVANCE_RENT}}": adv_rent, "{{ESCALATION}}": escalation,
-            "{{LEASE TERM}}": lease_term, "{{HANDOVER CONDITION}}": handover,
-            "{{PROPERTY_HIGHLIGHTS1}}": prop_high1, "{{PROPERTY_HIGHLIGHTS2}}": prop_high2
-        }
+    text_data = {
+        "{{PROPERTY_LOCATION}}": prop_location, "{{PROPERTY_SIZE}}": prop_size,
+        "{{PROPERTY_TYPE}}": prop_type, "{{PROPERTY_ADDRESS}}": prop_address,
+        "{{LEASE_RATES}}": lease_rates, "{{SECURITY_DEPOSIT}}": sec_deposit,
+        "{{ADVANCE_RENT}}": adv_rent, "{{ESCALATION}}": escalation,
+        "{{LEASE TERM}}": lease_term, "{{HANDOVER CONDITION}}": handover,
+        "{{PROPERTY_HIGHLIGHTS1}}": prop_high1, "{{PROPERTY_HIGHLIGHTS2}}": prop_high2
+    }
+    
+    if cta1_selection != "None":
+        text_data["{{CTA1_NAME}}"] = cta1_selection
+        text_data["{{CTA1_CONTACT_NUMBER}}"] = contacts_database[cta1_selection]["phone"]
+        text_data["{{CTA1_EMAIL_ADDRESS}}"] = contacts_database[cta1_selection]["email"]
+    
+    image_data = {"{{PROPERTY_PHOTO1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map, "{{PROPERTY_LOTPLAN}}": u_lotplan}
 
-        for i, selection in enumerate([cta1_selection, cta2_selection], start=1):
-            name_token  = f"{{{{CTA{i}_NAME}}}}"
-            phone_token = f"{{{{CTA{i}_CONTACT_NUMBER}}}}"
-            email_token = f"{{{{CTA{i}_EMAIL_ADDRESS}}}}"
-            
-            if selection and selection != "None":
-                text_data[name_token]  = selection
-                text_data[phone_token] = contacts_database[selection]["phone"]
-                text_data[email_token] = contacts_database[selection]["email"]
+elif app_mode == "Custom Adaptive Template" and u_template is not None:
+    raw_bytes = u_template.getvalue()
+    tokens = extract_placeholders(raw_bytes)
+    
+    if not tokens:
+        with col_in1: st.info("No {{PLACEHOLDERS}} found in the uploaded PPTX.")
+    else:
+        # Distribute dynamically generated inputs across the 2 columns
+        col1_elements, col2_elements = [], []
+        for i, token in enumerate(tokens):
+            if i % 2 == 0:
+                col1_elements.append(token)
             else:
-                text_data[name_token], text_data[phone_token], text_data[email_token] = "", "", ""
+                col2_elements.append(token)
                 
-        image_data = {
-            "{{PROPERTY_PHOTO1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map,
-            "{{PROPERTY_LOTPLAN}}": u_lotplan, "{{PROPERTY_PHOTO2}}": u_photo2,
-            "{{PROPERTY_PHOTO3}}": u_photo3
-        }
-
-    elif app_mode == "Custom Adaptive Template" and u_template is not None:
-        raw_bytes = u_template.getvalue()
-        tokens = extract_placeholders(raw_bytes)
-        
-        st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
-        st.markdown("### DYNAMIC DATA ENTRY")
-        
-        if not tokens:
-            st.info("No {{PLACEHOLDERS}} found in the uploaded PPTX.")
-        else:
-            for token in tokens:
+        with col_in1:
+            st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+            for token in col1_elements:
                 t_type = st.session_state.custom_mapping.get(token, "Short Text")
                 clean_label = token.replace("{", "").replace("}", "")
-                
-                if t_type == "Short Text":
-                    text_data[token] = dynamic_form_row("📝", clean_label, f"val_{token}")
-                elif t_type == "Paragraph":
-                    text_data[token] = dynamic_textarea_row("📄", clean_label, f"val_{token}")
-                elif t_type == "Image":
-                    image_data[token] = dynamic_uploader_row("📸", clean_label, ["png", "jpg", "jpeg"], f"val_{token}")
-                    
-        st.markdown('</div>', unsafe_allow_html=True)
-    elif app_mode == "Custom Adaptive Template" and u_template is None:
-        st.warning("⚠️ Please upload a Master Blueprint (PPTX) to map dynamic placeholders.")
+                if t_type == "Short Text": text_data[token] = dynamic_form_row("📝", clean_label, f"val_{token}")
+                elif t_type == "Paragraph": text_data[token] = dynamic_textarea_row("📄", clean_label, f"val_{token}")
+                elif t_type == "Image": image_data[token] = dynamic_uploader_row("📸", clean_label, ["png", "jpg", "jpeg"], f"val_{token}")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        with col_in2:
+            st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+            for token in col2_elements:
+                t_type = st.session_state.custom_mapping.get(token, "Short Text")
+                clean_label = token.replace("{", "").replace("}", "")
+                if t_type == "Short Text": text_data[token] = dynamic_form_row("📝", clean_label, f"val_{token}")
+                elif t_type == "Paragraph": text_data[token] = dynamic_textarea_row("📄", clean_label, f"val_{token}")
+                elif t_type == "Image": image_data[token] = dynamic_uploader_row("📸", clean_label, ["png", "jpg", "jpeg"], f"val_{token}")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-
-with col_right:
-    # --- CONFIGURATION HUB (Replaces Preview) ---
+# --- 3RD COLUMN: CONFIG HUB & EXPORT ACTIONS ---
+with col_out:
     if app_mode == "Custom Adaptive Template" and u_template is not None:
         st.markdown('<div class="config-card">', unsafe_allow_html=True)
         st.markdown("### ⚙️ JSON CONFIGURATION HUB")
-        st.markdown("<p style='font-size: 13px; color: #64748B; margin-bottom: 20px;'>Map data types to your PPTX placeholders. Export this config as a JSON file for future use.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 13px; color: #64748B; margin-bottom: 20px;'>Map data types to your PPTX placeholders.</p>", unsafe_allow_html=True)
         
         # 1. Upload Config
         u_json = st.file_uploader("LOAD SAVED CONFIG (JSON)", type=["json"])
@@ -306,14 +303,19 @@ with col_right:
 
         st.markdown("<hr style='border-color:#CBD5E1;'>", unsafe_allow_html=True)
         
-        # 2. Manual Mapping
+        # 2. Manual Mapping (WITH DEFENSIVE VALIDATION FIX)
         st.markdown("#### CURRENT MAPPINGS")
+        valid_types = ["Short Text", "Paragraph", "Image"]
+        
         for token in tokens:
-            current_type = st.session_state.custom_mapping.get(token, "Short Text")
+            raw_type = st.session_state.custom_mapping.get(token, "Short Text")
+            # Defensive check: if old JSON mapped "Text", force it to "Short Text" safely
+            safe_type = raw_type if raw_type in valid_types else "Short Text"
+            
             new_type = st.selectbox(
                 f"Data Type for {token}", 
-                ["Short Text", "Paragraph", "Image"], 
-                index=["Short Text", "Paragraph", "Image"].index(current_type),
+                valid_types, 
+                index=valid_types.index(safe_type),
                 key=f"config_{token}"
             )
             st.session_state.custom_mapping[token] = new_type
@@ -322,7 +324,7 @@ with col_right:
         st.markdown("<hr style='border-color:#CBD5E1;'>", unsafe_allow_html=True)
         config_json_str = json.dumps(st.session_state.custom_mapping, indent=4)
         st.download_button(
-            label="💾 EXPORT SETTINGS AS JSON",
+            label="💾 SAVE CONFIG AS JSON",
             data=config_json_str,
             file_name="template_config.json",
             mime="application/json",
@@ -330,26 +332,23 @@ with col_right:
         )
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- GENERATION ACTIONS ---
+    # --- GENERATION COMMANDS ---
     st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
-    st.markdown("### DOCUMENT EXPORT")
+    st.markdown("### 🚀 DOCUMENT EXPORT")
     
     if u_template:
-        if st.button("🚀 COMPILE PRESENTATION"):
+        if st.button("COMPILE PRESENTATION MATRIX", use_container_width=True):
             with st.spinner("Processing Matrix Assets & Merging Data..."):
                 try:
-                    # Generate PPTX
                     raw_pptx = generate_pptx_bytes(u_template.getvalue(), text_data, image_data)
                     st.session_state.final_pptx = raw_pptx
-                    
-                    # Generate PDF (Background conversion for download)
                     st.session_state.final_pdf = convert_pptx_to_pdf(raw_pptx)
-                    
-                    st.success("Compilation Successful! Ready for download.")
+                    st.success("Compilation Successful!")
                 except Exception as e:
                     st.error(f"Compilation core failure log description: {e}")
 
-        # Download Buttons Matrix
+        # Downloads Pipeline
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         dl_col1, dl_col2 = st.columns(2)
         with dl_col1:
             if st.session_state.final_pptx:
