@@ -5,6 +5,7 @@ import tempfile
 import base64
 import re
 import streamlit as st
+import streamlit.components.v1 as components
 from pptx import Presentation
 from PIL import Image
 
@@ -109,7 +110,6 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
         shapes_to_delete, images_to_add = [], []
 
         for shape in slide.shapes:
-            # Process Images first
             if shape.has_text_frame:
                 text_content = shape.text
                 for img_token, img_file in image_inputs.items():
@@ -117,7 +117,6 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                         images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
                         shapes_to_delete.append(shape)
 
-            # Process Text & Tables
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
@@ -147,18 +146,36 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     return pptx_stream.getvalue()
 
 def display_pdf(pdf_bytes):
-    # Chromium Bypass: Using <object> and <embed> instead of iframe to bypass top-level navigation blocks
+    # BLOB URL WORKAROUND: Bypasses Chromium Edge/Brave data-uri blocks by rendering in-memory
     base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-    pdf_display = f"""
-    <object data="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="850px" style="border: 1px solid #002B49;">
-        <embed src="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="850px" />
-        <div style="padding: 20px; text-align: center; color: #002B49; font-weight: bold;">
-            ⚠️ Your browser (Edge/Brave) is currently blocking the inline PDF preview.<br><br>
-            Don't worry, the file was successfully generated. Please use the DOWNLOAD buttons below to view the file.
-        </div>
-    </object>
+    js_blob_injection = f"""
+    <html>
+    <head>
+        <style>
+            body {{ margin: 0; padding: 0; background-color: #F8FAFC; }}
+            #pdf-container {{ width: 100%; height: 850px; border: 1px solid #002B49; box-sizing: border-box; }}
+            iframe {{ width: 100%; height: 100%; border: none; }}
+        </style>
+    </head>
+    <body>
+        <div id="pdf-container"></div>
+        <script>
+            const b64 = "{base64_pdf}";
+            const binary = atob(b64);
+            const array = new Uint8Array(binary.length);
+            for(let i = 0; i < binary.length; i++) {{
+                array[i] = binary.charCodeAt(i);
+            }}
+            const blob = new Blob([array], {{type: 'application/pdf'}});
+            const url = URL.createObjectURL(blob);
+            const iframe = document.createElement('iframe');
+            iframe.src = url;
+            document.getElementById('pdf-container').appendChild(iframe);
+        </script>
+    </body>
+    </html>
     """
-    st.markdown(pdf_display, unsafe_allow_html=True)
+    components.html(js_blob_injection, height=860)
 
 # --- UI HELPERS ---
 def dynamic_form_row(icon, label_text, key):
@@ -175,7 +192,6 @@ def dynamic_selector_row(icon, label_text, options, key):
     r_col1, r_col2 = st.columns([9, 11])
     with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
     with r_col2: return st.selectbox(label_text, options, key=key, label_visibility="collapsed")
-
 
 # --- INIT APP ---
 st.set_page_config(page_title="Matrix Generator", layout="wide")
@@ -201,7 +217,6 @@ with col_left:
     st.markdown('</div>', unsafe_allow_html=True)
 
     if app_mode == "Standard PIS (Legacy Specs)":
-        # --- FULL LEGACY PIS SPECIFICATION ROWS ---
         st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
         prop_location = dynamic_form_row("📍", "Property Location", "cre_loc")
         prop_size     = dynamic_form_row("📐", "Property Size (SQM)", "cre_size")
@@ -216,7 +231,6 @@ with col_left:
         prop_high1    = dynamic_form_row("✨", "Property Highlight 1", "cre_high1")
         prop_high2    = dynamic_form_row("✨", "Property Highlight 2", "cre_high2")
         
-        # Contacts Database
         contacts_database = {
             "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
             "Meliza Zapata": {"phone": "0996 880 5399", "email": "meliza.zapata@primephilippines.com"},
@@ -231,7 +245,6 @@ with col_left:
         cta2_selection = dynamic_selector_row("📞", "CTA 2", dropdown_options, "web_cta2")
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Media Pipelines
         st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
         img_types = ["png", "jpg", "jpeg"]
         u_map     = dynamic_uploader_row("🗺️", "Location Map", img_types, "web_mp")
@@ -241,7 +254,6 @@ with col_left:
         u_photo3  = dynamic_uploader_row("📸", "Property Photo 3", img_types, "web_p3")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Mapping Legacy Variables
         text_data = {
             "{{PROPERTY_LOCATION}}": prop_location, "{{PROPERTY_SIZE}}": prop_size,
             "{{PROPERTY_TYPE}}": prop_type, "{{PROPERTY_ADDRESS}}": prop_address,
@@ -324,4 +336,4 @@ with col_right:
     if st.session_state.preview_pdf:
         display_pdf(st.session_state.preview_pdf)
     else:
-        st.markdown('<div class="preview-panel">WAITING FOR PREVIEW RENDERING PROTOCOL<br><br><span style="font-size:12px; font-weight:400; color:#94A3B8;">(Upload template, map values, and click Generate Preview)</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="preview-panel">WAITING FOR PREVIEW RENDERING PROTOCOL<br><br><span style="font-size:12px; font-weight:400; color:#94A3B8;">(Upload template, input data, and click Generate Preview)</span></div>', unsafe_allow_html=True)
