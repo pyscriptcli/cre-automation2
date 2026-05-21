@@ -38,11 +38,15 @@ LUXURY_CRE_SYSTEM = """
     /* Typography & Cards */
     .row-metric-label { font-size: 14px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; color: #002B49 !important; display: flex; align-items: center; padding-top: 12px; }
     .luxury-workspace-card { background-color: #FFFFFF; border-top: 4px solid #002B49; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .preview-panel { border: 1px solid #002B49; background-color: #F8FAFC; height: 850px; display: flex; align-items: center; justify-content: center; color: #64748B; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
+    .preview-panel { border: 1px solid #002B49; background-color: #F8FAFC; height: 850px; display: flex; align-items: center; justify-content: center; color: #64748B; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; text-align: center; padding: 20px; }
     
     /* Buttons */
     div.stButton > button { background-color: #002B49 !important; color: #FFFFFF !important; font-weight: 700 !important; font-size: 14px !important; text-transform: uppercase !important; border: none !important; border-radius: 0px !important; border-bottom: 4px solid #C5A059 !important; padding: 12px 24px !important; width: 100% !important; transition: background-color 0.15s ease; }
     div.stButton > button:hover { background-color: #0A3352 !important; border-bottom-color: #C5A059 !important; color: #FFFFFF !important; }
+    
+    /* Minimalist Radio Toggle Fix */
+    div[role="radiogroup"] { flex-direction: row !important; gap: 20px; padding-bottom: 10px; }
+    div[role="radiogroup"] label { font-weight: 700 !important; text-transform: uppercase; letter-spacing: 0.05em; color: #002B49 !important; }
 </style>
 """
 
@@ -143,23 +147,32 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     return pptx_stream.getvalue()
 
 def display_pdf(pdf_bytes):
+    # Chromium Bypass: Using <object> and <embed> instead of iframe to bypass top-level navigation blocks
     base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="850" type="application/pdf" style="border: none;"></iframe>'
+    pdf_display = f"""
+    <object data="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="850px" style="border: 1px solid #002B49;">
+        <embed src="data:application/pdf;base64,{base64_pdf}" type="application/pdf" width="100%" height="850px" />
+        <div style="padding: 20px; text-align: center; color: #002B49; font-weight: bold;">
+            ⚠️ Your browser (Edge/Brave) is currently blocking the inline PDF preview.<br><br>
+            Don't worry, the file was successfully generated. Please use the DOWNLOAD buttons below to view the file.
+        </div>
+    </object>
+    """
     st.markdown(pdf_display, unsafe_allow_html=True)
 
 # --- UI HELPERS ---
 def dynamic_form_row(icon, label_text, key):
-    r_col1, r_col2 = st.columns([2, 3])
+    r_col1, r_col2 = st.columns([9, 11])
     with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
     with r_col2: return st.text_input("", key=key, label_visibility="collapsed")
 
 def dynamic_uploader_row(icon, label_text, allowed_types, key):
-    r_col1, r_col2 = st.columns([2, 3])
+    r_col1, r_col2 = st.columns([9, 11])
     with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
     with r_col2: return st.file_uploader(label_text, type=allowed_types, key=key, label_visibility="collapsed")
 
 def dynamic_selector_row(icon, label_text, options, key):
-    r_col1, r_col2 = st.columns([2, 3])
+    r_col1, r_col2 = st.columns([9, 11])
     with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
     with r_col2: return st.selectbox(label_text, options, key=key, label_visibility="collapsed")
 
@@ -172,11 +185,12 @@ if "preview_pdf" not in st.session_state: st.session_state.preview_pdf = None
 if "final_pptx" not in st.session_state: st.session_state.final_pptx = None
 if "custom_mapping" not in st.session_state: st.session_state.custom_mapping = {}
 
-st.sidebar.markdown("### MODE SELECTION")
-app_mode = st.sidebar.radio("Active Protocol:", ["Standard PIS", "Custom Adaptive"])
-
 # --- MAIN LAYOUT ---
-col_left, col_right = st.columns([1.2, 1], gap="large")
+st.markdown("### WORKSPACE PROTOCOL")
+app_mode = st.radio("Select Generation Mode:", ["Standard PIS (Legacy Specs)", "Custom Adaptive Template"], horizontal=True, label_visibility="collapsed")
+st.markdown("<hr style='margin-top:0px; border-color:#002B49;'>", unsafe_allow_html=True)
+
+col_left, col_right = st.columns([1.1, 1], gap="large")
 
 text_data = {}
 image_data = {}
@@ -186,30 +200,76 @@ with col_left:
     u_template = st.file_uploader("📂 UPLOAD MASTER BLUEPRINT (PPTX)", type=["pptx"])
     st.markdown('</div>', unsafe_allow_html=True)
 
-    if app_mode == "Standard PIS":
+    if app_mode == "Standard PIS (Legacy Specs)":
+        # --- FULL LEGACY PIS SPECIFICATION ROWS ---
         st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
-        st.markdown("### STANDARD PROPERTY SPECS")
         prop_location = dynamic_form_row("📍", "Property Location", "cre_loc")
-        prop_size     = dynamic_form_row("📐", "Property Size", "cre_size")
+        prop_size     = dynamic_form_row("📐", "Property Size (SQM)", "cre_size")
         prop_type     = dynamic_form_row("🏢", "Property Type", "cre_type")
+        prop_address  = dynamic_form_row("🗺️", "Full Address", "cre_addr")
         lease_rates   = dynamic_form_row("💰", "Lease Rates", "cre_rates")
+        sec_deposit   = dynamic_form_row("🛡️", "Security Deposit", "cre_sec")
+        adv_rent      = dynamic_form_row("💵", "Advance Rent", "cre_adv")
+        escalation    = dynamic_form_row("📈", "Rental Escalation", "cre_esc")
+        lease_term    = dynamic_form_row("📅", "Lease Term", "cre_term")
+        handover      = dynamic_form_row("🏗️", "Handover Condition", "cre_hand")
+        prop_high1    = dynamic_form_row("✨", "Property Highlight 1", "cre_high1")
+        prop_high2    = dynamic_form_row("✨", "Property Highlight 2", "cre_high2")
         
-        contacts_db = {"None": "", "Dave Policarpio": "0908 865 8945", "Sondi Tuazon": "0917 843 6128"}
-        cta1_name = dynamic_selector_row("📞", "CTA 1 Name", list(contacts_db.keys()), "cta1_nm")
+        # Contacts Database
+        contacts_database = {
+            "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
+            "Meliza Zapata": {"phone": "0996 880 5399", "email": "meliza.zapata@primephilippines.com"},
+            "Dykstra Pineda": {"phone": "0920 986 2748", "email": "dykstra.pineda@primephilippines.com"},
+            "Cedtrix Rena": {"phone": "0977 653 1494", "email": "cedtriz.rena@primephilippines.com"},
+            "Carlo Medina": {"phone": "0920 986 2763", "email": "carlo.medina@primephilippines.com"},
+            "Dave Policarpio": {"phone": "0908 865 8945", "email": "dave.policarpio@primephilippines.com"},
+            "Irish Rima": {"phone": "0917 000 0000", "email": "irish.rima@primephilippines.com"}
+        }
+        dropdown_options = ["None"] + list(contacts_database.keys())
+        cta1_selection = dynamic_selector_row("📞", "CTA 1", dropdown_options, "web_cta1")
+        cta2_selection = dynamic_selector_row("📞", "CTA 2", dropdown_options, "web_cta2")
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        u_photo1 = dynamic_uploader_row("📸", "Property Photo 1", ["png", "jpg", "jpeg"], "p1")
-        u_map    = dynamic_uploader_row("🗺️", "Location Map", ["png", "jpg", "jpeg"], "m1")
+        # Media Pipelines
+        st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+        img_types = ["png", "jpg", "jpeg"]
+        u_map     = dynamic_uploader_row("🗺️", "Location Map", img_types, "web_mp")
+        u_lotplan = dynamic_uploader_row("📐", "Lot Plan", img_types, "web_lp")
+        u_photo1  = dynamic_uploader_row("📸", "Property Photo 1", img_types, "web_p1")
+        u_photo2  = dynamic_uploader_row("📸", "Property Photo 2", img_types, "web_p2")
+        u_photo3  = dynamic_uploader_row("📸", "Property Photo 3", img_types, "web_p3")
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # Mapping Legacy Variables
         text_data = {
             "{{PROPERTY_LOCATION}}": prop_location, "{{PROPERTY_SIZE}}": prop_size,
-            "{{PROPERTY_TYPE}}": prop_type, "{{LEASE_RATES}}": lease_rates,
-            "{{CTA1_NAME}}": "" if cta1_name == "None" else cta1_name,
-            "{{CTA1_CONTACT_NUMBER}}": contacts_db.get(cta1_name, "")
+            "{{PROPERTY_TYPE}}": prop_type, "{{PROPERTY_ADDRESS}}": prop_address,
+            "{{LEASE_RATES}}": lease_rates, "{{SECURITY_DEPOSIT}}": sec_deposit,
+            "{{ADVANCE_RENT}}": adv_rent, "{{ESCALATION}}": escalation,
+            "{{LEASE TERM}}": lease_term, "{{HANDOVER CONDITION}}": handover,
+            "{{PROPERTY_HIGHLIGHTS1}}": prop_high1, "{{PROPERTY_HIGHLIGHTS2}}": prop_high2
         }
-        image_data = {"{{PROPERTY_PHOTO1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map}
 
-    elif app_mode == "Custom Adaptive" and u_template is not None:
+        for i, selection in enumerate([cta1_selection, cta2_selection], start=1):
+            name_token  = f"{{{{CTA{i}_NAME}}}}"
+            phone_token = f"{{{{CTA{i}_CONTACT_NUMBER}}}}"
+            email_token = f"{{{{CTA{i}_EMAIL_ADDRESS}}}}"
+            
+            if selection and selection != "None":
+                text_data[name_token]  = selection
+                text_data[phone_token] = contacts_database[selection]["phone"]
+                text_data[email_token] = contacts_database[selection]["email"]
+            else:
+                text_data[name_token], text_data[phone_token], text_data[email_token] = "", "", ""
+                
+        image_data = {
+            "{{PROPERTY_PHOTO1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map,
+            "{{PROPERTY_LOTPLAN}}": u_lotplan, "{{PROPERTY_PHOTO2}}": u_photo2,
+            "{{PROPERTY_PHOTO3}}": u_photo3
+        }
+
+    elif app_mode == "Custom Adaptive Template" and u_template is not None:
         raw_bytes = u_template.getvalue()
         tokens = extract_placeholders(raw_bytes)
         
@@ -229,22 +289,24 @@ with col_left:
             else:
                 image_data[token] = dynamic_uploader_row("📸", token.replace("{", "").replace("}", ""), ["png", "jpg", "jpeg"], f"val_{token}")
         st.markdown('</div>', unsafe_allow_html=True)
+    elif app_mode == "Custom Adaptive Template" and u_template is None:
+        st.warning("⚠️ Please upload a Master Blueprint (PPTX) to map dynamic placeholders.")
 
-    # --- ACTION DESK ---
+    # --- CONTROL DESK ACTION LAYER ---
     st.markdown("<div style='margin-top: 10px; border-top: 1px solid #002B49; padding-top: 20px;'></div>", unsafe_allow_html=True)
     btn_col1, btn_col2, btn_col3 = st.columns(3)
 
     if u_template:
         with btn_col1:
             if st.button("👁️ GENERATE PREVIEW"):
-                with st.spinner("Processing & Rendering PDF..."):
+                with st.spinner("Processing Matrix Assets & Rendering PDF..."):
                     try:
                         raw_pptx = generate_pptx_bytes(u_template.getvalue(), text_data, image_data)
                         pdf_bytes = convert_pptx_to_pdf(raw_pptx)
                         st.session_state.preview_pdf = pdf_bytes
                         st.session_state.final_pptx = raw_pptx
                     except Exception as e:
-                        st.error(f"Render Core Error: {e}")
+                        st.error(f"Compilation core failure log description: {e}")
 
         with btn_col2:
             if st.session_state.preview_pdf:
@@ -262,4 +324,4 @@ with col_right:
     if st.session_state.preview_pdf:
         display_pdf(st.session_state.preview_pdf)
     else:
-        st.markdown('<div class="preview-panel">DOCUMENT PREVIEW RENDERED HERE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="preview-panel">WAITING FOR PREVIEW RENDERING PROTOCOL<br><br><span style="font-size:12px; font-weight:400; color:#94A3B8;">(Upload template, map values, and click Generate Preview)</span></div>', unsafe_allow_html=True)
