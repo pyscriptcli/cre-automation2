@@ -1,10 +1,9 @@
 import os
 import io
-import re
-import base64
 import subprocess
 import tempfile
-import json
+import base64
+import re
 import streamlit as st
 from pptx import Presentation
 from PIL import Image
@@ -17,40 +16,44 @@ if not os.path.exists(_config_file):
     with open(_config_file, "w", encoding="utf-8") as f:
         f.write("[theme]\nbase=\"light\"\n")
 
-# --- FLAT & LUXURIOUS LUXURY DESIGN SYSTEM ---
+# --- LUXURY DESIGN SYSTEM (CSS INJECTION) ---
 LUXURY_CRE_SYSTEM = """
 <style>
     .stApp { background-color: #FFFFFF !important; color: #002B49 !important; font-family: 'Inter', -apple-system, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; }
-    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width: 1200px !important; }
+    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width: 1600px !important; }
+    
+    /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"] {
-        background-color: #FFFFFF !important; border: 1px solid #002B49 !important; border-radius: 0px !important; color: #002B49 !important;
+        background-color: #FFFFFF !important; border: 1px solid #002B49 !important; border-radius: 0px !important;
+        color: #002B49 !important; transition: border-color 0.15s ease-in-out !important;
     }
     div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within { border-color: #C5A059 !important; box-shadow: none !important; }
-    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #002B49 !important; font-size: 15px !important; font-weight: 500 !important; }
+    input[type="text"], .stTextInput input, div[data-baseweb="select"] div { color: #002B49 !important; font-size: 14px !important; font-weight: 500 !important; }
+    
+    /* File Uploader */
     section[data-testid="stFileUploader"] { background-color: #FFFFFF !important; border: 1px solid #002B49 !important; border-radius: 0px !important; padding: 4px 12px !important; }
-    .row-metric-label { font-size: 13px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; color: #002B49 !important; display: flex; align-items: center; padding-top: 12px; }
-    .large-icon { font-size: 20px !important; margin-right: 12px; }
-    .luxury-workspace-card { background-color: #FFFFFF; border-top: 4px solid #002B49; padding-top: 20px; margin-bottom: 25px; }
-    div.stButton > button { background-color: #002B49 !important; color: #FFFFFF !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; border: none !important; border-radius: 0px !important; border-bottom: 4px solid #C5A059 !important; padding: 12px 24px !important; width: 100% !important; }
-    div.stButton > button:hover { background-color: #0A3352 !important; border-bottom-color: #C5A059 !important; }
+    section[data-testid="stFileUploader"] div, section[data-testid="stFileUploader"] span { color: #002B49 !important; font-size: 13px !important; font-weight: 500 !important; }
+    
+    /* Typography & Cards */
+    .row-metric-label { font-size: 14px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; color: #002B49 !important; display: flex; align-items: center; padding-top: 12px; }
+    .luxury-workspace-card { background-color: #FFFFFF; border-top: 4px solid #002B49; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .preview-panel { border: 1px solid #002B49; background-color: #F8FAFC; height: 850px; display: flex; align-items: center; justify-content: center; color: #64748B; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
+    
+    /* Buttons */
+    div.stButton > button { background-color: #002B49 !important; color: #FFFFFF !important; font-weight: 700 !important; font-size: 14px !important; text-transform: uppercase !important; border: none !important; border-radius: 0px !important; border-bottom: 4px solid #C5A059 !important; padding: 12px 24px !important; width: 100% !important; transition: background-color 0.15s ease; }
+    div.stButton > button:hover { background-color: #0A3352 !important; border-bottom-color: #C5A059 !important; color: #FFFFFF !important; }
 </style>
 """
 
-# --- EXTERNALIZED CONFIGURATION (Simulated Database) ---
-CONTACTS_DATABASE = {
-    "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
-    "Dave Policarpio": {"phone": "0908 865 8945", "email": "dave.policarpio@primephilippines.com"},
-    "Meliza Zapata": {"phone": "0996 880 5399", "email": "meliza.zapata@primephilippines.com"}
-}
-
-# --- BACKEND UTILS ---
+# --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     try:
         img = Image.open(img_file)
         img_w, img_h = img.size
         target_ratio = target_w_emu / target_h_emu
         img_ratio = img_w / img_h
+        
         if img_ratio > target_ratio:
             new_w = int(img_h * target_ratio)
             left = (img_w - new_w) // 2
@@ -59,6 +62,7 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
             new_h = int(img_w / target_ratio)
             top = (img_h - new_h) // 2
             img = img.crop((0, top, img_w, top + new_h))
+            
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
         img_byte_arr.seek(0)
@@ -66,86 +70,65 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     except Exception:
         return img_file
 
-@st.cache_data(show_spinner=False)
 def convert_pptx_to_pdf(pptx_bytes):
     with tempfile.TemporaryDirectory() as temp_dir:
-        input_path = os.path.join(temp_dir, "doc.pptx")
-        output_path = os.path.join(temp_dir, "doc.pdf")
-        with open(input_path, "wb") as f:
+        input_pptx_path = os.path.join(temp_dir, "document.pptx")
+        with open(input_pptx_path, "wb") as f:
             f.write(pptx_bytes)
         try:
-            subprocess.run(["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, input_path], 
-                           check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if os.path.exists(output_path):
-                with open(output_path, "rb") as f:
+            command = ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, input_pptx_path]
+            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output_pdf_path = os.path.join(temp_dir, "document.pdf")
+            if os.path.exists(output_pdf_path):
+                with open(output_pdf_path, "rb") as f:
                     return f.read()
         except Exception:
             return None
     return None
 
-def extract_template_tokens(prs):
-    """Scans OpenXML geometries for {{TOKENS}} and categorizes them."""
-    tokens = {"TXT": set(), "NUM": set(), "IMG": set(), "LST": set(), "CTA": set()}
-    pattern = re.compile(r'\{\{(.*?)\}\}')
-    
+def extract_placeholders(pptx_bytes):
+    prs = Presentation(io.BytesIO(pptx_bytes))
+    tokens = set()
     for slide in prs.slides:
         for shape in slide.shapes:
-            text_frames = []
             if shape.has_text_frame:
-                text_frames.append(shape.text_frame)
+                tokens.update(re.findall(r'\{\{.*?\}\}', shape.text))
             if shape.has_table:
                 for row in shape.table.rows:
                     for cell in row.cells:
-                        text_frames.append(cell.text_frame)
-                        
-            for frame in text_frames:
-                for paragraph in frame.paragraphs:
-                    matches = pattern.findall(paragraph.text)
-                    for match in matches:
-                        if match.startswith("TXT:"): tokens["TXT"].add(match)
-                        elif match.startswith("NUM:"): tokens["NUM"].add(match)
-                        elif match.startswith("IMG:"): tokens["IMG"].add(match)
-                        elif match.startswith("LST:"): tokens["LST"].add(match)
-                        elif match.startswith("CTA"): tokens["CTA"].add(match) # e.g., CTA1_NAME
-                        else: tokens["TXT"].add(match) # Default to text
-    return {k: sorted(list(v)) for k, v in tokens.items()}
+                        tokens.update(re.findall(r'\{\{.*?\}\}', cell.text))
+    return sorted(list(tokens))
 
-# --- CORE COMPILE ENGINE ---
-def compile_presentation(prs, text_data, image_data):
+def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
+    prs = Presentation(io.BytesIO(template_bytes))
     for slide in prs.slides:
-        shapes_to_delete = []
-        images_to_add = []
+        shapes_to_delete, images_to_add = [], []
 
         for shape in slide.shapes:
-            text_frames = []
+            # Process Images first
             if shape.has_text_frame:
-                text_frames.append(shape.text_frame)
-            if shape.has_table:
-                for row in shape.table.rows:
-                    for cell in row.cells:
-                        text_frames.append(cell.text_frame)
+                text_content = shape.text
+                for img_token, img_file in image_inputs.items():
+                    if img_token in text_content and img_file is not None:
+                        images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
+                        shapes_to_delete.append(shape)
 
-            for frame in text_frames:
-                # Text Replacement
-                for paragraph in frame.paragraphs:
-                    for run in paragraph.runs:
-                        for token, value in text_data.items():
-                            target = f"{{{{{token}}}}}"
-                            if target in run.text:
-                                run.text = run.text.replace(target, str(value))
-                                # Auto-scaling heuristic
-                                if len(str(value)) > 100 and run.font.size:
-                                    run.font.size = int(run.font.size * 0.8)
-
-                # Image Replacement Detection
+            # Process Text & Tables
+            if shape not in shapes_to_delete:
                 if shape.has_text_frame:
-                    text_content = frame.text
-                    for img_token, img_file in image_data.items():
-                        target = f"{{{{{img_token}}}}}"
-                        if target in text_content:
-                            if img_file is not None:
-                                images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
-                            shapes_to_delete.append(shape)
+                    for paragraph in shape.text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            for token, value in text_inputs.items():
+                                if token in run.text:
+                                    run.text = run.text.replace(token, str(value))
+                if shape.has_table:
+                    for row in shape.table.rows:
+                        for cell in row.cells:
+                            for paragraph in cell.text_frame.paragraphs:
+                                for run in paragraph.runs:
+                                    for token, value in text_inputs.items():
+                                        if token in run.text:
+                                            run.text = run.text.replace(token, str(value))
 
         for img_file, left, top, width, height in images_to_add:
             processed_img = smart_crop_to_fit(img_file, width, height)
@@ -159,97 +142,124 @@ def compile_presentation(prs, text_data, image_data):
     prs.save(pptx_stream)
     return pptx_stream.getvalue()
 
+def display_pdf(pdf_bytes):
+    base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="850" type="application/pdf" style="border: none;"></iframe>'
+    st.markdown(pdf_display, unsafe_allow_html=True)
 
-# --- FRONTEND INTERFACE ---
-st.set_page_config(page_title="Dynamic PPTX Engine", layout="wide")
+# --- UI HELPERS ---
+def dynamic_form_row(icon, label_text, key):
+    r_col1, r_col2 = st.columns([2, 3])
+    with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
+    with r_col2: return st.text_input("", key=key, label_visibility="collapsed")
+
+def dynamic_uploader_row(icon, label_text, allowed_types, key):
+    r_col1, r_col2 = st.columns([2, 3])
+    with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
+    with r_col2: return st.file_uploader(label_text, type=allowed_types, key=key, label_visibility="collapsed")
+
+def dynamic_selector_row(icon, label_text, options, key):
+    r_col1, r_col2 = st.columns([2, 3])
+    with r_col1: st.markdown(f'<div class="row-metric-label">{icon} {label_text}</div>', unsafe_allow_html=True)
+    with r_col2: return st.selectbox(label_text, options, key=key, label_visibility="collapsed")
+
+
+# --- INIT APP ---
+st.set_page_config(page_title="Matrix Generator", layout="wide")
 st.markdown(LUXURY_CRE_SYSTEM, unsafe_allow_html=True)
 
-st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
-st.markdown('<div class="row-metric-label"><span class="large-icon">📂</span> 1. UPLOAD MASTER TEMPLATE</div>', unsafe_allow_html=True)
-u_template = st.file_uploader("", type=["pptx"], key="master_template")
-st.markdown('</div>', unsafe_allow_html=True)
+if "preview_pdf" not in st.session_state: st.session_state.preview_pdf = None
+if "final_pptx" not in st.session_state: st.session_state.final_pptx = None
+if "custom_mapping" not in st.session_state: st.session_state.custom_mapping = {}
 
-if u_template:
-    try:
-        prs = Presentation(io.BytesIO(u_template.getvalue()))
-        tokens = extract_template_tokens(prs)
+st.sidebar.markdown("### MODE SELECTION")
+app_mode = st.sidebar.radio("Active Protocol:", ["Standard PIS", "Custom Adaptive"])
+
+# --- MAIN LAYOUT ---
+col_left, col_right = st.columns([1.2, 1], gap="large")
+
+text_data = {}
+image_data = {}
+
+with col_left:
+    st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+    u_template = st.file_uploader("📂 UPLOAD MASTER BLUEPRINT (PPTX)", type=["pptx"])
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    if app_mode == "Standard PIS":
+        st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+        st.markdown("### STANDARD PROPERTY SPECS")
+        prop_location = dynamic_form_row("📍", "Property Location", "cre_loc")
+        prop_size     = dynamic_form_row("📐", "Property Size", "cre_size")
+        prop_type     = dynamic_form_row("🏢", "Property Type", "cre_type")
+        lease_rates   = dynamic_form_row("💰", "Lease Rates", "cre_rates")
         
-        # Validation UI
-        with st.expander("Template Diagnostics (Found Tokens)", expanded=False):
-            st.json(tokens)
-            
-        st.markdown('<div class="row-metric-label"><span class="large-icon">⚙️</span> 2. CONFIGURE DATA</div>', unsafe_allow_html=True)
+        contacts_db = {"None": "", "Dave Policarpio": "0908 865 8945", "Sondi Tuazon": "0917 843 6128"}
+        cta1_name = dynamic_selector_row("📞", "CTA 1 Name", list(contacts_db.keys()), "cta1_nm")
         
-        with st.form("dynamic_data_form"):
-            col_left, col_right = st.columns([1, 1], gap="large")
-            text_inputs = {}
-            image_inputs = {}
-            cta_inputs = {}
-            
-            with col_left:
-                st.markdown("**Text & Metrics**")
-                for token in tokens["TXT"]:
-                    clean_label = token.replace("TXT:", "").replace("_", " ")
-                    text_inputs[token] = st.text_input(clean_label, key=f"in_{token}")
-                
-                for token in tokens["NUM"]:
-                    clean_label = token.replace("NUM:", "").replace("_", " ")
-                    text_inputs[token] = st.number_input(clean_label, value=0.0, key=f"in_{token}")
-                    
-                for token in tokens["LST"]:
-                    clean_label = token.replace("LST:", "").replace("_", " ")
-                    raw_list = st.text_area(f"{clean_label} (One item per line)", key=f"in_{token}")
-                    # Convert to bullet-friendly string
-                    text_inputs[token] = "\n".join([f"• {line.strip()}" for line in raw_list.split("\n") if line.strip()])
+        u_photo1 = dynamic_uploader_row("📸", "Property Photo 1", ["png", "jpg", "jpeg"], "p1")
+        u_map    = dynamic_uploader_row("🗺️", "Location Map", ["png", "jpg", "jpeg"], "m1")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            with col_right:
-                st.markdown("**Media & Assets**")
-                for token in tokens["IMG"]:
-                    clean_label = token.replace("IMG:", "").replace("_", " ")
-                    image_inputs[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"up_{token}")
-                
-                # Check if CTA variables exist (e.g., CTA1_NAME) and render single dropdown
-                has_cta1 = any("CTA1" in t for t in tokens["CTA"])
-                if has_cta1:
-                    st.markdown("**Call to Action**")
-                    cta_sel = st.selectbox("Assign Agent Profile", ["None"] + list(CONTACTS_DATABASE.keys()))
-                    if cta_sel != "None":
-                        text_inputs["CTA1_NAME"] = cta_sel
-                        text_inputs["CTA1_CONTACT_NUMBER"] = CONTACTS_DATABASE[cta_sel]["phone"]
-                        text_inputs["CTA1_EMAIL_ADDRESS"] = CONTACTS_DATABASE[cta_sel]["email"]
-                    else:
-                        text_inputs["CTA1_NAME"] = text_inputs["CTA1_CONTACT_NUMBER"] = text_inputs["CTA1_EMAIL_ADDRESS"] = ""
+        text_data = {
+            "{{PROPERTY_LOCATION}}": prop_location, "{{PROPERTY_SIZE}}": prop_size,
+            "{{PROPERTY_TYPE}}": prop_type, "{{LEASE_RATES}}": lease_rates,
+            "{{CTA1_NAME}}": "" if cta1_name == "None" else cta1_name,
+            "{{CTA1_CONTACT_NUMBER}}": contacts_db.get(cta1_name, "")
+        }
+        image_data = {"{{PROPERTY_PHOTO1}}": u_photo1, "{{PROPERTY_LOCATION_MAP}}": u_map}
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            submitted = st.form_submit_button("GENERATE & PREVIEW ⚡")
+    elif app_mode == "Custom Adaptive" and u_template is not None:
+        raw_bytes = u_template.getvalue()
+        tokens = extract_placeholders(raw_bytes)
+        
+        st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
+        st.markdown("### 1. MAP DATA TYPES")
+        with st.expander("Configure Placeholders Detected in PPTX", expanded=True):
+            for token in tokens:
+                c1, c2 = st.columns([3, 2])
+                c1.code(token)
+                st.session_state.custom_mapping[token] = c2.selectbox("Type", ["Text", "Image"], key=f"map_{token}", label_visibility="collapsed")
+        
+        st.markdown("### 2. INPUT DATA")
+        for token in tokens:
+            t_type = st.session_state.custom_mapping.get(token, "Text")
+            if t_type == "Text":
+                text_data[token] = dynamic_form_row("📝", token.replace("{", "").replace("}", ""), f"val_{token}")
+            else:
+                image_data[token] = dynamic_uploader_row("📸", token.replace("{", "").replace("}", ""), ["png", "jpg", "jpeg"], f"val_{token}")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        # --- PROCESS & PREVIEW LOGIC ---
-        if submitted:
-            with st.spinner("Compiling Presentation..."):
-                final_pptx_bytes = compile_presentation(prs, text_inputs, image_inputs)
-                st.session_state['pptx_bytes'] = final_pptx_bytes
-                
-            with st.spinner("Rendering Print Preview via LibreOffice Engine..."):
-                pdf_bytes = convert_pptx_to_pdf(final_pptx_bytes)
-                st.session_state['pdf_bytes'] = pdf_bytes
+    # --- ACTION DESK ---
+    st.markdown("<div style='margin-top: 10px; border-top: 1px solid #002B49; padding-top: 20px;'></div>", unsafe_allow_html=True)
+    btn_col1, btn_col2, btn_col3 = st.columns(3)
 
-        # --- RENDER OUTPUT ---
-        if 'pdf_bytes' in st.session_state and st.session_state['pdf_bytes']:
-            st.markdown('<div class="luxury-workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="row-metric-label"><span class="large-icon">👁️</span> 3. PRINT PREVIEW</div>', unsafe_allow_html=True)
-            
-            # Base64 iframe integration
-            base64_pdf = base64.b64encode(st.session_state['pdf_bytes']).decode('utf-8')
-            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800" type="application/pdf" style="border: 1px solid #002B49; margin-top: 15px;"></iframe>'
-            st.markdown(pdf_display, unsafe_allow_html=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            d_col1, d_col2 = st.columns(2)
-            with d_col1:
-                st.download_button("📥 DOWNLOAD AS PDF", data=st.session_state['pdf_bytes'], file_name="Presentation_Generated.pdf", mime="application/pdf", use_container_width=True)
-            with d_col2:
-                st.download_button("📥 DOWNLOAD AS PPTX", data=st.session_state['pptx_bytes'], file_name="Presentation_Generated.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+    if u_template:
+        with btn_col1:
+            if st.button("👁️ GENERATE PREVIEW"):
+                with st.spinner("Processing & Rendering PDF..."):
+                    try:
+                        raw_pptx = generate_pptx_bytes(u_template.getvalue(), text_data, image_data)
+                        pdf_bytes = convert_pptx_to_pdf(raw_pptx)
+                        st.session_state.preview_pdf = pdf_bytes
+                        st.session_state.final_pptx = raw_pptx
+                    except Exception as e:
+                        st.error(f"Render Core Error: {e}")
 
-    except Exception as e:
-        st.error(f"Template Initialization Failure: {str(e)}")
+        with btn_col2:
+            if st.session_state.preview_pdf:
+                st.download_button("📥 DOWNLOAD PDF", data=st.session_state.preview_pdf, file_name="Document_Export.pdf", mime="application/pdf", use_container_width=True)
+            else:
+                st.button("📥 DOWNLOAD PDF", disabled=True)
+
+        with btn_col3:
+            if st.session_state.final_pptx:
+                st.download_button("📥 DOWNLOAD PPTX", data=st.session_state.final_pptx, file_name="Document_Export.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True)
+            else:
+                st.button("📥 DOWNLOAD PPTX", disabled=True)
+
+with col_right:
+    if st.session_state.preview_pdf:
+        display_pdf(st.session_state.preview_pdf)
+    else:
+        st.markdown('<div class="preview-panel">DOCUMENT PREVIEW RENDERED HERE</div>', unsafe_allow_html=True)
