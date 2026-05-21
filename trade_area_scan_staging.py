@@ -348,7 +348,7 @@ leaflet_template = """
 
     <div id="scan-results-panel">
         <div class="results-header"><span>LAYERS</span><span id="results-count" style="color:#C9AB4C;">0</span></div>
-        <div class="manage-layers-btn" onclick="toggleManageLayers()">Manage Layers</div>
+        <div class="manage-layers-btn" onclick="toggleManageLayers()">⚙️ Manage Layers</div>
         <div class="results-list" id="results-list-box"></div>
         <div class="add-layer-btn" onclick="createNewLayer()">+ Add Custom Layer</div>
     </div>
