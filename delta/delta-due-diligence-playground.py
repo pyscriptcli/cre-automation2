@@ -11,7 +11,7 @@ from datetime import datetime
 import numpy as np
 
 # Core Geospatial, Document, & Vision Engine Binaries
-import fitz  # PyMuPDF
+import pymupdf as fitz  # FIXED: Swapped to explicit PyMuPDF binding layer
 from docx import Document
 from docx.shared import Pt
 from docx.enum.section import WD_ORIENT
@@ -20,8 +20,6 @@ from docx.oxml.ns import qn
 import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 import matplotlib.pyplot as plt
-
-import pytesseract
 import shutil
 import os
 
@@ -153,14 +151,12 @@ def parse_pdf(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     paragraphs = []
     for page in doc:
-        # Check if page has vector text
         text_blocks = page.get_text("blocks")
         if len(text_blocks) > 0:
             for b in text_blocks:
                 text = b[4].strip()
                 if text: paragraphs.append(" ".join(text.split()))
         else:
-            # Raster PDF fallback to OCR
             pix = page.get_pixmap(dpi=200)
             img_data = pix.tobytes("png")
             paragraphs.extend(extract_text_via_ocr(img_data))
@@ -249,17 +245,11 @@ def compute_token_diff_html(text1, text2):
 # BLOCK 5: TECHNICAL DESCRIPTION GEOMETRY ENGINE
 # ==========================================
 def parse_technical_description(text_content):
-    """
-    Parses land title boundaries containing calls: THENCE [DIRECTION] [BEARING] [DISTANCE]
-    Example: THENCE S. 32 DEG. 00'E., 18.58 M. TO POINT 2;
-    """
     cleaned = text_content.replace('\n', ' ')
-    # Dynamic regex to catch variations of bearing and line segments
     pattern = r'THENCE\s+([N|S])\s*[\.]?\s*(\d+)\s*DEG\.\s*(\d+)\'?\s*([E|W])\s*[\.]?[\, ]?\s*(\d+(?:\.\d+)?)\s*M\.'
     matches = re.findall(pattern, cleaned, re.IGNORECASE)
     
     if not matches:
-        # Fallback raw text extractor loop for unstructured segments
         pattern_fallback = r'(N|S)\s*(\d+)\s*DEG\s*(\d+)\s*(E|W)\s*(\d+(?:\.\d+)?)'
         matches = re.findall(pattern_fallback, cleaned, re.IGNORECASE)
     
@@ -272,10 +262,7 @@ def parse_technical_description(text_content):
             deg_val = float(deg)
             min_val = float(mins)
             
-            # Convert to decimal degrees
             angle_rad = math.radians(deg_val + (min_val / 60.0))
-            
-            # Compute quadrant bearings adjustments
             ns_sign = 1.0 if ns.upper() == 'N' else -1.0
             ew_sign = 1.0 if ew.upper() == 'E' else -1.0
             
@@ -289,19 +276,16 @@ def parse_technical_description(text_content):
             continue
             
     if len(coordinates) > 1:
-        # Close loop manually if endpoint has closure drift errors
         coordinates[-1] = (0.0, 0.0)
         
     return coordinates
 
 def generate_white_blueprint_pdf(coordinates):
     doc = fitz.open()
-    page_w, page_h = 612, 792 # Portrait Letter size
+    page_w, page_h = 612, 792 
     page = doc.new_page(width=page_w, height=page_h)
     
-    # Structure Clean White Presentation Layout Canvas
     page.draw_rect(fitz.Rect(0, 0, page_w, page_h), color=None, fill=(1, 1, 1))
-    
     page.insert_text(fitz.Point(54, 54), "DELTA AUTOMATED LOT SURVEY PLAN", fontsize=14, fontname="Helvetica-Bold", color=(0.1, 0.1, 0.1))
     page.insert_text(fitz.Point(54, 70), f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Architectural Matrix Pipeline", fontsize=8, fontname="Helvetica-Oblique", color=(0.4, 0.4, 0.4))
     
@@ -315,7 +299,6 @@ def generate_white_blueprint_pdf(coordinates):
         span_x = max_x - min_x if max_x != min_x else 1.0
         span_y = max_y - min_y if max_y != min_y else 1.0
         
-        # Scale & Fit polygon layout within a 400x400 safe bounding zone frame
         scale = min(400.0 / span_x, 400.0 / span_y)
         center_x, center_y = 306, 430
         
@@ -325,14 +308,12 @@ def generate_white_blueprint_pdf(coordinates):
         transformed_pts = []
         for x, y in coordinates:
             px = center_x + (x - map_cx) * scale
-            py = center_y - (y - map_cy) * scale # Invert Cartesian y-axis to window coordinates space
+            py = center_y - (y - map_cy) * scale 
             transformed_pts.append(fitz.Point(px, py))
             
-        # Draw Plot Grid Coordinate Center Tick Lines
         page.draw_line(fitz.Point(center_x-20, center_y), fitz.Point(center_x+20, center_y), color=(0.8, 0.8, 0.8), width=0.5)
         page.draw_line(fitz.Point(center_x, center_y-20), fitz.Point(center_x, center_y+20), color=(0.8, 0.8, 0.8), width=0.5)
         
-        # Render Polygon Bound Boundaries lines
         for idx in range(len(transformed_pts) - 1):
             p1 = transformed_pts[idx]
             p2 = transformed_pts[idx+1]
@@ -346,8 +327,7 @@ def generate_white_blueprint_pdf(coordinates):
     return doc.write()
 
 def generate_kml_payload(coordinates):
-    # Standard fallback projection setup for visualization assuming local reference center datum anchor
-    base_lat, base_lng = 14.6541, 120.9791 # Normalized datum reference frame anchor matching Malinta Estate L.M. 30
+    base_lat, base_lng = 14.6541, 120.9791 
     
     kml_str = """<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
@@ -366,10 +346,9 @@ def generate_kml_payload(coordinates):
             <coordinates>
 """
     for x, y in coordinates:
-        # Metes-to-degrees reduction calculation approximations
-        lng_offset = x / 111320.0
-        lat_offset = y / 111054.0
-        kml_str += f"              {base_lng + lng_offset},{base_lat + lat_offset},0\n"
+      lng_offset = x / 111320.0
+      lat_offset = y / 111054.0
+      kml_str += f"              {base_lng + lng_offset},{base_lat + lat_offset},0\n"
         
     kml_str += """            </coordinates>
           </LinearRing>
@@ -400,20 +379,20 @@ def export_due_diligence_docx(left_paras, right_paras, title_left, title_right, 
     for tag, i1, _, j1, _ in alignment_opcodes:
         row = table.add_row()
         if tag == 'equal':
-            row.cells[0].text = left_paras[i1]
-            row.cells[1].text = right_paras[j1]
+            row.cells[0].text = left_paras[i1] if i1 is not None else ""
+            row.cells[1].text = right_paras[j1] if j1 is not None else ""
             row.cells[2].text = "Verified Match. Zero variance found."
         elif tag == 'replace':
-            row.cells[0].text = left_paras[i1]
-            row.cells[1].text = right_paras[j1]
+            row.cells[0].text = left_paras[i1] if i1 is not None else ""
+            row.cells[1].text = right_paras[j1] if j1 is not None else ""
             row.cells[2].text = "Mismatched Parameter Text block. Variance verified requires audit confirmation."
         elif tag == 'delete':
-            row.cells[0].text = left_paras[i1]
+            row.cells[0].text = left_paras[i1] if i1 is not None else ""
             row.cells[1].text = "[Omitted Field Frame]"
             row.cells[2].text = "Red Flag Structural Data point absent from target evaluation document."
         elif tag == 'insert':
             row.cells[0].text = "[Absent Frame]"
-            row.cells[1].text = right_paras[j1]
+            row.cells[1].text = right_paras[j1] if j1 is not None else ""
             row.cells[2].text = "Injected External Entry Block clause verified."
             
     bio = io.BytesIO()
@@ -550,7 +529,6 @@ def render_due_diligence_workspace():
                 geo_col1, geo_col2 = st.columns([6, 4])
                 
                 with geo_col1:
-                    # Pure UI Render Visualization Frame Window using Matplotlib Canvas Engine Custom Parameters Array
                     fig, ax = plt.subplots(figsize=(6, 6), facecolor='#FFFFFF')
                     x_pts = [c[0] for c in coords]
                     y_pts = [c[1] for c in coords]
@@ -568,12 +546,12 @@ def render_due_diligence_workspace():
                     ax.spines['bottom'].set_color('#CCCCCC')
                     plt.title("TRANSFORM PLOT RADIAL AZIMUTH COMPASS PLAN PREVIEW", fontsize=10, fontname="DejaVu Sans", fontweight='bold', pad=12)
                     st.pyplot(fig)
+                    plt.close(fig) # FIXED: Closes plot to prevent memory compounding
                     
                 with geo_col2:
                     st.markdown("#### Export Pipeline Asset Formats Matrix")
                     st.markdown("Select an automated execution routine format pipeline down below to generate legal blueprint assets for CAD, GIS, or Title Presentation verification portfolios.")
                     
-                    # Target Format 1: White Plain Background Document Presentation Layout
                     pdf_bytes = generate_white_blueprint_pdf(coords)
                     st.download_button(label="📥 Export Lot Plan White Plain PDF Document Asset",
                                        data=pdf_bytes,
@@ -582,7 +560,6 @@ def render_due_diligence_workspace():
                     
                     st.markdown("---")
                     
-                    # Target Format 2: Geospatial KML System Framework Component
                     kml_bytes = generate_kml_payload(coords)
                     st.download_button(label="📥 Export Geospatial Vector KML (Google Earth/QGIS Engine)",
                                        data=kml_bytes,
@@ -591,7 +568,6 @@ def render_due_diligence_workspace():
                     
                     st.markdown("---")
                     
-                    # Secondary Metrics Verification Coordinates Frame Logs Readout
                     st.markdown("**Local Relational Cartesian Bounds Registry Table Array Map**")
                     st.dataframe([{"Vertex Sequence Point": f"Point {idx+1}", "Relative Delta X (Eastings M.)": f"{pt[0]:.2f} m", "Relative Delta Y (Northings M.)": f"{pt[1]:.2f} m"} for idx, pt in enumerate(coords[:-1])], use_container_width=True)
             else:
