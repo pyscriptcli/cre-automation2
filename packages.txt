@@ -1,4 +1,3 @@
-libreoffice
 tesseract-ocr
 libgl1-mesa-glx
 gdal-bin
@@ -7,3 +6,4 @@ libproj-dev
 libgeos-dev
 proj-bin
 build-essential
+libreoffice
