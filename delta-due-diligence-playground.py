@@ -21,6 +21,21 @@ import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 import matplotlib.pyplot as plt
 
+import pytesseract
+import shutil
+import os
+
+# Explicit dynamic resolution of Linux system path bindings for Tesseract
+if not shutil.which("tesseract"):
+    # Fallback default hardcoded paths for standard Debian/Ubuntu containers
+    fallback_paths = ["/usr/bin/tesseract", "/usr/local/bin/tesseract"]
+    for path in fallback_paths:
+        if os.path.exists(path):
+            pytesseract.pytesseract.tesseract_cmd = path
+            break
+else:
+    pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
+
 # ==========================================
 # BLOCK 1: STATE HYDRATION
 # ==========================================
