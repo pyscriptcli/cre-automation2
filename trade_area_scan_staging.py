@@ -19,8 +19,12 @@ if not os.path.exists(_config_file):
 
 st.set_page_config(page_title="Trade Area Scan Playground", layout="wide", initial_sidebar_state="expanded")
 
-# Configure OSMnx local caching to accelerate repetitive spatial queries
-ox.config(use_cache=True, log_console=False)
+# =============================================================================
+# [ CONFIGURATION BLOCK: OSMNX ENGINE SETTINGS ]
+# Updated to leverage the modern ox.settings module attributes.
+# =============================================================================
+ox.settings.use_cache = True
+ox.settings.log_console = False
 
 # =============================================================================
 # [ CONFIGURATION BLOCK: GLOBAL CSS STYLES ]
