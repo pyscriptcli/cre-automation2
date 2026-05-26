@@ -1,5 +1,5 @@
 tesseract-ocr
-libgl1-mesa-glx
+libgl1
 gdal-bin
 libgdal-dev
 libproj-dev
