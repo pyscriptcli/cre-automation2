@@ -1,1 +1,9 @@
 libreoffice
+tesseract-ocr
+libgl1-mesa-glx
+gdal-bin
+libgdal-dev
+libproj-dev
+libgeos-dev
+proj-bin
+build-essential
