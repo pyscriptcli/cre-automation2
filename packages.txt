@@ -6,4 +6,3 @@ libproj-dev
 libgeos-dev
 proj-bin
 build-essential
-libreoffice
