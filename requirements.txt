@@ -5,10 +5,10 @@ Pillow==10.3.0
 matplotlib==3.8.4
 numpy==1.26.4
 streamlit==1.33.0
-python-pptx
-pandas
-requests
-folium
-streamlit-folium
-osmnx
-shapely
+python-pptx==1.0.2
+pandas==2.2.1
+requests==2.31.0
+folium==0.16.0
+streamlit-folium==0.19.2
+shapely==2.0.3
+osmnx==1.9.1
