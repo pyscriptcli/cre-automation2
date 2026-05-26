@@ -3,6 +3,7 @@ import requests
 import re
 import json
 import os
+import math
 import osmnx as ox
 import pandas as pd
 
@@ -84,6 +85,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
+# [ CORE LOGIC: HAVERSINE DISTANCE FILTER ]
+# Purges any coordinate outside the exact radius mathematically.
+# =============================================================================
+def calculate_haversine(lat1, lon1, lat2, lon2):
+    R = 6371000  # Radius of Earth in meters
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+# =============================================================================
 # [ CONFIGURATION BLOCK: SESSION STATE INITIALIZATION ]
 # =============================================================================
 DEFAULT_COORDS = "14.5995, 120.9842"
@@ -121,13 +135,26 @@ ADVANCED_CONFIG = {
 with st.sidebar:
     st.markdown('<div class="brand-title">Trade Area Scan</div>', unsafe_allow_html=True)
     
-    st.download_button(
-        label="SAVE PROJECT", 
-        data=json.dumps(st.session_state.scanned_records), 
-        file_name="TradeArea_Data.json", 
-        mime="application/json",
-        use_container_width=True
-    )
+    # DYNAMIC EXPORT BUTTON: Only shows relevant data post-scan
+    if st.session_state.scanned_records:
+        st.download_button(
+            label=f"💾 EXPORT {len(st.session_state.scanned_records)} POIs", 
+            data=json.dumps(st.session_state.scanned_records, indent=4), 
+            file_name="TradeArea_Data.json", 
+            mime="application/json",
+            use_container_width=True,
+            type="primary"
+        )
+    else:
+        st.download_button(
+            label="SAVE PROJECT (EMPTY)", 
+            data=json.dumps([]), 
+            file_name="TradeArea_Data.json", 
+            mime="application/json",
+            use_container_width=True,
+            disabled=True
+        )
+    
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
 
     location_input = st.text_input("LOCATION SEARCH OR COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
@@ -212,7 +239,6 @@ with st.sidebar:
                     ox.settings.use_cache = False
                     ox.settings.log_console = False
 
-                    # Build OSMnx compatible tags dictionary from Overpass Regex Strings
                     osmnx_tags = {}
                     for tag_str in selected_tags:
                         match = re.search(r'"([^"]+)"(=|~)"([^"]+)"', tag_str)
@@ -234,7 +260,7 @@ with st.sidebar:
                             else:
                                 osmnx_tags[k] = val
 
-                    # Extract geometries inside the radius
+                    # Extract geometries
                     gdf = ox.features_from_point((lat_coord, lon_coord), tags=osmnx_tags, dist=radius_val)
                     
                     if not gdf.empty:
@@ -247,34 +273,36 @@ with st.sidebar:
                                 centroid = geom.centroid
                                 p_lat, p_lon = centroid.y, centroid.x
                             
-                            name = row.get('name', 'Unknown')
-                            if pd.isna(name): name = 'Unknown'
-                            
-                            p_type = 'Node'
-                            for k in osmnx_tags.keys():
-                                if k in row and not pd.isna(row[k]):
-                                    p_type = str(row[k])
-                                    break
-                            
-                            # Note: Explicit casts to str() and float() to prevent empty exports
-                            # caused by Python JSON dumps failing on np.float64 or pd.NA objects
-                            records.append({
-                                "lat": float(p_lat), 
-                                "lon": float(p_lon), 
-                                "name": str(name), 
-                                "type": str(p_type), 
-                                "geomType": str(geom.geom_type)
-                            })
+                            # STRICT RADIUS CLAMPING
+                            dist = calculate_haversine(lat_coord, lon_coord, p_lat, p_lon)
+                            if dist <= radius_val:
+                                name = row.get('name', 'Unknown')
+                                if pd.isna(name): name = 'Unknown'
+                                
+                                p_type = 'Node'
+                                for k in osmnx_tags.keys():
+                                    if k in row and not pd.isna(row[k]):
+                                        p_type = str(row[k])
+                                        break
+                                
+                                records.append({
+                                    "lat": float(p_lat), 
+                                    "lon": float(p_lon), 
+                                    "name": str(name), 
+                                    "type": str(p_type), 
+                                    "geomType": str(geom.geom_type),
+                                    "shape": "Drop" # Default Icon Shape
+                                })
                         
                         st.session_state.scanned_records = records
                         st.session_state.last_scan_lat, st.session_state.last_scan_lon = lat_coord, lon_coord
                         success = True
-                        status_indicator.success(f"Success! OSMnx extracted {len(records)} POIs.")
+                        status_indicator.success(f"Success! OSMnx extracted {len(records)} bounded POIs.")
                     else:
                         st.session_state.scanned_records = []
                         st.session_state.last_scan_lat, st.session_state.last_scan_lon = lat_coord, lon_coord
                         success = True
-                        status_indicator.warning("OSMnx completed: 0 POIs found in this radius.")
+                        status_indicator.warning("OSMnx completed: 0 POIs found strictly in this radius.")
 
                 # -------------------------------------------------------------
                 # ATTEMPT 2: Overpass Turbo (Fallback Extraction Method)
@@ -293,22 +321,26 @@ with st.sidebar:
                                 for el in res.json().get('elements', []):
                                     e_lat = el.get('lat') or el.get('center', {}).get('lat')
                                     e_lon = el.get('lon') or el.get('center', {}).get('lon')
+                                    
                                     if e_lat and e_lon:
-                                        tags = el.get('tags', {})
-                                        p_type = tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node'
-                                        
-                                        # Strict typing to ensure the export JSON successfully processes
-                                        records.append({
-                                            "lat": float(e_lat), 
-                                            "lon": float(e_lon), 
-                                            "name": str(tags.get('name', 'Unknown')), 
-                                            "type": str(p_type), 
-                                            "geomType": str("Point" if el.get('type') == 'node' else "Polygon")
-                                        })
+                                        # STRICT RADIUS CLAMPING
+                                        dist = calculate_haversine(lat_coord, lon_coord, float(e_lat), float(e_lon))
+                                        if dist <= radius_val:
+                                            tags = el.get('tags', {})
+                                            p_type = tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node'
+                                            
+                                            records.append({
+                                                "lat": float(e_lat), 
+                                                "lon": float(e_lon), 
+                                                "name": str(tags.get('name', 'Unknown')), 
+                                                "type": str(p_type), 
+                                                "geomType": str("Point" if el.get('type') == 'node' else "Polygon"),
+                                                "shape": "Drop" # Default Icon Shape
+                                            })
                                 st.session_state.scanned_records = records
                                 st.session_state.last_scan_lat, st.session_state.last_scan_lon = lat_coord, lon_coord
                                 success = True
-                                status_indicator.success(f"Success! Overpass Turbo Backup extracted {len(records)} POIs.")
+                                status_indicator.success(f"Success! Overpass Turbo Backup extracted {len(records)} bounded POIs.")
                                 break
                         except Exception:
                             continue
@@ -317,7 +349,7 @@ with st.sidebar:
                     import time
                     time.sleep(1.5)
                     status_indicator.empty()
-                    st.rerun()
+                    st.rerun() # Refresh to populate the download button top-of-sidebar
                 else:
                     status_indicator.error("Critical Error: Both OSMnx and all Overpass Backup servers failed.")
 
@@ -370,7 +402,8 @@ leaflet_template = """
         .minimal-label { font-size: 9px; font-weight: 700; padding: 6px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #888780; margin: 0; text-transform: uppercase; border-top: 1px solid #f8fafc;}
 
         /* --- DYNAMIC SIDEBAR LIST UI --- */
-        #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 280px; max-height: calc(100vh - 20px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
+        /* Updated max-height to clear the native Streamlit Manage App button in the corner */
+        #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 280px; max-height: calc(100vh - 100px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
         .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; }
         
         .manage-s-btn { background: #f8fafc; color: #003366; padding: 6px; text-align: center; font-size: 9px; font-weight: 800; border-bottom: 1px solid #e0e0e0; cursor: pointer; text-transform: uppercase; transition: background 0.2s;}
@@ -388,10 +421,9 @@ leaflet_template = """
         .results-item:hover { background: #f0f4f8; color: #003366; }
         
         /* --- MANAGE MODE TOGGLE CSS --- */
-        /* Hides edit/delete/drag icons unless Manage Mode is active */
         .manage-tools { display: none; }
         .manage-mode-active .manage-tools { display: flex; }
-        .manage-mode-active .layer-category-header, .manage-mode-active .results-item { cursor: move; } /* Show move cursor only in manage mode */
+        .manage-mode-active .layer-category-header, .manage-mode-active .results-item { cursor: move; }
 
         .icon-btn { cursor: pointer; padding: 2px; margin-left:4px; fill: #888780; transition: fill 0.2s;}
         .icon-btn:hover { fill: #003366; }
@@ -407,7 +439,7 @@ leaflet_template = """
         /* --- CUSTOM EDIT POPUP CSS --- */
         .edit-form-container { display: flex; flex-direction: column; gap: 6px; font-family: 'Montserrat', sans-serif; min-width: 180px;}
         .edit-form-container label { font-size: 8px; font-weight: 700; color: #888780; text-transform: uppercase; margin-bottom: -4px;}
-        .edit-form-container input[type="text"], .edit-form-container input[type="color"] { width: 100%; border: none; border-bottom: 1px solid #C9AB4C; padding: 4px 0; font-family: inherit; font-size: 11px; font-weight: 600; color: #003366; outline: none; background: transparent;}
+        .edit-form-container input[type="text"], .edit-form-container input[type="color"], .edit-form-container select { width: 100%; border: none; border-bottom: 1px solid #C9AB4C; padding: 4px 0; font-family: inherit; font-size: 11px; font-weight: 600; color: #003366; outline: none; background: transparent;}
         .edit-form-container input[type="range"] { width: 100%; cursor: pointer;}
         .edit-form-container button { background: #003366; color: white; border: none; padding: 6px; border-radius: 2px; cursor: pointer; font-size: 9px; font-weight: 700; text-transform: uppercase; margin-top: 4px;}
         .edit-form-container button:hover { background: #C9AB4C; }
@@ -597,8 +629,20 @@ leaflet_template = """
             renderSidebar();
         });
 
-        const createPinIcon = (color) => {
-            return L.divIcon({ html: `<svg viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`, className: '', iconSize: [24, 24], iconAnchor: [12, 24] });
+        // =============================================================================
+        // [ CONFIGURATION BLOCK: DYNAMIC ICON MORPHOLOGY (SHAPES) ]
+        // =============================================================================
+        const createPinIcon = (color, shapeStr) => {
+            let svgMarkup = '';
+            if (shapeStr === 'Circle') {
+                svgMarkup = `<svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="10" fill="${color}" stroke="#ffffff" stroke-width="2"/></svg>`;
+            } else if (shapeStr === 'Ball') {
+                svgMarkup = `<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="${color}" stroke="#333" stroke-width="1"/><circle cx="10" cy="9" r="3" fill="#fff" opacity="0.6"/></svg>`;
+            } else {
+                // Default 'Drop' style
+                svgMarkup = `<svg viewBox="0 0 24 24" width="24" height="24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
+            }
+            return L.divIcon({ html: svgMarkup, className: '', iconSize: [24, 24], iconAnchor: [12, 24] });
         };
 
         // =============================================================================
@@ -620,7 +664,7 @@ leaflet_template = """
                 
                 categoryMap[key].forEach(p => {
                     if(!p._layer) {
-                        p._layer = L.marker([p.lat, p.lon], { icon: createPinIcon(p.color || pColor) });
+                        p._layer = L.marker([p.lat, p.lon], { icon: createPinIcon(p.color || pColor, p.shape) });
                         if(p.name && p.name !== 'Unknown') p._layer.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -18], className: 'poi-text-label' });
                         p._layer.on('contextmenu', (evt) => openStyleEditor(evt, p._uid));
                     }
@@ -700,6 +744,13 @@ leaflet_template = """
                     <input type="text" id="edit-type-${uid}" value="${p.type || ''}">
                     <label>Color (Hex)</label>
                     <input type="color" id="edit-color-${uid}" value="${p.color || categoryColors[p.type] || '#003366'}">
+                    ${isMarker ? `
+                    <label>Icon Shape</label>
+                    <select id="edit-shape-${uid}">
+                        <option value="Drop" ${(!p.shape || p.shape === 'Drop') ? 'selected' : ''}>Drop Pin</option>
+                        <option value="Circle" ${p.shape === 'Circle' ? 'selected' : ''}>Circle Dot</option>
+                        <option value="Ball" ${p.shape === 'Ball' ? 'selected' : ''}>3D Ball</option>
+                    </select>` : ''}
                     ${!isMarker ? `<label>Line Weight (Thickness)</label><input type="range" id="edit-wt-${uid}" min="1" max="10" step="1" value="${p.weight || 3}">` : ''}
                     ${(!isMarker && p.geomType !== 'Polyline') ? `<label>Fill Opacity</label><input type="range" id="edit-op-${uid}" min="0" max="1" step="0.1" value="${p.opacity || 0.5}">` : ''}
                     <button onclick="saveStyleEditor(${uid})">Apply Settings</button>
@@ -716,7 +767,8 @@ leaflet_template = """
             p.color = document.getElementById(`edit-color-${uid}`).value;
             
             if(!p.geomType || p.geomType === 'Point' || p.geomType === 'Marker') {
-                p._layer.setIcon(createPinIcon(p.color));
+                p.shape = document.getElementById(`edit-shape-${uid}`) ? document.getElementById(`edit-shape-${uid}`).value : 'Drop';
+                p._layer.setIcon(createPinIcon(p.color, p.shape));
             } else {
                 p.weight = document.getElementById(`edit-wt-${uid}`) ? document.getElementById(`edit-wt-${uid}`).value : 3;
                 p.opacity = document.getElementById(`edit-op-${uid}`) ? document.getElementById(`edit-op-${uid}`).value : 0.5;
@@ -731,7 +783,7 @@ leaflet_template = """
                 categoryColors[catKey] = newColor;
                 pts.filter(p => p.type === catKey).forEach(p => { 
                     p.color = newColor; 
-                    if(p._layer && (!p.geomType || p.geomType === 'Point')) p._layer.setIcon(createPinIcon(newColor)); 
+                    if(p._layer && (!p.geomType || p.geomType === 'Point')) p._layer.setIcon(createPinIcon(newColor, p.shape)); 
                     if(p._layer && p.geomType && p.geomType !== 'Point') p._layer.setStyle({color: newColor, fillColor: newColor});
                 });
                 renderSidebar();
@@ -746,14 +798,14 @@ leaflet_template = """
         window.toggleAccordionCollapse = function(catKey) { document.getElementById('items-' + catKey.replace(/\\s/g, '')).classList.toggle('collapsed'); }
         window.createNewLayer = function() {
             const name = prompt("Enter new Custom Layer name:");
-            if(name) { categoryColors[name] = catPalette[colorIndex++ % catPalette.length]; pts.push({_uid: globalIdCounter++, name: 'Dummy Node (Hidden)', type: name, lat:0, lon:0}); renderSidebar(); }
+            if(name) { categoryColors[name] = catPalette[colorIndex++ % catPalette.length]; pts.push({_uid: globalIdCounter++, name: 'Dummy Node (Hidden)', type: name, lat:0, lon:0, shape: 'Drop'}); renderSidebar(); }
         }
 
         // =============================================================================
         // [ CONFIGURATION BLOCK: INITIALIZATION ]
         // =============================================================================
         L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.08 }).addTo(map);
-      L.marker([__LAT__, __LON__], { icon: L.divIcon({ html: '<div style="background:#003366; color:#C9AB4C; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; border:2px solid #fff;">★</div>', className:'', iconSize:[36,36] }), zIndexOffset: 10000 }).addTo(map);
+        L.marker([__LAT__, __LON__], { icon: L.divIcon({ html: '<div style="background:#003366; color:#C9AB4C; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; border:2px solid #fff;">★</div>', className:'', iconSize:[36,36] }), zIndexOffset: 10000 }).addTo(map);
 
         renderSidebar(); 
         if (pts.length > 0 && !__IS_STALE__) {
