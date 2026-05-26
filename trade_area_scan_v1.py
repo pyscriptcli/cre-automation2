@@ -21,6 +21,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Setup page configurations first
+st.set_page_config(page_title="Production App", layout="wide")
+
+# CSS Injection to completely strip Streamlit UI branding
+hide_branding_css = """
+    <style>
+    /* Hides the 'Hosted with Streamlit' footer or standard footer */
+    footer {visibility: hidden;}
+    .streamlit-footer {display: none;}
+    
+    /* Hides the main menu hamburger icon */
+    #MainMenu {visibility: hidden;}
+    
+    /* Hides the top decorative header bar and running indicators */
+    header {visibility: hidden;}
+    
+    /* Optional: Closes up top padding gap caused by hiding the header */
+    .stAppDeployDropdown {display: none !important;}
+    .st-emotion-cache-uf99v8 {display: none;} 
+    </style>
+"""
+st.markdown(hide_branding_css, unsafe_allow_html=True)
+
+st.title("Clean Workspace Dashboard")
+st.write("The Streamlit footer, header, and menu elements are now hidden.")
+
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
