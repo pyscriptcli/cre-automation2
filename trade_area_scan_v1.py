@@ -21,31 +21,34 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Setup page configurations first
-st.set_page_config(page_title="Production App", layout="wide")
+import streamlit as st
 
-# CSS Injection to completely strip Streamlit UI branding
-hide_branding_css = """
+st.set_page_config(page_title="Trade Area Dashboard", layout="wide")
+
+# Enhanced CSS Override targeting both standard footer and platform hosting wrappers
+unbranded_css = """
     <style>
-    /* Hides the 'Hosted with Streamlit' footer or standard footer */
-    footer {visibility: hidden;}
-    .streamlit-footer {display: none;}
+    /* 1. Hide the standard footer & main menu */
+    footer {visibility: hidden !important;}
+    #MainMenu {visibility: hidden !important;}
+    header {visibility: hidden !important;}
     
-    /* Hides the main menu hamburger icon */
-    #MainMenu {visibility: hidden;}
+    /* 2. Eradicate the Community Cloud 'Hosted with Streamlit' viewer badge */
+    [data-testid="stViewerBadge"] {display: none !important;}
+    div[class*="viewerBadge"] {display: none !important;}
+    span[class*="viewerBadge"] {display: none !important;}
     
-    /* Hides the top decorative header bar and running indicators */
-    header {visibility: hidden;}
+    /* 3. Catch-all for any floating hosting attribution element in the bottom right */
+    iframe[title="Managed by Streamlit Cloud"] {display: none !important;}
     
-    /* Optional: Closes up top padding gap caused by hiding the header */
+    /* Optional: Clean up top spacing from hidden header */
     .stAppDeployDropdown {display: none !important;}
-    .st-emotion-cache-uf99v8 {display: none;} 
     </style>
 """
-st.markdown(hide_branding_css, unsafe_allow_html=True)
+st.markdown(unbranded_css, unsafe_allow_html=True)
 
-st.title("Clean Workspace Dashboard")
-st.write("The Streamlit footer, header, and menu elements are now hidden.")
+# Your app content continues below
+st.title("CTrade Area Dashboard")
 
 st.markdown("""
     <style>
