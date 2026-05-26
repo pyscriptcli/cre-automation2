@@ -5,3 +5,5 @@ pandas
 requests
 folium
 streamlit-folium
+osmnx
+shapely
