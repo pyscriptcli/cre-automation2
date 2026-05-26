@@ -463,13 +463,15 @@ def render_due_diligence_workspace():
             </div>
         """, unsafe_allow_html=True)
         
-        h_col1, _, h_col2, _ = st.columns([4, 0.5, 4, 3.5])
+        # FIXED: Expanded layouts allocations to clear text truncation bugs
+        h_col1, _, h_col2, _ = st.columns([5, 0.2, 5, 4.5])
         with h_col1: st.markdown("<p style='font-size:11px; text-transform:uppercase; color:#737373; font-weight:600; margin-bottom:15px;'>BASELINE CORE SOURCE TEXT</p>", unsafe_allow_html=True)
         with h_col2: st.markdown("<p style='font-size:11px; text-transform:uppercase; color:#737373; font-weight:600; margin-bottom:15px;'>EVALUATION COMPARISON FIELD TARGET</p>", unsafe_allow_html=True)
         
         change_index = 1
         for idx, (tag, i1, _, j1, _) in enumerate(alignment_opcodes):
-            r_col1, r_col2, r_col3, r_col4 = st.columns([4, 0.5, 4, 3.5])
+            # FIXED: Wider text panes allocation, streamlined review panels boundaries
+            r_col1, r_col2, r_col3, r_col4 = st.columns([5, 0.2, 5, 4.5])
             
             with r_col1:
                 if tag == 'equal':
@@ -502,7 +504,7 @@ def render_due_diligence_workspace():
             with r_col4:
                 if tag != 'equal':
                     unique_id = f"dd_row_{i1}_{j1}_{idx}"
-                    st.markdown(f'<div class="advisory-panel"><div class="advisory-header"><span style="color:#EF4444;">🚨 Operational Alert #{change_index}</span></div><p style="font-size:11px; margin:0; color:#525252;">Verify values for consistency.</p></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="advisory-panel" style="margin-bottom:0px; padding-bottom:8px;"><div class="advisory-header"><span style="color:#EF4444;">🚨 Operational Alert #{change_index}</span></div><p style="font-size:11px; margin:0 0 8px 0; color:#525252;">Verify values for consistency.</p></div>', unsafe_allow_html=True)
                     st.radio("Risk Disposition", ["Clear", "Minor Variance", "Fraud Risk", "Hold Asset"], key=f"risk_{unique_id}", horizontal=True, label_visibility="collapsed")
                     st.text_input("Discrepancy Note Ledger", key=f"note_dd_{unique_id}", placeholder="Add due diligence findings...", label_visibility="collapsed")
                     change_index += 1
@@ -546,7 +548,7 @@ def render_due_diligence_workspace():
                     ax.spines['bottom'].set_color('#CCCCCC')
                     plt.title("TRANSFORM PLOT RADIAL AZIMUTH COMPASS PLAN PREVIEW", fontsize=10, fontname="DejaVu Sans", fontweight='bold', pad=12)
                     st.pyplot(fig)
-                    plt.close(fig) # FIXED: Closes plot to prevent memory compounding
+                    plt.close(fig)
                     
                 with geo_col2:
                     st.markdown("#### Export Pipeline Asset Formats Matrix")
@@ -577,7 +579,7 @@ def render_due_diligence_workspace():
     if st.button("Terminate Due Diligence Work Staging Context Array Frame Session"):
         st.session_state.dd_processing_complete = False
         st.rerun()
-
+        
 # ==========================================
 # BLOCK 9: ENTRYPOINT ORCHESTRATION
 # ==========================================
