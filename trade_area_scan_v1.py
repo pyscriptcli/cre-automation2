@@ -21,34 +21,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-import streamlit as st
-
-st.set_page_config(page_title="Trade Area Dashboard", layout="wide")
-
-# Enhanced CSS Override targeting both standard footer and platform hosting wrappers
-unbranded_css = """
-    <style>
-    /* 1. Hide the standard footer & main menu */
-    footer {visibility: hidden !important;}
-    #MainMenu {visibility: hidden !important;}
-    header {visibility: hidden !important;}
-    
-    /* 2. Eradicate the Community Cloud 'Hosted with Streamlit' viewer badge */
-    [data-testid="stViewerBadge"] {display: none !important;}
-    div[class*="viewerBadge"] {display: none !important;}
-    span[class*="viewerBadge"] {display: none !important;}
-    
-    /* 3. Catch-all for any floating hosting attribution element in the bottom right */
-    iframe[title="Managed by Streamlit Cloud"] {display: none !important;}
-    
-    /* Optional: Clean up top spacing from hidden header */
-    .stAppDeployDropdown {display: none !important;}
-    </style>
-"""
-st.markdown(unbranded_css, unsafe_allow_html=True)
-
-# Your app content continues below
-st.title("CTrade Area Dashboard")
 
 st.markdown("""
     <style>
