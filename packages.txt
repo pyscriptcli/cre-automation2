@@ -1,9 +1,5 @@
-tesseract-ocr
-libgl1
-gdal-bin
 libgdal-dev
+gdal-bin
 libproj-dev
-libgeos-dev
 proj-bin
-build-essential
-libreoffice
+libspatialindex-dev
