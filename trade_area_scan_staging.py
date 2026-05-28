@@ -15,10 +15,15 @@ st.markdown("""
             background-color: #FFFFFF !important;
         }
         
-        /* TYPOGRAPHY: Midnight Blue */
+        /* TYPOGRAPHY: Midnight Blue & Icon Fix */
         h1, h2, h3, h4, h5, h6, p, label, span {
             color: #003366 !important;
             font-family: 'Inter', sans-serif !important;
+        }
+        
+        /* RULE 1 FIX: Protect Streamlit's internal icons from the Inter font */
+        .material-symbols-rounded, .material-icons, span.material-icons {
+            font-family: 'Material Symbols Rounded', 'Material Icons' !important;
         }
 
         /* BUTTONS & POPOVERS: Midnight Blue -> Gold Hover */
@@ -52,10 +57,18 @@ st.markdown("""
             display: none !important; 
         }
         
-        /* CLEANUP PADDING */
+        /* RULE 2 FIX: EDGE-TO-EDGE CANVAS FORCE */
         .block-container {
-            padding-top: 1rem !important;
-            padding-bottom: 0rem !important;
+            padding: 0rem !important;
+            margin: 0px !important;
+            max-width: 100% !important;
+        }
+        
+        /* Add a tiny bit of padding just for the top nav elements so they aren't cut off */
+        .top-nav-wrapper {
+            padding-top: 1rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -69,6 +82,8 @@ if "map_drawings" not in st.session_state:
 # =============================================================================
 # [ TOP NAVIGATION MATRIX ]
 # =============================================================================
+st.markdown("<div class='top-nav-wrapper'>", unsafe_allow_html=True)
+
 # 1. Workspace Mode Switcher
 st.radio(
     "Active Environment",
@@ -95,15 +110,15 @@ with col4:
     with st.popover("📊 Insights"):
         st.write("Generative AI market summaries go here.")
 
-st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 # =============================================================================
 # [ SPATIAL ENGINE: FOLIUM + DRAW ]
 # =============================================================================
-# Initialize base map centered on a default coordinate (e.g., Manila)
+# Initialize base map
 m = folium.Map(location=[14.5995, 120.9842], zoom_start=14, tiles="CartoDB positron")
 
-# Inject drawing tools configured to output GeoJSON
+# Inject drawing tools
 draw_options = Draw(
     export=False,
     position="topleft",
@@ -111,7 +126,7 @@ draw_options = Draw(
         "polyline": True,
         "polygon": True,
         "rectangle": True,
-        "circle": False, # Folium circles don't export to standard GeoJSON polygons easily
+        "circle": False, 
         "marker": True,
         "circlemarker": False
     },
@@ -119,11 +134,10 @@ draw_options = Draw(
 )
 draw_options.add_to(m)
 
-# Render map and bind directly to Streamlit Session State
-# use_container_width ensures it fills the entire remaining screen real estate
+# RULE 3 FIX: Render giant map and bind to State
 map_output = st_folium(
     m, 
-    height=700, 
+    height=750, 
     use_container_width=True, 
     returned_objects=["all_drawings"]
 )
@@ -131,6 +145,3 @@ map_output = st_folium(
 # Persist drawings into backend memory
 if map_output and "all_drawings" in map_output:
     st.session_state.map_drawings = map_output["all_drawings"]
-
-# Debugger to verify State Binding (Optional: Remove in production)
-# st.write("Current Spatial Buffer:", st.session_state.map_drawings)
