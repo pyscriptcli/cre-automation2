@@ -15,13 +15,13 @@ st.markdown("""
             background-color: #FFFFFF !important;
         }
         
-        /* TYPOGRAPHY: Midnight Blue & Icon Fix */
-        h1, h2, h3, h4, h5, h6, p, label, span {
+        /* RULE 1 FIX: TYPOGRAPHY EXCLUSION */
+        h1, h2, h3, h4, h5, h6, p, label, span:not(.material-icons):not(.material-symbols-rounded) {
             color: #003366 !important;
             font-family: 'Inter', sans-serif !important;
         }
         
-        /* RULE 1 FIX: Protect Streamlit's internal icons from the Inter font */
+        /* Explicitly force Material Icons to keep their native font */
         .material-symbols-rounded, .material-icons, span.material-icons {
             font-family: 'Material Symbols Rounded', 'Material Icons' !important;
         }
@@ -57,18 +57,14 @@ st.markdown("""
             display: none !important; 
         }
         
-        /* RULE 2 FIX: EDGE-TO-EDGE CANVAS FORCE */
+        /* RULE 2 FIX: EDGE-TO-EDGE CANVAS WITH TOP CLEARANCE */
         .block-container {
-            padding: 0rem !important;
+            padding-top: 3rem !important;
+            padding-bottom: 0rem !important;
+            padding-left: 0rem !important;
+            padding-right: 0rem !important;
             margin: 0px !important;
             max-width: 100% !important;
-        }
-        
-        /* Add a tiny bit of padding just for the top nav elements so they aren't cut off */
-        .top-nav-wrapper {
-            padding-top: 1rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -82,8 +78,6 @@ if "map_drawings" not in st.session_state:
 # =============================================================================
 # [ TOP NAVIGATION MATRIX ]
 # =============================================================================
-st.markdown("<div class='top-nav-wrapper'>", unsafe_allow_html=True)
-
 # 1. Workspace Mode Switcher
 st.radio(
     "Active Environment",
@@ -110,8 +104,6 @@ with col4:
     with st.popover("📊 Insights"):
         st.write("Generative AI market summaries go here.")
 
-st.markdown("</div>", unsafe_allow_html=True)
-
 # =============================================================================
 # [ SPATIAL ENGINE: FOLIUM + DRAW ]
 # =============================================================================
@@ -134,7 +126,7 @@ draw_options = Draw(
 )
 draw_options.add_to(m)
 
-# RULE 3 FIX: Render giant map and bind to State
+# Render giant map and bind to State
 map_output = st_folium(
     m, 
     height=750, 
