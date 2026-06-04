@@ -78,8 +78,6 @@ st.markdown("""
         
         div.stDownloadButton > button { background-color: var(--brand-midnight) !important; border: none !important; border-radius: 2px !important; width: 100% !important; padding: 4px !important; }
         div.stDownloadButton > button:hover { background-color: var(--brand-gold) !important; }
-        div.stDownloadButton > button:disabled { background-color: #e2e8f0 !important; border-color: #cbd5e1 !important; cursor: not-allowed !important; }
-        div.stDownloadButton > button:disabled p { color: #94a3b8 !important; }
         
         div.stButton > button[kind="primary"] { background: transparent !important; border: none !important; color: var(--text-muted) !important; padding: 0 !important; margin-top: 2px; }
         div.stButton > button[kind="primary"] p { color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600; text-transform: uppercase; }
@@ -104,12 +102,10 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
-
-        /* Structural Scanning Area HUD Animations */
-        .scan-loader-box { border: 1px solid rgba(201, 171, 76, 0.3); padding: 8px; border-radius: 2px; background: #fffdf7; display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-        .scan-spinner { width: 12px; height: 12px; border: 2px solid rgba(0, 51, 102, 0.1); border-top-color: var(--brand-midnight); border-radius: 50%; animation: spinCycle 0.75s linear infinite; }
-        @keyframes spinCycle { to { transform: rotate(360deg); } }
-        .scan-loader-text { font-size: 9px; font-weight: 700; color: var(--brand-midnight); letter-spacing: 0.5px; text-transform: uppercase; }
+        
+        /* Custom Loading Spinner Layout Formatter overrides */
+        div[data-testid="stStatusWidget"] { background-color: var(--bg-offwhite) !important; border: 1px solid var(--brand-gold) !important; border-radius: 2px !important; padding: 8px !important; }
+        div[data-testid="stStatusWidget"] p { color: var(--brand-midnight) !important; font-weight: 700 !important; font-size: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -125,7 +121,7 @@ if 'scanned_records' not in st.session_state: st.session_state.scanned_records =
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
-if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {} 
+if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -208,78 +204,71 @@ with st.sidebar:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
         else:
-            # Inline brand-compliant loading box allocation
-            loader_placeholder = st.markdown("""
-                <div class="scan-loader-box">
-                    <div class="scan-spinner"></div>
-                    <div class="scan-loader-text">Initiating Scanning Area...</div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            records = []
-            success = False
-            
-            try:
-                import osmnx as ox
-                tags_dict = {}
-                for tag in selected_tags:
-                    clean = tag.replace('"', '')
-                    if '=' in clean:
-                        k, v = clean.split('=', 1)
-                        if '|' in v: v = [x.strip() for x in v.split('|')]
-                        tags_dict[k] = v
-                    else:
-                        tags_dict[clean] = True
-                        
-                gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
-                if not gdf.empty:
-                    for idx, row in gdf.iterrows():
-                        if hasattr(row.geometry, 'centroid'):
-                            c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
-                        else: continue
-                        name = row.get('name', 'Unknown')
-                        if isinstance(name, float): name = 'Unknown'
-                        
-                        matched_type = 'Node'
-                        for k in tags_dict.keys():
-                            if k in row and row[k]:
-                                matched_type = str(row[k])
-                                break
-                        records.append({
-                            "lat": c_lat, "lon": c_lon, "name": str(name), 
-                            "type": matched_type, "visible": True, "uid": len(records)
-                        })
-                    st.session_state.scanned_records = records
-                    st.session_state.last_scan_lat = lat_coord
-                    st.session_state.last_scan_lon = lon_coord
-                    success = True
-            except Exception: pass
-
-            if not success:
-                url = "https://overpass-api.de/api/interpreter"
-                statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
-                ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
+            # Inject structural loading panel wrapper
+            with st.spinner("Scanning Area... Initializing spatial engine sync."):
+                records = []
+                success = False
+                
                 try:
-                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
-                    if res.status_code == 200:
-                        for el in res.json().get('elements', []):
-                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                            if e_lat and e_lon:
-                                tags = el.get('tags', {})
-                                records.append({
-                                    "lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), 
-                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                                    "visible": True, "uid": len(records)
-                                })
+                    import osmnx as ox
+                    tags_dict = {}
+                    for tag in selected_tags:
+                        clean = tag.replace('"', '')
+                        if '=' in clean:
+                            k, v = clean.split('=', 1)
+                            if '|' in v: v = [x.strip() for x in v.split('|')]
+                            tags_dict[k] = v
+                        else:
+                            tags_dict[clean] = True
+                            
+                    gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
+                    if not gdf.empty:
+                        for idx, row in gdf.iterrows():
+                            if hasattr(row.geometry, 'centroid'):
+                                c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
+                            else: continue
+                            name = row.get('name', 'Unknown')
+                            if isinstance(name, float): name = 'Unknown'
+                            
+                            matched_type = 'Node'
+                            for k in tags_dict.keys():
+                                if k in row and row[k]:
+                                    matched_type = str(row[k])
+                                    break
+                            records.append({
+                                "lat": c_lat, "lon": c_lon, "name": str(name), 
+                                "type": matched_type, "visible": True, "uid": len(records)
+                            })
                         st.session_state.scanned_records = records
                         st.session_state.last_scan_lat = lat_coord
                         st.session_state.last_scan_lon = lon_coord
                         success = True
                 except Exception: pass
-            
-            loader_placeholder.empty()
-            if success: st.rerun()
+
+                if not success:
+                    url = "https://overpass-api.de/api/interpreter"
+                    statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
+                    ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
+                    try:
+                        res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
+                        if res.status_code == 200:
+                            for el in res.json().get('elements', []):
+                                e_lat = el.get('lat') or el.get('center', {}).get('lat')
+                                e_lon = el.get('lon') or el.get('center', {}).get('lon')
+                                if e_lat and e_lon:
+                                    tags = el.get('tags', {})
+                                    records.append({
+                                        "lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), 
+                                        "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
+                                        "visible": True, "uid": len(records)
+                                    })
+                            st.session_state.scanned_records = records
+                            st.session_state.last_scan_lat = lat_coord
+                            st.session_state.last_scan_lon = lon_coord
+                            success = True
+                    except Exception: pass
+                
+                if success: st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
@@ -292,18 +281,18 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
-    # Export Guard Matrix Formulation (Prevents empty asset processing)
     col1, col2 = st.columns(2)
-    if st.session_state.scanned_records:
-        with col1: 
+    with col1: 
+        if st.session_state.scanned_records:
             st.download_button("RADIUS", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
-        with col2: 
+        else:
+            st.button("RADIUS", type="primary", disabled=True, use_container_width=True, help="Scan area to generate exportable payload markers.")
+            
+    with col2: 
+        if st.session_state.scanned_records:
             st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
-    else:
-        with col1: 
-            st.button("RADIUS", disabled=True, use_container_width=True, key="dis_btn_radius", help="Scan area to parse exports.")
-        with col2: 
-            st.button("MARKERS", disabled=True, use_container_width=True, key="dis_btn_markers", help="Scan area to parse exports.")
+        else:
+            st.button("MARKERS", type="primary", disabled=True, use_container_width=True, help="Scan area to generate exportable payload markers.")
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
@@ -496,7 +485,7 @@ leaflet_template = """
         let targetConfig = __TARGET_CONFIG_JSON__;
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
-        let clusters = {}; 
+        let clusters = {};
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
@@ -723,9 +712,7 @@ leaflet_template = """
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
-                htmlPayload += `
-                    <div class="layer-category-block" id="cat-block-${catName}">
-                `;
+                htmlPayload += `<div class="layer-category-block" id="cat-block-${catName}">`;
                 htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
                 htmlPayload += '</div>';
             });
