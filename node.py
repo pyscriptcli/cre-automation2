@@ -87,11 +87,19 @@ st.markdown("""
         
         [data-testid="stSidebar"] .st-expander { border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important; border-radius: 2px !important; margin-bottom: 2px !important; }
         
+        /* Strict Navy Blue Checkbox and Alignment Matrix Overrides */
         .stCheckbox { display: flex !important; align-items: center !important; margin-bottom: 2px !important; }
         .stCheckbox label { display: inline-flex !important; align-items: center !important; gap: 6px !important; margin: 0px !important; padding: 0px !important; }
         .stCheckbox label p { font-size: 10px !important; font-weight: 500 !important; color: var(--brand-midnight) !important; display: inline-block !important; margin: 0 !important; line-height: 1.2 !important; }
         div[data-baseweb="checkbox"] { align-self: center !important; }
-        div[data-baseweb="checkbox"] input:checked + div, div[data-baseweb="checkbox"] div[aria-checked="true"] { background-color: var(--brand-midnight) !important; border-color: var(--brand-midnight) !important; }
+        
+        /* Enforce Navy Blue (#003366) on all active/checked state primitives */
+        div[data-baseweb="checkbox"] input:checked + div, 
+        div[data-baseweb="checkbox"] div[aria-checked="true"],
+        div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] > div { 
+            background-color: #003366 !important; 
+            border-color: #003366 !important; 
+        }
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
@@ -99,7 +107,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE & SYSTEM STORAGE
+# 2. STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
@@ -153,6 +161,7 @@ def compile_features_kml(features):
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
+    # SCAN AREA BUTTON (Repositioned precisely at top of sidebar layout flow)
     selected_tags = []
     scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
     
@@ -188,6 +197,7 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
+    # Core Data Gathering Pipeline Architecture (OSMnx with fixed lowercase post fallback request method)
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -232,13 +242,13 @@ with st.sidebar:
                     success = True
             except Exception: pass
 
-            # SECONDARY FALLOVER: Overpass Turbo
+            # SECONDARY FALLOVER ENGINE: Overpass Turbo API (Corrected case format)
             if not success:
                 url = "https://overpass-api.de/api/interpreter"
                 statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
                 ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
                 try:
-                    res = requests.POST(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
+                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
                     if res.status_code == 200:
                         for el in res.json().get('elements', []):
                             e_lat = el.get('lat') or el.get('center', {}).get('lat')
@@ -268,7 +278,7 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
-    # EXPORT PICTURE CANVAS LAYER
+    # EXPORT PICTURE MAP GENERATOR WITH COORDS VECTOR STYLING
     if st.button("EXPORT PICTURE", type="secondary", use_container_width=True):
         if not st.session_state.scanned_records:
             st.error("No active data to export.")
@@ -288,7 +298,7 @@ with st.sidebar:
                 buffer_zone = cx_center.buffer(radius_val)
                 xmin, ymin, xmax, ymax = buffer_zone.bounds
                 
-                # Canvas Rendering Bugfix: Replaces string layout conversion models with pure hex mappings directly
+                # Dynamic Radius Render Fix: Enforces pure hexadecimal + separate float inputs to block Matplotlib RGBA validation mismatch errors
                 r_col = str(st.session_state.radius_config["color"])
                 r_opacity = float(st.session_state.radius_config["fill_opacity"])
                 r_weight = float(st.session_state.radius_config["weight"])
@@ -334,12 +344,27 @@ with st.sidebar:
                 st.download_button(label="DOWNLOAD IMAGE AS PNG", data=img_buf, fileName="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
             except Exception as e: st.error(f"Failed to generate canvas asset: {str(e)}")
 
+    # Rebranded Download buttons row layout sequence mapping
     col1, col2 = st.columns(2)
-    with col1: st.download_button("JSON", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
-    with col2: st.download_button("KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+    with col1: st.download_button("RADIUS", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
+    with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+
+    with st.popover("IMPORT FILE", use_container_width=True):
+        imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
+        if imported_file is not None:
+            if st.button("LOAD", type="secondary", use_container_width=True):
+                try:
+                    data = json.load(imported_file)
+                    st.session_state.scanned_records = data.get("scanned_records", data)
+                    st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
+                    st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
+                    st.rerun()
+                except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# 4. RUNTIME STORAGE ACTION LAYER SYNC
+# 4. MUTATION SIGNAL INTERCEPT MATRIX
 # -----------------------------------------------------------------------------
 if 'runtime_action' in st.session_state:
     action = st.session_state.runtime_action
@@ -376,7 +401,7 @@ if 'runtime_action' in st.session_state:
         st.rerun()
 
 # -----------------------------------------------------------------------------
-# 5. SPLIT-VIEW GEOSPATIAL CANVAS OVERVIEW METER
+# 5. ZERO-LATENCY MAP ARCHITECTURE FRAME RENDERING
 # -----------------------------------------------------------------------------
 pts_active = st.session_state.scanned_records
 unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
@@ -644,7 +669,6 @@ leaflet_template = """
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
-                // Requirements Update: Only style inputs (Dropdown, slider, colorpicker) displayed under master loop headers
                 htmlPayload += `
                     <div class="layer-category-block" id="cat-block-${catName}">
                         <div class="layer-category-header">
@@ -701,7 +725,6 @@ leaflet_template = """
         window.removePoiInstance = function(uid, catKey) { pts = pts.filter(item => item.uid !== uid); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) { pts.forEach(p => { if (p.type === catKey) p.visible = !currentlyVisible; }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
 
-        // Layer renaming function fires strictly when pencil icon context is invoked
         window.promptRenameLayer = function(oldKey) {
             const newKey = prompt("Rename layer designation path description:", oldKey);
             if (newKey && newKey.trim() !== "" && newKey !== oldKey) {
@@ -716,15 +739,15 @@ leaflet_template = """
         };
 
         // --- GLOBAL GEOSPATIAL RIGHT-CLICK CONTEXT OPTIONS INTERFACE ---
+        // Silent payload execution block to securely clear popups and alerts on text copying actions
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
             const menuHtml = `
                 <div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;">
                     <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${coordStr}'); alert('Coordinates copied: ' + '${coordStr}');">Copy Coordinates</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank');">Open in Google Maps</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}', '_blank');">Open in Streetview</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
