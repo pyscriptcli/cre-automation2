@@ -16,10 +16,10 @@ if not os.path.exists(_config_file):
         f.write("[theme]\nbase=\"light\"\n")
 
 # -----------------------------------------------------------------------------
-# 1. BRANDED BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
+# 1. BRANDED THEME & STRUCTURAL FULL OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Trade Area Scan",
+    page_title="Open Node",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -27,12 +27,11 @@ st.set_page_config(
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
+        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
 
         :root {
             --brand-midnight: #003366 !important;
             --brand-gold: #C9AB4C !important;
-            --brand-dark: #001F3F !important;
             --white-clean: #ffffff !important;
             --bg-offwhite: #f8fafc !important;
             --text-muted: #888780 !important;
@@ -74,35 +73,45 @@ st.markdown("""
         .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer { padding: 0px !important; margin: 0px !important; max-width: 100% !important; gap: 0rem !important; }
         iframe { height: 100vh !important; width: 100% !important; border: none !important; display: block !important; }
         
-        [data-testid="stSidebarUserContent"] {
-            padding-top: 12px !important; padding-left: 12px !important; padding-right: 12px !important; height: 100vh !important; overflow-y: auto !important; overflow-x: hidden !important;
-        }
-        
         div[data-baseweb="input"], div[data-baseweb="select"] { background-color: transparent !important; border: none !important; border-bottom: 1px solid rgba(201, 171, 76, 0.5) !important; border-radius: 0px !important; box-shadow: none !important; }
-        div[data-baseweb="input"]:focus-within { border-bottom: 2px solid var(--brand-gold) !important; }
         
-        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button { background-color: var(--brand-midnight) !important; border: 1px solid var(--brand-midnight) !important; border-radius: 2px !important; width: 100% !important; padding: 6px !important; box-shadow: var(--soft-shadow) !important; transition: all 0.3s ease !important; }
+        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button { background-color: var(--brand-midnight) !important; border: 1px solid var(--brand-midnight) !important; border-radius: 2px !important; width: 100% !important; padding: 4px !important; box-shadow: var(--soft-shadow) !important; }
         div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover { background-color: var(--brand-gold) !important; border-color: var(--brand-gold) !important; }
         div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p { color: var(--white-clean) !important; font-weight: 700 !important; font-size: 9px !important; text-transform: uppercase !important; letter-spacing: 1px; }
         
         div.stDownloadButton > button { background-color: var(--brand-midnight) !important; border: none !important; border-radius: 2px !important; width: 100% !important; padding: 4px !important; }
         div.stDownloadButton > button:hover { background-color: var(--brand-gold) !important; }
         
-        div.stButton > button[kind="primary"] { background: transparent !important; border: none !important; color: var(--text-muted) !important; box-shadow: none !important; padding: 0 !important; margin-top: 2px; display: inline-flex; }
-        div.stButton > button[kind="primary"] p { color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600 !important; text-decoration: none !important; text-transform: uppercase; }
+        div.stButton > button[kind="primary"] { background: transparent !important; border: none !important; color: var(--text-muted) !important; padding: 0 !important; margin-top: 2px; }
+        div.stButton > button[kind="primary"] p { color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600; text-transform: uppercase; }
         
-        [data-testid="stSidebar"] .st-expander { border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important; border-radius: 2px !important; margin-bottom: 2px !important; overflow: hidden !important; }
-        .stCheckbox label p { font-size: 10px !important; font-weight: 500 !important; }
+        [data-testid="stSidebar"] .st-expander { border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important; border-radius: 2px !important; margin-bottom: 2px !important; }
         
-        div[data-baseweb="checkbox"] input:checked + div, div[data-baseweb="checkbox"] div[aria-checked="true"] { background-color: var(--brand-midnight) !important; border-color: var(--brand-midnight) !important; }
+        .stCheckbox { display: flex !important; align-items: center !important; margin-bottom: 2px !important; }
+        .stCheckbox label { display: inline-flex !important; align-items: center !important; gap: 6px !important; margin: 0px !important; padding: 0px !important; }
+        .stCheckbox label p { font-size: 10px !important; font-weight: 500 !important; color: var(--brand-midnight) !important; display: inline-block !important; margin: 0 !important; line-height: 1.2 !important; }
+        div[data-baseweb="checkbox"] { align-self: center !important; }
         
-        .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 30px; }
-        .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
+        div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
+            background-color: #003366 !important;
+            border-color: #003366 !important;
+        }
+        div[data-baseweb="checkbox"] input:checked + div, 
+        div[data-baseweb="checkbox"] div[aria-checked="true"],
+        div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] > div { 
+            background-color: #003366 !important; 
+            border-color: #003366 !important; 
+        }
+        
+        .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
+        .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
+
+        input[aria-label="hidden_sync_bridge"], [data-testid="stTextInput"]:has(input[aria-label="hidden_sync_bridge"]) { display: none !important; height: 0px !important; margin: 0px !important; padding: 0px !important; }
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE & DATA MODELS
+# 2. STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
@@ -112,14 +121,18 @@ if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_R
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
-
-# Layer Preference State Models (Native Python Management Sync)
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
-if 'custom_groups' not in st.session_state: st.session_state.custom_groups = {}
-if 'target_config' not in st.session_state: st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
-if 'radius_config' not in st.session_state: st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
-if 'basemap_style' not in st.session_state: st.session_state.basemap_style = "osm"
-if 'show_labels' not in st.session_state: st.session_state.show_labels = True
+if 'cached_export_buffer' not in st.session_state: st.session_state.cached_export_buffer = None
+
+if 'target_config' not in st.session_state:
+    st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
+
+if 'radius_config' not in st.session_state:
+    st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
+
+if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "dots"
+if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
+if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
 POI_CONFIG = {
     "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
@@ -141,53 +154,37 @@ ADVANCED_CONFIG = {
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
+        if not f.get('visible', True): continue
         name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
         class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
-# 3. SIDEBAR WORKSPACE & OSM GEOCODING
+# 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div class="brand-title">Trade Area Scan</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
+    
+    selected_tags = []
+    scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
     
     location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
     st.session_state.geo_radius = radius_val
 
     coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
-    
     if coord_match:
         lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
         st.session_state.geo_coords = location_input
     else:
-        if location_input and location_input != st.session_state.get('last_geocoded_query', ''):
-            with st.spinner("Locating via OpenStreetMap..."):
-                try:
-                    headers = {'User-Agent': 'TradeAreaScan/3.1'}
-                    osm_url = f"https://nominatim.openstreetmap.org/search?q={location_input}&format=json&limit=1"
-                    resp = requests.get(osm_url, headers=headers, timeout=10).json()
-                    if resp:
-                        new_lat = float(resp[0]['lat'])
-                        new_lon = float(resp[0]['lon'])
-                        st.session_state.geo_coords = f"{new_lat:.5f}, {new_lon:.5f}"
-                        st.session_state.last_geocoded_query = location_input
-                        st.rerun()
-                    else:
-                        st.error("Location not found.")
-                        lat_coord, lon_coord = 14.5995, 120.9842 
-                except Exception:
-                    lat_coord, lon_coord = 14.5995, 120.9842
-        else:
-            fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-            lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+        fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+        lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     
-    selected_tags = []
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -204,16 +201,13 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    if st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn"):
+    if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
         else:
             records = []
             success = False
             
-            # Primary: OSMnx Extraction
             try:
                 import osmnx as ox
                 tags_dict = {}
@@ -225,6 +219,7 @@ with st.sidebar:
                         tags_dict[k] = v
                     else:
                         tags_dict[clean] = True
+                        
                 gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
                 if not gdf.empty:
                     for idx, row in gdf.iterrows():
@@ -233,6 +228,7 @@ with st.sidebar:
                         else: continue
                         name = row.get('name', 'Unknown')
                         if isinstance(name, float): name = 'Unknown'
+                        
                         matched_type = 'Node'
                         for k in tags_dict.keys():
                             if k in row and row[k]:
@@ -248,13 +244,12 @@ with st.sidebar:
                     success = True
             except Exception: pass
 
-            # Fallback: Overpass Engine
             if not success:
                 url = "https://overpass-api.de/api/interpreter"
                 statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
                 ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
                 try:
-                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "TradeAreaScan/3.1"}, timeout=90)
+                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
                     if res.status_code == 200:
                         for el in res.json().get('elements', []):
                             e_lat = el.get('lat') or el.get('center', {}).get('lat')
@@ -274,47 +269,48 @@ with st.sidebar:
             
             if success: st.rerun()
 
+    st.markdown("<br>", unsafe_allow_html=True)
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
-        st.session_state.custom_groups = {}
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
         st.rerun()
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
-    
+
     col1, col2 = st.columns(2)
-    with col1: st.download_button("JSON", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
-    with col2: st.download_button("KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+    with col1: st.download_button("RADIUS", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
+    with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+
+    with st.popover("IMPORT FILE", use_container_width=True):
+        imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
+        if imported_file is not None:
+            if st.button("LOAD", type="secondary", use_container_width=True):
+                try:
+                    data = json.load(imported_file)
+                    st.session_state.scanned_records = data.get("scanned_records", data)
+                    st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
+                    st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
+                    st.rerun()
+                except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# 4. NATIVE PYTHON LAYER PREFERENCE ENGINE & MATPLOTLIB RENDERER
+# 4. EXPORT PICTURE FUNCTIONALITY ENGINE (MATPLOTLIB + CONTEXTILY ARTIFACT)
 # -----------------------------------------------------------------------------
-active_records = st.session_state.scanned_records
-detected_layers = list(set([p.get('type', 'Unclassified') for p in active_records]))
-cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
-
-# Auto-initialize preference dictionary structures safely
-for i, layer in enumerate(detected_layers):
-    if layer not in st.session_state.layer_meta:
-        st.session_state.layer_meta[layer] = {
-            "color": cat_palette[i % len(cat_palette)],
-            "style": "dots",
-            "size": 14,
-            "visible": True
-        }
-
-# MATPLOTLIB STATIC CANVAS EXPORTER
-def generate_report_canvas_image():
+def execute_static_map_render():
     if not st.session_state.scanned_records:
-        return None
+        return
     try:
         import contextily as cx
         import geopandas as gpd
         from shapely.geometry import Point
+        from matplotlib.patches import Shadow
         
         pts = [p for p in st.session_state.scanned_records if p.get('visible', True)]
+        cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
         fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
         
         center_gdf = gpd.GeoDataFrame(geometry=[Point(lon_coord, lat_coord)], crs="EPSG:4326").to_crs(epsg=3857)
@@ -335,28 +331,30 @@ def generate_report_canvas_image():
         t_marker = '*' if st.session_state.target_config["style"] == "star" else 'o'
         ax.scatter([cx_center.x], [cx_center.y], color=t_col, edgecolors='#ffffff', s=t_size, marker=t_marker, zorder=10)
         
-        for lyr in detected_layers:
-            meta = st.session_state.layer_meta[lyr]
-            if not meta.get("visible", True):
-                continue
-                
-            cat_pts = [p for p in pts if p.get('type', 'Unclassified') == lyr]
-            if not cat_pts:
-                continue
-                
+        unique_types = list(set([p.get('type', 'Unclassified') for p in pts]))
+        for i, category_type in enumerate(unique_types):
+            meta = st.session_state.layer_meta.get(category_type, {})
+            cat_color = meta.get("color", cat_palette[i % len(cat_palette)])
+            cat_size = float(meta.get("size", st.session_state.global_marker_size))
+            cat_style = meta.get("style", st.session_state.global_marker_style)
+            
+            cat_pts = [p for p in pts if p.get('type', 'Unclassified') == category_type]
+            if not cat_pts: continue
+            
             pt_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy([p['lon'] for p in cat_pts], [p['lat'] for p in cat_pts]), crs="EPSG:4326").to_crs(epsg=3857)
             
-            c_style = meta.get("style", "dots")
-            c_size = float(meta.get("size", 14))
-            c_color = meta.get("color", "#003366")
-            
-            if c_style == 'modern-pin':
-                ax.scatter(pt_gdf.geometry.x + (radius_val * 0.015), pt_gdf.geometry.y - (radius_val * 0.015), color='#000000', s=c_size*6, marker='o', alpha=0.25, zorder=4)
-                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=c_color, edgecolors='#0A1520', linewidths=0.6, s=c_size*6, marker='o', alpha=1.0, label=lyr, zorder=5)
-                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color='#FFFFFF', s=c_size*1.2, marker='o', alpha=1.0, zorder=6)
+            if cat_style == 'modern-pin':
+                # Matplotlib implementation matching the drop shadow needle layout architecture 
+                # Shadow Offset Layer
+                ax.scatter(pt_gdf.geometry.x + (radius_val * 0.015), pt_gdf.geometry.y - (radius_val * 0.015), color='#000000', s=cat_size*6, marker='o', alpha=0.25, zorder=4)
+                # Outer Circle Ring Head Layer
+                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#0A1520', linewidths=0.6, s=cat_size*6, marker='o', alpha=1.0, label=category_type, zorder=5)
+                # Inner Target White Core Layer
+                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color='#FFFFFF', s=cat_size*1.2, marker='o', alpha=1.0, zorder=6)
             else:
-                m_shape = 'o' if c_style == 'dots' else '^'
-                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=c_color, edgecolors='#ffffff', s=c_size*4, marker=m_shape, alpha=0.9, label=lyr, zorder=5)
+                m_shape = 'o'
+                if m_shape == 'pin': m_shape = '^'
+                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#ffffff', s=cat_size*4, marker=m_shape, alpha=0.9, label=category_type, zorder=5)
         
         try: cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, zorder=1)
         except Exception: pass
@@ -364,289 +362,468 @@ def generate_report_canvas_image():
         ax.set_xlim(xmin - (radius_val*0.1), xmax + (radius_val*0.1))
         ax.set_ylim(ymin - (radius_val*0.1), ymax + (radius_val*0.1))
         ax.axis('off')
+        
         ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor=(0.0, 0.2, 0.4, 0.1), fontsize=7)
         
         img_buf = io.BytesIO()
         plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=300)
         img_buf.seek(0)
         plt.close(fig)
-        return img_buf
-    except Exception:
-        return None
+        
+        st.session_state.cached_export_buffer = img_buf
+    except Exception as e: st.error(f"Failed to generate canvas asset: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 5. CONTROL PANEL ARCHITECTURE (NATIVE STREAMLIT RIGHT PANEL CONTAINER)
+# 5. JS <-> PYTHON SECURE STATE SYNC BRIDGE 
 # -----------------------------------------------------------------------------
-# Using column segmentation to split the layout seamlessly without external JS panels
-main_map_col, right_panel_col = st.columns([3, 1])
-
-with right_panel_col:
-    st.markdown("### WORKSPACE PANEL")
-    
-    # 1. Base Controller Block
-    with st.expander("🌐 BASEMAP CONTROLLER", expanded=True):
-        st.session_state.basemap_style = st.selectbox("Tile Layer Style", ["osm", "satellite", "carto"], index=["osm", "satellite", "carto"].index(st.session_state.basemap_style))
-        st.session_state.show_labels = st.checkbox("Render Text Labels", value=st.session_state.show_labels)
+sync_val = st.text_input("hidden_sync_bridge", key="hidden_sync_bridge", label_visibility="collapsed")
+if sync_val:
+    try:
+        bridge_state = json.loads(sync_val)
+        st.session_state.layer_meta = bridge_state.get("layer_meta", st.session_state.layer_meta)
+        st.session_state.target_config = bridge_state.get("target_config", st.session_state.target_config)
+        st.session_state.radius_config = bridge_state.get("radius_config", st.session_state.radius_config)
+        st.session_state.scanned_records = bridge_state.get("pts", st.session_state.scanned_records)
         
-    # 2. Functional Layer Group Creation Framework [NEW FEATURE]
-    with st.expander("📁 CREATE LAYER GROUP", expanded=False):
-        if detected_layers:
-            group_name_input = st.text_input("Group Designation Name", placeholder="e.g., Priority Retail Hubs")
-            selected_group_layers = []
-            st.markdown("<p style='font-size:10px; font-weight:700; margin:0;'>Select Layers to Group:</p>", unsafe_allow_html=True)
-            for lyr in detected_layers:
-                # Filter out layers already contained inside another group structure
-                is_grouped = any(lyr in g_info["layers"] for g_info in st.session_state.custom_groups.values())
-                lbl_suffix = " (Grouped)" if is_grouped else ""
-                if st.checkbox(f"{lyr}{lbl_suffix}", key=f"grp_sel_{lyr}"):
-                    selected_group_layers.append(lyr)
+        if bridge_state.get("trigger_export", False):
+            execute_static_map_render()
             
-            if st.button("ASSEMBLE LAYER GROUP", use_container_width=True):
-                if group_name_input.strip() and selected_group_layers:
-                    st.session_state.custom_groups[group_name_input.strip()] = {
-                        "layers": selected_group_layers,
-                        "collapsed": True
-                    }
-                    st.toast(f"Assembled Group: {group_name_input}", icon="📁")
-                    st.columns(1) # Refresh context frame
-                    st.rerun()
-                else:
-                    st.warning("Provide a name and check ≥ 1 layer.")
-        else:
-            st.caption("Scan an area to extract active operational layers.")
+        st.session_state.hidden_sync_bridge = ""
+        st.rerun()
+    except Exception: pass
 
-    # 3. Targets and Anchors Configuration Controls
-    with st.expander("🎯 TARGET & BUFFER PROFILE", expanded=False):
-        st.session_state.target_config["style"] = st.selectbox("Center Anchor", ["star", "circle"], index=0 if st.session_state.target_config["style"] == "star" else 1)
-        st.session_state.target_config["color"] = st.color_picker("Anchor Core Hex", value=st.session_state.target_config["color"])
-        st.session_state.target_config["size"] = st.slider("Anchor Scale", 10, 60, int(st.session_state.target_config["size"]))
-        st.session_state.radius_config["color"] = st.color_picker("Radius Boundary Hex", value=st.session_state.radius_config["color"])
-        st.session_state.radius_config["fill_opacity"] = st.slider("Buffer Opacity", 0.0, 1.0, float(st.session_state.radius_config["fill_opacity"]), step=0.01)
-        st.session_state.radius_config["weight"] = st.slider("Boundary Thickness", 0.5, 8.0, float(st.session_state.radius_config["weight"]), step=0.5)
-
-    st.markdown("---")
-    st.markdown(f"**ACTIVE LAYERS ({len(active_records)})**")
-    
-    # 4. Managed Active Layers List Rendering Loop
-    assigned_grouped_layers = []
-    
-    # Render Custom Assembled Groups First
-    for g_title, g_info in list(st.session_state.custom_groups.items()):
-        assigned_grouped_layers.extend(g_info["layers"])
-        
-        # Calculate total records inside the entire group boundary
-        g_count = sum(len([p for p in active_records if p.get('type') == lyr]) for lyr in g_info["layers"])
-        
-        st.markdown(f"<div style='padding:4px; background:#e2e8f0; font-weight:700; font-size:11px; color:#003366; border-radius:2px; margin-top:6px;'>📁 GROUP: {g_title.upper()} ({g_count})</div>", unsafe_allow_html=True)
-        
-        # Batch Controller Settings inside Group Header Matrix
-        g_vis = st.checkbox("Toggle Group Visibility", value=True, key=f"vis_g_{g_title}")
-        g_style = st.selectbox("Batch Marker Style", ["dots", "pin", "modern-pin"], key=f"sty_g_{g_title}")
-        g_size = st.slider("Batch Scale", 10, 40, 14, key=f"siz_g_{g_title}")
-        g_color = st.color_picker("Batch Hex Override", value="#C9AB4C", key=f"col_g_{g_title}")
-        apply_g = st.button("APPLY BATCH OVERRIDES", key=f"btn_g_{g_title}", use_container_width=True)
-        
-        if apply_g:
-            for child_lyr in g_info["layers"]:
-                if child_lyr in st.session_state.layer_meta:
-                    st.session_state.layer_meta[child_lyr]["visible"] = g_vis
-                    st.session_state.layer_meta[child_lyr]["style"] = g_style
-                    st.session_state.layer_meta[child_lyr]["size"] = g_size
-                    st.session_state.layer_meta[child_lyr]["color"] = g_color
-            st.toast(f"Applied layout preferences to {g_title}", icon="⚡")
-            
-        if st.button("DISSOLVE GROUP STRUCTURE", key=f"del_g_{g_title}", use_container_width=True):
-            del st.session_state.custom_groups[g_title]
-            st.rerun()
-            
-        st.markdown("<div style='height:4px; border-bottom:2px dashed #C9AB4C;'></div>", unsafe_allow_html=True)
-
-    # Render Standalone Layer Expanders
-    for lyr in detected_layers:
-        if lyr in assigned_grouped_layers:
-            continue # Skipped because it is handled inside its parent layout group block above
-            
-        meta = st.session_state.layer_meta[lyr]
-        lyr_records = [p for p in active_records if p.get('type', 'Unclassified') == lyr]
-        
-        with st.expander(f"📍 {lyr.upper()} ({len(lyr_records)})"):
-            meta["visible"] = st.checkbox("Layer Visibility", value=meta.get("visible", True), key=f"vis_v_{lyr}")
-            meta["style"] = st.selectbox("Marker Style Primitive", ["dots", "pin", "modern-pin"], index=["dots", "pin", "modern-pin"].index(meta.get("style", "dots")), key=f"sty_v_{lyr}")
-            meta["size"] = st.slider("Marker Scale Bound", 10, 40, int(meta.get("size", 14)), key=f"siz_v_{lyr}")
-            meta["color"] = st.color_picker("Marker Hex Color", value=meta.get("color", "#003366"), key=f"col_v_{lyr}")
-            
-            # Inline unique record tracking table listing
-            for p in lyr_records:
-                p_visible = p.get('visible', True)
-                if st.checkbox(f"ID: {p.get('uid', 0)} | {p.get('name', 'Unknown')[:18]}", value=p_visible, key=f"poi_v_{p.get('uid')}"):
-                    p['visible'] = True
-                else:
-                    p['visible'] = False
-
-    st.markdown("---")
-    # Native Instant Matplotlib Vector Image Exporter Engine Trigger Execution
-    if st.button("GENERATE STATIC REPORT CANVAS", type="secondary", use_container_width=True):
-        with st.spinner("Processing high-fidelity vectors..."):
-            canvas_buffer = generate_report_canvas_image()
-            if canvas_buffer:
-                st.session_state.cached_export_buffer = canvas_buffer
-                st.rerun()
+if st.session_state.cached_export_buffer is not None:
+    st.markdown("### Exported Map Frame Visualization")
+    st.image(st.session_state.cached_export_buffer, caption="Export Map Output Visualization")
+    st.download_button(label="DOWNLOAD IMAGE AS PNG", data=st.session_state.cached_export_buffer, file_name="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
+    st.session_state.cached_export_buffer = None
 
 # -----------------------------------------------------------------------------
 # 6. ZERO-LATENCY MAP ARCHITECTURE FRAME RENDERING
 # -----------------------------------------------------------------------------
-with main_map_col:
-    # Process visibility mutations inside real-time records payload
-    sanatized_records = []
-    for p in st.session_state.scanned_records:
-        lyr_type = p.get('type', 'Unclassified')
-        if lyr_type in st.session_state.layer_meta:
-            # Drop record execution node if parent layer visibility mask is toggled off
-            if not st.session_state.layer_meta[lyr_type].get("visible", True):
-                continue
-        if p.get('visible', True):
-            sanatized_records.append(p)
+pts_active = st.session_state.scanned_records
+unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
+cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
 
-    layer_meta_json = json.dumps(st.session_state.layer_meta)
-    target_config_json = json.dumps(st.session_state.target_config)
-    radius_config_json = json.dumps(st.session_state.radius_config)
-    geojson_str = json.dumps(sanatized_records)
+for idx, layer in enumerate(unique_layers):
+    if layer not in st.session_state.layer_meta:
+        st.session_state.layer_meta[layer] = {
+            "color": cat_palette[idx % len(cat_palette)],
+            "style": st.session_state.global_marker_style,
+            "size": st.session_state.global_marker_size
+        }
 
-    render_lat = lat_coord
-    render_lon = lon_coord
-    is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
+layer_meta_json = json.dumps(st.session_state.layer_meta)
+target_config_json = json.dumps(st.session_state.target_config)
+radius_config_json = json.dumps(st.session_state.radius_config)
+geojson_str = json.dumps(pts_active)
 
-    leaflet_template = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
-        <style>
-            body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
-            #map { height: 100vh; width: 100%; }
-            .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-            .hide-labels .poi-text-label { display: none !important; }
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        <script>
-            // Initialization Pipeline with interactive UI hooks extracted
-            const map = L.map('map', { 
-                zoomControl: true, 
-                attributionControl: false, 
-                preferCanvas: true 
-            }).setView([__LAT__, __LON__], 14);
+render_lat = lat_coord
+render_lon = lon_coord
+is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 
-            let layerMeta = __LAYER_META_JSON__;
-            let targetConfig = __TARGET_CONFIG_JSON__;
-            let radiusConfig = __RADIUS_CONFIG_JSON__;
-            let pts = __GEOJSON__;
+leaflet_template = """
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
+        #map { height: 100vh; width: 100%; }
 
-            const basemaps = {
-                osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-                satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-                carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
-            };
-            
-            // Map Basemap Style preferences natively derived from state assignments
-            let activeStyle = "__BASEMAP_STYLE__";
-            basemaps[activeStyle].addTo(map);
-            
-            if (__SHOW_LABELS__ === false) {
-                document.getElementById('map').classList.add('hide-labels');
-            }
+        #scan-results-panel { 
+            position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; 
+            max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); 
+            background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; 
+            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); 
+        }
+        .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
+        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; }
+        .layer-category-block { border-bottom: 1px solid #f0f0f0; }
+        .layer-category-header { background: #ffffff; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+        .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
+        .layer-category-items { padding: 0; background: #f8fafc; }
+        .layer-category-items.collapsed { display: none !important; }
+        
+        .results-item { padding: 4px 8px 4px 16px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
+        .results-item:hover { background: #ffffff; color: #003366; }
+        
+        .action-icon-trigger { cursor: pointer; padding: 2px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 2px; transition: all 0.15s; }
+        .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
+        .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
+        .action-icon-trigger:hover svg { fill: #003366; }
+        .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
 
-            // Render Center Buffer Rings
-            L.circle([__LAT__, __LON__], {
+        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .hide-labels .poi-text-label { display: none !important; }
+        .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
+        
+        .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
+        .config-headline { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+        .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 600; color: #003366; gap: 6px; }
+        .config-flex-row select, .config-flex-row input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
+        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
+        .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
+        
+        .split-button-matrix-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; border-top: 1px solid rgba(0,51,102,0.1); background:#f8fafc; }
+        .workspace-action-btn-element { background:#003366; color:#fff; border:none; padding:8px 4px; border-radius:2px; font-family:Montserrat; font-weight:700; cursor:pointer; font-size:9px; letter-spacing:0.5px; box-shadow: 0 4px 12px rgba(0,51,102,0.1); transition: all 0.2s ease; text-transform: uppercase; text-align: center; }
+        .workspace-action-btn-element:hover { background: #C9AB4C; }
+        .export-action-btn-override { background: #C9AB4C; color: #003366; border: 1px solid rgba(0,51,102,0.15); }
+        .export-action-btn-override:hover { background: #003366; color: #ffffff; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div id="scan-results-panel">
+        <div class="results-header">
+            <span>WORKSPACE</span>
+            <span id="results-count" style="color:#C9AB4C;">0</span>
+        </div>
+        
+        <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
+            <div class="config-headline">Basemap Controller</div>
+            <div class="config-flex-row">
+                <span>Tile Style:</span>
+                <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
+                    <option value="osm">OpenStreetMap</option>
+                    <option value="satellite">Satellite View</option>
+                    <option value="carto">Carto Light</option>
+                </select>
+                <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                    <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
+                </label>
+            </div>
+        </div>
+        
+        <div class="config-block-wrapper">
+            <div class="config-headline">Global Markers</div>
+            <div class="config-flex-row">
+                <span>Style:</span>
+                <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
+                    <option value="dots">Dots</option>
+                    <option value="pin">Pin Location</option>
+                    <option value="modern-pin">Modern Drop-Pin</option>
+                </select>
+                <span>Size:</span>
+                <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
+            </div>
+            <div class="config-flex-row">
+                <span>Color:</span>
+                <input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)">
+                <select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;">
+                    <option value="">Preset</option>
+                    <option value="#003366">Midnight</option>
+                    <option value="#C9AB4C">Gold</option>
+                    <option value="#AA2E20">Crimson</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="config-block-wrapper">
+            <div class="config-headline">Target Coordinates & Radius Layer</div>
+            <div class="config-flex-row">
+                <span>Target:</span>
+                <select onchange="patchTargetCenterConfig('style', this.value)">
+                    <option value="star">Star</option>
+                    <option value="circle">Dot</option>
+                </select>
+                <input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)">
+                <input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)">
+            </div>
+            <div class="config-flex-row">
+                <span>Radius Fill:</span>
+                <input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)">
+                <span>Opacity:</span>
+                <input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
+            </div>
+            <div class="config-flex-row">
+                <span>Thickness:</span>
+                <input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)">
+            </div>
+        </div>
+        
+        <div class="results-list" id="results-list-box"></div>
+        
+        <div class="split-button-matrix-wrapper">
+            <button id="sync-bridge-btn" onclick="pushStateToPythonBridge(false)" class="workspace-action-btn-element">SYNC EDITS</button>
+            <button id="export-bridge-btn" onclick="pushStateToPythonBridge(true)" class="workspace-action-btn-element export-action-btn-override">EXPORT PIC</button>
+            <div style="font-size:8px; color:#888780; grid-column: span 2; margin-top:4px; font-weight: 600; text-align: center;">Sync real-time edits or export direct report canvas.</div>
+        </div>
+    </div>
+
+    <script>
+        const map = L.map('map', { 
+            zoomControl: false, 
+            attributionControl: false, 
+            preferCanvas: true 
+        }).setView([__LAT__, __LON__], 14);
+
+        let layerMeta = __LAYER_META_JSON__;
+        let targetConfig = __TARGET_CONFIG_JSON__;
+        let radiusConfig = __RADIUS_CONFIG_JSON__;
+        let pts = __GEOJSON__;
+
+        const basemaps = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
+            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
+        };
+        basemaps[(localStorage.getItem('ts_persistent_basemap') || 'osm')].addTo(map);
+        
+        function switchActiveBasemap(targetKey) {
+            Object.keys(basemaps).forEach(k => { if(map.hasLayer(basemaps[k])) map.removeLayer(basemaps[k]); });
+            basemaps[targetKey].addTo(map); localStorage.setItem('ts_persistent_basemap', targetKey);
+        }
+
+        let labelsActive = localStorage.getItem('ts_persistent_labels') !== 'false';
+        document.getElementById('label-toggle-chk').checked = labelsActive;
+        if (!labelsActive) document.getElementById('map').classList.add('hide-labels');
+        
+        function toggleLabelsMatrix(isShown) {
+            if (isShown) document.getElementById('map').classList.remove('hide-labels');
+            else document.getElementById('map').classList.add('hide-labels');
+            localStorage.setItem('ts_persistent_labels', isShown);
+        }
+
+        let radiusCircle = null;
+        function renderRadiusCircleBounds() {
+            if (radiusCircle) map.removeLayer(radiusCircle);
+            radiusCircle = L.circle([__LAT__, __LON__], {
                 radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight),
                 fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity)
             }).addTo(map);
+        }
 
-            // Render Center Core Anchor Marker Flag
+        let centerMarker = null;
+        function renderTargetCenterIcon() {
+            if (centerMarker) map.removeLayer(centerMarker);
             const d = targetConfig.size; const c = targetConfig.color;
             const htmlElement = targetConfig.style === "star" 
                 ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">★</div>`
                 : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
             
-            L.marker([__LAT__, __LON__], { 
+            centerMarker = L.marker([__LAT__, __LON__], { 
                 icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 
             }).addTo(map);
+        }
 
-            // Vector Icon Factory Generator
-            const generateMarkerElement = (color, styleMode, sizeDimension) => {
-                const sDim = parseInt(sizeDimension);
-                if (styleMode === "pin") {
-                    return L.divIcon({ 
-                        html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${sDim*1.3}" height="${sDim*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
-                        className: '', iconSize: [sDim*1.3, sDim*1.3], iconAnchor: [sDim*0.65, sDim*1.3] 
-                    });
-                } else if (styleMode === "modern-pin") {
-                    const w = sDim * 1.5;
-                    const h = sDim * 2.2;
-                    const customSvg = `
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
-                        <defs>
-                            <filter id="shadowFilter-${color.replace('#','')}" x="-20%" y="-20%" width="150%" height="150%">
-                                <feDropShadow dx="0" dy="4" stdDeviation="2.5" flood-color="#001F3F" flood-opacity="0.4"/>
-                            </filter>
-                        </defs>
-                        <g filter="url(#shadowFilter-${color.replace('#','')})">
-                            <path d="M20 20 L20 52" stroke="${color}" stroke-width="3.2" stroke-linecap="round"/>
-                            <path d="M20 20 L20 52" stroke="#FFFFFF" stroke-width="1.0" stroke-linecap="round"/>
-                            <circle cx="20" cy="20" r="13" fill="${color}" stroke="#0A1520" stroke-width="1.2" />
-                            <circle cx="20" cy="20" r="4.2" fill="#FFFFFF"/>
-                        </g>
-                    </svg>`;
-                    return L.divIcon({
-                        html: `<div style="transform: translate(-50%, -88%); width: ${w}px; height: ${h}px;">${customSvg}</div>`,
-                        className: '', iconSize: [w, h], iconAnchor: [0, 0]
-                    });
-                }
+        const generateMarkerElement = (color, styleMode, sizeDimension) => {
+            const d = parseInt(sizeDimension);
+            if (styleMode === "pin") {
                 return L.divIcon({ 
-                    html: `<div style="background-color: ${color}; width: ${sDim}px; height: ${sDim}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, 
-                    className: '', iconSize: [sDim, sDim], iconAnchor: [sDim/2, sDim/2] 
+                    html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
+                    className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
                 });
-            };
+            } else if (styleMode === "modern-pin") {
+                const w = d * 1.5;
+                const h = d * 2.2;
+                // Integrated explicit SVG drop-shadow filter matrices to match report specification
+                const customSvg = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
+                    <defs>
+                        <filter id="shadowFilter" x="-20%" y="-20%" width="150%" height="150%">
+                            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#002147" flood-opacity="0.35"/>
+                        </filter>
+                    </defs>
+                    <g filter="url(#shadowFilter)">
+                        <path d="M20 20 L20 52" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+                        <path d="M20 20 L20 52" stroke="#FFFFFF" stroke-width="1.0" stroke-linecap="round"/>
+                        <circle cx="20" cy="20" r="13" fill="${color}" stroke="#0A1520" stroke-width="1.2" />
+                        <circle cx="20" cy="20" r="4.2" fill="#FFFFFF"/>
+                    </g>
+                </svg>`;
+                return L.divIcon({
+                    html: `<div style="transform: translate(-50%, -88%); width: ${w}px; height: ${h}px;">${customSvg}</div>`,
+                    className: '', iconSize: [w, h], iconAnchor: [0, 0]
+                });
+            }
+            return L.divIcon({ 
+                html: `<div style="background-color: ${color}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, 
+                className: '', iconSize: [d, d], iconAnchor: [d/2, d/2] 
+            });
+        };
 
-            // Multipoint Geolocation Rendering Block Pipeline
+        const layerGroupsRef = {}; const categoryMap = {};
+
+        function compileLayersAndRenderPoints() {
+            Object.keys(layerGroupsRef).forEach(k => { map.removeLayer(layerGroupsRef[k]); delete layerGroupsRef[k]; });
+            Object.keys(categoryMap).forEach(k => delete categoryMap[k]);
+            
             pts.forEach(p => {
-                const lyrKey = p.type || 'Unclassified';
-                const meta = layerMeta[lyrKey] || { color: "#003366", style: "dots", size: 14 };
-                
-                const marker = L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) })
-                                .bindPopup(`<b>${p.name}</b><br><span style="color:#888780;font-size:9px;">${p.type}</span>`);
-                if (p.name && p.name !== 'Unknown') {
-                    marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -10], className: 'poi-text-label' });
-                }
-                marker.addTo(map);
+                const layerKey = p.type || 'Unclassified';
+                if (!categoryMap[layerKey]) categoryMap[layerKey] = []; categoryMap[layerKey].push(p);
             });
 
-            // Map Fitting Zoom Constraint Rules Logic
-            if (pts.length > 0 && !__IS_STALE__) {
-                const validMarkers = pts.map(p => L.marker([p.lat, p.lon]));
-                const boundsGroup = L.featureGroup([L.marker([__LAT__, __LON__]), ...validMarkers]);
-                map.fitBounds(boundsGroup.getBounds().pad(0.06));
+            Object.keys(categoryMap).forEach(key => {
+                layerGroupsRef[key] = L.layerGroup().addTo(map);
+                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
+                
+                categoryMap[key].forEach(p => {
+                    if (p.visible === false) return;
+                    const marker = L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) })
+                                    .bindPopup(`<b>${p.name}</b><br><span style="color:#888780;font-size:9px;">${p.type}</span>`);
+                    if (p.name && p.name !== 'Unknown') {
+                        marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -10], className: 'poi-text-label' });
+                    }
+                    marker.addTo(layerGroupsRef[key]);
+                });
+            });
+        }
+
+        window.pushStateToPythonBridge = function(shouldTriggerExport) {
+            try {
+                const payload = { 
+                    layer_meta: layerMeta, 
+                    target_config: targetConfig, 
+                    radius_config: radiusConfig, 
+                    pts: pts,
+                    trigger_export: shouldTriggerExport
+                };
+                const parentDoc = window.parent.document;
+                
+                const hiddenInput = parentDoc.querySelector('input[aria-label="hidden_sync_bridge"]');
+                if (hiddenInput) {
+                    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                    valueSetter.call(hiddenInput, JSON.stringify(payload));
+                    hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    
+                    const btn = document.getElementById(shouldTriggerExport ? 'export-bridge-btn' : 'sync-bridge-btn');
+                    const originalText = btn.innerText;
+                    btn.innerText = "RUNNING ✓";
+                    btn.style.backgroundColor = "#C9AB4C";
+                    setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = shouldTriggerExport ? "#C9AB4C" : "#003366"; }, 1500);
+                }
+            } catch(e) { console.warn("Bridge deployment failed", e); }
+        };
+
+        window.patchGlobalMarkerStyle = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].style = v); compileLayersAndRenderPoints(); };
+        window.patchGlobalMarkerSize = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v)); compileLayersAndRenderPoints(); };
+        window.patchGlobalMarkerColor = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].color = v); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
+        window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
+        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderRadiusCircleBounds(); };
+        window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
+
+        function rebuildSidebarControlLayout() {
+            const listBox = document.getElementById('results-list-box');
+            document.getElementById('results-count').innerText = pts.length;
+            if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:9px; padding:12px; color:#888780;'>No items mapped.</div>"; return; }
+
+            let htmlPayload = '';
+            const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
+            const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
+            const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
+
+            Object.keys(categoryMap).forEach(catName => {
+                const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
+                const layerPts = categoryMap[catName] || [];
+                const isLayerVisible = layerPts.some(p => p.visible !== false);
+
+                htmlPayload += `
+                    <div class="layer-category-block" id="cat-block-${catName}">
+                        <div class="layer-category-header">
+                            <div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')">
+                                <span class="color-dot" style="background-color: ${meta.color};"></span>
+                                <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:1px;">
+                                <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
+                                <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
+                                <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
+                                <span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">▼</span>
+                            </div>
+                        </div>
+                        <div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);">
+                            <div class="config-flex-row">
+                                <select onchange="triggerLayerUpdate('${catName}', 'style', this.value)">
+                                    <option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option>
+                                    <option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option>
+                                    <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
+                                </select>
+                                <input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
+                                <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
+                            </div>
+                        </div>
+                        <div class="layer-category-items collapsed" id="items-${catName}">
+                `;
+                layerPts.forEach(p => {
+                    const itemVisible = p.visible !== false;
+                    htmlPayload += `
+                    <div class="results-item" id="res-item-${p.uid}" style="${itemVisible ? '' : 'opacity:0.4;'}">
+                        <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
+                            ${p.name || 'Unknown'}
+                        </div>
+                        <div style="display:flex; align-items:center; gap:1px;">
+                            <a class="action-icon-trigger" onclick="promptRenamePoi(${p.uid}, '${p.name}')">${editSvg}</a>
+                            <a class="action-icon-trigger" onclick="togglePoiVisibility(${p.uid})">${eyeSvg}</a>
+                            <a class="action-icon-trigger delete-btn" onclick="removePoiInstance(${p.uid}, '${catName}')">${trashSvg}</a>
+                        </div>
+                    </div>`;
+                });
+                htmlPayload += '</div></div>';
+            });
+            listBox.innerHTML = htmlPayload;
+        }
+
+        window.toggleAccordionCollapse = function(catKey) {
+            const panel = document.getElementById('items-' + catKey); const chev = document.getElementById('chevron-' + catKey);
+            if(panel) { panel.classList.toggle('collapsed'); chev.innerText = panel.classList.contains('collapsed') ? '▼' : '▲'; }
+        };
+
+        window.togglePoiVisibility = function(uid) { const p = pts.find(item => item.uid === uid); if (p) { p.visible = (p.visible === false); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
+        window.promptRenamePoi = function(uid, oldName) { const newName = prompt("Rename asset description Name:", oldName); if (newName && newName.trim() !== "") { const p = pts.find(item => item.uid === uid); if (p) { p.name = newName; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } } };
+        window.removePoiInstance = function(uid, catKey) { pts = pts.filter(item => item.uid !== uid); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
+        window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) { pts.forEach(p => { if (p.type === catKey) p.visible = !currentlyVisible; }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
+
+        window.promptRenameLayer = function(oldKey) {
+            const newKey = prompt("Rename layer designation path description:", oldKey);
+            if (newKey && newKey.trim() !== "" && newKey !== oldKey) {
+                pts.forEach(p => { if (p.type === oldKey) p.type = newKey; });
+                if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; }
+                compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
             }
-        </script>
-    </body>
-    </html>
-    """
+        };
 
-    leaflet_html = (leaflet_template
-                    .replace("__LAT__", str(render_lat))
-                    .replace("__LON__", str(render_lon))
-                    .replace("__RADIUS__", str(radius_val))
-                    .replace("__IS_STALE__", is_stale)
-                    .replace("__BASEMAP_STYLE__", str(st.session_state.basemap_style))
-                    .replace("__SHOW_LABELS__", "true" if st.session_state.show_labels else "false")
-                    .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
-                    .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
-                    .replace("__TARGET_CONFIG_JSON__", target_config_json)
-                    .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
-                    .replace("__LAYER_META_JSON__", layer_meta_json)
-                    .replace("__GEOJSON__", geojson_str))
+        window.triggerLayerDeletion = function(catKey) {
+            if (confirm(`Remove entire layer cluster: "${catKey}"?`)) { pts = pts.filter(p => p.type !== catKey); delete layerMeta[catKey]; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); }
+        };
 
-    st.components.v1.html(leaflet_html, height=850, scrolling=False)
+        map.on('contextmenu', function(e) {
+            const lat = e.latlng.lat; const lng = e.latlng.lng;
+            const menuHtml = `
+                <div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;">
+                    <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
+                </div>
+            `;
+            L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
+        });
+
+        renderTargetCenterIcon(); renderRadiusCircleBounds(); compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
+
+        if (pts.length > 0 && !__IS_STALE__) {
+            const validPts = pts.filter(p => p.visible !== false);
+            if (validPts.length > 0) { map.fitBounds(L.featureGroup([L.marker([__LAT__, __LON__]), ...validPts.map(p => L.marker([p.lat, p.lon]))]).getBounds().pad(0.05)); }
+        }
+    </script>
+</body>
+</html>
+"""
+
+leaflet_html = (leaflet_template
+                .replace("__LAT__", str(render_lat))
+                .replace("__LON__", str(render_lon))
+                .replace("__RADIUS__", str(radius_val))
+                .replace("__IS_STALE__", is_stale)
+                .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
+                .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
+                .replace("__TARGET_CONFIG_JSON__", target_config_json)
+                .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
+                .replace("__LAYER_META_JSON__", layer_meta_json)
+                .replace("__GEOJSON__", geojson_str))
+
+st.components.v1.html(leaflet_html, height=850, scrolling=False)
