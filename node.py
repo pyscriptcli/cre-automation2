@@ -122,6 +122,7 @@ if 'scanned_records' not in st.session_state: st.session_state.scanned_records =
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
+if 'cached_export_buffer' not in st.session_state: st.session_state.cached_export_buffer = None
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -301,12 +302,12 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 def execute_static_map_render():
     if not st.session_state.scanned_records:
-        st.error("No active data to export.")
         return
     try:
         import contextily as cx
         import geopandas as gpd
         from shapely.geometry import Point
+        from matplotlib.patches import Shadow
         
         pts = [p for p in st.session_state.scanned_records if p.get('visible', True)]
         cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
@@ -343,12 +344,16 @@ def execute_static_map_render():
             pt_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy([p['lon'] for p in cat_pts], [p['lat'] for p in cat_pts]), crs="EPSG:4326").to_crs(epsg=3857)
             
             if cat_style == 'modern-pin':
-                # Re-engineered high-resolution scatter mapping mimicking the custom drop-pin shape natively
-                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#0A1520', linewidths=0.5, s=cat_size*6, marker='o', alpha=0.9, label=category_type, zorder=5)
+                # Matplotlib implementation matching the drop shadow needle layout architecture 
+                # Shadow Offset Layer
+                ax.scatter(pt_gdf.geometry.x + (radius_val * 0.015), pt_gdf.geometry.y - (radius_val * 0.015), color='#000000', s=cat_size*6, marker='o', alpha=0.25, zorder=4)
+                # Outer Circle Ring Head Layer
+                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#0A1520', linewidths=0.6, s=cat_size*6, marker='o', alpha=1.0, label=category_type, zorder=5)
+                # Inner Target White Core Layer
                 ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color='#FFFFFF', s=cat_size*1.2, marker='o', alpha=1.0, zorder=6)
             else:
                 m_shape = 'o'
-                if cat_style == 'pin' or cat_style == 'teardrop': m_shape = '^'
+                if m_shape == 'pin': m_shape = '^'
                 ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#ffffff', s=cat_size*4, marker=m_shape, alpha=0.9, label=category_type, zorder=5)
         
         try: cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, zorder=1)
@@ -365,7 +370,7 @@ def execute_static_map_render():
         img_buf.seek(0)
         plt.close(fig)
         
-        st.session_state["cached_export_buffer"] = img_buf
+        st.session_state.cached_export_buffer = img_buf
     except Exception as e: st.error(f"Failed to generate canvas asset: {str(e)}")
 
 # -----------------------------------------------------------------------------
@@ -380,18 +385,18 @@ if sync_val:
         st.session_state.radius_config = bridge_state.get("radius_config", st.session_state.radius_config)
         st.session_state.scanned_records = bridge_state.get("pts", st.session_state.scanned_records)
         
-        if "trigger_export" in bridge_state and bridge_state["trigger_export"]:
+        if bridge_state.get("trigger_export", False):
             execute_static_map_render()
             
         st.session_state.hidden_sync_bridge = ""
         st.rerun()
     except Exception: pass
 
-if "cached_export_buffer" in st.session_state and st.session_state["cached_export_buffer"] is not None:
+if st.session_state.cached_export_buffer is not None:
     st.markdown("### Exported Map Frame Visualization")
-    st.image(st.session_state["cached_export_buffer"], caption="Export Map Output Visualization")
-    st.download_button(label="DOWNLOAD IMAGE AS PNG", data=st.session_state["cached_export_buffer"], file_name="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
-    st.session_state["cached_export_buffer"] = None
+    st.image(st.session_state.cached_export_buffer, caption="Export Map Output Visualization")
+    st.download_button(label="DOWNLOAD IMAGE AS PNG", data=st.session_state.cached_export_buffer, file_name="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
+    st.session_state.cached_export_buffer = None
 
 # -----------------------------------------------------------------------------
 # 6. ZERO-LATENCY MAP ARCHITECTURE FRAME RENDERING
@@ -500,7 +505,6 @@ leaflet_template = """
                 <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
                     <option value="dots">Dots</option>
                     <option value="pin">Pin Location</option>
-                    <option value="teardrop">Teardrop Marker</option>
                     <option value="modern-pin">Modern Drop-Pin</option>
                 </select>
                 <span>Size:</span>
@@ -613,34 +617,26 @@ leaflet_template = """
                     html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
                 });
-            } else if (styleMode === "teardrop") {
-                return L.divIcon({
-                    html: `<div style="display:flex; justify-content:center; align-items:center;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2.69c-4.42 0-8 3.58-8 8 0 5.25 8 10.62 8 10.62s8-5.37 8-10.62c0-4.42-3.58-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" fill="${color}" stroke="#ffffff" stroke-width="1.2"/></svg></div>`,
-                    className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3]
-                });
             } else if (styleMode === "modern-pin") {
-                // FIXED VECTOR GEOMETRY: True circular head, white core micro-dot, crisp slim-line needle stem, and real-time blurred backdrop shadow
                 const w = d * 1.5;
                 const h = d * 2.2;
+                // Integrated explicit SVG drop-shadow filter matrices to match report specification
                 const customSvg = `
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
                     <defs>
-                        <radialGradient id="shadow-${color.replace('#','')}" cx="50%" cy="50%" r="50%">
-                            <stop offset="0%" stop-color="#000000" stop-opacity="0.6"/>
-                            <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
-                        </radialGradient>
+                        <filter id="shadowFilter" x="-20%" y="-20%" width="150%" height="150%">
+                            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#002147" flood-opacity="0.35"/>
+                        </filter>
                     </defs>
-                    <ellipse cx="20" cy="56" rx="10" ry="3" fill="url(#shadow-${color.replace('#','')})" />
-                    
-                    <path d="M20 20 L20 56" stroke="${color}" stroke-width="3.5" stroke-linecap="round"/>
-                    <path d="M20 20 L20 56" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
-                    
-                    <circle cx="20" cy="20" r="14" fill="${color}" stroke="#0A1520" stroke-width="1.5" />
-                    
-                    <circle cx="20" cy="20" r="4.5" fill="#FFFFFF"/>
+                    <g filter="url(#shadowFilter)">
+                        <path d="M20 20 L20 52" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+                        <path d="M20 20 L20 52" stroke="#FFFFFF" stroke-width="1.0" stroke-linecap="round"/>
+                        <circle cx="20" cy="20" r="13" fill="${color}" stroke="#0A1520" stroke-width="1.2" />
+                        <circle cx="20" cy="20" r="4.2" fill="#FFFFFF"/>
+                    </g>
                 </svg>`;
                 return L.divIcon({
-                    html: `<div style="transform: translate(-50%, -93%); width: ${w}px; height: ${h}px;">${customSvg}</div>`,
+                    html: `<div style="transform: translate(-50%, -88%); width: ${w}px; height: ${h}px;">${customSvg}</div>`,
                     className: '', iconSize: [w, h], iconAnchor: [0, 0]
                 });
             }
@@ -744,7 +740,6 @@ leaflet_template = """
                                 <select onchange="triggerLayerUpdate('${catName}', 'style', this.value)">
                                     <option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option>
                                     <option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option>
-                                    <option value="teardrop" ${meta.style==='teardrop'?'selected':''}>Teardrop</option>
                                     <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
                                 </select>
                                 <input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
