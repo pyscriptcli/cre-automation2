@@ -334,17 +334,22 @@ def execute_static_map_render():
         for i, category_type in enumerate(unique_types):
             meta = st.session_state.layer_meta.get(category_type, {})
             cat_color = meta.get("color", cat_palette[i % len(cat_palette)])
-            cat_size = float(meta.get("size", st.session_state.global_marker_size)) * 4
+            cat_size = float(meta.get("size", st.session_state.global_marker_size))
             cat_style = meta.get("style", st.session_state.global_marker_style)
-            
-            m_shape = 'o'
-            if cat_style == 'pin' or cat_style == 'teardrop' or cat_style == 'modern-pin': m_shape = '^'
             
             cat_pts = [p for p in pts if p.get('type', 'Unclassified') == category_type]
             if not cat_pts: continue
             
             pt_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy([p['lon'] for p in cat_pts], [p['lat'] for p in cat_pts]), crs="EPSG:4326").to_crs(epsg=3857)
-            ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#ffffff', s=cat_size, marker=m_shape, alpha=0.9, label=category_type, zorder=5)
+            
+            if cat_style == 'modern-pin':
+                # Re-engineered high-resolution scatter mapping mimicking the custom drop-pin shape natively
+                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#0A1520', linewidths=0.5, s=cat_size*6, marker='o', alpha=0.9, label=category_type, zorder=5)
+                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color='#FFFFFF', s=cat_size*1.2, marker='o', alpha=1.0, zorder=6)
+            else:
+                m_shape = 'o'
+                if cat_style == 'pin' or cat_style == 'teardrop': m_shape = '^'
+                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#ffffff', s=cat_size*4, marker=m_shape, alpha=0.9, label=category_type, zorder=5)
         
         try: cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, zorder=1)
         except Exception: pass
@@ -382,12 +387,10 @@ if sync_val:
         st.rerun()
     except Exception: pass
 
-# DISPLAY PRE-RENDERED STATIC CAPTURED MAP OUTSIDE THE CONTROLLER BLOCK IF AVAILABLE
 if "cached_export_buffer" in st.session_state and st.session_state["cached_export_buffer"] is not None:
     st.markdown("### Exported Map Frame Visualization")
     st.image(st.session_state["cached_export_buffer"], caption="Export Map Output Visualization")
     st.download_button(label="DOWNLOAD IMAGE AS PNG", data=st.session_state["cached_export_buffer"], file_name="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
-    # Clear out structural cache after immediate layout draw to optimize system memory footprint
     st.session_state["cached_export_buffer"] = None
 
 # -----------------------------------------------------------------------------
@@ -459,7 +462,6 @@ leaflet_template = """
         .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
         .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
         
-        /* 50/50 Dual Split Button Grid Controls Layout CSS Class Structure Overrides */
         .split-button-matrix-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; border-top: 1px solid rgba(0,51,102,0.1); background:#f8fafc; }
         .workspace-action-btn-element { background:#003366; color:#fff; border:none; padding:8px 4px; border-radius:2px; font-family:Montserrat; font-weight:700; cursor:pointer; font-size:9px; letter-spacing:0.5px; box-shadow: 0 4px 12px rgba(0,51,102,0.1); transition: all 0.2s ease; text-transform: uppercase; text-align: center; }
         .workspace-action-btn-element:hover { background: #C9AB4C; }
@@ -502,7 +504,7 @@ leaflet_template = """
                     <option value="modern-pin">Modern Drop-Pin</option>
                 </select>
                 <span>Size:</span>
-                <input type="range" min="4" max="64" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
+                <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
             </div>
             <div class="config-flex-row">
                 <span>Color:</span>
@@ -617,22 +619,29 @@ leaflet_template = """
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3]
                 });
             } else if (styleMode === "modern-pin") {
-                // Injected High-Fidelity 3D Gradient Shadow Drop Pin with crisp centered micro-dot geometry 
+                // FIXED VECTOR GEOMETRY: True circular head, white core micro-dot, crisp slim-line needle stem, and real-time blurred backdrop shadow
+                const w = d * 1.5;
+                const h = d * 2.2;
                 const customSvg = `
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 42" width="${d * 1.5}" height="${d * 1.95}">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
                     <defs>
                         <radialGradient id="shadow-${color.replace('#','')}" cx="50%" cy="50%" r="50%">
                             <stop offset="0%" stop-color="#000000" stop-opacity="0.6"/>
                             <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
                         </radialGradient>
                     </defs>
-                    <ellipse cx="16" cy="38" rx="8" ry="2.5" fill="url(#shadow-${color.replace('#','')})" />
-                    <path d="M16 2C8.3 2 2 8.3 2 16c0 11 14 24 14 24s14-13 14-24c0-7.7-6.3-14-14-14z" fill="${color}" stroke="#0A1520" stroke-width="1.2" stroke-linejoin="round"/>
-                    <circle cx="16" cy="16" r="4.2" fill="#FFFFFF"/>
+                    <ellipse cx="20" cy="56" rx="10" ry="3" fill="url(#shadow-${color.replace('#','')})" />
+                    
+                    <path d="M20 20 L20 56" stroke="${color}" stroke-width="3.5" stroke-linecap="round"/>
+                    <path d="M20 20 L20 56" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+                    
+                    <circle cx="20" cy="20" r="14" fill="${color}" stroke="#0A1520" stroke-width="1.5" />
+                    
+                    <circle cx="20" cy="20" r="4.5" fill="#FFFFFF"/>
                 </svg>`;
                 return L.divIcon({
-                    html: `<div style="transform: translate(-50%, -85%); width: ${d * 1.5}px;">${customSvg}</div>`,
-                    className: '', iconSize: [d * 1.5, d * 1.95], iconAnchor: [0, 0]
+                    html: `<div style="transform: translate(-50%, -93%); width: ${w}px; height: ${h}px;">${customSvg}</div>`,
+                    className: '', iconSize: [w, h], iconAnchor: [0, 0]
                 });
             }
             return L.divIcon({ 
@@ -738,7 +747,7 @@ leaflet_template = """
                                     <option value="teardrop" ${meta.style==='teardrop'?'selected':''}>Teardrop</option>
                                     <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
                                 </select>
-                                <input type="range" min="4" max="64" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
+                                <input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
                                 <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
                             </div>
                         </div>
