@@ -93,7 +93,11 @@ st.markdown("""
         .stCheckbox label p { font-size: 10px !important; font-weight: 500 !important; color: var(--brand-midnight) !important; display: inline-block !important; margin: 0 !important; line-height: 1.2 !important; }
         div[data-baseweb="checkbox"] { align-self: center !important; }
         
-        /* Enforce Navy Blue (#003366) on all active/checked state primitives */
+        /* Enforce Navy Blue (#003366) on all active/checked state primitives explicitly */
+        div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
+            background-color: #003366 !important;
+            border-color: #003366 !important;
+        }
         div[data-baseweb="checkbox"] input:checked + div, 
         div[data-baseweb="checkbox"] div[aria-checked="true"],
         div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] > div { 
@@ -103,6 +107,9 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
+
+        /* Hide the programmatic sync bridge input payload */
+        input[aria-label="hidden_sync_bridge"], [data-testid="stTextInput"]:has(input[aria-label="hidden_sync_bridge"]) { display: none !important; height: 0px !important; margin: 0px !important; padding: 0px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -197,7 +204,7 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
-    # Core Data Gathering Pipeline Architecture (OSMnx with fixed lowercase post fallback request method)
+    # Core Data Gathering Pipeline Architecture
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -242,7 +249,7 @@ with st.sidebar:
                     success = True
             except Exception: pass
 
-            # SECONDARY FALLOVER ENGINE: Overpass Turbo API (Corrected case format)
+            # SECONDARY FALLOVER ENGINE: Overpass Turbo API (Fixed .post() syntax method routing)
             if not success:
                 url = "https://overpass-api.de/api/interpreter"
                 statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
@@ -278,7 +285,7 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
-    # EXPORT PICTURE MAP GENERATOR WITH COORDS VECTOR STYLING
+    # EXPORT PICTURE MAP GENERATOR (With Fixed PyPlot RGBA Parameters and file_name mapping)
     if st.button("EXPORT PICTURE", type="secondary", use_container_width=True):
         if not st.session_state.scanned_records:
             st.error("No active data to export.")
@@ -333,7 +340,7 @@ with st.sidebar:
                 ax.set_ylim(ymin - (radius_val*0.1), ymax + (radius_val*0.1))
                 ax.axis('off')
                 
-                # BUGFIX: Converted RGBA string format to valid PyPlot Tuple Format array.
+                # BUGFIX: Fixed Matplotlib formatting string exception utilizing a standard PyPlot 4-tuple RGBA mapping
                 ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor=(0.0, 0.2, 0.4, 0.1), fontsize=7)
                 
                 img_buf = io.BytesIO()
@@ -342,7 +349,9 @@ with st.sidebar:
                 plt.close(fig)
                 
                 st.image(img_buf, caption="Export Map Output Visualization")
-                st.download_button(label="DOWNLOAD IMAGE AS PNG", data=img_buf, fileName="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
+                
+                # BUGFIX: File name assignment string parameter fixed natively.
+                st.download_button(label="DOWNLOAD IMAGE AS PNG", data=img_buf, file_name="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
             except Exception as e: st.error(f"Failed to generate canvas asset: {str(e)}")
 
     col1, col2 = st.columns(2)
@@ -364,41 +373,20 @@ with st.sidebar:
                 except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# 4. MUTATION SIGNAL INTERCEPT MATRIX
+# 4. JS <-> PYTHON SECURE STATE SYNC BRIDGE 
 # -----------------------------------------------------------------------------
-if 'runtime_action' in st.session_state:
-    action = st.session_state.runtime_action
-    if action.get("type") == "delete_poi":
-        st.session_state.scanned_records = [p for p in st.session_state.scanned_records if p.get('uid') != action["uid"]]
-        del st.session_state.runtime_action
+sync_val = st.text_input("hidden_sync_bridge", key="hidden_sync_bridge", label_visibility="collapsed")
+if sync_val:
+    try:
+        bridge_state = json.loads(sync_val)
+        st.session_state.layer_meta = bridge_state.get("layer_meta", st.session_state.layer_meta)
+        st.session_state.target_config = bridge_state.get("target_config", st.session_state.target_config)
+        st.session_state.radius_config = bridge_state.get("radius_config", st.session_state.radius_config)
+        st.session_state.scanned_records = bridge_state.get("pts", st.session_state.scanned_records)
+        # Wipe structural bridge string securely to prevent continuous reload execution loop
+        st.session_state.hidden_sync_bridge = ""
         st.rerun()
-    elif action.get("type") == "toggle_poi":
-        for p in st.session_state.scanned_records:
-            if p.get('uid') == action["uid"]: p['visible'] = not p.get('visible', True)
-        del st.session_state.runtime_action
-        st.rerun()
-    elif action.get("type") == "rename_poi":
-        for p in st.session_state.scanned_records:
-            if p.get('uid') == action["uid"]: p['name'] = action["new_name"]
-        del st.session_state.runtime_action
-        st.rerun()
-    elif action.get("type") == "delete_layer":
-        st.session_state.scanned_records = [p for p in st.session_state.scanned_records if p.get('type') != action["layer_key"]]
-        if action["layer_key"] in st.session_state.layer_meta: del st.session_state.layer_meta[action["layer_key"]]
-        del st.session_state.runtime_action
-        st.rerun()
-    elif action.get("type") == "toggle_layer":
-        for p in st.session_state.scanned_records:
-            if p.get('type') == action["layer_key"]: p['visible'] = action["visible"]
-        del st.session_state.runtime_action
-        st.rerun()
-    elif action.get("type") == "rename_layer":
-        for p in st.session_state.scanned_records:
-            if p.get('type') == action["old_key"]: p['type'] = action["new_key"]
-        if action["old_key"] in st.session_state.layer_meta:
-            st.session_state.layer_meta[action["new_key"]] = st.session_state.layer_meta.pop(action["old_key"])
-        del st.session_state.runtime_action
-        st.rerun()
+    except Exception: pass
 
 # -----------------------------------------------------------------------------
 # 5. ZERO-LATENCY MAP ARCHITECTURE FRAME RENDERING
@@ -442,7 +430,7 @@ leaflet_template = """
             box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); 
         }
         .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
-        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 8px; }
+        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; }
         .layer-category-block { border-bottom: 1px solid #f0f0f0; }
         .layer-category-header { background: #ffffff; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
         .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
@@ -479,7 +467,7 @@ leaflet_template = """
             <span id="results-count" style="color:#C9AB4C;">0</span>
         </div>
         
-        <div class="config-block-wrapper" style="border-bottom: 2px solid #C9AB4C;">
+        <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
             <div class="config-headline">Basemap Controller</div>
             <div class="config-flex-row">
                 <span>Tile Style:</span>
@@ -542,10 +530,15 @@ leaflet_template = """
         </div>
         
         <div class="results-list" id="results-list-box"></div>
+        
+        <div style="padding: 10px; border-top: 1px solid rgba(0,51,102,0.1); background:#f8fafc; text-align:center;">
+            <button id="sync-bridge-btn" onclick="pushStateToPythonBridge()" style="width:100%; background:#003366; color:#fff; border:none; padding:8px; border-radius:2px; font-family:Montserrat; font-weight:700; cursor:pointer; font-size:10px; letter-spacing:1px; box-shadow: 0 4px 12px rgba(0,51,102,0.1); transition: background 0.2s;">SYNC EDITS FOR EXPORT</button>
+            <div style="font-size:8px; color:#888780; margin-top:6px; font-weight: 600;">Push changes to Python before clicking Export Picture.</div>
+        </div>
     </div>
 
     <script>
-        // Zoom Controls strictly disabled via Leaflet constructor override rules
+        // STRICT REQUIREMENTS: Zoom Controls strictly disabled via Leaflet constructor override rules
         const map = L.map('map', { 
             zoomControl: false, 
             attributionControl: false, 
@@ -647,6 +640,27 @@ leaflet_template = """
             });
         }
 
+        // Bridge Execution Mapping Hook Function
+        window.pushStateToPythonBridge = function() {
+            try {
+                const payload = { layer_meta: layerMeta, target_config: targetConfig, radius_config: radiusConfig, pts: pts };
+                const parentDoc = window.parent.document;
+                
+                const hiddenInput = parentDoc.querySelector('input[aria-label="hidden_sync_bridge"]');
+                if (hiddenInput) {
+                    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                    valueSetter.call(hiddenInput, JSON.stringify(payload));
+                    hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    
+                    // Flash UX verification sequence onto button safely
+                    const btn = document.getElementById('sync-bridge-btn');
+                    btn.innerText = "SYNCED ✓";
+                    btn.style.backgroundColor = "#C9AB4C";
+                    setTimeout(() => { btn.innerText = "SYNC EDITS FOR EXPORT"; btn.style.backgroundColor = "#003366"; }, 1500);
+                }
+            } catch(e) { console.warn("Bridge deployment failed", e); }
+        };
+
         window.patchGlobalMarkerStyle = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].style = v); compileLayersAndRenderPoints(); };
         window.patchGlobalMarkerSize = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v)); compileLayersAndRenderPoints(); };
         window.patchGlobalMarkerColor = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].color = v); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
@@ -725,7 +739,6 @@ leaflet_template = """
         window.removePoiInstance = function(uid, catKey) { pts = pts.filter(item => item.uid !== uid); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) { pts.forEach(p => { if (p.type === catKey) p.visible = !currentlyVisible; }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
 
-        // Layer renaming function fires strictly when pencil icon context is invoked
         window.promptRenameLayer = function(oldKey) {
             const newKey = prompt("Rename layer designation path description:", oldKey);
             if (newKey && newKey.trim() !== "" && newKey !== oldKey) {
@@ -740,7 +753,7 @@ leaflet_template = """
         };
 
         // --- GLOBAL GEOSPATIAL RIGHT-CLICK CONTEXT OPTIONS INTERFACE ---
-        // Silent payload execution block to securely clear popups and alerts on text copying actions
+        // Silent payload execution block to securely format exact Google Street View standard URLs
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
             const menuHtml = `
@@ -748,7 +761,7 @@ leaflet_template = """
                     <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div>
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div>
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
