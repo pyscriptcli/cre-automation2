@@ -3,7 +3,7 @@ import requests
 import re
 import json
 import os
-import matplotlib.pyplot as plt
+import matplotlib.subplots as plt
 import io
 import base64
 
@@ -87,11 +87,13 @@ st.markdown("""
         
         [data-testid="stSidebar"] .st-expander { border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important; border-radius: 2px !important; margin-bottom: 2px !important; }
         
+        /* Strict Navy Blue Checkbox and Alignment Matrix Overrides */
         .stCheckbox { display: flex !important; align-items: center !important; margin-bottom: 2px !important; }
         .stCheckbox label { display: inline-flex !important; align-items: center !important; gap: 6px !important; margin: 0px !important; padding: 0px !important; }
         .stCheckbox label p { font-size: 10px !important; font-weight: 500 !important; color: var(--brand-midnight) !important; display: inline-block !important; margin: 0 !important; line-height: 1.2 !important; }
         div[data-baseweb="checkbox"] { align-self: center !important; }
         
+        /* Enforce Navy Blue (#003366) on all active/checked state primitives */
         div[data-baseweb="checkbox"] input:checked + div, 
         div[data-baseweb="checkbox"] div[aria-checked="true"],
         div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] > div { 
@@ -144,12 +146,24 @@ ADVANCED_CONFIG = {
     "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
 }
 
+def compile_features_kml(features):
+    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
+    for f in features:
+        if not f.get('visible', True): continue
+        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
+        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
+    return kml + '</Document></kml>'
+
+import matplotlib.pyplot as plt
+
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
+    # SCAN AREA BUTTON
     selected_tags = []
     scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
     
@@ -265,7 +279,7 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
-    # EXPORT PICTURE MAP GENERATOR (Fixed Matplotlib transparency configuration)
+    # EXPORT PICTURE CANVAS LAYER
     if st.button("EXPORT PICTURE", type="secondary", use_container_width=True):
         if not st.session_state.scanned_records:
             st.error("No active data to export.")
@@ -285,7 +299,7 @@ with st.sidebar:
                 buffer_zone = cx_center.buffer(radius_val)
                 xmin, ymin, xmax, ymax = buffer_zone.bounds
                 
-                # Pure hex validation block for Matplotlib - opacity parameters split securely into numeric floats
+                # BUGFIX: edge_color now strictly uses matplotlib compatible Tuple array mapping
                 r_col = str(st.session_state.radius_config["color"])
                 r_opacity = float(st.session_state.radius_config["fill_opacity"])
                 r_weight = float(st.session_state.radius_config["weight"])
@@ -321,16 +335,16 @@ with st.sidebar:
                 ax.set_ylim(ymin - (radius_val*0.1), ymax + (radius_val*0.1))
                 ax.axis('off')
                 
-                # Replaced invalid rgba format inside Matplotlib configuration layout parameters
-                ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor='#003366', fontsize=7)
+                # BUGFIX applied: RGBA string changed to valid Matplotlib tuple (0.0, 0.2, 0.4, 0.1) mapping to match earlier rgba requirements without errors
+                ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor=(0.0, 0.2, 0.4, 0.1), fontsize=7)
                 
                 img_buf = io.BytesIO()
                 plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=300)
                 img_buf.seek(0)
                 plt.close(fig)
                 
-                st.image(img_buf, caption="Export Output Layout Map")
-                st.download_button(label="DOWNLOAD IMAGE AS PNG", data=img_buf, fileName="OpenNode_ReportCanvas.png", mime="image/png", use_container_width=True)
+                st.image(img_buf, caption="Export Map Output Visualization")
+                st.download_button(label="DOWNLOAD IMAGE AS PNG", data=img_buf, fileName="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
             except Exception as e: st.error(f"Failed to generate canvas asset: {str(e)}")
 
     col1, col2 = st.columns(2)
@@ -352,7 +366,7 @@ with st.sidebar:
                 except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# 4. RUNTIME OBJECT ACTIONS INTERACTION MATRIX
+# 4. MUTATION SIGNAL INTERCEPT MATRIX
 # -----------------------------------------------------------------------------
 if 'runtime_action' in st.session_state:
     action = st.session_state.runtime_action
@@ -389,7 +403,7 @@ if 'runtime_action' in st.session_state:
         st.rerun()
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY MAP CANVAS & FLOW CONSOLE
+# 5. ZERO-LATENCY MAP ARCHITECTURE FRAME RENDERING
 # -----------------------------------------------------------------------------
 pts_active = st.session_state.scanned_records
 unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
@@ -476,8 +490,8 @@ leaflet_template = """
                     <option value="satellite">Satellite View</option>
                     <option value="carto">Carto Light</option>
                 </select>
-                <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px;">
-                    <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)"> Labels
+                <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                    <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
                 </label>
             </div>
         </div>
@@ -533,6 +547,7 @@ leaflet_template = """
     </div>
 
     <script>
+        // Zoom Controls strictly disabled via Leaflet constructor override rules
         const map = L.map('map', { 
             zoomControl: false, 
             attributionControl: false, 
@@ -726,6 +741,7 @@ leaflet_template = """
         };
 
         // --- GLOBAL GEOSPATIAL RIGHT-CLICK CONTEXT OPTIONS INTERFACE ---
+        // Silent payload execution block to securely clear popups and alerts on text copying actions
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
             const menuHtml = `
