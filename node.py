@@ -87,7 +87,6 @@ st.markdown("""
         
         [data-testid="stSidebar"] .st-expander { border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important; border-radius: 2px !important; margin-bottom: 2px !important; }
         
-        /* Navy Blue Checkbox and Alignment Matrix Overrides */
         .stCheckbox { display: flex !important; align-items: center !important; margin-bottom: 2px !important; }
         .stCheckbox label { display: inline-flex !important; align-items: center !important; gap: 6px !important; margin: 0px !important; padding: 0px !important; }
         .stCheckbox label p { font-size: 10px !important; font-weight: 500 !important; color: var(--brand-midnight) !important; display: inline-block !important; margin: 0 !important; line-height: 1.2 !important; }
@@ -100,7 +99,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE & DATA CONFIGURATIONS
+# 2. STATE PERSISTENCE & SYSTEM STORAGE
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
@@ -154,7 +153,6 @@ def compile_features_kml(features):
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
-    # SCAN AREA BUTTON (Repositioned at absolute top of parameters layout)
     selected_tags = []
     scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
     
@@ -190,7 +188,6 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
-    # Core Geoprocessing Pipeline execution block triggered from top button sequence
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -198,7 +195,7 @@ with st.sidebar:
             records = []
             success = False
             
-            # PRIMARY: OSMnx Engine Loader execution
+            # PRIMARY ENGINE: OSMnx
             try:
                 import osmnx as ox
                 tags_dict = {}
@@ -235,13 +232,13 @@ with st.sidebar:
                     success = True
             except Exception: pass
 
-            # SECONDARY: Overpass Turbo API Fallover
+            # SECONDARY FALLOVER: Overpass Turbo
             if not success:
                 url = "https://overpass-api.de/api/interpreter"
                 statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
                 ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
                 try:
-                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
+                    res = requests.POST(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
                     if res.status_code == 200:
                         for el in res.json().get('elements', []):
                             e_lat = el.get('lat') or el.get('center', {}).get('lat')
@@ -271,7 +268,7 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
-    # 4. REPORT PICTURE EXPORT ARCHITECTURE
+    # EXPORT PICTURE CANVAS LAYER
     if st.button("EXPORT PICTURE", type="secondary", use_container_width=True):
         if not st.session_state.scanned_records:
             st.error("No active data to export.")
@@ -291,7 +288,8 @@ with st.sidebar:
                 buffer_zone = cx_center.buffer(radius_val)
                 xmin, ymin, xmax, ymax = buffer_zone.bounds
                 
-                r_col = st.session_state.radius_config["color"]
+                # Canvas Rendering Bugfix: Replaces string layout conversion models with pure hex mappings directly
+                r_col = str(st.session_state.radius_config["color"])
                 r_opacity = float(st.session_state.radius_config["fill_opacity"])
                 r_weight = float(st.session_state.radius_config["weight"])
                 
@@ -299,7 +297,7 @@ with st.sidebar:
                 ax.add_patch(circle_patch)
                 
                 t_size = float(st.session_state.target_config["size"]) * 4
-                t_col = st.session_state.target_config["color"]
+                t_col = str(st.session_state.target_config["color"])
                 t_marker = '*' if st.session_state.target_config["style"] == "star" else 'o'
                 ax.scatter([cx_center.x], [cx_center.y], color=t_col, edgecolors='#ffffff', s=t_size, marker=t_marker, zorder=10)
                 
@@ -311,7 +309,7 @@ with st.sidebar:
                     cat_style = meta.get("style", st.session_state.global_marker_style)
                     
                     m_shape = 'o'
-                    if cat_style == 'teardrop': m_shape = '^'
+                    if cat_style == 'teardrop' or cat_style == 'pin': m_shape = '^'
                     
                     cat_pts = [p for p in pts if p.get('type', 'Unclassified') == category_type]
                     if not cat_pts: continue
@@ -332,7 +330,7 @@ with st.sidebar:
                 img_buf.seek(0)
                 plt.close(fig)
                 
-                st.image(img_buf, caption="Export Output Map Preview")
+                st.image(img_buf, caption="Export Map Output Visualization")
                 st.download_button(label="DOWNLOAD IMAGE AS PNG", data=img_buf, fileName="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
             except Exception as e: st.error(f"Failed to generate canvas asset: {str(e)}")
 
@@ -341,7 +339,7 @@ with st.sidebar:
     with col2: st.download_button("KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# 4. DATA SYNCHRONIZATION TRIGGER HANDLERS
+# 4. RUNTIME STORAGE ACTION LAYER SYNC
 # -----------------------------------------------------------------------------
 if 'runtime_action' in st.session_state:
     action = st.session_state.runtime_action
@@ -411,17 +409,6 @@ leaflet_template = """
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map { height: 100vh; width: 100%; }
-        
-        #minimal-basemap-panel {
-            position: absolute; top: 10px; left: 54px; z-index: 1000;
-            background: #ffffff; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); padding: 4px;
-            display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
-        }
-        #minimal-basemap-panel select {
-            border: none; border-bottom: 1px solid #f0f0f0; padding: 4px; font-size: 10px; font-weight: 700;
-            color: #003366; background: transparent; outline: none; cursor: pointer; text-transform: uppercase;
-        }
-        .minimal-label { font-size: 9px; font-weight: 700; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #003366; text-transform: uppercase; margin: 0; }
 
         #scan-results-panel { 
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; 
@@ -440,7 +427,6 @@ leaflet_template = """
         .results-item { padding: 4px 8px 4px 16px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
         .results-item:hover { background: #ffffff; color: #003366; }
         
-        /* Minimal Icon controls mapping utilities replacing raw text descriptors cleanly */
         .action-icon-trigger { cursor: pointer; padding: 2px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 2px; transition: all 0.15s; }
         .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
         .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
@@ -461,22 +447,26 @@ leaflet_template = """
 </head>
 <body>
     <div id="map"></div>
-    
-    <div id="minimal-basemap-panel">
-        <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
-            <option value="osm">OSM</option>
-            <option value="satellite">Satellite</option>
-            <option value="carto">Carto Light</option>
-        </select>
-        <label class="minimal-label" for="label-toggle-chk">
-            <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)"> Labels
-        </label>
-    </div>
 
     <div id="scan-results-panel">
         <div class="results-header">
             <span>WORKSPACE</span>
             <span id="results-count" style="color:#C9AB4C;">0</span>
+        </div>
+        
+        <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
+            <div class="config-headline">Basemap Controller</div>
+            <div class="config-flex-row">
+                <span>Tile Style:</span>
+                <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
+                    <option value="osm">OpenStreetMap</option>
+                    <option value="satellite">Satellite View</option>
+                    <option value="carto">Carto Light</option>
+                </select>
+                <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px;">
+                    <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)"> Labels
+                </label>
+            </div>
         </div>
         
         <div class="config-block-wrapper">
@@ -530,8 +520,12 @@ leaflet_template = """
     </div>
 
     <script>
-        const map = L.map('map', { zoomControl: true, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
-        map.zoomControl.setPosition('topleft');
+        // Zoom Controls strictly disabled via Leaflet constructor override rules
+        const map = L.map('map', { 
+            zoomControl: false, 
+            attributionControl: false, 
+            preferCanvas: true 
+        }).setView([__LAT__, __LON__], 14);
 
         let layerMeta = __LAYER_META_JSON__;
         let targetConfig = __TARGET_CONFIG_JSON__;
@@ -582,7 +576,6 @@ leaflet_template = """
             }).addTo(map);
         }
 
-        // Custom Teardrop SVG Marker rendering factory cleanly matching requirements configuration
         const generateMarkerElement = (color, styleMode, sizeDimension) => {
             const d = parseInt(sizeDimension);
             if (styleMode === "pin") {
@@ -591,7 +584,6 @@ leaflet_template = """
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
                 });
             } else if (styleMode === "teardrop") {
-                // High fidelity vector teardrop canvas representation matching specific asset styles
                 return L.divIcon({
                     html: `<div style="display:flex; justify-content:center; align-items:center;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2.69c-4.42 0-8 3.58-8 8 0 5.25 8 10.62 8 10.62s8-5.37 8-10.62c0-4.42-3.58-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" fill="${color}" stroke="#ffffff" stroke-width="1.2"/></svg></div>`,
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3]
@@ -637,7 +629,6 @@ leaflet_template = """
         window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderRadiusCircleBounds(); };
         window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
 
-        // Rebuild workspace list dashboard view utilizing micro icon matrices cleanly instead of text fields
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box');
             document.getElementById('results-count').innerText = pts.length;
@@ -653,6 +644,7 @@ leaflet_template = """
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
+                // Requirements Update: Only style inputs (Dropdown, slider, colorpicker) displayed under master loop headers
                 htmlPayload += `
                     <div class="layer-category-block" id="cat-block-${catName}">
                         <div class="layer-category-header">
@@ -684,7 +676,7 @@ leaflet_template = """
                     const itemVisible = p.visible !== false;
                     htmlPayload += `
                     <div class="results-item" id="res-item-${p.uid}" style="${itemVisible ? '' : 'opacity:0.4;'}">
-                        <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;" title="${p.name || 'Unknown'}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
+                        <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
                             ${p.name || 'Unknown'}
                         </div>
                         <div style="display:flex; align-items:center; gap:1px;">
@@ -705,12 +697,13 @@ leaflet_template = """
         };
 
         window.togglePoiVisibility = function(uid) { const p = pts.find(item => item.uid === uid); if (p) { p.visible = (p.visible === false); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
-        window.promptRenamePoi = function(uid, oldName) { const newName = prompt("Rename asset:", oldName); if (newName && newName.trim() !== "") { const p = pts.find(item => item.uid === uid); if (p) { p.name = newName; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } } };
+        window.promptRenamePoi = function(uid, oldName) { const newName = prompt("Rename asset description Name:", oldName); if (newName && newName.trim() !== "") { const p = pts.find(item => item.uid === uid); if (p) { p.name = newName; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } } };
         window.removePoiInstance = function(uid, catKey) { pts = pts.filter(item => item.uid !== uid); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) { pts.forEach(p => { if (p.type === catKey) p.visible = !currentlyVisible; }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
 
+        // Layer renaming function fires strictly when pencil icon context is invoked
         window.promptRenameLayer = function(oldKey) {
-            const newKey = prompt("Rename Category:", oldKey);
+            const newKey = prompt("Rename layer designation path description:", oldKey);
             if (newKey && newKey.trim() !== "" && newKey !== oldKey) {
                 pts.forEach(p => { if (p.type === oldKey) p.type = newKey; });
                 if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; }
@@ -721,6 +714,21 @@ leaflet_template = """
         window.triggerLayerDeletion = function(catKey) {
             if (confirm(`Remove entire layer cluster: "${catKey}"?`)) { pts = pts.filter(p => p.type !== catKey); delete layerMeta[catKey]; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); }
         };
+
+        // --- GLOBAL GEOSPATIAL RIGHT-CLICK CONTEXT OPTIONS INTERFACE ---
+        map.on('contextmenu', function(e) {
+            const lat = e.latlng.lat; const lng = e.latlng.lng;
+            const coordStr = lat.toFixed(5) + ", " + lng.toFixed(5);
+            const menuHtml = `
+                <div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;">
+                    <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${coordStr}'); alert('Coordinates copied: ' + '${coordStr}');">Copy Coordinates</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank');">Open in Google Maps</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}', '_blank');">Open in Streetview</div>
+                </div>
+            `;
+            L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
+        });
 
         renderTargetCenterIcon(); renderRadiusCircleBounds(); compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
 
