@@ -78,6 +78,8 @@ st.markdown("""
         
         div.stDownloadButton > button { background-color: var(--brand-midnight) !important; border: none !important; border-radius: 2px !important; width: 100% !important; padding: 4px !important; }
         div.stDownloadButton > button:hover { background-color: var(--brand-gold) !important; }
+        div.stDownloadButton > button:disabled { background-color: #e2e8f0 !important; border-color: #cbd5e1 !important; cursor: not-allowed !important; }
+        div.stDownloadButton > button:disabled p { color: #94a3b8 !important; }
         
         div.stButton > button[kind="primary"] { background: transparent !important; border: none !important; color: var(--text-muted) !important; padding: 0 !important; margin-top: 2px; }
         div.stButton > button[kind="primary"] p { color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600; text-transform: uppercase; }
@@ -102,6 +104,12 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
+
+        /* Structural Scanning Area HUD Animations */
+        .scan-loader-box { border: 1px solid rgba(201, 171, 76, 0.3); padding: 8px; border-radius: 2px; background: #fffdf7; display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+        .scan-spinner { width: 12px; height: 12px; border: 2px solid rgba(0, 51, 102, 0.1); border-top-color: var(--brand-midnight); border-radius: 50%; animation: spinCycle 0.75s linear infinite; }
+        @keyframes spinCycle { to { transform: rotate(360deg); } }
+        .scan-loader-text { font-size: 9px; font-weight: 700; color: var(--brand-midnight); letter-spacing: 0.5px; text-transform: uppercase; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -117,7 +125,7 @@ if 'scanned_records' not in st.session_state: st.session_state.scanned_records =
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
-if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {} # Frontend cluster reference trackers
+if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {} 
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -150,8 +158,8 @@ def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
+        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
@@ -200,6 +208,14 @@ with st.sidebar:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
         else:
+            # Inline brand-compliant loading box allocation
+            loader_placeholder = st.markdown("""
+                <div class="scan-loader-box">
+                    <div class="scan-spinner"></div>
+                    <div class="scan-loader-text">Initiating Scanning Area...</div>
+                </div>
+            """, unsafe_allow_html=True)
+            
             records = []
             success = False
             
@@ -262,6 +278,7 @@ with st.sidebar:
                         success = True
                 except Exception: pass
             
+            loader_placeholder.empty()
             if success: st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -275,9 +292,18 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
+    # Export Guard Matrix Formulation (Prevents empty asset processing)
     col1, col2 = st.columns(2)
-    with col1: st.download_button("RADIUS", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
-    with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+    if st.session_state.scanned_records:
+        with col1: 
+            st.download_button("RADIUS", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
+        with col2: 
+            st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+    else:
+        with col1: 
+            st.button("RADIUS", disabled=True, use_container_width=True, key="dis_btn_radius", help="Scan area to parse exports.")
+        with col2: 
+            st.button("MARKERS", disabled=True, use_container_width=True, key="dis_btn_markers", help="Scan area to parse exports.")
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
@@ -362,7 +388,6 @@ leaflet_template = """
         .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
         .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
 
-        /* Dynamic Cluster Custom Layout Component Styles */
         .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 4px; border-bottom: 1px solid rgba(0,51,102,0.08); }
         .group-cluster-header { background: #e2e8f0; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
         .group-cluster-title { font-size: 9px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
@@ -471,7 +496,7 @@ leaflet_template = """
         let targetConfig = __TARGET_CONFIG_JSON__;
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
-        let clusters = {}; // Local memory persistence map for group definitions
+        let clusters = {}; 
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
@@ -579,7 +604,6 @@ leaflet_template = """
             });
         }
 
-        // --- DYNAMIC CLUSTERING ENGINE FUNCTIONS ---
         window.openClusterModalWindow = function() {
             const container = document.getElementById('cluster-checkbox-target-mount');
             container.innerHTML = '';
@@ -650,7 +674,6 @@ leaflet_template = """
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
             const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
 
-            // Render Dynamic Groups first if available
             Object.keys(clusters).forEach(clusterName => {
                 const assignedLayers = clusters[clusterName] || [];
                 let aggregatedCount = 0;
@@ -679,7 +702,6 @@ leaflet_template = """
                         <div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 8px; background: rgba(0,0,0,0.02);">
                 `;
 
-                // Nest matching category elements inside the operational cluster block view loop
                 assignedLayers.forEach(catName => {
                     if(!categoryMap[catName]) return;
                     const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
@@ -692,9 +714,7 @@ leaflet_template = """
                 htmlPayload += '</div></div>';
             });
 
-            // Render remaining isolated layers
             Object.keys(categoryMap).forEach(catName => {
-                // Check if layer belongs to an existing compiled group layer cluster structure
                 let insideClusterGroup = false;
                 Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
                 if (insideClusterGroup) return;
@@ -774,7 +794,6 @@ leaflet_template = """
                 pts.forEach(p => { if (p.type === oldKey) p.type = newKey; });
                 if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; }
                 
-                // Update bindings inside custom clusters maps cleanly
                 Object.keys(clusters).forEach(cName => {
                     clusters[cName] = clusters[cName].map(item => item === oldKey ? newKey : item);
                 });
