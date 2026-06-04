@@ -6,19 +6,6 @@ import os
 import matplotlib.pyplot as plt
 import io
 import base64
-from PIL import Image, ImageDraw, ImageOps
-import numpy as np
-
-# Try importing OSMnx and Contextily safely
-try:
-    import osmnx as ox
-except ImportError:
-    ox = None
-
-try:
-    import contextily as cx
-except ImportError:
-    cx = None
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
@@ -29,7 +16,7 @@ if not os.path.exists(_config_file):
         f.write("[theme]\nbase=\"light\"\n")
 
 # -----------------------------------------------------------------------------
-# 1. BRANDED BICHROMATIC THEME & TRUE FULL SCREEN OVERRIDES
+# 1. BRANDED THEME & STRUCTURAL FULL OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Open Node",
@@ -45,7 +32,6 @@ st.markdown("""
         :root {
             --brand-midnight: #003366 !important;
             --brand-gold: #C9AB4C !important;
-            --brand-dark: #001F3F !important;
             --white-clean: #ffffff !important;
             --bg-offwhite: #f8fafc !important;
             --text-muted: #888780 !important;
@@ -80,10 +66,6 @@ st.markdown("""
             font-family: 'Montserrat', sans-serif !important;
         }
         
-        .material-symbols-rounded, span[class*="material-symbols"] {
-            font-family: 'Material Symbols Rounded' !important; font-weight: normal !important; font-style: normal !important; font-size: 18px !important; line-height: 1 !important; letter-spacing: normal !important; text-transform: none !important; display: inline-block !important; white-space: nowrap !important; word-wrap: normal !important; direction: ltr !important;
-        }
-        
         [data-testid="stHeader"], header, #stDecoration { display: none !important; }
         
         [data-testid="stAppViewContainer"] { display: flex !important; flex-direction: row !important; width: 100vw !important; height: 100vh !important; overflow: hidden !important; }
@@ -91,39 +73,28 @@ st.markdown("""
         .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer { padding: 0px !important; margin: 0px !important; max-width: 100% !important; gap: 0rem !important; }
         iframe { height: 100vh !important; width: 100% !important; border: none !important; display: block !important; }
         
-        [data-testid="stSidebarUserContent"] {
-            padding-top: 12px !important; padding-left: 12px !important; padding-right: 12px !important; height: 100vh !important; overflow-y: auto !important; overflow-x: hidden !important;
-        }
-        
         div[data-baseweb="input"], div[data-baseweb="select"] { background-color: transparent !important; border: none !important; border-bottom: 1px solid rgba(201, 171, 76, 0.5) !important; border-radius: 0px !important; box-shadow: none !important; }
-        div[data-baseweb="input"]:focus-within { border-bottom: 2px solid var(--brand-gold) !important; }
         
-        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button { background-color: var(--brand-midnight) !important; border: 1px solid var(--brand-midnight) !important; border-radius: 2px !important; width: 100% !important; padding: 4px !important; box-shadow: var(--soft-shadow) !important; transition: all 0.3s ease !important; }
+        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button { background-color: var(--brand-midnight) !important; border: 1px solid var(--brand-midnight) !important; border-radius: 2px !important; width: 100% !important; padding: 4px !important; box-shadow: var(--soft-shadow) !important; }
         div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover { background-color: var(--brand-gold) !important; border-color: var(--brand-gold) !important; }
         div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p { color: var(--white-clean) !important; font-weight: 700 !important; font-size: 9px !important; text-transform: uppercase !important; letter-spacing: 1px; }
         
         div.stDownloadButton > button { background-color: var(--brand-midnight) !important; border: none !important; border-radius: 2px !important; width: 100% !important; padding: 4px !important; }
         div.stDownloadButton > button:hover { background-color: var(--brand-gold) !important; }
         
-        div.stButton > button[kind="primary"] { background: transparent !important; border: none !important; color: var(--text-muted) !important; box-shadow: none !important; padding: 0 !important; margin-top: 2px; display: inline-flex; }
-        div.stButton > button[kind="primary"] p { color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600 !important; text-decoration: none !important; text-transform: uppercase; }
-        div.stButton > button[kind="primary"]:hover p { color: #AA2E20 !important; }
+        div.stButton > button[kind="primary"] { background: transparent !important; border: none !important; color: var(--text-muted) !important; padding: 0 !important; margin-top: 2px; }
+        div.stButton > button[kind="primary"] p { color: var(--text-muted) !important; font-size: 9px !important; font-weight: 600; text-transform: uppercase; }
         
-        [data-testid="stSidebar"] .st-expander { border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important; border-radius: 2px !important; margin-bottom: 2px !important; overflow: hidden !important; }
-        [data-testid="stSidebar"] .st-expander summary p { font-size: 5px !important; font-weight: 500 !important; }
+        [data-testid="stSidebar"] .st-expander { border: 1px solid rgba(0, 51, 102, 0.05) !important; background-color: var(--white-clean) !important; border-radius: 2px !important; margin-bottom: 2px !important; }
         .stCheckbox label p { font-size: 10px !important; font-weight: 500 !important; }
         
-        div[data-baseweb="checkbox"] input:checked + div, div[data-baseweb="checkbox"] div[aria-checked="true"] { background-color: var(--brand-midnight) !important; border-color: var(--brand-midnight) !important; }
-        
-        .stDeployButton, footer { display:none !important; }
-        
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 15px; }
-        .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; letter-spacing: 0.5px; color: var(--text-muted) !important; }
+        .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE & DATA MODELS
+# 2. STATE PERSISTENCE & SYSTEM CACHING
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
@@ -133,27 +104,14 @@ if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_R
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
-
-# Global layer configurations map cache
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 
-# Target Center coordinate config model
 if 'target_config' not in st.session_state:
-    st.session_state.target_config = {
-        "size": 24,
-        "color": "#003366",
-        "style": "star"
-    }
+    st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
 
-# Radius styling configurations mapping
 if 'radius_config' not in st.session_state:
-    st.session_state.radius_config = {
-        "color": "#003366",
-        "fill_opacity": 0.08,
-        "weight": 1.5
-    }
+    st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
 
-# Global workspace configuration engine keys
 if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "dots"
 if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
@@ -209,13 +167,13 @@ def build_tags_dict_or_list(tags_list):
     return parsed
 
 # -----------------------------------------------------------------------------
-# 3. SIDEBAR WORKSPACE & PRIMARY GEOPROCESSING
+# 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
-    # Dual-purpose location tracking variable setup
-    location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input", label_visibility="visible")
+    # 1. Coordinates and Placement UI Boundaries
+    location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
     st.session_state.geo_radius = radius_val
 
@@ -224,32 +182,10 @@ with st.sidebar:
         lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
         st.session_state.geo_coords = location_input
     else:
-        if location_input and location_input != st.session_state.get('last_geocoded_query', ''):
-            with st.spinner("Locating via OpenStreetMap..."):
-                try:
-                    headers = {'User-Agent': 'OpenNode/3.1'}
-                    osm_url = f"https://nominatim.openstreetmap.org/search?q={location_input}&format=json&limit=1"
-                    resp = requests.get(osm_url, headers=headers, timeout=10).json()
-                    if resp:
-                        new_lat = float(resp[0]['lat'])
-                        new_lon = float(resp[0]['lon'])
-                        st.session_state.geo_coords = f"{new_lat:.5f}, {new_lon:.5f}"
-                        st.session_state.last_geocoded_query = location_input
-                        st.rerun()
-                    else:
-                        st.error("Location not found.")
-                        lat_coord, lon_coord = 14.5995, 120.9842 
-                except Exception:
-                    st.error("API Error: Nominatim Timeout")
-                    lat_coord, lon_coord = 14.5995, 120.9842
-        else:
-            fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-            if fallback_match:
-                lat_coord, lon_coord = float(fallback_match.group(1)), float(fallback_match.group(2))
-            else:
-                lat_coord, lon_coord = 14.5995, 120.9842
+        fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+        lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
 
-    # Standard Button flow directly nested after coordinates mapping context
+    # 2. Tag Parameters Parsing Workflow
     selected_tags = []
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
@@ -263,9 +199,7 @@ with st.sidebar:
                     if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
 
     st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
-    adv_container = st.container()
-    
-    with adv_container:
+    with st.container():
         for cat_name, node_items in ADVANCED_CONFIG.items():
             matched = [item for item in node_items if search_query in item[0].lower()]
             if matched:
@@ -275,7 +209,7 @@ with st.sidebar:
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # SCAN AREA ACTION BUTTON
+    # 3. SCAN AREA ACTION BUTTON
     if st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn"):
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -283,66 +217,68 @@ with st.sidebar:
             records = []
             success = False
             
-            if ox is not None:
-                with st.spinner("Extracting nodes via OSMnx..."):
-                    try:
-                        tags_dict = build_tags_dict_or_list(selected_tags)
-                        gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
-                        if not gdf.empty:
-                            for idx, row in gdf.iterrows():
-                                if hasattr(row.geometry, 'centroid'):
-                                    c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
-                                else:
-                                    continue
-                                name = row.get('name', 'Unknown')
-                                if isinstance(name, float): name = 'Unknown'
-                                matched_type = 'Node'
-                                for k in tags_dict.keys():
-                                    if k in row and row[k]:
-                                        matched_type = str(row[k])
-                                        break
-                                records.append({
-                                    "lat": c_lat, 
-                                    "lon": c_lon, 
-                                    "name": str(name), 
-                                    "type": matched_type,
-                                    "visible": True,
-                                    "uid": len(records)
-                                })
-                            st.session_state.scanned_records = records
-                            st.session_state.last_scan_lat = lat_coord
-                            st.session_state.last_scan_lon = lon_coord
-                            success = True
-                    except Exception:
-                        pass
+            # PRIMARY ENGINE: OSMnx (Optimized spatial boundary loading)
+            try:
+                import osmnx as ox
+                import geopandas as gpd
+                from shapely.geometry import Point
+                
+                tags_dict = build_tags_dict_or_list(selected_tags)
+                # Fetch spatial parameters using high performance center point locks
+                gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
+                if not gdf.empty:
+                    for idx, row in gdf.iterrows():
+                        if hasattr(row.geometry, 'centroid'):
+                            c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
+                        else:
+                            continue
+                        name = row.get('name', 'Unknown')
+                        if isinstance(name, float): name = 'Unknown'
+                        
+                        matched_type = 'Node'
+                        for k in tags_dict.keys():
+                            if k in row and row[k]:
+                                matched_type = str(row[k])
+                                break
+                        
+                        records.append({
+                            "lat": c_lat, "lon": c_lon, 
+                            "name": str(name), "type": matched_type,
+                            "visible": True, "uid": len(records)
+                        })
+                    st.session_state.scanned_records = records
+                    st.session_state.last_scan_lat = lat_coord
+                    st.session_state.last_scan_lon = lon_coord
+                    success = True
+            except Exception:
+                pass
 
+            # SECONDARY FALLOVER ENGINE: Overpass Turbo API
             if not success:
                 url = "https://overpass-api.de/api/interpreter"
                 statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
                 ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
-                with st.spinner("Extracting nodes via Overpass Fallover..."):
-                    try:
-                        res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=100)
-                        if res.status_code == 200:
-                            for el in res.json().get('elements', []):
-                                e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                                e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                                if e_lat and e_lon:
-                                    tags = el.get('tags', {})
-                                    records.append({
-                                        "lat": e_lat, 
-                                        "lon": e_lon, 
-                                        "name": tags.get('name', 'Unknown'), 
-                                        "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                                        "visible": True,
-                                        "uid": len(records)
-                                    })
-                            st.session_state.scanned_records = records
-                            st.session_state.last_scan_lat = lat_coord
-                            st.session_state.last_scan_lon = lon_coord
-                            success = True
-                    except Exception as e:
-                        st.error("Timeout")
+                try:
+                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
+                    if res.status_code == 200:
+                        for el in res.json().get('elements', []):
+                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
+                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
+                            if e_lat and e_lon:
+                                tags = el.get('tags', {})
+                                records.append({
+                                    "lat": e_lat, "lon": e_lon, 
+                                    "name": tags.get('name', 'Unknown'), 
+                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
+                                    "visible": True, "uid": len(records)
+                                })
+                        st.session_state.scanned_records = records
+                        st.session_state.last_scan_lat = lat_coord
+                        st.session_state.last_scan_lon = lon_coord
+                        success = True
+                except Exception:
+                    st.error("Data fetch timeout or connection failure.")
+            
             if success:
                 st.rerun()
 
@@ -350,114 +286,96 @@ with st.sidebar:
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         for key in list(st.session_state.keys()):
-            if key.startswith("chk_"):
-                st.session_state[key] = False
+            if key.startswith("chk_"): st.session_state[key] = False
         st.rerun()
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
-    # EXPORT PICTURE ACTION WORKSPACE
+    # 4. REPORT PICTURE EXPORT
     if st.button("EXPORT PICTURE", type="secondary", use_container_width=True):
         if not st.session_state.scanned_records:
-            st.error("No data available to export.")
-        elif cx is None:
-            st.error("Contextily package is required for rendering background maps.")
+            st.error("No active data to export.")
         else:
-            with st.spinner("Generating report visualization canvas..."):
+            try:
+                import contextily as cx
+                import geopandas as gpd
+                from shapely.geometry import Point
+                
+                pts = [p for p in st.session_state.scanned_records if p.get('visible', True)]
+                cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
+                
+                fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
+                
+                center_gdf = gpd.GeoDataFrame(geometry=[Point(lon_coord, lat_coord)], crs="EPSG:4326").to_crs(epsg=3857)
+                cx_center = center_gdf.geometry.iloc[0]
+                
+                buffer_zone = cx_center.buffer(radius_val)
+                xmin, ymin, xmax, ymax = buffer_zone.bounds
+                
+                # Dynamic Radius Render Fix: Enforces clean float matching for radius opacity parameters
+                r_col = st.session_state.radius_config["color"]
+                r_opacity = float(st.session_state.radius_config["fill_opacity"])
+                r_weight = float(st.session_state.radius_config["weight"])
+                
+                circle_patch = plt.Circle((cx_center.x, cx_center.y), radius_val, fill=True, facecolor=r_col, alpha=r_opacity, edgecolor=r_col, linewidth=r_weight, zorder=2)
+                ax.add_patch(circle_patch)
+                
+                # Target Center Anchor Render Layer
+                t_size = float(st.session_state.target_config["size"]) * 4
+                t_col = st.session_state.target_config["color"]
+                t_style = st.session_state.target_config["style"]
+                t_marker = '*' if t_style == "star" else 'o'
+                ax.scatter([cx_center.x], [cx_center.y], color=t_col, edgecolors='#ffffff', s=t_size, marker=t_marker, label='Target Center', zorder=10)
+                
+                # POI Point Clusters Layer Distribution
+                unique_types = list(set([p.get('type', 'Unclassified') for p in pts]))
+                for i, category_type in enumerate(unique_types):
+                    meta = st.session_state.layer_meta.get(category_type, {})
+                    cat_color = meta.get("color", cat_palette[i % len(cat_palette)])
+                    cat_size = float(meta.get("size", st.session_state.global_marker_size)) * 4
+                    cat_style = meta.get("style", st.session_state.global_marker_style)
+                    
+                    m_shape = 'o'
+                    if cat_style == 'pin': m_shape = '^'
+                    elif cat_style == '1pin': m_shape = 's'
+                    
+                    cat_pts = [p for p in pts if p.get('type', 'Unclassified') == category_type]
+                    if not cat_pts: continue
+                    
+                    lon_vals = [p['lon'] for p in cat_pts]
+                    lat_vals = [p['lat'] for p in cat_pts]
+                    
+                    pt_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy(lon_vals, lat_vals), crs="EPSG:4326").to_crs(epsg=3857)
+                    ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#ffffff', s=cat_size, marker=m_shape, alpha=0.9, label=category_type, zorder=5)
+                
                 try:
-                    pts = [p for p in st.session_state.scanned_records if p.get('visible', True)]
-                    cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
-                    
-                    fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
-                    
-                    import geopandas as gpd
-                    from shapely.geometry import Point
-                    
-                    center_gdf = gpd.GeoDataFrame(geometry=[Point(lon_coord, lat_coord)], crs="EPSG:4326")
-                    center_gdf = center_gdf.to_crs(epsg=3857)
-                    cx_center = center_gdf.geometry.iloc[0]
-                    
-                    buffer_zone = cx_center.buffer(radius_val)
-                    xmin, ymin, xmax, ymax = buffer_zone.bounds
-                    
-                    # Custom Matplotlib parsing fix for rgba string format error mismatch
-                    r_col = st.session_state.radius_config["color"]
-                    r_opacity = float(st.session_state.radius_config["fill_opacity"])
-                    r_weight = float(st.session_state.radius_config["weight"])
-                    
-                    circle_patch = plt.Circle((cx_center.x, cx_center.y), radius_val, fill=True, facecolor=r_col, alpha=r_opacity, edgecolor=r_col, linewidth=r_weight, zorder=2)
-                    ax.add_patch(circle_patch)
-                    
-                    # Add Target custom point safely matching global criteria parameters
-                    t_size = float(st.session_state.target_config["size"]) * 4
-                    t_col = st.session_state.target_config["color"]
-                    t_style = st.session_state.target_config["style"]
-                    t_marker = '*' if t_style == "star" else 'o'
-                    
-                    ax.scatter([cx_center.x], [cx_center.y], color=t_col, edgecolors='#ffffff', s=t_size, marker=t_marker, label='Target Center', zorder=10)
-                    
-                    # Gather and process group layer sets mapping points coordinates accurately
-                    unique_types = list(set([p.get('type', 'Unclassified') for p in pts]))
-                    for i, category_type in enumerate(unique_types):
-                        meta = st.session_state.layer_meta.get(category_type, {})
-                        cat_color = meta.get("color", cat_palette[i % len(cat_palette)])
-                        cat_size = float(meta.get("size", st.session_state.global_marker_size)) * 4
-                        cat_style = meta.get("style", st.session_state.global_marker_style)
-                        
-                        m_shape = 'o'
-                        if cat_style == 'pin': m_shape = '^'
-                        elif cat_style == '1pin': m_shape = 's'
-                        
-                        cat_pts = [p for p in pts if p.get('type', 'Unclassified') == category_type]
-                        if not cat_pts: continue
-                        
-                        lon_vals = [p['lon'] for p in cat_pts]
-                        lat_vals = [p['lat'] for p in cat_pts]
-                        
-                        pt_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy(lon_vals, lat_vals), crs="EPSG:4326").to_crs(epsg=3857)
-                        ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#ffffff', s=cat_size, marker=m_shape, alpha=0.9, label=category_type, zorder=5)
-                    
                     cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, zorder=1)
-                    
-                    ax.set_xlim(xmin - (radius_val*0.1), xmax + (radius_val*0.1))
-                    ax.set_ylim(ymin - (radius_val*0.1), ymax + (radius_val*0.1))
-                    ax.axis('off')
-                    
-                    ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor='rgba(0, 51, 102, 0.1)', fontsize=7, title="Open Node Legend", title_fontsize=8)
-                    plt.title("OPEN NODE - TRADE AREA SCAN", fontsize=12, fontweight='bold', pad=10, color='#003366', fontname='sans-serif')
-                    
-                    img_buf = io.BytesIO()
-                    plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=300)
-                    img_buf.seek(0)
-                    plt.close(fig)
-                    
-                    st.image(img_buf, caption="Generated Export Asset View")
-                    st.download_button(label="DOWNLOAD PNG IMAGE", data=img_buf, fileName="OpenNode_Canvas.png", mime="image/png", use_container_width=True)
-                except Exception as export_error:
-                    st.error(f"Failed to compile asset layout mapping image: {str(export_error)}")
+                except Exception:
+                    pass
+                
+                ax.set_xlim(xmin - (radius_val*0.1), xmax + (radius_val*0.1))
+                ax.set_ylim(ymin - (radius_val*0.1), ymax + (radius_val*0.1))
+                ax.axis('off')
+                
+                ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor='rgba(0, 51, 102, 0.1)', fontsize=7, title="Open Node Legend", title_fontsize=8)
+                
+                img_buf = io.BytesIO()
+                plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=300)
+                img_buf.seek(0)
+                plt.close(fig)
+                
+                st.image(img_buf, caption="Export Output Layout")
+                st.download_button(label="DOWNLOAD IMAGE AS PNG", data=img_buf, fileName="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
+            except Exception as export_error:
+                st.error(f"Failed to generate layout mapping: {str(export_error)}")
 
     col1, col2 = st.columns(2)
-    with col1:
-        st.download_button("JSON", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
-    with col2:
-        st.download_button("KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+    with col1: st.download_button("JSON", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
+    with col2: st.download_button("KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-
-    with st.popover("IMPORT FILE", use_container_width=True):
-        imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
-        if imported_file is not None:
-            if st.button("LOAD", type="secondary", use_container_width=True):
-                try:
-                    data = json.load(imported_file)
-                    st.session_state.scanned_records = data.get("scanned_records", data)
-                    st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
-                    st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
-                    st.rerun()
-                except Exception:
-                    st.error("Invalid File")
-
-# Process runtime mutations from search result sidebar UI inputs
+# -----------------------------------------------------------------------------
+# 4. DATA MODEL INTEGRITY & SCRIPT SYNC CHANNELS
+# -----------------------------------------------------------------------------
 if 'runtime_action' in st.session_state:
     action = st.session_state.runtime_action
     if action.get("type") == "delete_poi":
@@ -466,41 +384,35 @@ if 'runtime_action' in st.session_state:
         st.rerun()
     elif action.get("type") == "toggle_poi":
         for p in st.session_state.scanned_records:
-            if p.get('uid') == action["uid"]:
-                p['visible'] = not p.get('visible', True)
+            if p.get('uid') == action["uid"]: p['visible'] = not p.get('visible', True)
         del st.session_state.runtime_action
         st.rerun()
     elif action.get("type") == "rename_poi":
         for p in st.session_state.scanned_records:
-            if p.get('uid') == action["uid"]:
-                p['name'] = action["new_name"]
+            if p.get('uid') == action["uid"]: p['name'] = action["new_name"]
         del st.session_state.runtime_action
         st.rerun()
     elif action.get("type") == "delete_layer":
         st.session_state.scanned_records = [p for p in st.session_state.scanned_records if p.get('type') != action["layer_key"]]
-        if action["layer_key"] in st.session_state.layer_meta:
-            del st.session_state.layer_meta[action["layer_key"]]
+        if action["layer_key"] in st.session_state.layer_meta: del st.session_state.layer_meta[action["layer_key"]]
         del st.session_state.runtime_action
         st.rerun()
     elif action.get("type") == "toggle_layer":
         for p in st.session_state.scanned_records:
-            if p.get('type') == action["layer_key"]:
-                p['visible'] = action["visible"]
+            if p.get('type') == action["layer_key"]: p['visible'] = action["visible"]
         del st.session_state.runtime_action
         st.rerun()
     elif action.get("type") == "rename_layer":
         for p in st.session_state.scanned_records:
-            if p.get('type') == action["old_key"]:
-                p['type'] = action["new_key"]
+            if p.get('type') == action["old_key"]: p['type'] = action["new_key"]
         if action["old_key"] in st.session_state.layer_meta:
             st.session_state.layer_meta[action["new_key"]] = st.session_state.layer_meta.pop(action["old_key"])
         del st.session_state.runtime_action
         st.rerun()
 
 # -----------------------------------------------------------------------------
-# 4. ZERO-LATENCY SPATIAL CANVAS (FULL-BLEED SPLIT VIEW)
+# 5. SPLIT-VIEW REALTIME CANVAS PARSING METER
 # -----------------------------------------------------------------------------
-# Re-index unique layers for rendering dynamically
 pts_active = st.session_state.scanned_records
 unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
 cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
@@ -513,7 +425,7 @@ for idx, layer in enumerate(unique_layers):
             "size": st.session_state.global_marker_size
         }
 
-# Inject configurations tracking payload
+# Structural parameters injection configuration maps
 layer_meta_json = json.dumps(st.session_state.layer_meta)
 target_config_json = json.dumps(st.session_state.target_config)
 radius_config_json = json.dumps(st.session_state.radius_config)
@@ -550,12 +462,7 @@ leaflet_template = """
             width: 100%; padding: 8px 12px; border: 1px solid rgba(0, 51, 102, 0.1); border-radius: 4px; background-clip: padding-box;
             font-size: 11px; font-family: 'Montserrat', sans-serif; font-weight: 600; color: #003366; background: #ffffff; outline: none; box-sizing: border-box; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
         }
-        #map-search:focus { border-bottom: 2px solid #C9AB4C; }
-        #search-results { position: absolute; top: 38px; left: 0; width: 100%; background: #ffffff; border-radius: 2px; display: none; max-height: 250px; overflow-x: hidden; overflow-y: auto; border: 1px solid rgba(0, 51, 102, 0.1); box-sizing: border-box; z-index: 1001; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
-        .search-item { padding: 8px 12px; font-size: 10px; font-weight: 600; cursor: pointer; border-bottom: 1px solid #f8fafc; color: #003366; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .search-item:hover { background: #f8fafc; color: #C9AB4C; }
 
-        /* Ensure Sidebar panel fits perfectly within layout boundaries without covering manage app elements */
         #scan-results-panel { 
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; 
             max-height: calc(100vh - 80px); border-radius: 2px; border: 1px solid rgba(0, 51, 102, 0.1); 
@@ -585,10 +492,8 @@ leaflet_template = """
         .leaflet-control-custom-stack { background: #fff; border: 2px solid rgba(0,0,0,0.2); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
         .leaflet-control-custom-stack a { display: flex !important; align-items: center; justify-content: center; background: #fff; text-decoration: none; width: 34px; height: 34px; border-bottom: 1px solid #ccc; cursor: pointer;}
         .leaflet-control-custom-stack a:last-child { border-bottom: none; }
-        .leaflet-control-custom-stack a:hover { background: #f4f4f4; }
         .custom-pin-container { display: flex; align-items: center; justify-content: center; }
         
-        /* Configuration UI elements */
         .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
         .config-headline { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
         .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 600; color: #003366; gap: 6px; }
@@ -666,9 +571,9 @@ leaflet_template = """
             </div>
             <div class="config-flex-row">
                 <span>Opacity:</span>
-                <input type="range" min="0" max="1" step="0.05" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
+                <input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" id="radius-opacity-slider" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
                 <span>Thickness:</span>
-                <input type="range" min="1" max="10" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)">
+                <input type="range" min="1" max="10" step="0.5" value="1.5" class="slider-control-element" id="radius-weight-slider" oninput="patchRadiusLayerConfig('weight', this.value)">
             </div>
         </div>
         
@@ -676,26 +581,26 @@ leaflet_template = """
     </div>
 
     <script>
-        const map = L.map('map', { zoomControl: true, attributionControl: false }).setView([__LAT__, __LON__], 14);
+        // Set up map canvas with preferential hardware rendering parameters enabled
+        const map = L.map('map', { 
+            zoomControl: true, 
+            attributionControl: false,
+            preferCanvas: true 
+        }).setView([__LAT__, __LON__], 14);
         map.zoomControl.setPosition('topleft');
 
-        // Parse custom configuration arrays dynamically
         let layerMeta = __LAYER_META_JSON__;
         let targetConfig = __TARGET_CONFIG_JSON__;
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
 
-        // MAP SEARCH LOGIC WITH NOMINATIM TYPEAHEAD
+        // Optimized Nominatim Search Hook
         let searchTimeout = null;
         function handleSearch(e) {
             clearTimeout(searchTimeout);
             const query = e.target.value;
             const resultsDiv = document.getElementById('search-results');
-            
-            if (query.length < 3) {
-                resultsDiv.style.display = 'none';
-                return;
-            }
+            if (query.length < 3) { resultsDiv.style.display = 'none'; return; }
             
             searchTimeout = setTimeout(() => {
                 fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`)
@@ -707,7 +612,6 @@ leaflet_template = """
                                 const div = document.createElement('div');
                                 div.className = 'search-item';
                                 div.innerText = item.display_name;
-                                div.title = item.display_name;
                                 div.onclick = () => {
                                     map.flyTo([item.lat, item.lon], 16);
                                     resultsDiv.style.display = 'none';
@@ -716,12 +620,9 @@ leaflet_template = """
                                 resultsDiv.appendChild(div);
                             });
                             resultsDiv.style.display = 'block';
-                        } else {
-                            resultsDiv.style.display = 'none';
-                        }
-                    })
-                    .catch(err => console.error(err));
-            }, 500);
+                        } else { resultsDiv.style.display = 'none'; }
+                    }).catch(err => console.error(err));
+            }, 400);
         }
 
         document.addEventListener('click', function(e) {
@@ -736,11 +637,10 @@ leaflet_template = """
             const shareIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="#003366"><path d="M720-80q-50 0-85-35t-35-85q0-7 1-14.5t3-13.5L322-392q-17 15-38 23.5t-44 8.5q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 44 8.5t38 23.5l282-164q-2-6-2.5-13.5T600-760q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-44-8.5T638-672L356-508q2 6 2.5 13.5t.5 14.5q0 7-.5 14.5T356-452l282 164q17-15 38-23.5t44-8.5q50 0 85 35t35 85q0 50-35 85t-85 35Z"/></svg>`;
             const layersIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="m116-435 364-199 364 199-364 199-364-199Zm0 157 364 199 364-199-47-26-317 173-317-173-47 26Zm364-257 267-146-267-146-267 146 267 146Z"/></svg>`;
             const saveIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill="#003366"><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM480-240q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/></svg>`;
-
             div.innerHTML = `
-                <a title="Copy View-Only Link" onclick="generateShareLink(event)">${shareIcon}</a>
+                <a title="Copy Link" onclick="generateShareLink(event)">${shareIcon}</a>
                 <a title="Toggle Layers" onclick="toggleLayerMenu(event)">${layersIcon}</a>
-                <a title="Save Project Settings" onclick="saveProjectSettings(event)">${saveIcon}</a>
+                <a title="Save Settings" onclick="saveProjectSettings(event)">${saveIcon}</a>
             `;
             return div;
         };
@@ -748,9 +648,9 @@ leaflet_template = """
 
         function generateShareLink(e) {
             e.preventDefault();
-            const baseUrl = (window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) ? window.location.ancestorOrigins[0] : window.location.origin + window.location.pathname;
-            const link = baseUrl + "?c=__LAT__,__LON__&r=__RADIUS__";
-            navigator.clipboard.writeText(link).then(() => { alert("View-only coordinates link copied!"); });
+            const baseUrl = window.location.origin + window.location.pathname;
+            navigator.clipboard.writeText(baseUrl + "?c=__LAT__,__LON__&r=__RADIUS__");
+            alert("Coordinates shared link copied!");
         }
 
         function toggleLayerMenu(e) {
@@ -761,10 +661,9 @@ leaflet_template = """
 
         function saveProjectSettings(e) {
             e.preventDefault();
-            const projectData = { coords: "__LAT__, __LON__", radius: __RADIUS__, scanned_records: pts };
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData));
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ coords: "__LAT__, __LON__", radius: __RADIUS__, scanned_records: pts }));
             const a = document.createElement('a'); a.href = dataStr; a.download = 'OpenNode_Workspace.json';
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            document.body.appendChild(a); a.click(); a.remove();
         }
         
         const basemaps = {
@@ -772,78 +671,74 @@ leaflet_template = """
             satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
             carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
         };
-        
-        let activeBasemapKey = localStorage.getItem('ts_persistent_basemap') || 'osm';
-        if (!basemaps[activeBasemapKey]) activeBasemapKey = 'osm';
-        document.getElementById('basemap-select').value = activeBasemapKey;
-        basemaps[activeBasemapKey].addTo(map);
+        basemaps[(localStorage.getItem('ts_persistent_basemap') || 'osm')].addTo(map);
         
         function switchActiveBasemap(targetKey) {
-            map.removeLayer(basemaps[activeBasemapKey]);
-            basemaps[targetKey].addTo(map); activeBasemapKey = targetKey;
+            Object.keys(basemaps).forEach(k => { if(map.hasLayer(basemaps[k])) map.removeLayer(basemaps[k]); });
+            basemaps[targetKey].addTo(map);
             localStorage.setItem('ts_persistent_basemap', targetKey);
         }
-        
-        let labelsActive = localStorage.getItem('ts_persistent_labels') !== 'false';
-        document.getElementById('label-toggle-chk').checked = labelsActive;
-        if (!labelsActive) document.getElementById('map').classList.add('hide-labels');
-        
-        function toggleLabelsMatrix(isShown) {
-            if (isShown) document.getElementById('map').classList.remove('hide-labels');
-            else document.getElementById('map').classList.add('hide-labels');
-            localStorage.setItem('ts_persistent_labels', isShown);
-        }
-        
-        // Target Coordinates Pin with strict maximum layout zIndex override matching requirement criteria
-        let centerMarker = null;
-        function renderTargetCenterIcon() {
-            if (centerMarker) map.removeLayer(centerMarker);
-            const d = targetConfig.size;
-            const c = targetConfig.color;
-            const s = targetConfig.style;
-            
-            let htmlElement = "";
-            if (s === "star") {
-                htmlElement = `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">★</div>`;
-            } else {
-                htmlElement = `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
-            }
-            
-            const starIcon = L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] });
-            centerMarker = L.marker([__LAT__, __LON__], { icon: starIcon, zIndexOffset: 999999 }).addTo(map);
-        }
-        
+
+        // --- RADIUS LAYER CONTEXT FIX ---
+        // Opacity mapping assignment matches explicit layout configurations
         let radiusCircle = null;
         function renderRadiusCircleBounds() {
             if (radiusCircle) map.removeLayer(radiusCircle);
+            
+            const parsedFillOpacity = parseFloat(radiusConfig.fill_opacity);
+            
             radiusCircle = L.circle([__LAT__, __LON__], {
                 radius: __RADIUS__,
                 color: radiusConfig.color,
                 weight: parseFloat(radiusConfig.weight),
                 fillColor: radiusConfig.color,
-                fillOpacity: parseFloat(radiusConfig.fillOpacity)
+                fillOpacity: parsedFillOpacity
+            }).addTo(map);
+            
+            document.getElementById('radius-opacity-slider').value = parsedFillOpacity;
+            document.getElementById('radius-weight-slider').value = parseFloat(radiusConfig.weight);
+        }
+
+        let centerMarker = null;
+        function renderTargetCenterIcon() {
+            if (centerMarker) map.removeLayer(centerMarker);
+            const d = targetConfig.size; const c = targetConfig.color;
+            const htmlElement = targetConfig.style === "star" 
+                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">★</div>`
+                : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
+            
+            centerMarker = L.marker([__LAT__, __LON__], { 
+                icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), 
+                zIndexOffset: 999999 
             }).addTo(map);
         }
 
-        // Global marker generators mapping layer specifications
         const generateMarkerElement = (color, styleMode, sizeDimension) => {
-            const currentDiameter = parseInt(sizeDimension);
+            const d = parseInt(sizeDimension);
             if (styleMode === "pin") {
-                const pinSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${currentDiameter*1.4}" height="${currentDiameter*1.4}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`;
-                return L.divIcon({ html: `<div class="custom-pin-container">${pinSvg}</div>`, className: '', iconSize: [currentDiameter*1.4, currentDiameter*1.4], iconAnchor: [currentDiameter*0.7, currentDiameter*1.4] });
+                return L.divIcon({ 
+                    html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.4}" height="${d*1.4}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
+                    className: '', iconSize: [d*1.4, d*1.4], iconAnchor: [d*0.7, d*1.4] 
+                });
             } else if (styleMode === "1pin") {
-                return L.divIcon({ html: `<div style="background-color: #AA2E20; width: ${currentDiameter}px; height: ${currentDiameter}px; border-radius: 50%; border: 2px solid ${color}; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;"><div style="width:4px; height:4px; background:#fff; border-radius:50%;"></div></div>`, className: '', iconSize: [currentDiameter, currentDiameter], iconAnchor: [currentDiameter/2, currentDiameter/2] });
-            } else {
-                return L.divIcon({ html: `<div style="background-color: ${color}; width: ${currentDiameter}px; height: ${currentDiameter}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, className: '', iconSize: [currentDiameter, currentDiameter], iconAnchor: [currentDiameter/2, currentDiameter/2] });
+                return L.divIcon({ 
+                    html: `<div style="background-color: #AA2E20; width: ${d}px; height: ${d}px; border-radius: 50%; border: 2px solid ${color}; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;"><div style="width:4px; height:4px; background:#fff; border-radius:50%;"></div></div>`, 
+                    className: '', iconSize: [d, d], iconAnchor: [d/2, d/2] 
+                });
             }
+            return L.divIcon({ 
+                html: `<div style="background-color: ${color}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, 
+                className: '', iconSize: [d, d], iconAnchor: [d/2, d/2] 
+            });
         };
 
         const layerGroupsRef = {};
         const categoryMap = {};
 
+        // Optimized batch point render engine context execution
         function compileLayersAndRenderPoints() {
-            // Reset existing layer references
-            Object.keys(layerGroupsRef).forEach(k => map.removeLayer(layerGroupsRef[k]));
+            Object.keys(layerGroupsRef).forEach(k => { map.removeLayer(layerGroupsRef[k]); delete layerGroupsRef[k]; });
+            Object.keys(categoryMap).forEach(k => delete categoryMap[k]);
             
             pts.forEach(p => {
                 const layerKey = p.type || 'Unclassified';
@@ -857,66 +752,27 @@ leaflet_template = """
                 
                 categoryMap[key].forEach(p => {
                     if (p.visible === false) return;
-                    const catPin = generateMarkerElement(meta.color, meta.style, meta.size);
-                    const marker = L.marker([p.lat, p.lon], { icon: catPin })
-                                    .bindPopup("<b style='color:#003366; font-family:Montserrat;'>" + p.name + "</b><br><span style='color:#888780; font-size:9px;'>" + p.type + "</span>");
+                    const marker = L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) })
+                                    .bindPopup(`<b>${p.name}</b><br><span style="color:#888780;font-size:9px;">${p.type}</span>`);
                     if (p.name && p.name !== 'Unknown') {
                         marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -10], className: 'poi-text-label' });
                     }
-                    p._marker = marker;
                     marker.addTo(layerGroupsRef[key]);
                 });
             });
         }
 
-        // Live mutation config set callbacks
-        window.patchGlobalMarkerStyle = function(v) {
-            Object.keys(layerMeta).forEach(k => layerMeta[k].style = v);
-            compileLayersAndRenderPoints();
-        };
-        window.patchGlobalMarkerSize = function(v) {
-            Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v));
-            compileLayersAndRenderPoints();
-        };
-        window.patchGlobalMarkerColor = function(v) {
-            Object.keys(layerMeta).forEach(k => layerMeta[k].color = v);
-            compileLayersAndRenderPoints();
-            rebuildSidebarControlLayout();
-        };
-        window.patchTargetCenterConfig = function(key, val) {
-            targetConfig[key] = val;
-            renderTargetCenterIcon();
-        };
-        window.patchRadiusLayerConfig = function(key, val) {
-            radiusConfig[key] = val;
-            renderRadiusCircleBounds();
-        };
+        window.patchGlobalMarkerStyle = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].style = v); compileLayersAndRenderPoints(); };
+        window.patchGlobalMarkerSize = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v)); compileLayersAndRenderPoints(); };
+        window.patchGlobalMarkerColor = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].color = v); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
+        window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
+        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderRadiusCircleBounds(); };
+        window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
 
-        // UI trigger synchronizations running callback routines
-        window.triggerLayerUpdate = function(layerKey, property, value) {
-            if (!layerMeta[layerKey]) layerMeta[layerKey] = {};
-            if (property === 'size') value = parseInt(value);
-            layerMeta[layerKey][property] = value;
-            compileLayersAndRenderPoints();
-        };
-
-        // Streamlit synchronization callback hooks
-        function sendActionToStreamlit(payload) {
-            const container = document.createElement('div');
-            container.innerHTML = `<iframe src="about:blank" style="display:none;"></iframe>`;
-            // Secure pass via state synchronization parameters mapping
-            parent.postMessage({type: 'streamlit:action', data: payload}, '*');
-        }
-
-        // Rebuild and execute Workspace component items UI mapping layout
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box');
             document.getElementById('results-count').innerText = pts.length;
-            
-            if (pts.length === 0) {
-                listBox.innerHTML = "<div style='font-size:9px; padding:12px; color:#888780;'>No items scanned yet.</div>";
-                return;
-            }
+            if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:9px; padding:12px; color:#888780;'>No items mapped.</div>"; return; }
 
             let htmlPayload = '';
             const trashSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="12" viewBox="0 -960 960 960" width="12"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>`;
@@ -932,17 +788,16 @@ leaflet_template = """
                     <div class="layer-category-block" id="cat-block-${catName}">
                         <div class="layer-category-header">
                             <div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')">
-                                <span class="color-dot" style="background-color: ${meta.color};" title="Layer Base Color"></span>
+                                <span class="color-dot" style="background-color: ${meta.color};"></span>
                                 <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
                             </div>
                             <div style="display:flex; align-items:center; gap:2px;">
-                                <a class="action-icon-trigger" title="Rename Layer" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
-                                <a class="action-icon-trigger" title="Toggle Layer" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
-                                <a class="action-icon-trigger delete-btn" title="Delete Layer" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
+                                <a class="action-icon-trigger" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
+                                <a class="action-icon-trigger" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
+                                <a class="action-icon-trigger delete-btn" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
                                 <span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">▼</span>
                             </div>
                         </div>
-                        
                         <div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);">
                             <div class="config-flex-row">
                                 <select onchange="triggerLayerUpdate('${catName}', 'style', this.value)">
@@ -951,13 +806,11 @@ leaflet_template = """
                                     <option value="1pin" ${meta.style==='1pin'?'selected':''}>1pin</option>
                                 </select>
                                 <input type="range" min="1" max="100" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
-                                <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value)">
+                                <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
                             </div>
                         </div>
-
-                        <div class="layer-category-items" id="items-${catName}">
+                        <div class="layer-category-items collapsed" id="items-${catName}">
                 `;
-                
                 layerPts.forEach(p => {
                     const itemVisible = p.visible !== false;
                     htmlPayload += `
@@ -966,9 +819,9 @@ leaflet_template = """
                             ${p.name || 'Unknown'}
                         </div>
                         <div style="display:flex; align-items:center; gap:3px;">
-                            <a class="action-icon-trigger" title="Rename POI" onclick="promptRenamePoi(${p.uid}, '${p.name}')">${editSvg}</a>
-                            <a class="action-icon-trigger" title="Toggle POI" onclick="togglePoiVisibility(${p.uid})">${eyeSvg}</a>
-                            <a class="action-icon-trigger delete-btn" title="Remove POI" onclick="removePoiInstance(${p.uid}, '${catName}')">${trashSvg}</a>
+                            <a class="action-icon-trigger" onclick="promptRenamePoi(${p.uid}, '${p.name}')">${editSvg}</a>
+                            <a class="action-icon-trigger" onclick="togglePoiVisibility(${p.uid})">${eyeSvg}</a>
+                            <a class="action-icon-trigger delete-btn" onclick="removePoiInstance(${p.uid}, '${catName}')">${trashSvg}</a>
                         </div>
                     </div>`;
                 });
@@ -980,77 +833,35 @@ leaflet_template = """
         window.toggleAccordionCollapse = function(catKey) {
             const panel = document.getElementById('items-' + catKey);
             const chev = document.getElementById('chevron-' + catKey);
-            if(panel) {
-                panel.classList.toggle('collapsed');
-                chev.innerText = panel.classList.contains('collapsed') ? '▲' : '▼';
-            }
+            if(panel) { panel.classList.toggle('collapsed'); chev.innerText = panel.classList.contains('collapsed') ? '▼' : '▲'; }
         };
 
-        // Operations pipelines supporting single instance mapping actions
         window.togglePoiVisibility = function(uid) {
             const p = pts.find(item => item.uid === uid);
-            if (p) {
-                p.visible = (p.visible === false) ? true : false;
-                compileLayersAndRenderPoints();
-                rebuildSidebarControlLayout();
-            }
+            if (p) { p.visible = (p.visible === false); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); }
         };
 
         window.promptRenamePoi = function(uid, oldName) {
-            const newName = prompt("Rename POI asset description:", oldName);
-            if (newName && newName.trim() !== "") {
-                const p = pts.find(item => item.uid === uid);
-                if (p) {
-                    p.name = newName;
-                    compileLayersAndRenderPoints();
-                    rebuildSidebarControlLayout();
-                }
-            }
+            const newName = prompt("Rename POI name:", oldName);
+            if (newName && newName.trim() !== "") { const p = pts.find(item => item.uid === uid); if (p) { p.name = newName; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } }
         };
 
-        window.removePoiInstance = function(uid, catKey) {
-            pts = pts.filter(item => item.uid !== uid);
-            compileLayersAndRenderPoints();
-            rebuildSidebarControlLayout();
-        };
-
-        // Operations pipelines supporting workspace layer actions
-        window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) {
-            pts.forEach(p => {
-                if (p.type === catKey) p.visible = !currentlyVisible;
-            });
-            compileLayersAndRenderPoints();
-            rebuildSidebarControlLayout();
-        };
+        window.removePoiInstance = function(uid, catKey) { pts = pts.filter(item => item.uid !== uid); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
+        window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) { pts.forEach(p => { if (p.type === catKey) p.visible = !currentlyVisible; }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
 
         window.promptRenameLayer = function(oldKey) {
-            const newKey = prompt("Enter new name for this layer category:", oldKey);
+            const newKey = prompt("Rename layer target:", oldKey);
             if (newKey && newKey.trim() !== "" && newKey !== oldKey) {
                 pts.forEach(p => { if (p.type === oldKey) p.type = newKey; });
-                if (layerMeta[oldKey]) {
-                    layerMeta[newKey] = layerMeta[oldKey];
-                    delete layerMeta[oldKey];
-                }
-                if (categoryMap[oldKey]) {
-                    categoryMap[newKey] = categoryMap[oldKey];
-                    delete categoryMap[oldKey];
-                }
-                compileLayersAndRenderPoints();
-                rebuildSidebarControlLayout();
+                if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; }
+                compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
             }
         };
 
         window.triggerLayerDeletion = function(catKey) {
-            if (confirm(`Are you sure you want to delete the entire layer "${catKey}"?`)) {
-                pts = pts.filter(p => p.type !== catKey);
-                delete categoryMap[catKey];
-                delete layerMeta[catKey];
-                compileLayersAndRenderPoints();
-                rebuildSidebarControlLayout();
-            }
+            if (confirm(`Delete the layer entirely: "${catKey}"?`)) { pts = pts.filter(p => p.type !== catKey); delete layerMeta[catKey]; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); }
         };
 
-        // Master runtime load sequence
         renderTargetCenterIcon();
         renderRadiusCircleBounds();
         compileLayersAndRenderPoints();
@@ -1059,8 +870,7 @@ leaflet_template = """
         if (pts.length > 0 && !__IS_STALE__) {
             const validPts = pts.filter(p => p.visible !== false);
             if (validPts.length > 0) {
-                const bounds = L.featureGroup([L.marker([__LAT__, __LON__]), ...validPts.map(p => L.marker([p.lat, p.lon]))]).getBounds();
-                map.fitBounds(bounds.pad(0.1));
+                map.fitBounds(L.featureGroup([L.marker([__LAT__, __LON__]), ...validPts.map(p => L.marker([p.lat, p.lon]))]).getBounds().pad(0.05));
             }
         }
     </script>
