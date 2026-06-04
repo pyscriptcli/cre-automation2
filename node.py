@@ -3,7 +3,7 @@ import requests
 import re
 import json
 import os
-import matplotlib.subplots as plt
+import matplotlib.pyplot as plt
 import io
 import base64
 
@@ -155,15 +155,13 @@ def compile_features_kml(features):
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
-import matplotlib.pyplot as plt
-
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
-    # SCAN AREA BUTTON
+    # SCAN AREA BUTTON (Repositioned precisely at top of sidebar layout flow)
     selected_tags = []
     scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
     
@@ -199,6 +197,7 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
+    # Core Data Gathering Pipeline Architecture (OSMnx with fixed lowercase post fallback request method)
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -243,7 +242,7 @@ with st.sidebar:
                     success = True
             except Exception: pass
 
-            # SECONDARY FALLOVER: Overpass Turbo
+            # SECONDARY FALLOVER ENGINE: Overpass Turbo API (Corrected case format)
             if not success:
                 url = "https://overpass-api.de/api/interpreter"
                 statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
@@ -279,7 +278,7 @@ with st.sidebar:
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
-    # EXPORT PICTURE CANVAS LAYER
+    # EXPORT PICTURE MAP GENERATOR WITH COORDS VECTOR STYLING
     if st.button("EXPORT PICTURE", type="secondary", use_container_width=True):
         if not st.session_state.scanned_records:
             st.error("No active data to export.")
@@ -299,7 +298,6 @@ with st.sidebar:
                 buffer_zone = cx_center.buffer(radius_val)
                 xmin, ymin, xmax, ymax = buffer_zone.bounds
                 
-                # BUGFIX: edge_color now strictly uses matplotlib compatible Tuple array mapping
                 r_col = str(st.session_state.radius_config["color"])
                 r_opacity = float(st.session_state.radius_config["fill_opacity"])
                 r_weight = float(st.session_state.radius_config["weight"])
@@ -335,7 +333,7 @@ with st.sidebar:
                 ax.set_ylim(ymin - (radius_val*0.1), ymax + (radius_val*0.1))
                 ax.axis('off')
                 
-                # BUGFIX applied: RGBA string changed to valid Matplotlib tuple (0.0, 0.2, 0.4, 0.1) mapping to match earlier rgba requirements without errors
+                # BUGFIX: Converted RGBA string format to valid PyPlot Tuple Format array.
                 ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor=(0.0, 0.2, 0.4, 0.1), fontsize=7)
                 
                 img_buf = io.BytesIO()
@@ -481,7 +479,7 @@ leaflet_template = """
             <span id="results-count" style="color:#C9AB4C;">0</span>
         </div>
         
-        <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
+        <div class="config-block-wrapper" style="border-bottom: 2px solid #C9AB4C;">
             <div class="config-headline">Basemap Controller</div>
             <div class="config-flex-row">
                 <span>Tile Style:</span>
@@ -727,6 +725,7 @@ leaflet_template = """
         window.removePoiInstance = function(uid, catKey) { pts = pts.filter(item => item.uid !== uid); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) { pts.forEach(p => { if (p.type === catKey) p.visible = !currentlyVisible; }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
 
+        // Layer renaming function fires strictly when pencil icon context is invoked
         window.promptRenameLayer = function(oldKey) {
             const newKey = prompt("Rename layer designation path description:", oldKey);
             if (newKey && newKey.trim() !== "" && newKey !== oldKey) {
