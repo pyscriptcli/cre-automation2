@@ -107,7 +107,6 @@ st.markdown("""
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
 
         input[aria-label="hidden_sync_bridge"], [data-testid="stTextInput"]:has(input[aria-label="hidden_sync_bridge"]) { display: none !important; height: 0px !important; margin: 0px !important; padding: 0px !important; }
-        input[aria-label="hidden_export_trigger"], [data-testid="stTextInput"]:has(input[aria-label="hidden_export_trigger"]) { display: none !important; height: 0px !important; margin: 0px !important; padding: 0px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -298,7 +297,74 @@ with st.sidebar:
                 except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# 4. SECURE SYNC BRIDGE & STATIC IMAGE GENERATOR PIPELINE
+# 4. EXPORT PICTURE FUNCTIONALITY ENGINE (MATPLOTLIB + CONTEXTILY ARTIFACT)
+# -----------------------------------------------------------------------------
+def execute_static_map_render():
+    if not st.session_state.scanned_records:
+        st.error("No active data to export.")
+        return
+    try:
+        import contextily as cx
+        import geopandas as gpd
+        from shapely.geometry import Point
+        
+        pts = [p for p in st.session_state.scanned_records if p.get('visible', True)]
+        cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
+        fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
+        
+        center_gdf = gpd.GeoDataFrame(geometry=[Point(lon_coord, lat_coord)], crs="EPSG:4326").to_crs(epsg=3857)
+        cx_center = center_gdf.geometry.iloc[0]
+        
+        buffer_zone = cx_center.buffer(radius_val)
+        xmin, ymin, xmax, ymax = buffer_zone.bounds
+        
+        r_col = str(st.session_state.radius_config["color"])
+        r_opacity = float(st.session_state.radius_config["fill_opacity"])
+        r_weight = float(st.session_state.radius_config["weight"])
+        
+        circle_patch = plt.Circle((cx_center.x, cx_center.y), radius_val, fill=True, facecolor=r_col, alpha=r_opacity, edgecolor=r_col, linewidth=r_weight, zorder=2)
+        ax.add_patch(circle_patch)
+        
+        t_size = float(st.session_state.target_config["size"]) * 4
+        t_col = str(st.session_state.target_config["color"])
+        t_marker = '*' if st.session_state.target_config["style"] == "star" else 'o'
+        ax.scatter([cx_center.x], [cx_center.y], color=t_col, edgecolors='#ffffff', s=t_size, marker=t_marker, zorder=10)
+        
+        unique_types = list(set([p.get('type', 'Unclassified') for p in pts]))
+        for i, category_type in enumerate(unique_types):
+            meta = st.session_state.layer_meta.get(category_type, {})
+            cat_color = meta.get("color", cat_palette[i % len(cat_palette)])
+            cat_size = float(meta.get("size", st.session_state.global_marker_size)) * 4
+            cat_style = meta.get("style", st.session_state.global_marker_style)
+            
+            m_shape = 'o'
+            if cat_style == 'pin' or cat_style == 'teardrop' or cat_style == 'modern-pin': m_shape = '^'
+            
+            cat_pts = [p for p in pts if p.get('type', 'Unclassified') == category_type]
+            if not cat_pts: continue
+            
+            pt_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy([p['lon'] for p in cat_pts], [p['lat'] for p in cat_pts]), crs="EPSG:4326").to_crs(epsg=3857)
+            ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#ffffff', s=cat_size, marker=m_shape, alpha=0.9, label=category_type, zorder=5)
+        
+        try: cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, zorder=1)
+        except Exception: pass
+        
+        ax.set_xlim(xmin - (radius_val*0.1), xmax + (radius_val*0.1))
+        ax.set_ylim(ymin - (radius_val*0.1), ymax + (radius_val*0.1))
+        ax.axis('off')
+        
+        ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor=(0.0, 0.2, 0.4, 0.1), fontsize=7)
+        
+        img_buf = io.BytesIO()
+        plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=300)
+        img_buf.seek(0)
+        plt.close(fig)
+        
+        st.session_state["cached_export_buffer"] = img_buf
+    except Exception as e: st.error(f"Failed to generate canvas asset: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 5. JS <-> PYTHON SECURE STATE SYNC BRIDGE 
 # -----------------------------------------------------------------------------
 sync_val = st.text_input("hidden_sync_bridge", key="hidden_sync_bridge", label_visibility="collapsed")
 if sync_val:
@@ -308,81 +374,24 @@ if sync_val:
         st.session_state.target_config = bridge_state.get("target_config", st.session_state.target_config)
         st.session_state.radius_config = bridge_state.get("radius_config", st.session_state.radius_config)
         st.session_state.scanned_records = bridge_state.get("pts", st.session_state.scanned_records)
+        
+        if "trigger_export" in bridge_state and bridge_state["trigger_export"]:
+            execute_static_map_render()
+            
         st.session_state.hidden_sync_bridge = ""
         st.rerun()
     except Exception: pass
 
-export_trigger = st.text_input("hidden_export_trigger", key="hidden_export_trigger", label_visibility="collapsed")
-if export_trigger:
-    st.session_state.hidden_export_trigger = ""
-    if not st.session_state.scanned_records:
-        st.error("No active data to export.")
-    else:
-        try:
-            import contextily as cx
-            import geopandas as gpd
-            from shapely.geometry import Point
-            
-            pts = [p for p in st.session_state.scanned_records if p.get('visible', True)]
-            cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
-            fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
-            
-            center_gdf = gpd.GeoDataFrame(geometry=[Point(lon_coord, lat_coord)], crs="EPSG:4326").to_crs(epsg=3857)
-            cx_center = center_gdf.geometry.iloc[0]
-            
-            buffer_zone = cx_center.buffer(radius_val)
-            xmin, ymin, xmax, ymax = buffer_zone.bounds
-            
-            r_col = str(st.session_state.radius_config["color"])
-            r_opacity = float(st.session_state.radius_config["fill_opacity"])
-            r_weight = float(st.session_state.radius_config["weight"])
-            
-            circle_patch = plt.Circle((cx_center.x, cx_center.y), radius_val, fill=True, facecolor=r_col, alpha=r_opacity, edgecolor=r_col, linewidth=r_weight, zorder=2)
-            ax.add_patch(circle_patch)
-            
-            t_size = float(st.session_state.target_config["size"]) * 4
-            t_col = str(st.session_state.target_config["color"])
-            t_marker = '*' if st.session_state.target_config["style"] == "star" else 'o'
-            ax.scatter([cx_center.x], [cx_center.y], color=t_col, edgecolors='#ffffff', s=t_size, marker=t_marker, zorder=10)
-            
-            unique_types = list(set([p.get('type', 'Unclassified') for p in pts]))
-            for i, category_type in enumerate(unique_types):
-                meta = st.session_state.layer_meta.get(category_type, {})
-                cat_color = meta.get("color", cat_palette[i % len(cat_palette)])
-                cat_size = float(meta.get("size", st.session_state.global_marker_size)) * 4
-                cat_style = meta.get("style", st.session_state.global_marker_style)
-                
-                m_shape = 'o'
-                if cat_style == 'teardrop' or cat_style == 'pin': m_shape = '^'
-                
-                cat_pts = [p for p in pts if p.get('type', 'Unclassified') == category_type]
-                if not cat_pts: continue
-                
-                pt_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy([p['lon'] for p in cat_pts], [p['lat'] for p in cat_pts]), crs="EPSG:4326").to_crs(epsg=3857)
-                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#ffffff', s=cat_size, marker=m_shape, alpha=0.9, label=category_type, zorder=5)
-            
-            try: cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, zorder=1)
-            except Exception: pass
-            
-            ax.set_xlim(xmin - (radius_val*0.1), xmax + (radius_val*0.1))
-            ax.set_ylim(ymin - (radius_val*0.1), ymax + (radius_val*0.1))
-            ax.axis('off')
-            
-            ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor=(0.0, 0.2, 0.4, 0.1), fontsize=7)
-            
-            img_buf = io.BytesIO()
-            plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=300)
-            img_buf.seek(0)
-            plt.close(fig)
-            
-            # Modal Overlay View Block for rendered canvas asset
-            st.markdown("### Generated Canvas Report Output")
-            st.image(img_buf)
-            st.download_button(label="DOWNLOAD EXPORT REPORT IMAGE (PNG)", data=img_buf, file_name="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
-        except Exception as e: st.error(f"Failed to generate canvas asset: {str(e)}")
+# DISPLAY PRE-RENDERED STATIC CAPTURED MAP OUTSIDE THE CONTROLLER BLOCK IF AVAILABLE
+if "cached_export_buffer" in st.session_state and st.session_state["cached_export_buffer"] is not None:
+    st.markdown("### Exported Map Frame Visualization")
+    st.image(st.session_state["cached_export_buffer"], caption="Export Map Output Visualization")
+    st.download_button(label="DOWNLOAD IMAGE AS PNG", data=st.session_state["cached_export_buffer"], file_name="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
+    # Clear out structural cache after immediate layout draw to optimize system memory footprint
+    st.session_state["cached_export_buffer"] = None
 
 # -----------------------------------------------------------------------------
-# 5. ZERO-LATENCY MAP ARCHITECTURE FRAME RENDERING
+# 6. ZERO-LATENCY MAP ARCHITECTURE FRAME RENDERING
 # -----------------------------------------------------------------------------
 pts_active = st.session_state.scanned_records
 unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
@@ -450,18 +459,12 @@ leaflet_template = """
         .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
         .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
         
-        /* BICHROMATIC FOOTER ACTIONS GRID LAYOUT MATRIX */
-        .workspace-footer-grid {
-            padding: 10px; border-top: 1px solid rgba(0,51,102,0.1); background:#f8fafc; 
-            display: grid; grid-template-columns: 1H 1H; gap: 8px; text-align: center;
-        }
-        .action-grid-button {
-            background: #003366; color: #fff; border: none; padding: 8px 4px; border-radius: 2px; 
-            font-family: Montserrat; font-weight: 700; cursor: pointer; font-size: 9px; 
-            letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(0,51,102,0.05); transition: background 0.2s;
-            text-transform: uppercase; display: flex; align-items: center; justify-content: center;
-        }
-        .action-grid-button:hover { background: #C9AB4C; }
+        /* 50/50 Dual Split Button Grid Controls Layout CSS Class Structure Overrides */
+        .split-button-matrix-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; border-top: 1px solid rgba(0,51,102,0.1); background:#f8fafc; }
+        .workspace-action-btn-element { background:#003366; color:#fff; border:none; padding:8px 4px; border-radius:2px; font-family:Montserrat; font-weight:700; cursor:pointer; font-size:9px; letter-spacing:0.5px; box-shadow: 0 4px 12px rgba(0,51,102,0.1); transition: all 0.2s ease; text-transform: uppercase; text-align: center; }
+        .workspace-action-btn-element:hover { background: #C9AB4C; }
+        .export-action-btn-override { background: #C9AB4C; color: #003366; border: 1px solid rgba(0,51,102,0.15); }
+        .export-action-btn-override:hover { background: #003366; color: #ffffff; }
     </style>
 </head>
 <body>
@@ -496,6 +499,7 @@ leaflet_template = """
                     <option value="dots">Dots</option>
                     <option value="pin">Pin Location</option>
                     <option value="teardrop">Teardrop Marker</option>
+                    <option value="modern-pin">Modern Drop-Pin</option>
                 </select>
                 <span>Size:</span>
                 <input type="range" min="4" max="64" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
@@ -537,12 +541,10 @@ leaflet_template = """
         
         <div class="results-list" id="results-list-box"></div>
         
-        <div style="border-top: 1px solid rgba(0,51,102,0.1); background:#f8fafc; padding:10px 10px 4px 10px;">
-            <div style="display: flex; gap: 6px; width: 100%;">
-                <button id="sync-bridge-btn" onclick="pushStateToPythonBridge(false)" style="flex: 1; background:#003366; color:#fff; border:none; padding:8px 2px; border-radius:2px; font-family:Montserrat; font-weight:700; cursor:pointer; font-size:9px; letter-spacing:0.5px; box-shadow: 0 4px 12px rgba(0,51,102,0.1); transition: background 0.2s; text-transform: uppercase;">SYNC EDITS</button>
-                <button id="export-canvas-btn" onclick="pushStateToPythonBridge(true)" style="flex: 1; background:#003366; color:#fff; border:none; padding:8px 2px; border-radius:2px; font-family:Montserrat; font-weight:700; cursor:pointer; font-size:9px; letter-spacing:0.5px; box-shadow: 0 4px 12px rgba(0,51,102,0.1); transition: background 0.2s; text-transform: uppercase;">EXPORT PICTURE</button>
-            </div>
-            <div style="font-size:8px; color:#888780; margin-top:6px; font-weight: 600; text-align: center; width: 100%;">Sync local workspace state modifications prior to output asset compiling.</div>
+        <div class="split-button-matrix-wrapper">
+            <button id="sync-bridge-btn" onclick="pushStateToPythonBridge(false)" class="workspace-action-btn-element">SYNC EDITS</button>
+            <button id="export-bridge-btn" onclick="pushStateToPythonBridge(true)" class="workspace-action-btn-element export-action-btn-override">EXPORT PIC</button>
+            <div style="font-size:8px; color:#888780; grid-column: span 2; margin-top:4px; font-weight: 600; text-align: center;">Sync real-time edits or export direct report canvas.</div>
         </div>
     </div>
 
@@ -614,6 +616,24 @@ leaflet_template = """
                     html: `<div style="display:flex; justify-content:center; align-items:center;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2.69c-4.42 0-8 3.58-8 8 0 5.25 8 10.62 8 10.62s8-5.37 8-10.62c0-4.42-3.58-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" fill="${color}" stroke="#ffffff" stroke-width="1.2"/></svg></div>`,
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3]
                 });
+            } else if (styleMode === "modern-pin") {
+                // Injected High-Fidelity 3D Gradient Shadow Drop Pin with crisp centered micro-dot geometry 
+                const customSvg = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 42" width="${d * 1.5}" height="${d * 1.95}">
+                    <defs>
+                        <radialGradient id="shadow-${color.replace('#','')}" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stop-color="#000000" stop-opacity="0.6"/>
+                            <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+                        </radialGradient>
+                    </defs>
+                    <ellipse cx="16" cy="38" rx="8" ry="2.5" fill="url(#shadow-${color.replace('#','')})" />
+                    <path d="M16 2C8.3 2 2 8.3 2 16c0 11 14 24 14 24s14-13 14-24c0-7.7-6.3-14-14-14z" fill="${color}" stroke="#0A1520" stroke-width="1.2" stroke-linejoin="round"/>
+                    <circle cx="16" cy="16" r="4.2" fill="#FFFFFF"/>
+                </svg>`;
+                return L.divIcon({
+                    html: `<div style="transform: translate(-50%, -85%); width: ${d * 1.5}px;">${customSvg}</div>`,
+                    className: '', iconSize: [d * 1.5, d * 1.95], iconAnchor: [0, 0]
+                });
             }
             return L.divIcon({ 
                 html: `<div style="background-color: ${color}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, 
@@ -648,33 +668,30 @@ leaflet_template = """
             });
         }
 
-        // ASYNC DUAL-ACTION ROUTING BACKEND STATE SYNC BRIDGE INTERFACE HOOK
-        window.pushStateToPythonBridge = function(triggerExportFlag) {
+        window.pushStateToPythonBridge = function(shouldTriggerExport) {
             try {
-                const payload = { layer_meta: layerMeta, target_config: targetConfig, radius_config: radiusConfig, pts: pts };
+                const payload = { 
+                    layer_meta: layerMeta, 
+                    target_config: targetConfig, 
+                    radius_config: radiusConfig, 
+                    pts: pts,
+                    trigger_export: shouldTriggerExport
+                };
                 const parentDoc = window.parent.document;
                 
-                const hiddenSyncInput = parentDoc.querySelector('input[aria-label="hidden_sync_bridge"]');
-                const hiddenExportInput = parentDoc.querySelector('input[aria-label="hidden_export_trigger"]');
-                
-                if (hiddenSyncInput) {
+                const hiddenInput = parentDoc.querySelector('input[aria-label="hidden_sync_bridge"]');
+                if (hiddenInput) {
                     const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                    valueSetter.call(hiddenSyncInput, JSON.stringify(payload));
-                    hiddenSyncInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    valueSetter.call(hiddenInput, JSON.stringify(payload));
+                    hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
                     
-                    if (triggerExportFlag && hiddenExportInput) {
-                        setTimeout(() => {
-                            valueSetter.call(hiddenExportInput, "compile_static_map_frame");
-                            hiddenExportInput.dispatchEvent(new Event('input', { bubbles: true }));
-                        }, 100);
-                    } else {
-                        const btn = document.getElementById('sync-bridge-btn');
-                        btn.innerText = "SYNCED ✓";
-                        btn.style.backgroundColor = "#C9AB4C";
-                        setTimeout(() => { btn.innerText = "SYNC EDITS"; btn.style.backgroundColor = "#003366"; }, 1200);
-                    }
+                    const btn = document.getElementById(shouldTriggerExport ? 'export-bridge-btn' : 'sync-bridge-btn');
+                    const originalText = btn.innerText;
+                    btn.innerText = "RUNNING ✓";
+                    btn.style.backgroundColor = "#C9AB4C";
+                    setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = shouldTriggerExport ? "#C9AB4C" : "#003366"; }, 1500);
                 }
-            } catch(e) { console.warn("State bridge interface disruption", e); }
+            } catch(e) { console.warn("Bridge deployment failed", e); }
         };
 
         window.patchGlobalMarkerStyle = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].style = v); compileLayersAndRenderPoints(); };
@@ -719,6 +736,7 @@ leaflet_template = """
                                     <option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option>
                                     <option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option>
                                     <option value="teardrop" ${meta.style==='teardrop'?'selected':''}>Teardrop</option>
+                                    <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
                                 </select>
                                 <input type="range" min="4" max="64" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
                                 <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
