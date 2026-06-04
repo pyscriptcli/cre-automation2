@@ -3,9 +3,6 @@ import requests
 import re
 import json
 import os
-import matplotlib.pyplot as plt
-import io
-import base64
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
@@ -105,8 +102,6 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
-
-        input[aria-label="hidden_sync_bridge"], [data-testid="stTextInput"]:has(input[aria-label="hidden_sync_bridge"]) { display: none !important; height: 0px !important; margin: 0px !important; padding: 0px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -122,7 +117,7 @@ if 'scanned_records' not in st.session_state: st.session_state.scanned_records =
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
-if 'cached_export_buffer' not in st.session_state: st.session_state.cached_export_buffer = None
+if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {} # Frontend cluster reference trackers
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -155,8 +150,8 @@ def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
-        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
@@ -273,6 +268,7 @@ with st.sidebar:
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
+        st.session_state.layer_groups = {}
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
         st.rerun()
@@ -298,108 +294,7 @@ with st.sidebar:
                 except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# 4. EXPORT PICTURE FUNCTIONALITY ENGINE (MATPLOTLIB + CONTEXTILY ARTIFACT)
-# -----------------------------------------------------------------------------
-def execute_static_map_render():
-    if not st.session_state.scanned_records:
-        return
-    try:
-        import contextily as cx
-        import geopandas as gpd
-        from shapely.geometry import Point
-        from matplotlib.patches import Shadow
-        
-        pts = [p for p in st.session_state.scanned_records if p.get('visible', True)]
-        cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
-        fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
-        
-        center_gdf = gpd.GeoDataFrame(geometry=[Point(lon_coord, lat_coord)], crs="EPSG:4326").to_crs(epsg=3857)
-        cx_center = center_gdf.geometry.iloc[0]
-        
-        buffer_zone = cx_center.buffer(radius_val)
-        xmin, ymin, xmax, ymax = buffer_zone.bounds
-        
-        r_col = str(st.session_state.radius_config["color"])
-        r_opacity = float(st.session_state.radius_config["fill_opacity"])
-        r_weight = float(st.session_state.radius_config["weight"])
-        
-        circle_patch = plt.Circle((cx_center.x, cx_center.y), radius_val, fill=True, facecolor=r_col, alpha=r_opacity, edgecolor=r_col, linewidth=r_weight, zorder=2)
-        ax.add_patch(circle_patch)
-        
-        t_size = float(st.session_state.target_config["size"]) * 4
-        t_col = str(st.session_state.target_config["color"])
-        t_marker = '*' if st.session_state.target_config["style"] == "star" else 'o'
-        ax.scatter([cx_center.x], [cx_center.y], color=t_col, edgecolors='#ffffff', s=t_size, marker=t_marker, zorder=10)
-        
-        unique_types = list(set([p.get('type', 'Unclassified') for p in pts]))
-        for i, category_type in enumerate(unique_types):
-            meta = st.session_state.layer_meta.get(category_type, {})
-            cat_color = meta.get("color", cat_palette[i % len(cat_palette)])
-            cat_size = float(meta.get("size", st.session_state.global_marker_size))
-            cat_style = meta.get("style", st.session_state.global_marker_style)
-            
-            cat_pts = [p for p in pts if p.get('type', 'Unclassified') == category_type]
-            if not cat_pts: continue
-            
-            pt_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy([p['lon'] for p in cat_pts], [p['lat'] for p in cat_pts]), crs="EPSG:4326").to_crs(epsg=3857)
-            
-            if cat_style == 'modern-pin':
-                # Matplotlib implementation matching the drop shadow needle layout architecture 
-                # Shadow Offset Layer
-                ax.scatter(pt_gdf.geometry.x + (radius_val * 0.015), pt_gdf.geometry.y - (radius_val * 0.015), color='#000000', s=cat_size*6, marker='o', alpha=0.25, zorder=4)
-                # Outer Circle Ring Head Layer
-                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#0A1520', linewidths=0.6, s=cat_size*6, marker='o', alpha=1.0, label=category_type, zorder=5)
-                # Inner Target White Core Layer
-                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color='#FFFFFF', s=cat_size*1.2, marker='o', alpha=1.0, zorder=6)
-            else:
-                m_shape = 'o'
-                if m_shape == 'pin': m_shape = '^'
-                ax.scatter(pt_gdf.geometry.x, pt_gdf.geometry.y, color=cat_color, edgecolors='#ffffff', s=cat_size*4, marker=m_shape, alpha=0.9, label=category_type, zorder=5)
-        
-        try: cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, zorder=1)
-        except Exception: pass
-        
-        ax.set_xlim(xmin - (radius_val*0.1), xmax + (radius_val*0.1))
-        ax.set_ylim(ymin - (radius_val*0.1), ymax + (radius_val*0.1))
-        ax.axis('off')
-        
-        ax.legend(loc='upper left', bbox_to_anchor=(0.02, 0.98), frameon=True, facecolor='#ffffff', edgecolor=(0.0, 0.2, 0.4, 0.1), fontsize=7)
-        
-        img_buf = io.BytesIO()
-        plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=300)
-        img_buf.seek(0)
-        plt.close(fig)
-        
-        st.session_state.cached_export_buffer = img_buf
-    except Exception as e: st.error(f"Failed to generate canvas asset: {str(e)}")
-
-# -----------------------------------------------------------------------------
-# 5. JS <-> PYTHON SECURE STATE SYNC BRIDGE 
-# -----------------------------------------------------------------------------
-sync_val = st.text_input("hidden_sync_bridge", key="hidden_sync_bridge", label_visibility="collapsed")
-if sync_val:
-    try:
-        bridge_state = json.loads(sync_val)
-        st.session_state.layer_meta = bridge_state.get("layer_meta", st.session_state.layer_meta)
-        st.session_state.target_config = bridge_state.get("target_config", st.session_state.target_config)
-        st.session_state.radius_config = bridge_state.get("radius_config", st.session_state.radius_config)
-        st.session_state.scanned_records = bridge_state.get("pts", st.session_state.scanned_records)
-        
-        if bridge_state.get("trigger_export", False):
-            execute_static_map_render()
-            
-        st.session_state.hidden_sync_bridge = ""
-        st.rerun()
-    except Exception: pass
-
-if st.session_state.cached_export_buffer is not None:
-    st.markdown("### Exported Map Frame Visualization")
-    st.image(st.session_state.cached_export_buffer, caption="Export Map Output Visualization")
-    st.download_button(label="DOWNLOAD IMAGE AS PNG", data=st.session_state.cached_export_buffer, file_name="OpenNode_ExportReport.png", mime="image/png", use_container_width=True)
-    st.session_state.cached_export_buffer = None
-
-# -----------------------------------------------------------------------------
-# 6. ZERO-LATENCY MAP ARCHITECTURE FRAME RENDERING
+# 4. MAP FRAME RENDERING ENGINE & INTERACTION ARCHITECTURE
 # -----------------------------------------------------------------------------
 pts_active = st.session_state.scanned_records
 unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
@@ -466,12 +361,14 @@ leaflet_template = """
         .config-flex-row select, .config-flex-row input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
         .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
         .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
-        
-        .split-button-matrix-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; border-top: 1px solid rgba(0,51,102,0.1); background:#f8fafc; }
-        .workspace-action-btn-element { background:#003366; color:#fff; border:none; padding:8px 4px; border-radius:2px; font-family:Montserrat; font-weight:700; cursor:pointer; font-size:9px; letter-spacing:0.5px; box-shadow: 0 4px 12px rgba(0,51,102,0.1); transition: all 0.2s ease; text-transform: uppercase; text-align: center; }
-        .workspace-action-btn-element:hover { background: #C9AB4C; }
-        .export-action-btn-override { background: #C9AB4C; color: #003366; border: 1px solid rgba(0,51,102,0.15); }
-        .export-action-btn-override:hover { background: #003366; color: #ffffff; }
+
+        /* Dynamic Cluster Custom Layout Component Styles */
+        .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 4px; border-bottom: 1px solid rgba(0,51,102,0.08); }
+        .group-cluster-header { background: #e2e8f0; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .group-cluster-title { font-size: 9px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+        .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
+        .cluster-popover-modal.active { display: block; }
+        .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -480,7 +377,22 @@ leaflet_template = """
     <div id="scan-results-panel">
         <div class="results-header">
             <span>WORKSPACE</span>
-            <span id="results-count" style="color:#C9AB4C;">0</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
+                <span id="results-count" style="color:#C9AB4C;">0</span>
+            </div>
+        </div>
+
+        <div id="cluster-modal-overlay" class="cluster-popover-modal">
+            <div style="font-size: 9px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 8px;">CREATE LAYER CLUSTER GROUP</div>
+            <div style="margin-bottom: 8px;">
+                <input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);">
+            </div>
+            <div id="cluster-checkbox-target-mount" style="max-height: 140px; overflow-y: auto; margin-bottom: 8px;"></div>
+            <div style="display: flex; gap: 4px;">
+                <button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button>
+                <button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button>
+            </div>
         </div>
         
         <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
@@ -546,12 +458,6 @@ leaflet_template = """
         </div>
         
         <div class="results-list" id="results-list-box"></div>
-        
-        <div class="split-button-matrix-wrapper">
-            <button id="sync-bridge-btn" onclick="pushStateToPythonBridge(false)" class="workspace-action-btn-element">SYNC EDITS</button>
-            <button id="export-bridge-btn" onclick="pushStateToPythonBridge(true)" class="workspace-action-btn-element export-action-btn-override">EXPORT PIC</button>
-            <div style="font-size:8px; color:#888780; grid-column: span 2; margin-top:4px; font-weight: 600; text-align: center;">Sync real-time edits or export direct report canvas.</div>
-        </div>
     </div>
 
     <script>
@@ -565,6 +471,7 @@ leaflet_template = """
         let targetConfig = __TARGET_CONFIG_JSON__;
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
+        let clusters = {}; // Local memory persistence map for group definitions
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
@@ -620,7 +527,6 @@ leaflet_template = """
             } else if (styleMode === "modern-pin") {
                 const w = d * 1.5;
                 const h = d * 2.2;
-                // Integrated explicit SVG drop-shadow filter matrices to match report specification
                 const customSvg = `
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
                     <defs>
@@ -673,30 +579,58 @@ leaflet_template = """
             });
         }
 
-        window.pushStateToPythonBridge = function(shouldTriggerExport) {
-            try {
-                const payload = { 
-                    layer_meta: layerMeta, 
-                    target_config: targetConfig, 
-                    radius_config: radiusConfig, 
-                    pts: pts,
-                    trigger_export: shouldTriggerExport
-                };
-                const parentDoc = window.parent.document;
-                
-                const hiddenInput = parentDoc.querySelector('input[aria-label="hidden_sync_bridge"]');
-                if (hiddenInput) {
-                    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                    valueSetter.call(hiddenInput, JSON.stringify(payload));
-                    hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    
-                    const btn = document.getElementById(shouldTriggerExport ? 'export-bridge-btn' : 'sync-bridge-btn');
-                    const originalText = btn.innerText;
-                    btn.innerText = "RUNNING ✓";
-                    btn.style.backgroundColor = "#C9AB4C";
-                    setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = shouldTriggerExport ? "#C9AB4C" : "#003366"; }, 1500);
-                }
-            } catch(e) { console.warn("Bridge deployment failed", e); }
+        // --- DYNAMIC CLUSTERING ENGINE FUNCTIONS ---
+        window.openClusterModalWindow = function() {
+            const container = document.getElementById('cluster-checkbox-target-mount');
+            container.innerHTML = '';
+            const layers = Object.keys(categoryMap);
+            
+            if(layers.length === 0) {
+                container.innerHTML = '<div style="font-size:9px; padding:4px; color:#888780;">No active layers to compile.</div>';
+            } else {
+                layers.forEach(lyr => {
+                    container.innerHTML += `
+                        <div class="cluster-selection-row">
+                            <input type="checkbox" class="cluster-matrix-select-target" value="${lyr}" style="accent-color:#003366;">
+                            <span>${lyr} (${categoryMap[lyr].length})</span>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('cluster-modal-overlay').classList.add('active');
+        };
+
+        window.closeClusterModalWindow = function() {
+            document.getElementById('cluster-modal-overlay').classList.remove('active');
+            document.getElementById('new-cluster-name-input').value = '';
+        };
+
+        window.commitStructuralLayerCluster = function() {
+            const titleInput = document.getElementById('new-cluster-name-input').value.trim();
+            if (!titleInput) { alert('Cluster designation namespace required.'); return; }
+            
+            const selectedCheckboxes = document.querySelectorAll('.cluster-matrix-select-target:checked');
+            const layerKeys = Array.from(selectedCheckboxes).map(cb => cb.value);
+            
+            if (layerKeys.length === 0) { alert('Select at least 1 layer entry.'); return; }
+            
+            clusters[titleInput] = layerKeys;
+            closeClusterModalWindow();
+            rebuildSidebarControlLayout();
+        };
+
+        window.destroyClusterGroupReference = function(clusterId) {
+            delete clusters[clusterId];
+            rebuildSidebarControlLayout();
+        };
+
+        window.toggleClusterGroupVisibility = function(clusterId, currentlyVisible) {
+            const targetedLayers = clusters[clusterId] || [];
+            pts.forEach(p => {
+                if (targetedLayers.includes(p.type)) p.visible = !currentlyVisible;
+            });
+            compileLayersAndRenderPoints();
+            rebuildSidebarControlLayout();
         };
 
         window.patchGlobalMarkerStyle = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].style = v); compileLayersAndRenderPoints(); };
@@ -716,55 +650,112 @@ leaflet_template = """
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
             const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
 
+            // Render Dynamic Groups first if available
+            Object.keys(clusters).forEach(clusterName => {
+                const assignedLayers = clusters[clusterName] || [];
+                let aggregatedCount = 0;
+                let groupIsVisible = false;
+
+                assignedLayers.forEach(lKey => {
+                    if (categoryMap[lKey]) {
+                        aggregatedCount += categoryMap[lKey].length;
+                        if (categoryMap[lKey].some(p => p.visible !== false)) groupIsVisible = true;
+                    }
+                });
+
+                htmlPayload += `
+                    <div class="group-cluster-block" id="cluster-block-${clusterName}">
+                        <div class="group-cluster-header">
+                            <div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')">
+                                <span style="color:#C9AB4C;">⚡</span>
+                                <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} across ${assignedLayers.length} Layers)</span></span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:2px;">
+                                <a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a>
+                                <a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a>
+                                <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span>
+                            </div>
+                        </div>
+                        <div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 8px; background: rgba(0,0,0,0.02);">
+                `;
+
+                // Nest matching category elements inside the operational cluster block view loop
+                assignedLayers.forEach(catName => {
+                    if(!categoryMap[catName]) return;
+                    const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
+                    const layerPts = categoryMap[catName] || [];
+                    const isLayerVisible = layerPts.some(p => p.visible !== false);
+
+                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
+                });
+
+                htmlPayload += '</div></div>';
+            });
+
+            // Render remaining isolated layers
             Object.keys(categoryMap).forEach(catName => {
+                // Check if layer belongs to an existing compiled group layer cluster structure
+                let insideClusterGroup = false;
+                Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
+                if (insideClusterGroup) return;
+
                 const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
                 htmlPayload += `
                     <div class="layer-category-block" id="cat-block-${catName}">
-                        <div class="layer-category-header">
-                            <div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')">
-                                <span class="color-dot" style="background-color: ${meta.color};"></span>
-                                <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:1px;">
-                                <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
-                                <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
-                                <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
-                                <span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">▼</span>
-                            </div>
-                        </div>
-                        <div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);">
-                            <div class="config-flex-row">
-                                <select onchange="triggerLayerUpdate('${catName}', 'style', this.value)">
-                                    <option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option>
-                                    <option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option>
-                                    <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
-                                </select>
-                                <input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
-                                <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
-                            </div>
-                        </div>
-                        <div class="layer-category-items collapsed" id="items-${catName}">
                 `;
-                layerPts.forEach(p => {
-                    const itemVisible = p.visible !== false;
-                    htmlPayload += `
-                    <div class="results-item" id="res-item-${p.uid}" style="${itemVisible ? '' : 'opacity:0.4;'}">
-                        <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
-                            ${p.name || 'Unknown'}
-                        </div>
-                        <div style="display:flex; align-items:center; gap:1px;">
-                            <a class="action-icon-trigger" onclick="promptRenamePoi(${p.uid}, '${p.name}')">${editSvg}</a>
-                            <a class="action-icon-trigger" onclick="togglePoiVisibility(${p.uid})">${eyeSvg}</a>
-                            <a class="action-icon-trigger delete-btn" onclick="removePoiInstance(${p.uid}, '${catName}')">${trashSvg}</a>
-                        </div>
-                    </div>`;
-                });
-                htmlPayload += '</div></div>';
+                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
+                htmlPayload += '</div>';
             });
+
             listBox.innerHTML = htmlPayload;
+        }
+
+        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg) {
+            let chunk = `
+                <div class="layer-category-header">
+                    <div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')">
+                        <span class="color-dot" style="background-color: ${meta.color};"></span>
+                        <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:1px;">
+                        <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
+                        <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
+                        <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
+                        <span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">▼</span>
+                    </div>
+                </div>
+                <div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);">
+                    <div class="config-flex-row">
+                        <select onchange="triggerLayerUpdate('${catName}', 'style', this.value)">
+                            <option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option>
+                            <option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option>
+                            <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
+                        </select>
+                        <input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
+                        <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
+                    </div>
+                </div>
+                <div class="layer-category-items collapsed" id="items-${catName}">
+            `;
+            layerPts.forEach(p => {
+                const itemVisible = p.visible !== false;
+                chunk += `
+                <div class="results-item" id="res-item-${p.uid}" style="${itemVisible ? '' : 'opacity:0.4;'}">
+                    <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
+                        ${p.name || 'Unknown'}
+                    </div>
+                    <div style="display:flex; align-items:center; gap:1px;">
+                        <a class="action-icon-trigger" onclick="promptRenamePoi(${p.uid}, '${p.name}')">${editSvg}</a>
+                        <a class="action-icon-trigger" onclick="togglePoiVisibility(${p.uid})">${eyeSvg}</a>
+                        <a class="action-icon-trigger delete-btn" onclick="removePoiInstance(${p.uid}, '${catName}')">${trashSvg}</a>
+                    </div>
+                </div>`;
+            });
+            chunk += '</div>';
+            return chunk;
         }
 
         window.toggleAccordionCollapse = function(catKey) {
@@ -782,12 +773,22 @@ leaflet_template = """
             if (newKey && newKey.trim() !== "" && newKey !== oldKey) {
                 pts.forEach(p => { if (p.type === oldKey) p.type = newKey; });
                 if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; }
+                
+                // Update bindings inside custom clusters maps cleanly
+                Object.keys(clusters).forEach(cName => {
+                    clusters[cName] = clusters[cName].map(item => item === oldKey ? newKey : item);
+                });
                 compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
             }
         };
 
         window.triggerLayerDeletion = function(catKey) {
-            if (confirm(`Remove entire layer cluster: "${catKey}"?`)) { pts = pts.filter(p => p.type !== catKey); delete layerMeta[catKey]; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); }
+            if (confirm(`Remove entire layer cluster: "${catKey}"?`)) { 
+                pts = pts.filter(p => p.type !== catKey); 
+                delete layerMeta[catKey]; 
+                Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].filter(item => item !== catKey); });
+                compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); 
+            }
         };
 
         map.on('contextmenu', function(e) {
