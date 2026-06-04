@@ -102,10 +102,6 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
-        
-        /* Custom Loading Spinner Layout Formatter overrides */
-        div[data-testid="stStatusWidget"] { background-color: var(--bg-offwhite) !important; border: 1px solid var(--brand-gold) !important; border-radius: 2px !important; padding: 8px !important; }
-        div[data-testid="stStatusWidget"] p { color: var(--brand-midnight) !important; font-weight: 700 !important; font-size: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -122,6 +118,7 @@ if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
+if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -154,8 +151,8 @@ def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
-        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
@@ -204,77 +201,78 @@ with st.sidebar:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
         else:
-            # Inject structural loading panel wrapper
-            with st.spinner("Scanning Area... Initializing spatial engine sync."):
-                records = []
-                success = False
-                
+            st.session_state.scan_active_loading = True
+            records = []
+            success = False
+            
+            try:
+                import osmnx as ox
+                tags_dict = {}
+                for tag in selected_tags:
+                    clean = tag.replace('"', '')
+                    if '=' in clean:
+                        k, v = clean.split('=', 1)
+                        if '|' in v: v = [x.strip() for x in v.split('|')]
+                        tags_dict[k] = v
+                    else:
+                        tags_dict[clean] = True
+                        
+                gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
+                if not gdf.empty:
+                    for idx, row in gdf.iterrows():
+                        if hasattr(row.geometry, 'centroid'):
+                            c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
+                        else: continue
+                        name = row.get('name', 'Unknown')
+                        if isinstance(name, float): name = 'Unknown'
+                        
+                        matched_type = 'Node'
+                        for k in tags_dict.keys():
+                            if k in row and row[k]:
+                                matched_type = str(row[k])
+                                break
+                        records.append({
+                            "lat": c_lat, "lon": c_lon, "name": str(name), 
+                            "type": matched_type, "visible": True, "uid": len(records)
+                        })
+                    st.session_state.scanned_records = records
+                    st.session_state.last_scan_lat = lat_coord
+                    st.session_state.last_scan_lon = lon_coord
+                    success = True
+            except Exception: pass
+
+            if not success:
+                url = "https://overpass-api.de/api/interpreter"
+                statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
+                ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
                 try:
-                    import osmnx as ox
-                    tags_dict = {}
-                    for tag in selected_tags:
-                        clean = tag.replace('"', '')
-                        if '=' in clean:
-                            k, v = clean.split('=', 1)
-                            if '|' in v: v = [x.strip() for x in v.split('|')]
-                            tags_dict[k] = v
-                        else:
-                            tags_dict[clean] = True
-                            
-                    gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
-                    if not gdf.empty:
-                        for idx, row in gdf.iterrows():
-                            if hasattr(row.geometry, 'centroid'):
-                                c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
-                            else: continue
-                            name = row.get('name', 'Unknown')
-                            if isinstance(name, float): name = 'Unknown'
-                            
-                            matched_type = 'Node'
-                            for k in tags_dict.keys():
-                                if k in row and row[k]:
-                                    matched_type = str(row[k])
-                                    break
-                            records.append({
-                                "lat": c_lat, "lon": c_lon, "name": str(name), 
-                                "type": matched_type, "visible": True, "uid": len(records)
-                            })
+                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
+                    if res.status_code == 200:
+                        for el in res.json().get('elements', []):
+                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
+                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
+                            if e_lat and e_lon:
+                                tags = el.get('tags', {})
+                                records.append({
+                                    "lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), 
+                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
+                                    "visible": True, "uid": len(records)
+                                })
                         st.session_state.scanned_records = records
                         st.session_state.last_scan_lat = lat_coord
                         st.session_state.last_scan_lon = lon_coord
                         success = True
                 except Exception: pass
-
-                if not success:
-                    url = "https://overpass-api.de/api/interpreter"
-                    statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
-                    ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
-                    try:
-                        res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
-                        if res.status_code == 200:
-                            for el in res.json().get('elements', []):
-                                e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                                e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                                if e_lat and e_lon:
-                                    tags = el.get('tags', {})
-                                    records.append({
-                                        "lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), 
-                                        "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                                        "visible": True, "uid": len(records)
-                                    })
-                            st.session_state.scanned_records = records
-                            st.session_state.last_scan_lat = lat_coord
-                            st.session_state.last_scan_lon = lon_coord
-                            success = True
-                    except Exception: pass
-                
-                if success: st.rerun()
+            
+            st.session_state.scan_active_loading = False
+            if success: st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
+        st.session_state.scan_active_loading = False
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
         st.rerun()
@@ -282,17 +280,11 @@ with st.sidebar:
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
-    with col1: 
-        if st.session_state.scanned_records:
-            st.download_button("RADIUS", json.dumps(st.session_state.scanned_records), "scan.json", "application/json", use_container_width=True)
-        else:
-            st.button("RADIUS", type="primary", disabled=True, use_container_width=True, help="Scan area to generate exportable payload markers.")
-            
-    with col2: 
-        if st.session_state.scanned_records:
-            st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
-        else:
-            st.button("MARKERS", type="primary", disabled=True, use_container_width=True, help="Scan area to generate exportable payload markers.")
+    # Filter only fully visible pins for strict map-sync exports
+    visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
+    
+    with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
+    with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
@@ -331,6 +323,7 @@ geojson_str = json.dumps(pts_active)
 render_lat = lat_coord
 render_lon = lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
+show_loading = "true" if st.session_state.scan_active_loading else "false"
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -341,7 +334,23 @@ leaflet_template = """
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
-        #map { height: 100vh; width: 100%; }
+        #map-container { position: relative; width: 100%; height: 100vh; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
+
+        /* Centered Loading Splash Overlay UI */
+        #map-loading-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255, 255, 255, 0.75); z-index: 9999; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.3s ease; pointer-events: all;
+        }
+        .loading-spinner {
+            width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1);
+            border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
+            margin-bottom: 12px;
+        }
+        .loading-text { font-size: 11px; font-weight: 700; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         #scan-results-panel { 
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; 
@@ -386,92 +395,99 @@ leaflet_template = """
     </style>
 </head>
 <body>
-    <div id="map"></div>
-
-    <div id="scan-results-panel">
-        <div class="results-header">
-            <span>WORKSPACE</span>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
-                <span id="results-count" style="color:#C9AB4C;">0</span>
-            </div>
-        </div>
-
-        <div id="cluster-modal-overlay" class="cluster-popover-modal">
-            <div style="font-size: 9px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 8px;">CREATE LAYER CLUSTER GROUP</div>
-            <div style="margin-bottom: 8px;">
-                <input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);">
-            </div>
-            <div id="cluster-checkbox-target-mount" style="max-height: 140px; overflow-y: auto; margin-bottom: 8px;"></div>
-            <div style="display: flex; gap: 4px;">
-                <button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button>
-                <button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button>
-            </div>
+    <div id="map-container">
+        <div id="map-loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Scanning Area...</div>
         </div>
         
-        <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
-            <div class="config-headline">Basemap Controller</div>
-            <div class="config-flex-row">
-                <span>Tile Style:</span>
-                <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
-                    <option value="osm">OpenStreetMap</option>
-                    <option value="satellite">Satellite View</option>
-                    <option value="carto">Carto Light</option>
-                </select>
-                <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
-                    <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
-                </label>
-            </div>
-        </div>
-        
-        <div class="config-block-wrapper">
-            <div class="config-headline">Global Markers</div>
-            <div class="config-flex-row">
-                <span>Style:</span>
-                <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
-                    <option value="dots">Dots</option>
-                    <option value="pin">Pin Location</option>
-                    <option value="modern-pin">Modern Drop-Pin</option>
-                </select>
-                <span>Size:</span>
-                <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
-            </div>
-            <div class="config-flex-row">
-                <span>Color:</span>
-                <input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)">
-                <select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;">
-                    <option value="">Preset</option>
-                    <option value="#003366">Midnight</option>
-                    <option value="#C9AB4C">Gold</option>
-                    <option value="#AA2E20">Crimson</option>
-                </select>
-            </div>
-        </div>
+        <div id="map"></div>
 
-        <div class="config-block-wrapper">
-            <div class="config-headline">Target Coordinates & Radius Layer</div>
-            <div class="config-flex-row">
-                <span>Target:</span>
-                <select onchange="patchTargetCenterConfig('style', this.value)">
-                    <option value="star">Star</option>
-                    <option value="circle">Dot</option>
-                </select>
-                <input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)">
-                <input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)">
+        <div id="scan-results-panel">
+            <div class="results-header">
+                <span>WORKSPACE</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
+                    <span id="results-count" style="color:#C9AB4C;">0</span>
+                </div>
             </div>
-            <div class="config-flex-row">
-                <span>Radius Fill:</span>
-                <input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)">
-                <span>Opacity:</span>
-                <input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
+
+            <div id="cluster-modal-overlay" class="cluster-popover-modal">
+                <div style="font-size: 9px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 8px;">CREATE LAYER CLUSTER GROUP</div>
+                <div style="margin-bottom: 8px;">
+                    <input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);">
+                </div>
+                <div id="cluster-checkbox-target-mount" style="max-height: 140px; overflow-y: auto; margin-bottom: 8px;"></div>
+                <div style="display: flex; gap: 4px;">
+                    <button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button>
+                    <button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button>
+                </div>
             </div>
-            <div class="config-flex-row">
-                <span>Thickness:</span>
-                <input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)">
+            
+            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
+                <div class="config-headline">Basemap Controller</div>
+                <div class="config-flex-row">
+                    <span>Tile Style:</span>
+                    <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
+                        <option value="osm">OpenStreetMap</option>
+                        <option value="satellite">Satellite View</option>
+                        <option value="carto">Carto Light</option>
+                    </select>
+                    <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                        <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
+                    </label>
+                </div>
             </div>
+            
+            <div class="config-block-wrapper">
+                <div class="config-headline">Global Markers</div>
+                <div class="config-flex-row">
+                    <span>Style:</span>
+                    <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
+                        <option value="dots">Dots</option>
+                        <option value="pin">Pin Location</option>
+                        <option value="modern-pin">Modern Drop-Pin</option>
+                    </select>
+                    <span>Size:</span>
+                    <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
+                </div>
+                <div class="config-flex-row">
+                    <span>Color:</span>
+                    <input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)">
+                    <select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;">
+                        <option value="">Preset</option>
+                        <option value="#003366">Midnight</option>
+                        <option value="#C9AB4C">Gold</option>
+                        <option value="#AA2E20">Crimson</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="config-block-wrapper">
+                <div class="config-headline">Target Coordinates & Radius Layer</div>
+                <div class="config-flex-row">
+                    <span>Target:</span>
+                    <select onchange="patchTargetCenterConfig('style', this.value)">
+                        <option value="star">Star</option>
+                        <option value="circle">Dot</option>
+                    </select>
+                    <input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)">
+                    <input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)">
+                </div>
+                <div class="config-flex-row">
+                    <span>Radius Fill:</span>
+                    <input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)">
+                    <span>Opacity:</span>
+                    <input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
+                </div>
+                <div class="config-flex-row">
+                    <span>Thickness:</span>
+                    <input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)">
+                </div>
+            </div>
+            
+            <div class="results-list" id="results-list-box"></div>
         </div>
-        
-        <div class="results-list" id="results-list-box"></div>
     </div>
 
     <script>
@@ -485,7 +501,12 @@ leaflet_template = """
         let targetConfig = __TARGET_CONFIG_JSON__;
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
-        let clusters = {};
+        let clusters = {}; 
+
+        // Explicit loading engine toggle mapping
+        if (__SHOW_LOADING__) {
+            document.getElementById('map-loading-overlay').style.display = 'flex';
+        }
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
@@ -541,18 +562,17 @@ leaflet_template = """
             } else if (styleMode === "modern-pin") {
                 const w = d * 1.5;
                 const h = d * 2.2;
+                // Core Update: Removed white inner dot matrix core, added flat black pin stalk with custom drop-shadow filter styling
                 const customSvg = `
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
                     <defs>
-                        <filter id="shadowFilter" x="-20%" y="-20%" width="150%" height="150%">
-                            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#002147" flood-opacity="0.35"/>
+                        <filter id="shadowFilter" x="-40%" y="-40%" width="180%" height="180%">
+                            <feDropShadow dx="0" dy="5" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.4"/>
                         </filter>
                     </defs>
                     <g filter="url(#shadowFilter)">
-                        <path d="M20 20 L20 52" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
-                        <path d="M20 20 L20 52" stroke="#FFFFFF" stroke-width="1.0" stroke-linecap="round"/>
-                        <circle cx="20" cy="20" r="13" fill="${color}" stroke="#0A1520" stroke-width="1.2" />
-                        <circle cx="20" cy="20" r="4.2" fill="#FFFFFF"/>
+                        <path d="M20 20 L20 54" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/>
+                        <circle cx="20" cy="20" r="14" fill="${color}" stroke="#000000" stroke-width="1.5" />
                     </g>
                 </svg>`;
                 return L.divIcon({
@@ -646,6 +666,17 @@ leaflet_template = """
             rebuildSidebarControlLayout();
         };
 
+        // Core Feature Update: Intercept and distribute property matrices across cluster layers dynamically
+        window.batchStyleGroupCluster = function(clusterId, property, value) {
+            const targetedLayers = clusters[clusterId] || [];
+            targetedLayers.forEach(layerKey => {
+                if (!layerMeta[layerKey]) layerMeta[layerKey] = {};
+                layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value;
+            });
+            compileLayersAndRenderPoints();
+            rebuildSidebarControlLayout();
+        };
+
         window.patchGlobalMarkerStyle = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].style = v); compileLayersAndRenderPoints(); };
         window.patchGlobalMarkerSize = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v)); compileLayersAndRenderPoints(); };
         window.patchGlobalMarkerColor = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].color = v); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
@@ -663,6 +694,7 @@ leaflet_template = """
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
             const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
 
+            // Render Operational Groups with Dynamic Batch Layout Styling Controls Panel Modals
             Object.keys(clusters).forEach(clusterName => {
                 const assignedLayers = clusters[clusterName] || [];
                 let aggregatedCount = 0;
@@ -680,7 +712,7 @@ leaflet_template = """
                         <div class="group-cluster-header">
                             <div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')">
                                 <span style="color:#C9AB4C;">⚡</span>
-                                <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} across ${assignedLayers.length} Layers)</span></span>
+                                <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span>
                             </div>
                             <div style="display:flex; align-items:center; gap:2px;">
                                 <a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a>
@@ -688,6 +720,20 @@ leaflet_template = """
                                 <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span>
                             </div>
                         </div>
+                        
+                        <div class="config-block-wrapper" style="background: #e2e8f0; border-bottom: 1px solid rgba(0,51,102,0.15);">
+                            <div class="config-headline" style="font-size:7.5px; opacity:0.8;">Batch Group Style Controller</div>
+                            <div class="config-flex-row">
+                                <select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)">
+                                    <option value="dots">Dots</option>
+                                    <option value="pin">Pin</option>
+                                    <option value="modern-pin">Modern Pin</option>
+                                </select>
+                                <input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)">
+                                <input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)">
+                            </div>
+                        </div>
+
                         <div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 8px; background: rgba(0,0,0,0.02);">
                 `;
 
@@ -703,6 +749,7 @@ leaflet_template = """
                 htmlPayload += '</div></div>';
             });
 
+            // Cleanly loop trace remaining loose data sets outside explicit configurations
             Object.keys(categoryMap).forEach(catName => {
                 let insideClusterGroup = false;
                 Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
@@ -712,7 +759,9 @@ leaflet_template = """
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
-                htmlPayload += `<div class="layer-category-block" id="cat-block-${catName}">`;
+                htmlPayload += `
+                    <div class="layer-category-block" id="cat-block-${catName}">
+                `;
                 htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
                 htmlPayload += '</div>';
             });
@@ -826,6 +875,7 @@ leaflet_html = (leaflet_template
                 .replace("__LON__", str(render_lon))
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__IS_STALE__", is_stale)
+                .replace("__SHOW_LOADING__", show_loading)
                 .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
                 .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
                 .replace("__TARGET_CONFIG_JSON__", target_config_json)
