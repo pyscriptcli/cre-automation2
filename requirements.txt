@@ -7,3 +7,5 @@ geopandas>=0.14.0
 osmnx>=1.9.0
 streamlit-folium>=0.15.0
 folium>=0.15.0
+contextily>=1.4.0
+requests>=2.31.0
