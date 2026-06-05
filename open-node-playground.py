@@ -289,9 +289,6 @@ POI_CONFIG = {
     ]
 }
 
-# Explicit clean assignment to comply with downstream iteration loop pipelines
-ADVANCED_CONFIG = {}
-
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
