@@ -162,13 +162,14 @@ def compile_features_kml(features):
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
-# Handle cross-frame legend selection state logic updates
+# Handle dynamic structural cross-frame state processing logic layers seamlessly
 if "toggle_legend_layer" in st.query_params:
     tgt_lyr = st.query_params["toggle_legend_layer"]
     if tgt_lyr in st.session_state.legend_layers:
         st.session_state.legend_layers.remove(tgt_lyr)
     else:
         st.session_state.legend_layers.append(tgt_lyr)
+    st.query_params.clear()
 
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
@@ -421,7 +422,7 @@ leaflet_template = """
         #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
         #floating-export-btn:hover { background: #f8fafc; }
 
-        /* Structural Map-Centered Blueprint Blueprint Container Rules */
+        /* Static Invisible Export Layout Pipeline */
         #export-canvas-blueprint {
             position: absolute; left: -9999px; top: -9999px;
             width: 1024px; height: 768px; background: #ffffff;
@@ -451,7 +452,7 @@ leaflet_template = """
     <div id="map-container">
         <div id="map-loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
-            <div class="loading-text" id="loading-overlay-message">Scanning Area...</div>
+            <div class="loading-text" id="loading-overlay-message">Scanning Trade Area</div>
         </div>
         
         <div id="floating-export-btn" onclick="executeMapCapturePipeline()" title="Export Trade Area Frame">
@@ -504,7 +505,7 @@ leaflet_template = """
                     <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
                         <option value="dots">Dots</option>
                         <option value="pin">Pin Location</option>
-                        <option value="modern-pin">Modern Drop-Pin</option>
+                        <option value="modern-pin">Drop Pin</option>
                     </select>
                     <span>Size:</span>
                     <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
@@ -571,7 +572,7 @@ leaflet_template = """
         let legendLayers = __LEGEND_LAYERS_JSON__;
 
         if (__SHOW_LOADING__) {
-            document.getElementById('loading-overlay-message').innerText = 'Scanning Area...';
+            document.getElementById('loading-overlay-message').innerText = 'Scanning Trade Area';
             document.getElementById('map-loading-overlay').style.display = 'flex';
         }
 
@@ -630,7 +631,7 @@ leaflet_template = """
                     html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
                 });
-            } else if (styleMode === "modern-pin") {
+            } else if (styleMode === "modern-pin" || styleMode === "drop-pin") {
                 const w = d * 1.5;
                 const h = d * 2.2;
                 const customSvg = `
@@ -642,7 +643,7 @@ leaflet_template = """
                     </defs>
                     <g filter="url(#shadowFilter)">
                         <path d="M20 20 L20 54" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/>
-                        <circle cx="20" cy="20" r="14" fill="${color}" stroke="#000000" stroke-width="1.5" />
+                        <circle cx="20" cy="20" r="14" fill="${color}" />
                     </g>
                 </svg>`;
                 return L.divIcon({
@@ -738,6 +739,18 @@ leaflet_template = """
             rebuildSidebarControlLayout();
         };
 
+        window.toggleClusterGroupLegendState = function(clusterId, currentlyLegendActive) {
+            const targetedLayers = clusters[clusterId] || [];
+            targetedLayers.forEach(layerKey => {
+                if (currentlyLegendActive) {
+                    legendLayers = legendLayers.filter(item => item !== layerKey);
+                } else {
+                    if (!legendLayers.includes(layerKey)) legendLayers.push(layerKey);
+                }
+            });
+            window.parent.location.search = `?toggle_legend_layer=__FORCE_REFRESH__`;
+        };
+
         window.batchStyleGroupCluster = function(clusterId, property, value) {
             const targetedLayers = clusters[clusterId] || [];
             targetedLayers.forEach(layerKey => {
@@ -774,11 +787,13 @@ leaflet_template = """
                 const assignedLayers = clusters[clusterName] || [];
                 let aggregatedCount = 0;
                 let groupIsVisible = false;
+                let groupIsLegendActive = false;
 
                 assignedLayers.forEach(lKey => {
                     if (categoryMap[lKey]) {
                         aggregatedCount += categoryMap[lKey].length;
                         if (categoryMap[lKey].some(p => p.visible !== false)) groupIsVisible = true;
+                        if (legendLayers.includes(lKey)) groupIsLegendActive = true;
                     }
                 });
 
@@ -790,6 +805,7 @@ leaflet_template = """
                                 <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span>
                             </div>
                             <div style="display:flex; align-items:center; gap:2px;">
+                                <a class="action-icon-trigger ${groupIsLegendActive ? 'legend-active-btn' : ''}" title="Toggle Legend Representation for Group" onclick="toggleClusterGroupLegendState('${clusterName}', ${groupIsLegendActive})">${listSvg}</a>
                                 <a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a>
                                 <a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a>
                                 <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span>
@@ -802,7 +818,7 @@ leaflet_template = """
                                 <select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)">
                                     <option value="dots">Dots</option>
                                     <option value="pin">Pin</option>
-                                    <option value="modern-pin">Modern Pin</option>
+                                    <option value="modern-pin">Drop Pin</option>
                                 </select>
                                 <input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)">
                                 <input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)">
@@ -864,7 +880,7 @@ leaflet_template = """
                         <select onchange="triggerLayerUpdate('${catName}', 'style', this.value)">
                             <option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option>
                             <option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option>
-                            <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
+                            <option value="modern-pin" ${meta.style==='modern-pin'||meta.style==='drop-pin'?'selected':''}>Drop Pin</option>
                         </select>
                         <input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
                         <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
