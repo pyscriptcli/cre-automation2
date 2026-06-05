@@ -111,11 +111,6 @@ st.markdown("""
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
-# Handle state updates from query parameters for seamless map interaction
-if "lat" in st.query_params and "lon" in st.query_params:
-    st.session_state.geo_coords = f"{st.query_params['lat']}, {st.query_params['lon']}"
-    st.query_params.clear()
-
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
@@ -124,7 +119,6 @@ if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
-if 'legend_layers' not in st.session_state: st.session_state.legend_layers = []
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -161,15 +155,6 @@ def compile_features_kml(features):
         class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
-
-# Handle dynamic cross-frame state tracking changes via clear dictionary sync loops
-if "toggle_legend_layer" in st.query_params:
-    tgt_lyr = st.query_params["toggle_legend_layer"]
-    if tgt_lyr in st.session_state.legend_layers:
-        st.session_state.legend_layers.remove(tgt_lyr)
-    else:
-        st.session_state.legend_layers.append(tgt_lyr)
-    st.query_params.clear()
 
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
@@ -287,7 +272,6 @@ with st.sidebar:
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
-        st.session_state.legend_layers = []
         st.session_state.scan_active_loading = False
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
@@ -334,7 +318,6 @@ layer_meta_json = json.dumps(st.session_state.layer_meta)
 target_config_json = json.dumps(st.session_state.target_config)
 radius_config_json = json.dumps(st.session_state.radius_config)
 geojson_str = json.dumps(pts_active)
-legend_layers_json = json.dumps(st.session_state.legend_layers)
 
 render_lat = lat_coord
 render_lon = lon_coord
@@ -347,7 +330,6 @@ leaflet_template = """
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
@@ -391,7 +373,6 @@ leaflet_template = """
         .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
         .action-icon-trigger:hover svg { fill: #003366; }
         .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
-        .action-icon-trigger.legend-active-btn svg { fill: #C9AB4C !important; }
 
         .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .hide-labels .poi-text-label { display: none !important; }
@@ -406,59 +387,20 @@ leaflet_template = """
 
         .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 4px; border-bottom: 1px solid rgba(0,51,102,0.08); }
         .group-cluster-header { background: #e2e8f0; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .group-cluster-block .layer-category-block { border-bottom: 1px dashed rgba(0,51,102,0.05); }
         .group-cluster-title { font-size: 9px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
         .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
-
-        /* Custom Floating Top Left Export Trigger */
-        #floating-export-btn {
-            position: absolute; top: 10px; left: 10px; z-index: 1000;
-            background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
-            width: 32px; height: 32px; border-radius: 4px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        }
-        #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
-        #floating-export-btn:hover { background: #f8fafc; }
-
-        /* Static Invisible Export Layout Container Architecture */
-        #export-canvas-blueprint {
-            position: absolute; left: -9999px; top: -9999px;
-            width: 1024px; height: 768px; background: #ffffff;
-            display: flex; flex-direction: row; box-sizing: border-box; overflow: hidden;
-        }
-        #blueprint-map-frame { flex-grow: 1; height: 100%; position: relative; overflow: hidden; background: #f8fafc; }
-        #blueprint-legend-frame {
-            height: 100%; background: #ffffff;
-            border-left: 1px solid rgba(0, 51, 102, 0.1);
-            padding: 20px; box-sizing: border-box; display: flex; flex-direction: column;
-            flex-shrink: 0; width: auto; max-width: 240px;
-        }
-        .blueprint-legend-title {
-            font-size: 14px; font-weight: 800; color: #003366;
-            text-transform: uppercase; border-bottom: 2px solid #C9AB4C;
-            padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 1px;
-            white-space: nowrap;
-        }
-        .blueprint-legend-item {
-            display: flex; align-items: center; gap: 8px; font-size: 11px;
-            font-weight: 600; color: #003366; padding: 5px 0; text-transform: uppercase;
-            white-space: nowrap;
-        }
     </style>
 </head>
 <body>
     <div id="map-container">
         <div id="map-loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
-            <div class="loading-text" id="loading-overlay-message">Scanning Trade Area</div>
+            <div class="loading-text">Scanning Area...</div>
         </div>
         
-        <div id="floating-export-btn" onclick="executeMapCapturePipeline()" title="Export Trade Area Frame">
-            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
-        </div>
-
         <div id="map"></div>
 
         <div id="scan-results-panel">
@@ -490,7 +432,6 @@ leaflet_template = """
                         <option value="osm">OpenStreetMap</option>
                         <option value="satellite">Satellite View</option>
                         <option value="carto">Carto Light</option>
-                        <option value="dark">OSM Dark Matter</option>
                     </select>
                     <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
                         <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
@@ -505,7 +446,7 @@ leaflet_template = """
                     <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
                         <option value="dots">Dots</option>
                         <option value="pin">Pin Location</option>
-                        <option value="modern-pin">Drop Pin</option>
+                        <option value="modern-pin">Modern Drop-Pin</option>
                     </select>
                     <span>Size:</span>
                     <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
@@ -549,14 +490,6 @@ leaflet_template = """
         </div>
     </div>
 
-    <div id="export-canvas-blueprint">
-        <div id="blueprint-map-frame"></div>
-        <div id="blueprint-legend-frame">
-            <div class="blueprint-legend-title">Legend</div>
-            <div id="blueprint-legend-items-box"></div>
-        </div>
-    </div>
-
     <script>
         const map = L.map('map', { 
             zoomControl: false, 
@@ -569,23 +502,17 @@ leaflet_template = """
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
         let clusters = {}; 
-        let legendLayers = __LEGEND_LAYERS_JSON__;
 
         if (__SHOW_LOADING__) {
-            document.getElementById('loading-overlay-message').innerText = 'Scanning Trade Area';
             document.getElementById('map-loading-overlay').style.display = 'flex';
         }
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
             satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
-            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
+            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
         };
-        
-        let initialBasemap = localStorage.getItem('ts_persistent_basemap') || 'osm';
-        basemaps[initialBasemap].addTo(map);
-        document.getElementById('basemap-select').value = initialBasemap;
+        basemaps[(localStorage.getItem('ts_persistent_basemap') || 'osm')].addTo(map);
         
         function switchActiveBasemap(targetKey) {
             Object.keys(basemaps).forEach(k => { if(map.hasLayer(basemaps[k])) map.removeLayer(basemaps[k]); });
@@ -631,19 +558,14 @@ leaflet_template = """
                     html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
                 });
-            } else if (styleMode === "modern-pin" || styleMode === "drop-pin") {
+            } else if (styleMode === "modern-pin") {
                 const w = d * 1.5;
                 const h = d * 2.2;
                 const customSvg = `
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
-                    <defs>
-                        <filter id="shadowFilter" x="-40%" y="-40%" width="180%" height="180%">
-                            <feDropShadow dx="0" dy="5" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.4"/>
-                        </filter>
-                    </defs>
                     <g filter="url(#shadowFilter)">
                         <path d="M20 20 L20 54" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/>
-                        <circle cx="20" cy="20" r="14" fill="${color}" />
+                        <circle cx="20" cy="20" r="14" fill="${color}" stroke="#000000" stroke-width="1.5" />
                     </g>
                 </svg>`;
                 return L.divIcon({
@@ -682,8 +604,6 @@ leaflet_template = """
                     marker.addTo(layerGroupsRef[key]);
                 });
             });
-            
-            if (centerMarker) { centerMarker.bringToFront(); }
         }
 
         window.openClusterModalWindow = function() {
@@ -739,18 +659,6 @@ leaflet_template = """
             rebuildSidebarControlLayout();
         };
 
-        window.toggleClusterGroupLegendState = function(clusterId, currentlyLegendActive) {
-            const targetedLayers = clusters[clusterId] || [];
-            targetedLayers.forEach(layerKey => {
-                if (currentlyLegendActive) {
-                    legendLayers = legendLayers.filter(item => item !== layerKey);
-                } else {
-                    if (!legendLayers.includes(layerKey)) legendLayers.push(layerKey);
-                }
-            });
-            window.parent.location.search = `?toggle_legend_layer=__FORCE_REFRESH__`;
-        };
-
         window.batchStyleGroupCluster = function(clusterId, property, value) {
             const targetedLayers = clusters[clusterId] || [];
             targetedLayers.forEach(layerKey => {
@@ -765,12 +673,8 @@ leaflet_template = """
         window.patchGlobalMarkerSize = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v)); compileLayersAndRenderPoints(); };
         window.patchGlobalMarkerColor = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].color = v); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
-        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderTargetCenterIcon(); renderRadiusCircleBounds(); if (centerMarker) centerMarker.bringToFront(); };
+        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderRadiusCircleBounds(); };
         window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
-
-        window.toggleLegendLayerState = function(layerKey) {
-            window.parent.location.search = `?toggle_legend_layer=${encodeURIComponent(layerKey)}`;
-        };
 
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box');
@@ -781,52 +685,82 @@ leaflet_template = """
             const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
             const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
-            const listSvg = `<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>`;
 
             Object.keys(clusters).forEach(clusterName => {
                 const assignedLayers = clusters[clusterName] || [];
                 let aggregatedCount = 0;
                 let groupIsVisible = false;
-                let groupIsLegendActive = false;
 
                 assignedLayers.forEach(lKey => {
                     if (categoryMap[lKey]) {
                         aggregatedCount += categoryMap[lKey].length;
                         if (categoryMap[lKey].some(p => p.visible !== false)) groupIsVisible = true;
-                        if (legendLayers.includes(lKey)) groupIsLegendActive = true;
                     }
                 });
 
-htmlPayload += '</div></div>';
-            });
+                htmlPayload += `
+                    <div class="group-cluster-block" id="cluster-block-${clusterName}">
+                        <div class="group-cluster-header">
+                            <div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')">
+                                <span style="color:#C9AB4C;">⚡</span>
+                                <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:2px;">
+                                <a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a>
+                                <a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a>
+                                <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span>
+                            </div>
+                        </div>
+                        
+                        <div class="config-block-wrapper" style="background: #e2e8f0; border-bottom: 1px solid rgba(0,51,102,0.15);">
+                            <div class="config-headline" style="font-size:7.5px; opacity:0.8;">Batch Group Style Controller</div>
+                            <div class="config-flex-row">
+                                <select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)">
+                                    <option value="dots">Dots</option>
+                                    <option value="pin">Pin</option>
+                                    <option value="modern-pin">Modern Pin</option>
+                                </select>
+                                <input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)">
+                                <input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)">
+                            </div>
+                        </div>
 
-            // FIX: Ensure all scanned layers are accurately tracked, structured, and mounted regardless of cluster configuration
-            Object.keys(categoryMap).forEach(catName => {
-                let insideClusterGroup = false;
-                Object.values(clusters).forEach(layerArr => { 
-                    if(layerArr.includes(catName)) insideClusterGroup = true; 
+                        <div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 8px; background: rgba(0,0,0,0.02);">
+                `;
+
+                assignedLayers.forEach(catName => {
+                    if(!categoryMap[catName]) return;
+                    const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
+                    const layerPts = categoryMap[catName] || [];
+                    const isLayerVisible = layerPts.some(p => p.visible !== false);
+
+                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
                 });
 
-                // Extracted styling metadata state records
+                htmlPayload += '</div></div>';
+            });
+
+            // FIXED: Loops trace remaining loose datasets outside explicit configurations properly
+            Object.keys(categoryMap).forEach(catName => {
+                let insideClusterGroup = false;
+                Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
+                if (insideClusterGroup) return;
+
                 const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
-                // If it's not inside a cluster, render it as an independent workspace item immediately
-                if (!insideClusterGroup) {
-                    htmlPayload += `
-                        <div class="layer-category-block" id="cat-block-${catName}">
-                    `;
-                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg);
-                    htmlPayload += '</div>';
-                }
+                htmlPayload += `
+                    <div class="layer-category-block" id="cat-block-${catName}">
+                `;
+                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
+                htmlPayload += '</div>';
             });
 
             listBox.innerHTML = htmlPayload;
         }
 
-        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg) {
-            const isLegendActive = legendLayers.includes(catName);
+        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg) {
             let chunk = `
                 <div class="layer-category-header">
                     <div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')">
@@ -834,7 +768,6 @@ htmlPayload += '</div></div>';
                         <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
                     </div>
                     <div style="display:flex; align-items:center; gap:1px;">
-                        <a class="action-icon-trigger ${isLegendActive ? 'legend-active-btn' : ''}" title="Include/Exclude from Legend Panel" onclick="toggleLegendLayerState('${catName}')">${listSvg}</a>
                         <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
                         <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
                         <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
@@ -846,7 +779,7 @@ htmlPayload += '</div></div>';
                         <select onchange="triggerLayerUpdate('${catName}', 'style', this.value)">
                             <option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option>
                             <option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option>
-                            <option value="modern-pin" ${meta.style==='modern-pin'||meta.style==='drop-pin'?'selected':''}>Drop Pin</option>
+                            <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
                         </select>
                         <input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
                         <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
@@ -904,119 +837,14 @@ htmlPayload += '</div></div>';
             }
         };
 
-        // Snapshot Engine with Width-Adaptive Legend Column Sidebar Layout Compaction Alignment
-        window.executeMapCapturePipeline = function() {
-            document.getElementById('loading-overlay-message').innerText = 'Exporting Trade Area';
-            document.getElementById('map-loading-overlay').style.display = 'flex';
-
-            const activeBasemapKey = document.getElementById('basemap-select').value;
-            const currentCenter = map.getCenter();
-            const currentZoom = map.getZoom();
-
-            const blueprintMapContainer = document.getElementById('blueprint-map-frame');
-            blueprintMapContainer.innerHTML = '';
-            
-            const exportMap = L.map('blueprint-map-frame', {
-                zoomControl: false, attributionControl: false, preferCanvas: false
-            }).setView(currentCenter, currentZoom);
-
-            const captureBasemaps = {
-                osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-                satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-                carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
-                dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
-            };
-            
-            // Critical fix to avoid html2canvas canvas-tainting issues
-            captureBasemaps[activeBasemapKey].options.crossOrigin = 'anonymous';
-            captureBasemaps[activeBasemapKey].addTo(exportMap);
-
-            L.circle([__LAT__, __LON__], {
-                radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight),
-                fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity)
-            }).addTo(exportMap);
-
-            Object.keys(categoryMap).forEach(key => {
-                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
-                categoryMap[key].forEach(p => {
-                    if (p.visible === false) return;
-                    L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).addTo(exportMap);
-                });
-            });
-
-            const d = targetConfig.size; const c = targetConfig.color;
-            const htmlElement = targetConfig.style === "star" 
-                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">★</div>`
-                : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
-            
-            const exportCenterMarker = L.marker([__LAT__, __LON__], { 
-                icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 
-            }).addTo(exportMap);
-            exportCenterMarker.bringToFront();
-
-            const legendBox = document.getElementById('blueprint-legend-items-box');
-            legendBox.innerHTML = '';
-            
-            let layersToRender = legendLayers.filter(key => categoryMap[key]);
-            if (layersToRender.length === 0) {
-                layersToRender = Object.keys(categoryMap);
-            }
-
-            layersToRender.forEach(key => {
-                const meta = layerMeta[key] || { color: "#003366" };
-                legendBox.innerHTML += `
-                    <div class="blueprint-legend-item">
-                        <span class="color-dot" style="background-color: ${meta.color}; width:10px; height:10px;"></span>
-                        <span>${key}</span>
-                    </div>
-                `;
-            });
-
-            const legendFrame = document.getElementById('blueprint-legend-frame');
-            if (layersToRender.length === 0) {
-                legendFrame.style.width = '0px';
-                legendFrame.style.padding = '0px';
-                legendFrame.style.borderLeft = 'none';
-            } else {
-                legendFrame.style.width = 'auto';
-                legendFrame.style.padding = '20px';
-                legendFrame.style.borderLeft = '1px solid rgba(0, 51, 102, 0.1)';
-            }
-
-            setTimeout(() => {
-                exportMap.invalidateSize();
-                exportMap.setView(currentCenter, currentZoom);
-                
-                setTimeout(() => {
-                    html2canvas(document.getElementById('export-canvas-blueprint'), {
-                        useCORS: true, 
-                        allowTaint: false, 
-                        scale: 2,
-                        logging: false
-                    }).then(canvas => {
-                        const link = document.createElement('a');
-                        link.download = 'trade-area-export.png';
-                        link.href = canvas.toDataURL('image/png');
-                        link.click();
-                        document.getElementById('map-loading-overlay').style.display = 'none';
-                    }).catch(err => {
-                        console.error(err);
-                        document.getElementById('map-loading-overlay').style.display = 'none';
-                    });
-                }, 800);
-            }, 1000);
-        };
-
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const setTargetUrl = `?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`;
             const menuHtml = `
                 <div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;">
                     <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.parent.location.search='${setTargetUrl}';">set as the target coordinates</div>
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div>
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
@@ -1044,7 +872,6 @@ leaflet_html = (leaflet_template
                 .replace("__TARGET_CONFIG_JSON__", target_config_json)
                 .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
                 .replace("__LAYER_META_JSON__", layer_meta_json)
-                .replace("__GEOJSON__", geojson_str)
-                .replace("__LEGEND_LAYERS_JSON__", legend_layers_json))
+                .replace("__GEOJSON__", geojson_str))
 
 st.components.v1.html(leaflet_html, height=850, scrolling=False)
