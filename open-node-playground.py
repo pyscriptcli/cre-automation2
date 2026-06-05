@@ -7,8 +7,6 @@ import os
 # =====================================================================
 # SYSTEM INITIALIZATION & THEME CONFIGURATION
 # =====================================================================
-# Programmatic light mode configuration lock. This block writes a hard
-# rule config to ensure consistent application styling across instances.
 _config_dir = ".streamlit"
 _config_file = os.path.join(_config_dir, "config.toml")
 if not os.path.exists(_config_file):
@@ -22,8 +20,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom luxury branding stylesheet injecting font definitions, CSS grid system setups, 
-# explicit input form styling overrides, buttons configurations, and component sizing wrappers.
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
@@ -112,6 +108,10 @@ st.markdown("""
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
+if "lat" in st.query_params and "lon" in st.query_params:
+    st.session_state.geo_coords = f"{st.query_params['lat']}, {st.query_params['lon']}"
+    st.query_params.clear()
+
 POI_CONFIG = {
     "COMMERCIAL & ONSITE OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
     "RETAIL, SHOPS & CONSUMER SERVICES": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"market|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i'], ['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"'], ['Travel agency', '"shop"="travel_agency"']],
@@ -125,26 +125,19 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
-
 def compile_features_kml(features):
-    """Compiles geographic record features array into standard Google Earth KML string layout markup."""
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
+        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
-
 
 # =====================================================================
 # 1. SCRAPER CLUSTER (UI Inputs + Data Fetching Logic)
 # =====================================================================
-# INSTRUCTION TO EDITING AGENTS: All parameters relating to query configuration UI setup, 
-# search queries filtering tags, OSMnx compilation logic, and emergency Overpass API fetch fallbacks 
-# must be maintained directly within this single computational block function.
 def render_scraper_sidebar():
-    """Renders data fetching configurations UI and manages internal spatial scraping engines context."""
     with st.sidebar:
         st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
         
@@ -155,7 +148,6 @@ def render_scraper_sidebar():
         radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
         st.session_state.geo_radius = radius_val
 
-        # Regex Coordinate Geometry Engine Parsing
         coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
         if coord_match:
             lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
@@ -168,7 +160,6 @@ def render_scraper_sidebar():
         search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
         st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
         
-        # Primary Map Layer Categories Render
         for cat_name, node_items in POI_CONFIG.items():
             matched = [item for item in node_items if search_query in item[0].lower()]
             if matched:
@@ -176,17 +167,6 @@ def render_scraper_sidebar():
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
 
-        # Advanced Infrastructure Layer Configurations Render
-        st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
-        with st.container():
-            for cat_name, node_items in ADVANCED_CONFIG.items():
-                matched = [item for item in node_items if search_query in item[0].lower()]
-                if matched:
-                    with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                        for label, tag in matched:
-                            if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
-
-        # Processing Thread Hook for Area Map Scans
         if scan_triggered:
             if not selected_tags:
                 st.error("Select ≥ 1 layer.")
@@ -195,7 +175,6 @@ def render_scraper_sidebar():
                 records = []
                 success = False
                 
-                # Execution Matrix Engine Pass 1: Try Primary OSMnx library configuration compile
                 try:
                     import osmnx as ox
                     tags_dict = {}
@@ -232,7 +211,6 @@ def render_scraper_sidebar():
                         success = True
                 except Exception: pass
 
-                # Execution Matrix Engine Pass 2: Fallback direct post route request over Overpass API server
                 if not success:
                     url = "https://overpass-api.de/api/interpreter"
                     statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
@@ -259,7 +237,6 @@ def render_scraper_sidebar():
                 st.session_state.scan_active_loading = False
                 if success: st.rerun()
 
-        # Purge State Configurations Command Action UI 
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("CLEAR ALL", type="primary", key="clear_btn"):
             st.session_state.scanned_records = []
@@ -272,15 +249,10 @@ def render_scraper_sidebar():
 
     return lat_coord, lon_coord, radius_val
 
-
 # =====================================================================
 # 2. MAP CLUSTER (UI Controls + Map Rendering)
 # =====================================================================
-# INSTRUCTION TO EDITING AGENTS: The entire interactive Leaflet engine HTML setup blueprint, 
-# raw styling color bindings matrix maps, basemap switcher scripts, custom marker SVGs generator definitions, 
-# and structural canvas overlays must reside in this method block for modular editing.
 def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
-    """Processes style matrix profiles and renders compiled custom client-side Leaflet UI frame."""
     unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
     cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
 
@@ -308,6 +280,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
     <head>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
         <style>
             body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
@@ -374,7 +347,11 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
         <div id="map-container">
             <div id="map-loading-overlay" style="display: none;">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">Scanning Area...</div>
+                <div class="loading-text" id="loading-overlay-message">Scanning Area...</div>
+            </div>
+            
+            <div id="floating-export-btn" onclick="executeMapCapturePipeline()" title="Export Map to Photo View" style="position: absolute; top: 10px; left: 10px; z-index: 1000; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+                <svg viewBox="0 0 24 24" style="fill: #003366; width: 16px; height: 16px;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
             </div>
             
             <div id="map"></div>
@@ -466,6 +443,14 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
             </div>
         </div>
 
+        <div id="export-canvas-blueprint" style="position: absolute; left: -9999px; top: -9999px; width: 1200px; height: 900px; background: #ffffff; display: flex; flex-direction: row; box-sizing: border-box; overflow: hidden;">
+            <div id="blueprint-map-frame" style="flex-grow: 1; height: 100%; position: relative;"></div>
+            <div id="blueprint-legend-frame" style="width: 320px; height: 100%; background: #ffffff; border-left: 3px solid #C9AB4C; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column;">
+                <div style="font-size: 14px; font-weight: 800; color: #003366; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; padding-bottom: 8px; margin-bottom: 16px; letter-spacing: 1px;">TRADE AREA LEGEND</div>
+                <div id="blueprint-legend-items-box" style="display: flex; flex-direction: column; gap: 12px; overflow-y: auto;"></div>
+            </div>
+        </div>
+
         <script>
             const map = L.map('map', { 
                 zoomControl: false, 
@@ -539,11 +524,6 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                     const h = d * 2.2;
                     const customSvg = `
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
-                        <defs>
-                            <filter id="shadowFilter" x="-40%" y="-40%" width="180%" height="180%">
-                                <feDropShadow dx="0" dy="5" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.4"/>
-                            </filter>
-                        </defs>
                         <g filter="url(#shadowFilter)">
                             <path d="M20 20 L20 54" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/>
                             <circle cx="20" cy="20" r="14" fill="${color}" stroke="#000000" stroke-width="1.5" />
@@ -817,6 +797,97 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                 }
             };
 
+            // Two-Pass Hybrid Map Capture Engine implementation
+            window.executeMapCapturePipeline = function() {
+                document.getElementById('loading-overlay-message').innerText = 'Exporting Trade Area...';
+                document.getElementById('map-loading-overlay').style.display = 'flex';
+
+                const activeBasemapKey = document.getElementById('basemap-select').value;
+                const currentCenter = map.getCenter();
+                const currentZoom = map.getZoom();
+
+                const blueprintMapContainer = document.getElementById('blueprint-map-frame');
+                blueprintMapContainer.innerHTML = '';
+                
+                const exportMap = L.map('blueprint-map-frame', {
+                    zoomControl: false, attributionControl: false, preferCanvas: false
+                }).setView(currentCenter, currentZoom);
+
+                const captureBasemaps = {
+                    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
+                    satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+                    carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
+                };
+                
+                captureBasemaps[activeBasemapKey].options.crossOrigin = 'anonymous';
+                captureBasemaps[activeBasemapKey].addTo(exportMap);
+
+                L.circle(map.getCenter(), {
+                    radius: radiusCircle ? radiusCircle.getRadius() : 1000, 
+                    color: radiusConfig.color, 
+                    weight: parseFloat(radiusConfig.weight),
+                    fillColor: radiusConfig.color, 
+                    fillOpacity: parseFloat(radiusConfig.fill_opacity)
+                }).addTo(exportMap);
+
+                const legendBox = document.getElementById('blueprint-legend-items-box');
+                legendBox.innerHTML = '';
+                
+                Object.keys(categoryMap).forEach(key => {
+                    const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
+                    const pointsInLayer = categoryMap[key] || [];
+                    const isVisible = pointsInLayer.some(p => p.visible !== false);
+                    
+                    if (pointsInLayer.length > 0 && isVisible) {
+                        legendBox.innerHTML += `
+                            <div style="display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 600; color: #003366; text-transform: uppercase;">
+                                <span style="width: 12px; height: 12px; background-color: ${meta.color}; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.15);"></span>
+                                <span>${key} <span style="color: #C9AB4C; font-size: 9px;">(${pointsInLayer.length} PINS)</span></span>
+                            </div>
+                        `;
+
+                        pointsInLayer.forEach(p => {
+                            if (p.visible === false) return;
+                            L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).addTo(exportMap);
+                        });
+                    }
+                });
+
+                if (centerMarker) {
+                    const d = targetConfig.size; const c = targetConfig.color;
+                    const htmlElement = targetConfig.style === "star" 
+                        ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff;">★</div>`
+                        : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff;"></div>`;
+                    
+                    L.marker(map.getCenter(), { 
+                        icon: L.divIcon({ className: '', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 99999 
+                    }).addTo(exportMap);
+                }
+
+                setTimeout(() => {
+                    exportMap.invalidateSize();
+                    exportMap.setView(currentCenter, currentZoom);
+                    
+                    setTimeout(() => {
+                        html2canvas(document.getElementById('export-canvas-blueprint'), {
+                            useCORS: true, 
+                            allowTaint: false, 
+                            scale: 2, 
+                            logging: false
+                        }).then(canvas => {
+                            const link = document.createElement('a');
+                            link.download = `trade-area-snapshot-${Date.now()}.png`;
+                            link.href = canvas.toDataURL('image/png');
+                            link.click();
+                            document.getElementById('map-loading-overlay').style.display = 'none';
+                        }).catch(err => {
+                            console.error(err);
+                            document.getElementById('map-loading-overlay').style.display = 'none';
+                        });
+                    }, 1000);
+                }, 500);
+            };
+
             map.on('contextmenu', function(e) {
                 const lat = e.latlng.lat; const lng = e.latlng.lng;
                 const menuHtml = `
@@ -856,19 +927,14 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
 
     st.components.v1.html(leaflet_html, height=850, scrolling=False)
 
-
 # =====================================================================
 # 3. WORKSPACE CLUSTER (UI Tables + Data Actions)
 # =====================================================================
-# INSTRUCTION TO EDITING AGENTS: Import modules, file upload/download configurations, 
-# and structural table metrics utilities must match this function wrapper scheme precisely.
 def render_workspace(scanned_records):
-    """Processes pipeline exports, data action arrays, and downloads serialization loops."""
     with st.sidebar:
         st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
         col1, col2 = st.columns(2)
-        # Filter only fully visible pins for strict map-sync exports
         visible_only_records = [p for p in scanned_records if p.get('visible', True)]
         
         with col1: 
@@ -878,7 +944,6 @@ def render_workspace(scanned_records):
 
         st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-        # Import system action layer
         with st.popover("IMPORT FILE", use_container_width=True):
             imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
             if imported_file is not None:
@@ -892,14 +957,10 @@ def render_workspace(scanned_records):
                     except Exception: 
                         st.error("Invalid File")
 
-
 # =====================================================================
 # MAIN DIRECTOR (App Orchestration)
 # =====================================================================
-# INSTRUCTION TO EDITING AGENTS: Keep session initialization models inside this root block 
-# to ensure continuous sync transitions across structural data mutations.
 if __name__ == "__main__":
-    # Session Initialization Matrix Check
     if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
     if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
     if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
@@ -919,11 +980,6 @@ if __name__ == "__main__":
     if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
     if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
-    # 1. Execute Sidebar Scraper Control Input Operations
     lat_in, lon_in, radius_in = render_scraper_sidebar()
-
-    # 2. Execute Sidebar Export and Workspace Interactions Layer
     render_workspace(st.session_state.scanned_records)
-
-    # 3. Compile Map Component Interface Framework
     render_map_view(lat_in, lon_in, radius_in, st.session_state.scanned_records)
