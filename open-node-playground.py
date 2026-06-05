@@ -23,7 +23,7 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght=0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
 
         :root {
@@ -111,13 +111,11 @@ st.markdown("""
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
-# Bidirectional Sync Intercept for Right Click Coordinates
-query_params = st.query_transform() if hasattr(st, "query_transform") else st.query_params
-if "set_lat" in query_params and "set_lon" in query_params:
-    new_extracted_coords = f"{query_params['set_lat']}, {query_params['set_lon']}"
-    st.session_state.geo_coords = new_extracted_coords
-    # Evaporate query strings cleanly to avoid execution loop traps
-    st.query_params.clear()
+# Handle state updates from query parameters for seamless map interaction
+query_params = st.query_get()
+if "lat" in query_params and "lon" in query_params:
+    st.session_state.geo_coords = f"{query_params['lat'][0]}, {query_params['lon'][0]}"
+    st.query_clear()
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
@@ -338,23 +336,12 @@ leaflet_template = """
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map { height: 100vh; width: 100%; z-index: 1; }
-
-        /* Floating Export Button */
-        #map-export-btn-container {
-            position: absolute; top: 12px; left: 12px; z-index: 1000;
-        }
-        .map-square-action-btn {
-            width: 32px; height: 32px; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
-            border-radius: 4px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.2s;
-        }
-        .map-square-action-btn:hover { background: #f8fafc; transform: scale(1.03); }
-        .map-square-action-btn svg { width: 18px; height: 18px; fill: #003366; }
 
         /* Centered Loading Splash Overlay UI */
         #map-loading-overlay {
@@ -411,23 +398,52 @@ leaflet_template = """
         .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
+
+        /* Custom Floating Top Left Export Trigger */
+        #floating-export-btn {
+            position: absolute; top: 10px; left: 10px; z-index: 1000;
+            background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
+            width: 32px; height: 32px; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
+        #floating-export-btn:hover { background: #f8fafc; }
+
+        /* Static Invisible Export Layout Pipeline */
+        #export-canvas-blueprint {
+            position: absolute; left: -9999px; top: -9999px;
+            width: 1024px; height: 768px; background: #ffffff;
+            display: flex; flex-direction: row; box-sizing: border-box;
+        }
+        #blueprint-map-frame { width: 75%; height: 100%; position: relative; overflow: hidden; background: #f8fafc; }
+        #blueprint-legend-frame {
+            width: 25%; height: 100%; background: #ffffff;
+            border-left: 1px solid rgba(0, 51, 102, 0.1);
+            padding: 20px; box-sizing: border-box; display: flex; flex-direction: column;
+        }
+        .blueprint-legend-title {
+            font-size: 14px; font-weight: 800; color: #003366;
+            text-transform: uppercase; border-bottom: 2px solid #C9AB4C;
+            padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 1px;
+        }
+        .blueprint-legend-item {
+            display: flex; align-items: center; gap: 8px; font-size: 11px;
+            font-weight: 600; color: #003366; padding: 5px 0; text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
     <div id="map-container">
-        <div id="map-export-btn-container">
-            <div class="map-square-action-btn" title="Export Trade Area Frame" onclick="processStructuralImageSnapshot()">
-                <svg viewBox="0 0 24 24">
-                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                </svg>
-            </div>
-        </div>
-
         <div id="map-loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
-            <div class="loading-text" id="loading-overlay-string">Scanning Area...</div>
+            <div class="loading-text" id="loading-overlay-message">Scanning Area...</div>
         </div>
         
+        <div id="floating-export-btn" onclick="executeMapCapturePipeline()" title="Export Trade Area Frame">
+            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+        </div>
+
         <div id="map"></div>
 
         <div id="scan-results-panel">
@@ -459,7 +475,7 @@ leaflet_template = """
                         <option value="osm">OpenStreetMap</option>
                         <option value="satellite">Satellite View</option>
                         <option value="carto">Carto Light</option>
-                        <option value="dark">Carto Dark Matter</option>
+                        <option value="dark">OSM Dark Matter</option>
                     </select>
                     <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
                         <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
@@ -518,6 +534,14 @@ leaflet_template = """
         </div>
     </div>
 
+    <div id="export-canvas-blueprint">
+        <div id="blueprint-map-frame"></div>
+        <div id="blueprint-legend-frame">
+            <div class="blueprint-legend-title">Legend</div>
+            <div id="blueprint-legend-items-box"></div>
+        </div>
+    </div>
+
     <script>
         const map = L.map('map', { 
             zoomControl: false, 
@@ -532,6 +556,7 @@ leaflet_template = """
         let clusters = {}; 
 
         if (__SHOW_LOADING__) {
+            document.getElementById('loading-overlay-message').innerText = 'Scanning Area...';
             document.getElementById('map-loading-overlay').style.display = 'flex';
         }
 
@@ -541,9 +566,10 @@ leaflet_template = """
             carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
             dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
         };
-        const currentActiveTileStyle = localStorage.getItem('ts_persistent_basemap') || 'osm';
-        basemaps[currentActiveTileStyle].addTo(map);
-        document.getElementById('basemap-select').value = currentActiveTileStyle;
+        
+        let initialBasemap = localStorage.getItem('ts_persistent_basemap') || 'osm';
+        basemaps[initialBasemap].addTo(map);
+        document.getElementById('basemap-select').value = initialBasemap;
         
         function switchActiveBasemap(targetKey) {
             Object.keys(basemaps).forEach(k => { if(map.hasLayer(basemaps[k])) map.removeLayer(basemaps[k]); });
@@ -640,6 +666,9 @@ leaflet_template = """
                     marker.addTo(layerGroupsRef[key]);
                 });
             });
+            
+            // Explicit constraint integration target layer ordering enforcement mapping configuration logic.
+            if (centerMarker) { centerMarker.bringToFront(); }
         }
 
         window.openClusterModalWindow = function() {
@@ -709,7 +738,7 @@ leaflet_template = """
         window.patchGlobalMarkerSize = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v)); compileLayersAndRenderPoints(); };
         window.patchGlobalMarkerColor = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].color = v); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
-        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderRadiusCircleBounds(); };
+        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderTargetCenterIcon(); renderRadiusCircleBounds(); if (centerMarker) centerMarker.bringToFront(); };
         window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
 
         function rebuildSidebarControlLayout() {
@@ -872,137 +901,95 @@ leaflet_template = """
             }
         };
 
-        // Right Click Target Setup Protocol
-        window.updateParentTargetCoordsState = function(lat, lon) {
-            const currentUrl = new URL(window.parent.location.href);
-            currentUrl.searchParams.set("set_lat", lat.toFixed(5));
-            currentUrl.searchParams.set("set_lon", lon.toFixed(5));
-            window.parent.location.href = currentUrl.toString();
+        // Complete robust snapshot replication engine pipeline utilizing standalone isolated leaflet instances
+        window.executeMapCapturePipeline = function() {
+            document.getElementById('loading-overlay-message').innerText = 'Exporting Trade Area';
+            document.getElementById('map-loading-overlay').style.display = 'flex';
+
+            const activeBasemapKey = document.getElementById('basemap-select').value;
+            const currentCenter = map.getCenter();
+            const currentZoom = map.getZoom();
+
+            const blueprintMapContainer = document.getElementById('blueprint-map-frame');
+            blueprintMapContainer.innerHTML = '';
+            
+            const exportMap = L.map('blueprint-map-frame', {
+                zoomControl: false, attributionControl: false, preferCanvas: true
+            }).setView(currentCenter, currentZoom);
+
+            const captureBasemaps = {
+                osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
+                satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+                carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
+                dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
+            };
+            captureBasemaps[activeBasemapKey].addTo(exportMap);
+
+            L.circle([__LAT__, __LON__], {
+                radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight),
+                fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity)
+            }).addTo(exportMap);
+
+            Object.keys(categoryMap).forEach(key => {
+                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
+                categoryMap[key].forEach(p => {
+                    if (p.visible === false) return;
+                    L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).addTo(exportMap);
+                });
+            });
+
+            const d = targetConfig.size; const c = targetConfig.color;
+            const htmlElement = targetConfig.style === "star" 
+                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">★</div>`
+                : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
+            
+            L.marker([__LAT__, __LON__], { 
+                icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 
+            }).addTo(exportMap);
+
+            const legendBox = document.getElementById('blueprint-legend-items-box');
+            legendBox.innerHTML = '';
+            Object.keys(categoryMap).forEach(key => {
+                const meta = layerMeta[key] || { color: "#003366" };
+                legendBox.innerHTML += `
+                    <div class="blueprint-legend-item">
+                        <span class="color-dot" style="background-color: ${meta.color}; width:10px; height:10px;"></span>
+                        <span>${key}</span>
+                    </div>
+                `;
+            });
+
+            setTimeout(() => {
+                html2canvas(document.getElementById('export-canvas-blueprint'), {
+                    useCORS: true, allowTaint: true, scale: 2
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = 'trade-area-export.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    document.getElementById('map-loading-overlay').style.display = 'none';
+                }).catch(err => {
+                    console.error(err);
+                    document.getElementById('map-loading-overlay').style.display = 'none';
+                });
+            }, 1500);
         };
 
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
+            // Native platform trigger string interpolation context binding link pipeline.
+            const setTargetUrl = `?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`;
             const menuHtml = `
                 <div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;">
                     <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700; color: #003366;" onclick="updateParentTargetCoordsState(${lat}, ${lng})">📍 Set as Target Coordinate</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.parent.location.search='${setTargetUrl}';">set as the target coordinates</div>
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://maps.google.com/?q=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
-
-        // High-Resolution Localized Canvas Export Architecture
-        window.processStructuralImageSnapshot = function() {
-            const overlay = document.getElementById('map-loading-overlay');
-            document.getElementById('loading-overlay-string').innerText = "Exporting Trade Area...";
-            overlay.style.display = 'flex';
-
-            setTimeout(() => {
-                try {
-                    const canvas = document.createElement('canvas');
-                    // Force clean 4:3 presentation aspect standard
-                    canvas.width = 1200;
-                    canvas.height = 900;
-                    const ctx = canvas.getContext('2d');
-
-                    // Standard background fill execution
-                    ctx.fillStyle = "#ffffff";
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                    // Left Map segment definition boundaries
-                    const mapW = 900;
-                    const mapH = 900;
-                    ctx.fillStyle = "#222222"; 
-                    if (localStorage.getItem('ts_persistent_basemap') === 'osm' || localStorage.getItem('ts_persistent_basemap') === 'carto') {
-                        ctx.fillStyle = "#f4f3f0"; 
-                    }
-                    ctx.fillRect(0, 0, mapW, mapH);
-
-                    // Plot central bounding radius rings visually
-                    const centerCanvasX = mapW / 2;
-                    const centerCanvasY = mapH / 2;
-                    
-                    ctx.beginPath();
-                    ctx.arc(centerCanvasX, centerCanvasY, 280, 0, 2 * Math.PI);
-                    ctx.fillStyle = "rgba(0, 51, 102, 0.09)";
-                    ctx.fill();
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = targetConfig.color || "#003366";
-                    ctx.stroke();
-
-                    // Generate target center icon
-                    ctx.beginPath();
-                    ctx.arc(centerCanvasX, centerCanvasY, 12, 0, 2 * Math.PI);
-                    ctx.fillStyle = targetConfig.color || "#003366";
-                    ctx.fill();
-                    ctx.strokeStyle = "#ffffff";
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-
-                    // Re-project loose cluster points dynamically down inside mock coordinates window
-                    pts.forEach((p, idx) => {
-                        if (p.visible === false) return;
-                        const meta = layerMeta[p.type] || { color: "#003366" };
-                        
-                        // Seed safe offset layout maps close to core vector zones
-                        const seedX = centerCanvasX + (p.lon - (__LON__)) * 12000;
-                        const seedY = centerCanvasY - (p.lat - (__LAT__)) * 12000;
-
-                        if (seedX > 0 && seedX < mapW && seedY > 0 && seedY < mapH) {
-                            ctx.beginPath();
-                            ctx.arc(seedX, seedY, 6, 0, 2 * Math.PI);
-                            ctx.fillStyle = meta.color;
-                            ctx.fill();
-                            ctx.strokeStyle = "#ffffff";
-                            ctx.lineWidth = 1;
-                            ctx.stroke();
-                        }
-                    });
-
-                    // Build minimalist corporate vertical legend panel right side (300px width)
-                    const legX = mapW;
-                    ctx.fillStyle = "#003366"; // Corporate Navy Header strip block accent bar
-                    ctx.fillRect(legX, 0, 300, 45);
-                    
-                    ctx.fillStyle = "#ffffff";
-                    ctx.font = "bold 11px Montserrat, sans-serif";
-                    ctx.fillText("TRADE AREA METRICS", legX + 20, 26);
-
-                    // Construct layer matrix definitions cleanly
-                    let currentVerticalOffset = 80;
-                    const uniqueActiveKeys = Object.keys(categoryMap);
-                    
-                    uniqueActiveKeys.forEach(key => {
-                        const meta = layerMeta[key] || { color: "#003366" };
-                        
-                        // Icon dot alignment matrix mapping
-                        ctx.beginPath();
-                        ctx.arc(legX + 25, currentVerticalOffset - 4, 5, 0, 2 * Math.PI);
-                        ctx.fillStyle = meta.color;
-                        ctx.fill();
-
-                        ctx.fillStyle = "#003366";
-                        ctx.font = "600 10px Montserrat, sans-serif";
-                        const labelString = `${key.toUpperCase()} (${categoryMap[key].length})`;
-                        ctx.fillText(labelString, legX + 42, currentVerticalOffset);
-                        
-                        currentVerticalOffset += 26;
-                    });
-
-                    // Auto-execute clean trigger deployment loop sequences down out to local systems files
-                    const link = document.createElement('a');
-                    link.download = 'trade-area-analysis.png';
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                } catch(err) {
-                    alert("Snapshot Error: Rendering canvas sandbox context restrictions tracking.");
-                } finally {
-                    overlay.style.display = 'none';
-                }
-            }, 800);
-        };
 
         renderTargetCenterIcon(); renderRadiusCircleBounds(); compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
 
