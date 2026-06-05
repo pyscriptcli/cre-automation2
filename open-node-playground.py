@@ -162,7 +162,7 @@ def compile_features_kml(features):
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
-# Handle dynamic structural cross-frame state processing logic layers seamlessly
+# Handle dynamic cross-frame state tracking changes via clear dictionary sync loops
 if "toggle_legend_layer" in st.query_params:
     tgt_lyr = st.query_params["toggle_legend_layer"]
     if tgt_lyr in st.session_state.legend_layers:
@@ -422,7 +422,7 @@ leaflet_template = """
         #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
         #floating-export-btn:hover { background: #f8fafc; }
 
-        /* Static Invisible Export Layout Pipeline */
+        /* Static Invisible Export Layout Container Architecture */
         #export-canvas-blueprint {
             position: absolute; left: -9999px; top: -9999px;
             width: 1024px; height: 768px; background: #ffffff;
@@ -951,7 +951,7 @@ leaflet_template = """
             blueprintMapContainer.innerHTML = '';
             
             const exportMap = L.map('blueprint-map-frame', {
-                zoomControl: false, attributionControl: false, preferCanvas: true
+                zoomControl: false, attributionControl: false, preferCanvas: false
             }).setView(currentCenter, currentZoom);
 
             const captureBasemaps = {
@@ -960,6 +960,9 @@ leaflet_template = """
                 carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }),
                 dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
             };
+            
+            // Critical fix to avoid html2canvas canvas-tainting issues
+            captureBasemaps[activeBasemapKey].options.crossOrigin = 'anonymous';
             captureBasemaps[activeBasemapKey].addTo(exportMap);
 
             L.circle([__LAT__, __LON__], {
@@ -1020,7 +1023,10 @@ leaflet_template = """
                 
                 setTimeout(() => {
                     html2canvas(document.getElementById('export-canvas-blueprint'), {
-                        useCORS: true, allowTaint: true, scale: 2
+                        useCORS: true, 
+                        allowTaint: false, 
+                        scale: 2,
+                        logging: false
                     }).then(canvas => {
                         const link = document.createElement('a');
                         link.download = 'trade-area-export.png';
@@ -1031,7 +1037,7 @@ leaflet_template = """
                         console.error(err);
                         document.getElementById('map-loading-overlay').style.display = 'none';
                     });
-                }, 500);
+                }, 800);
             }, 1000);
         };
 
@@ -1044,7 +1050,7 @@ leaflet_template = """
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.parent.location.search='${setTargetUrl}';">set as the target coordinates</div>
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div>
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
