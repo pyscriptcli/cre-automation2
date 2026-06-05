@@ -797,63 +797,29 @@ leaflet_template = """
                     }
                 });
 
-                htmlPayload += `
-                    <div class="group-cluster-block" id="cluster-block-${clusterName}">
-                        <div class="group-cluster-header">
-                            <div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')">
-                                <span style="color:#C9AB4C;">⚡</span>
-                                <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:2px;">
-                                <a class="action-icon-trigger ${groupIsLegendActive ? 'legend-active-btn' : ''}" title="Toggle Legend Representation for Group" onclick="toggleClusterGroupLegendState('${clusterName}', ${groupIsLegendActive})">${listSvg}</a>
-                                <a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a>
-                                <a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a>
-                                <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span>
-                            </div>
-                        </div>
-                        
-                        <div class="config-block-wrapper" style="background: #e2e8f0; border-bottom: 1px solid rgba(0,51,102,0.15);">
-                            <div class="config-headline" style="font-size:7.5px; opacity:0.8;">Batch Group Style Controller</div>
-                            <div class="config-flex-row">
-                                <select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)">
-                                    <option value="dots">Dots</option>
-                                    <option value="pin">Pin</option>
-                                    <option value="modern-pin">Drop Pin</option>
-                                </select>
-                                <input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)">
-                                <input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)">
-                            </div>
-                        </div>
-
-                        <div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 8px; background: rgba(0,0,0,0.02);">
-                `;
-
-                assignedLayers.forEach(catName => {
-                    if(!categoryMap[catName]) return;
-                    const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
-                    const layerPts = categoryMap[catName] || [];
-                    const isLayerVisible = layerPts.some(p => p.visible !== false);
-
-                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg);
-                });
-
-                htmlPayload += '</div></div>';
+htmlPayload += '</div></div>';
             });
 
+            // FIX: Ensure all scanned layers are accurately tracked, structured, and mounted regardless of cluster configuration
             Object.keys(categoryMap).forEach(catName => {
                 let insideClusterGroup = false;
-                Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
-                if (insideClusterGroup) return;
+                Object.values(clusters).forEach(layerArr => { 
+                    if(layerArr.includes(catName)) insideClusterGroup = true; 
+                });
 
+                // Extracted styling metadata state records
                 const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
-                htmlPayload += `
-                    <div class="layer-category-block" id="cat-block-${catName}">
-                `;
-                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg);
-                htmlPayload += '</div>';
+                // If it's not inside a cluster, render it as an independent workspace item immediately
+                if (!insideClusterGroup) {
+                    htmlPayload += `
+                        <div class="layer-category-block" id="cat-block-${catName}">
+                    `;
+                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg);
+                    htmlPayload += '</div>';
+                }
             });
 
             listBox.innerHTML = htmlPayload;
