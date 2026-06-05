@@ -108,8 +108,12 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
-if "lat" in st.query_params and "lon" in st.query_params:
-    st.session_state.geo_coords = f"{st.query_params['lat']}, {st.query_params['lon']}"
+# Intercept context parameters from custom Leaflet dynamic right click events
+query_params = st.query_params
+if "lat" in query_params and "lon" in query_params:
+    st.session_state.geo_coords = f"{query_params['lat']}, {query_params['lon']}"
+    # Force reset structural state parameters to lock configuration execution paths cleanly
+    st.query_params.clear()
 
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
@@ -122,6 +126,7 @@ if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
+if 'legend_layers' not in st.session_state: st.session_state.legend_layers = []
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -158,6 +163,15 @@ def compile_features_kml(features):
         class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
+
+# Handle cross-frame legend selection logic mutations cleanly
+if "toggle_legend_layer" in query_params:
+    tgt_lyr = query_params["toggle_legend_layer"][0]
+    if tgt_lyr in st.session_state.legend_layers:
+        st.session_state.legend_layers.remove(tgt_lyr)
+    else:
+        st.session_state.legend_layers.append(tgt_lyr)
+    st.query_params.clear()
 
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
@@ -275,6 +289,7 @@ with st.sidebar:
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
+        st.session_state.legend_layers = []
         st.session_state.scan_active_loading = False
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
@@ -314,14 +329,14 @@ for idx, layer in enumerate(unique_layers):
         st.session_state.layer_meta[layer] = {
             "color": cat_palette[idx % len(cat_palette)],
             "style": st.session_state.global_marker_style,
-            "size": st.session_state.global_marker_size,
-            "in_legend": True
+            "size": st.session_state.global_marker_size
         }
 
 layer_meta_json = json.dumps(st.session_state.layer_meta)
 target_config_json = json.dumps(st.session_state.target_config)
 radius_config_json = json.dumps(st.session_state.radius_config)
 geojson_str = json.dumps(pts_active)
+legend_layers_json = json.dumps(st.session_state.legend_layers)
 
 render_lat = lat_coord
 render_lon = lon_coord
@@ -378,7 +393,7 @@ leaflet_template = """
         .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
         .action-icon-trigger:hover svg { fill: #003366; }
         .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
-        .action-icon-trigger.legend-active-btn svg { fill: #C9AB4C; }
+        .action-icon-trigger.legend-active-btn svg { fill: #C9AB4C !important; }
 
         .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .hide-labels .poi-text-label { display: none !important; }
@@ -398,7 +413,6 @@ leaflet_template = """
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
 
-        /* Custom Floating Top Left Export Trigger */
         #floating-export-btn {
             position: absolute; top: 10px; left: 10px; z-index: 1000;
             background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
@@ -409,27 +423,29 @@ leaflet_template = """
         #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
         #floating-export-btn:hover { background: #f8fafc; }
 
-        /* Static Invisible Export Layout Pipeline */
+        /* Dynamic Blueprint Output Blueprint Layout Engine CSS Spec */
         #export-canvas-blueprint {
             position: absolute; left: -9999px; top: -9999px;
             width: 1024px; height: 768px; background: #ffffff;
-            display: flex; flex-direction: row; box-sizing: border-box;
+            display: flex; flex-direction: row; box-sizing: border-box; overflow: hidden;
         }
-        #blueprint-map-frame { width: 75%; height: 100%; position: relative; overflow: hidden; background: #f8fafc; }
+        #blueprint-map-frame { flex-grow: 1; height: 100%; position: relative; overflow: hidden; background: #f8fafc; }
         #blueprint-legend-frame {
-            width: 25%; height: 100%; background: #ffffff;
+            height: 100%; background: #ffffff;
             border-left: 1px solid rgba(0, 51, 102, 0.1);
             padding: 20px; box-sizing: border-box; display: flex; flex-direction: column;
-            align-self: flex-start;
+            flex-shrink: 0; min-width: 120px; max-width: 240px;
         }
         .blueprint-legend-title {
             font-size: 14px; font-weight: 800; color: #003366;
             text-transform: uppercase; border-bottom: 2px solid #C9AB4C;
             padding-bottom: 6px; margin-bottom: 12px; letter-spacing: 1px;
+            white-space: nowrap;
         }
         .blueprint-legend-item {
             display: flex; align-items: center; gap: 8px; font-size: 11px;
             font-weight: 600; color: #003366; padding: 5px 0; text-transform: uppercase;
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -554,6 +570,7 @@ leaflet_template = """
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
         let clusters = {}; 
+        let legendLayers = __LEGEND_LAYERS_JSON__;
 
         if (__SHOW_LOADING__) {
             document.getElementById('loading-overlay-message').innerText = 'Scanning Area...';
@@ -654,7 +671,7 @@ leaflet_template = """
 
             Object.keys(categoryMap).forEach(key => {
                 layerGroupsRef[key] = L.layerGroup().addTo(map);
-                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12, in_legend: true };
+                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
                 
                 categoryMap[key].forEach(p => {
                     if (p.visible === false) return;
@@ -739,11 +756,9 @@ leaflet_template = """
         window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
         window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderTargetCenterIcon(); renderRadiusCircleBounds(); if (centerMarker) centerMarker.bringToFront(); };
         window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
-        
-        window.toggleLayerLegendFlag = function(layerKey) {
-            if (!layerMeta[layerKey]) layerMeta[layerKey] = {};
-            layerMeta[layerKey].in_legend = !layerMeta[layerKey].in_legend;
-            rebuildSidebarControlLayout();
+
+        window.toggleLegendLayerState = function(layerKey) {
+            window.parent.location.search = `?toggle_legend_layer=${encodeURIComponent(layerKey)}`;
         };
 
         function rebuildSidebarControlLayout() {
@@ -755,7 +770,7 @@ leaflet_template = """
             const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
             const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
-            const starSvg = `<svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`;
+            const listSvg = `<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>`;
 
             Object.keys(clusters).forEach(clusterName => {
                 const assignedLayers = clusters[clusterName] || [];
@@ -801,11 +816,11 @@ leaflet_template = """
 
                 assignedLayers.forEach(catName => {
                     if(!categoryMap[catName]) return;
-                    const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12, in_legend: true };
+                    const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
                     const layerPts = categoryMap[catName] || [];
                     const isLayerVisible = layerPts.some(p => p.visible !== false);
 
-                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, starSvg);
+                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg);
                 });
 
                 htmlPayload += '</div></div>';
@@ -816,22 +831,22 @@ leaflet_template = """
                 Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
                 if (insideClusterGroup) return;
 
-                const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12, in_legend: true };
+                const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
                 htmlPayload += `
                     <div class="layer-category-block" id="cat-block-${catName}">
                 `;
-                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, starSvg);
+                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg);
                 htmlPayload += '</div>';
             });
 
             listBox.innerHTML = htmlPayload;
         }
 
-        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, starSvg) {
-            const isLegendActive = meta.in_legend !== false;
+        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg) {
+            const isLegendActive = legendLayers.includes(catName);
             let chunk = `
                 <div class="layer-category-header">
                     <div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')">
@@ -839,7 +854,7 @@ leaflet_template = """
                         <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
                     </div>
                     <div style="display:flex; align-items:center; gap:1px;">
-                        <a class="action-icon-trigger ${isLegendActive ? 'legend-active-btn' : ''}" title="Toggle Legend Representation" onclick="toggleLayerLegendFlag('${catName}')">${starSvg}</a>
+                        <a class="action-icon-trigger ${isLegendActive ? 'legend-active-btn' : ''}" title="Toggle Legend Representation" onclick="toggleLegendLayerState('${catName}')">${listSvg}</a>
                         <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
                         <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
                         <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
@@ -909,7 +924,7 @@ leaflet_template = """
             }
         };
 
-        // Complete robust snapshot replication engine pipeline utilizing standalone isolated leaflet instances
+        // Snapshot Engine with Width-Adaptive Legend Column Sidebar Layout Compaction Alignment
         window.executeMapCapturePipeline = function() {
             document.getElementById('loading-overlay-message').innerText = 'Exporting Trade Area';
             document.getElementById('map-loading-overlay').style.display = 'flex';
@@ -939,7 +954,7 @@ leaflet_template = """
             }).addTo(exportMap);
 
             Object.keys(categoryMap).forEach(key => {
-                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12, in_legend: true };
+                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
                 categoryMap[key].forEach(p => {
                     if (p.visible === false) return;
                     L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).addTo(exportMap);
@@ -951,52 +966,61 @@ leaflet_template = """
                 ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">★</div>`
                 : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
             
-            L.marker([__LAT__, __LON__], { 
+            const exportCenterMarker = L.marker([__LAT__, __LON__], { 
                 icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 
             }).addTo(exportMap);
+            exportCenterMarker.bringToFront();
 
             const legendBox = document.getElementById('blueprint-legend-items-box');
             legendBox.innerHTML = '';
             
-            let descriptiveLayersCount = 0;
-            Object.keys(categoryMap).forEach(key => {
-                const meta = layerMeta[key] || { color: "#003366", in_legend: true };
-                if (meta.in_legend !== false) {
-                    descriptiveLayersCount++;
-                    legendBox.innerHTML += `
-                        <div class="blueprint-legend-item">
-                            <span class="color-dot" style="background-color: ${meta.color}; width:10px; height:10px;"></span>
-                            <span>${key}</span>
-                        </div>
-                    `;
-                }
+            // Build filter lists mapping tracking items configured exclusively inside legend selection contexts
+            let layersToRender = legendLayers.filter(key => categoryMap[key]);
+            if (layersToRender.length === 0) {
+                layersToRender = Object.keys(categoryMap);
+            }
+
+            layersToRender.forEach(key => {
+                const meta = layerMeta[key] || { color: "#003366" };
+                legendBox.innerHTML += `
+                    <div class="blueprint-legend-item">
+                        <span class="color-dot" style="background-color: ${meta.color}; width:10px; height:10px;"></span>
+                        <span>${key}</span>
+                    </div>
+                `;
             });
 
-            // Calculate precise required proportional bounding dimensions
-            const blueprintContainer = document.getElementById('export-canvas-blueprint');
-            if (descriptiveLayersCount === 0) {
-                document.getElementById('blueprint-legend-frame').style.display = 'none';
-                blueprintMapContainer.style.width = '100%';
+            // Adjust width to only what's necessary based on layers rendered
+            const legendFrame = document.getElementById('blueprint-legend-frame');
+            if (layersToRender.length === 0) {
+                legendFrame.style.width = '0px';
+                legendFrame.style.padding = '0px';
+                legendFrame.style.borderLeft = 'none';
             } else {
-                document.getElementById('blueprint-legend-frame').style.display = 'flex';
-                blueprintMapContainer.style.width = '75%';
+                legendFrame.style.width = 'auto';
+                legendFrame.style.padding = '20px';
+                legendFrame.style.borderLeft = '1px solid rgba(0, 51, 102, 0.1)';
             }
 
             setTimeout(() => {
                 exportMap.invalidateSize();
-                html2canvas(blueprintContainer, {
-                    useCORS: true, allowTaint: true, scale: 2
-                }).then(canvas => {
-                    const link = document.createElement('a');
-                    link.download = 'trade-area-export.png';
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                    document.getElementById('map-loading-overlay').style.display = 'none';
-                }).catch(err => {
-                    console.error(err);
-                    document.getElementById('map-loading-overlay').style.display = 'none';
-                });
-            }, 1500);
+                exportMap.setView(currentCenter, currentZoom);
+                
+                setTimeout(() => {
+                    html2canvas(document.getElementById('export-canvas-blueprint'), {
+                        useCORS: true, allowTaint: true, scale: 2
+                    }).then(canvas => {
+                        const link = document.createElement('a');
+                        link.download = 'trade-area-export.png';
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        document.getElementById('map-loading-overlay').style.display = 'none';
+                    }).catch(err => {
+                        console.error(err);
+                        document.getElementById('map-loading-overlay').style.display = 'none';
+                    });
+                }, 500);
+            }, 1000);
         };
 
         map.on('contextmenu', function(e) {
@@ -1036,6 +1060,7 @@ leaflet_html = (leaflet_template
                 .replace("__TARGET_CONFIG_JSON__", target_config_json)
                 .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
                 .replace("__LAYER_META_JSON__", layer_meta_json)
-                .replace("__GEOJSON__", geojson_str))
+                .replace("__GEOJSON__", geojson_str)
+                .replace("__LEGEND_LAYERS_JSON__", legend_layers_json))
 
 st.components.v1.html(leaflet_html, height=850, scrolling=False)
