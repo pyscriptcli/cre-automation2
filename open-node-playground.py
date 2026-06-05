@@ -112,9 +112,8 @@ DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
 # Handle state updates from query parameters for seamless map interaction
-query_params = st.query_get()
-if "lat" in query_params and "lon" in query_params:
-    st.session_state.geo_coords = f"{query_params['lat'][0]}, {query_params['lon'][0]}"
+if "lat" in st.query_params and "lon" in st.query_params:
+    st.session_state.geo_coords = f"{st.query_params['lat']}, {st.query_params['lon']}"
     st.query_clear()
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
