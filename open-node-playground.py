@@ -108,15 +108,13 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
-# Intercept context parameters from custom Leaflet dynamic right click events
-query_params = st.query_params
-if "lat" in query_params and "lon" in query_params:
-    st.session_state.geo_coords = f"{query_params['lat']}, {query_params['lon']}"
-    # Force reset structural state parameters to lock configuration execution paths cleanly
-    st.query_params.clear()
-
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
+
+# Handle state updates from query parameters for seamless map interaction
+if "lat" in st.query_params and "lon" in st.query_params:
+    st.session_state.geo_coords = f"{st.query_params['lat']}, {st.query_params['lon']}"
+    st.query_params.clear()
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
@@ -164,14 +162,13 @@ def compile_features_kml(features):
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
-# Handle cross-frame legend selection logic mutations cleanly
-if "toggle_legend_layer" in query_params:
-    tgt_lyr = query_params["toggle_legend_layer"][0]
+# Handle cross-frame legend selection state logic updates
+if "toggle_legend_layer" in st.query_params:
+    tgt_lyr = st.query_params["toggle_legend_layer"]
     if tgt_lyr in st.session_state.legend_layers:
         st.session_state.legend_layers.remove(tgt_lyr)
     else:
         st.session_state.legend_layers.append(tgt_lyr)
-    st.query_params.clear()
 
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
@@ -413,6 +410,7 @@ leaflet_template = """
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
 
+        /* Custom Floating Top Left Export Trigger */
         #floating-export-btn {
             position: absolute; top: 10px; left: 10px; z-index: 1000;
             background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
@@ -423,7 +421,7 @@ leaflet_template = """
         #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
         #floating-export-btn:hover { background: #f8fafc; }
 
-        /* Dynamic Blueprint Output Blueprint Layout Engine CSS Spec */
+        /* Structural Map-Centered Blueprint Blueprint Container Rules */
         #export-canvas-blueprint {
             position: absolute; left: -9999px; top: -9999px;
             width: 1024px; height: 768px; background: #ffffff;
@@ -434,7 +432,7 @@ leaflet_template = """
             height: 100%; background: #ffffff;
             border-left: 1px solid rgba(0, 51, 102, 0.1);
             padding: 20px; box-sizing: border-box; display: flex; flex-direction: column;
-            flex-shrink: 0; min-width: 120px; max-width: 240px;
+            flex-shrink: 0; width: auto; max-width: 240px;
         }
         .blueprint-legend-title {
             font-size: 14px; font-weight: 800; color: #003366;
@@ -854,7 +852,7 @@ leaflet_template = """
                         <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
                     </div>
                     <div style="display:flex; align-items:center; gap:1px;">
-                        <a class="action-icon-trigger ${isLegendActive ? 'legend-active-btn' : ''}" title="Toggle Legend Representation" onclick="toggleLegendLayerState('${catName}')">${listSvg}</a>
+                        <a class="action-icon-trigger ${isLegendActive ? 'legend-active-btn' : ''}" title="Include/Exclude from Legend Panel" onclick="toggleLegendLayerState('${catName}')">${listSvg}</a>
                         <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
                         <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
                         <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
@@ -974,7 +972,6 @@ leaflet_template = """
             const legendBox = document.getElementById('blueprint-legend-items-box');
             legendBox.innerHTML = '';
             
-            // Build filter lists mapping tracking items configured exclusively inside legend selection contexts
             let layersToRender = legendLayers.filter(key => categoryMap[key]);
             if (layersToRender.length === 0) {
                 layersToRender = Object.keys(categoryMap);
@@ -990,7 +987,6 @@ leaflet_template = """
                 `;
             });
 
-            // Adjust width to only what's necessary based on layers rendered
             const legendFrame = document.getElementById('blueprint-legend-frame');
             if (layersToRender.length === 0) {
                 legendFrame.style.width = '0px';
