@@ -108,13 +108,11 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
-DEFAULT_COORDS = "14.5995, 120.9842"
-DEFAULT_RADIUS = 1000
-
-# Handle state updates from query parameters for seamless map interaction
 if "lat" in st.query_params and "lon" in st.query_params:
     st.session_state.geo_coords = f"{st.query_params['lat']}, {st.query_params['lon']}"
-    st.query_clear()
+
+DEFAULT_COORDS = "14.5995, 120.9842"
+DEFAULT_RADIUS = 1000
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
@@ -316,7 +314,8 @@ for idx, layer in enumerate(unique_layers):
         st.session_state.layer_meta[layer] = {
             "color": cat_palette[idx % len(cat_palette)],
             "style": st.session_state.global_marker_style,
-            "size": st.session_state.global_marker_size
+            "size": st.session_state.global_marker_size,
+            "in_legend": True
         }
 
 layer_meta_json = json.dumps(st.session_state.layer_meta)
@@ -379,6 +378,7 @@ leaflet_template = """
         .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
         .action-icon-trigger:hover svg { fill: #003366; }
         .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
+        .action-icon-trigger.legend-active-btn svg { fill: #C9AB4C; }
 
         .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .hide-labels .poi-text-label { display: none !important; }
@@ -420,6 +420,7 @@ leaflet_template = """
             width: 25%; height: 100%; background: #ffffff;
             border-left: 1px solid rgba(0, 51, 102, 0.1);
             padding: 20px; box-sizing: border-box; display: flex; flex-direction: column;
+            align-self: flex-start;
         }
         .blueprint-legend-title {
             font-size: 14px; font-weight: 800; color: #003366;
@@ -653,7 +654,7 @@ leaflet_template = """
 
             Object.keys(categoryMap).forEach(key => {
                 layerGroupsRef[key] = L.layerGroup().addTo(map);
-                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
+                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12, in_legend: true };
                 
                 categoryMap[key].forEach(p => {
                     if (p.visible === false) return;
@@ -666,7 +667,6 @@ leaflet_template = """
                 });
             });
             
-            // Explicit constraint integration target layer ordering enforcement mapping configuration logic.
             if (centerMarker) { centerMarker.bringToFront(); }
         }
 
@@ -739,6 +739,12 @@ leaflet_template = """
         window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
         window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderTargetCenterIcon(); renderRadiusCircleBounds(); if (centerMarker) centerMarker.bringToFront(); };
         window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
+        
+        window.toggleLayerLegendFlag = function(layerKey) {
+            if (!layerMeta[layerKey]) layerMeta[layerKey] = {};
+            layerMeta[layerKey].in_legend = !layerMeta[layerKey].in_legend;
+            rebuildSidebarControlLayout();
+        };
 
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box');
@@ -749,6 +755,7 @@ leaflet_template = """
             const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
             const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
+            const starSvg = `<svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`;
 
             Object.keys(clusters).forEach(clusterName => {
                 const assignedLayers = clusters[clusterName] || [];
@@ -794,11 +801,11 @@ leaflet_template = """
 
                 assignedLayers.forEach(catName => {
                     if(!categoryMap[catName]) return;
-                    const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
+                    const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12, in_legend: true };
                     const layerPts = categoryMap[catName] || [];
                     const isLayerVisible = layerPts.some(p => p.visible !== false);
 
-                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
+                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, starSvg);
                 });
 
                 htmlPayload += '</div></div>';
@@ -809,21 +816,22 @@ leaflet_template = """
                 Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
                 if (insideClusterGroup) return;
 
-                const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
+                const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12, in_legend: true };
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
                 htmlPayload += `
                     <div class="layer-category-block" id="cat-block-${catName}">
                 `;
-                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
+                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, starSvg);
                 htmlPayload += '</div>';
             });
 
             listBox.innerHTML = htmlPayload;
         }
 
-        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg) {
+        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, starSvg) {
+            const isLegendActive = meta.in_legend !== false;
             let chunk = `
                 <div class="layer-category-header">
                     <div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')">
@@ -831,6 +839,7 @@ leaflet_template = """
                         <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
                     </div>
                     <div style="display:flex; align-items:center; gap:1px;">
+                        <a class="action-icon-trigger ${isLegendActive ? 'legend-active-btn' : ''}" title="Toggle Legend Representation" onclick="toggleLayerLegendFlag('${catName}')">${starSvg}</a>
                         <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
                         <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
                         <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
@@ -930,7 +939,7 @@ leaflet_template = """
             }).addTo(exportMap);
 
             Object.keys(categoryMap).forEach(key => {
-                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
+                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12, in_legend: true };
                 categoryMap[key].forEach(p => {
                     if (p.visible === false) return;
                     L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).addTo(exportMap);
@@ -948,18 +957,34 @@ leaflet_template = """
 
             const legendBox = document.getElementById('blueprint-legend-items-box');
             legendBox.innerHTML = '';
+            
+            let descriptiveLayersCount = 0;
             Object.keys(categoryMap).forEach(key => {
-                const meta = layerMeta[key] || { color: "#003366" };
-                legendBox.innerHTML += `
-                    <div class="blueprint-legend-item">
-                        <span class="color-dot" style="background-color: ${meta.color}; width:10px; height:10px;"></span>
-                        <span>${key}</span>
-                    </div>
-                `;
+                const meta = layerMeta[key] || { color: "#003366", in_legend: true };
+                if (meta.in_legend !== false) {
+                    descriptiveLayersCount++;
+                    legendBox.innerHTML += `
+                        <div class="blueprint-legend-item">
+                            <span class="color-dot" style="background-color: ${meta.color}; width:10px; height:10px;"></span>
+                            <span>${key}</span>
+                        </div>
+                    `;
+                }
             });
 
+            // Calculate precise required proportional bounding dimensions
+            const blueprintContainer = document.getElementById('export-canvas-blueprint');
+            if (descriptiveLayersCount === 0) {
+                document.getElementById('blueprint-legend-frame').style.display = 'none';
+                blueprintMapContainer.style.width = '100%';
+            } else {
+                document.getElementById('blueprint-legend-frame').style.display = 'flex';
+                blueprintMapContainer.style.width = '75%';
+            }
+
             setTimeout(() => {
-                html2canvas(document.getElementById('export-canvas-blueprint'), {
+                exportMap.invalidateSize();
+                html2canvas(blueprintContainer, {
                     useCORS: true, allowTaint: true, scale: 2
                 }).then(canvas => {
                     const link = document.createElement('a');
@@ -976,7 +1001,6 @@ leaflet_template = """
 
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
-            // Native platform trigger string interpolation context binding link pipeline.
             const setTargetUrl = `?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`;
             const menuHtml = `
                 <div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;">
