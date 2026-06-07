@@ -1,3 +1,12 @@
+import sys
+import os
+
+# FIXED: Force append the 'open-node' subfolder directory to the system path
+# prior to executing any modular library imports to prevent container deployment failures.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 import streamlit as st
 from config import initialize_session_states
 from sidebar import render_unified_dashboard_sidebar
