@@ -83,12 +83,12 @@ st.markdown("""
         # ---------------------------------------------------------------------
         [data-testid="stSidebar"] {
             position: fixed !important;
-            top: 10px !important;
-            left: 10px !important;
+            top: 8px !important;
+            left: 8px !important;
             height: calc(100vh - 20px) !important;
-            width: 240px !important;      /* <--- BAGUHIN ITO PARA SA LAPAD */
-            min-width: 240px !important;  /* <--- IPANTAY DITO */
-            max-width: 240px !important;  /* <--- IPANTAY DITO */
+            width: 280px !important;      /* <--- BAGUHIN ITO PARA SA LAPAD */
+            min-width: 280px !important;  /* <--- IPANTAY DITO */
+            max-width: 280px !important;  /* <--- IPANTAY DITO */
             background-color: rgba(255, 255, 255, 0.94) !important;
             backdrop-filter: blur(16px) !important;
             -webkit-backdrop-filter: blur(16px) !important;
