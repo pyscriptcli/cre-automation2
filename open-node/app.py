@@ -14,6 +14,14 @@ from map_view import render_leaflet_component_iframe
 # Initialize session parameters and default settings
 initialize_session_states()
 
+# --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
+_config_dir = ".streamlit"
+_config_file = os.path.join(_config_dir, "config.toml")
+if not os.path.exists(_config_file):
+    os.makedirs(_config_dir, exist_ok=True)
+    with open(_config_file, "w", encoding="utf-8") as f:
+        f.write("[theme]\nbase=\"light\"\n")
+
 # -----------------------------------------------------------------------------
 # 1. HARD LIGHT-MODE ENFORCEMENT & HIGH-COMPACT FLOATING SIDEBAR ENGINE
 # -----------------------------------------------------------------------------
