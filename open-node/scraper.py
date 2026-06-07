@@ -81,7 +81,7 @@ def run_spatial_layer_scan(lat: float, lon: float, radius: int, selected_tuples:
     try:
         res = requests.post(url, data={"data": ql_query}, headers={"User-Agent": "OpenNode/3.5"}, timeout=90)
         if res.status_code == 200:
-            elements = res.json().get('elements', []):
+            elements = res.json().get('elements', [])
             for el in elements:
                 e_lat = el.get('lat') or el.get('center', {}).get('lat')
                 e_lon = el.get('lon') or el.get('center', {}).get('lon')
