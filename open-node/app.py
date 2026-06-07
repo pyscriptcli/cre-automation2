@@ -73,15 +73,22 @@ st.markdown("""
             height: 100vh !important;
         }
 
-        /* FIXED: Re-engineered ultra-compact space-efficient minimalist floating structural card sidebar panel */
+        # =====================================================================
+        # PRODUCTION DIRECTIVE: SIDEBAR SIZE CONFIGURATION CONTROLLER
+        # =====================================================================
+        # ADJUST SIDEBAR WIDTH HERE: Palitan ang 240px sa ibaba upang baguhin 
+        # ang kabuuang lapad ng floating panel (e.g., 220px para sa mas compact, 
+        # o 280px para sa mas malawak na layout). Siguraduhing pareho ang tatlong 
+        # value (width, min-width, max-width) upang maiwasan ang flex layout distortion.
+        # ---------------------------------------------------------------------
         [data-testid="stSidebar"] {
             position: fixed !important;
             top: 10px !important;
             left: 10px !important;
             height: calc(100vh - 20px) !important;
-            width: 240px !important;
-            min-width: 240px !important;
-            max-width: 240px !important;
+            width: 240px !important;      /* <--- BAGUHIN ITO PARA SA LAPAD */
+            min-width: 240px !important;  /* <--- IPANTAY DITO */
+            max-width: 240px !important;  /* <--- IPANTAY DITO */
             background-color: rgba(255, 255, 255, 0.94) !important;
             backdrop-filter: blur(16px) !important;
             -webkit-backdrop-filter: blur(16px) !important;
