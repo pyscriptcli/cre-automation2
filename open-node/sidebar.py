@@ -1,105 +1,190 @@
-import os
-import sys
+"""
+sidebar.py – Google My Maps-style floating sidebar panel.
+All scan logic, POI selection, and workspace actions live here.
+"""
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
-
-import streamlit as st
-import json
 import re
-from config import load_poi_configuration
-from scraper import run_spatial_layer_scan, compile_features_kml
+import json
+import streamlit as st
+from config import POI_CONFIG, ADVANCED_CONFIG
+from scraper import fetch_pois
+from kml_export import compile_features_kml
 
-def render_unified_dashboard_sidebar():
-    config_data = load_poi_configuration()
-    poi_config = config_data.get("POI_CONFIG", {})
-    
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COORDINATE PARSER
+# ─────────────────────────────────────────────────────────────────────────────
+_COORD_RE = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
+
+
+def parse_coords(text: str) -> tuple[float, float] | None:
+    m = _COORD_RE.match(text)
+    if m:
+        return float(m.group(1)), float(m.group(2))
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SIDEBAR RENDER
+# ─────────────────────────────────────────────────────────────────────────────
+def render_unified_dashboard_sidebar() -> tuple[float, float, int]:
+    """
+    Render the full sidebar. Returns (lat, lon, radius) for the map renderer.
+    """
     with st.sidebar:
-        st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
-        
-        if st.session_state.sidebar_error_msg:
-            st.error(st.session_state.sidebar_error_msg)
-            
-        selected_tuples = []
-        scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
-        
-        location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
-        radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, step=100)
+        # ── Header ────────────────────────────────────────────────────────────
+        st.markdown(
+            '<div class="brand-title">🗺 Open Node</div>',
+            unsafe_allow_html=True,
+        )
+
+        # ── Location + Radius inputs ──────────────────────────────────────────
+        coords_input = st.text_input(
+            "Coordinates",
+            value=st.session_state.geo_coords,
+            placeholder="lat, lon",
+            key="coords_text_input",
+        )
+        radius_val = st.number_input(
+            "Radius (meters)",
+            min_value=100,
+            max_value=50_000,
+            value=st.session_state.geo_radius,
+            step=100,
+            key="radius_number_input",
+        )
         st.session_state.geo_radius = radius_val
 
-        coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
-        if coord_match:
-            lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
-            st.session_state.geo_coords = location_input
+        parsed = parse_coords(coords_input)
+        if parsed:
+            lat_coord, lon_coord = parsed
         else:
-            fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-            lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+            fallback = parse_coords(st.session_state.geo_coords)
+            lat_coord, lon_coord = fallback if fallback else (14.5995, 120.9842)
 
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-        search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-        
-        for cat_name, node_items in poi_config.items():
-            matched = [item for item in node_items if search_query in item[0].lower()]
-            if matched:
-                with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                    for label, key_tag, val_tag in matched:
-                        if st.checkbox(label, key=f"chk_{cat_name}_{label}"):
-                            selected_tuples.append((label, key_tag, val_tag))
+        # ── Persistent error banner ────────────────────────────────────────────
+        if st.session_state.scan_error:
+            st.error(st.session_state.scan_error)
 
-        if scan_triggered:
-            if not selected_tuples:
-                st.session_state.sidebar_error_msg = "Select ≥ 1 layer."
-                st.rerun()
+        # ── Scan button ───────────────────────────────────────────────────────
+        scan_clicked = st.button(
+            "SCAN AREA",
+            type="secondary",
+            use_container_width=True,
+            key="scan_btn",
+        )
+
+        # ── POI search filter ─────────────────────────────────────────────────
+        search_q = st.text_input(
+            "Search layers",
+            placeholder="Filter POI types...",
+            key="poi_search",
+        ).lower().strip()
+
+        # ── POI checkboxes ────────────────────────────────────────────────────
+        selected_tags: list[str] = []
+
+        def _render_category(cat_name: str, items: list[tuple], prefix: str):
+            matched = [item for item in items if search_q in item[0].lower()]
+            if not matched:
+                return
+            with st.expander(cat_name, expanded=bool(search_q)):
+                for label, tag in matched:
+                    key = f"chk_{prefix}_{cat_name}_{label}"
+                    if st.checkbox(label, key=key):
+                        selected_tags.append(tag)
+
+        st.markdown(
+            "<div style='font-size:10px;font-weight:600;color:#5f6368;padding:8px 0 4px;letter-spacing:0.5px;'>POI CATEGORIES</div>",
+            unsafe_allow_html=True,
+        )
+        for cat, items in POI_CONFIG.items():
+            _render_category(cat, items, "poi")
+
+        st.markdown(
+            "<div style='font-size:10px;font-weight:600;color:#5f6368;padding:8px 0 4px;letter-spacing:0.5px;'>ADVANCED</div>",
+            unsafe_allow_html=True,
+        )
+        for cat, items in ADVANCED_CONFIG.items():
+            _render_category(cat, items, "adv")
+
+        # ── Scan logic ────────────────────────────────────────────────────────
+        if scan_clicked:
+            if not selected_tags:
+                st.session_state.scan_error = "Select at least one layer before scanning."
             else:
-                st.session_state.sidebar_error_msg = None
+                st.session_state.scan_error = None
                 st.session_state.scan_active_loading = True
+
+                records, error = fetch_pois(lat_coord, lon_coord, radius_val, selected_tags)
+
+                st.session_state.scan_active_loading = False
+
+                if error and not records:
+                    st.session_state.scan_error = f"Scan failed: {error}"
+                else:
+                    st.session_state.scan_error = None
+                    st.session_state.scanned_records = records
+                    st.session_state.geo_coords      = f"{lat_coord:.5f}, {lon_coord:.5f}"
+                    st.session_state.last_scan_lat   = lat_coord
+                    st.session_state.last_scan_lon   = lon_coord
+                    # Reset layer meta so new layers pick fresh colours
+                    st.session_state.layer_meta = {}
                 st.rerun()
 
-        # Dynamic Execution Pipeline Block triggered cleanly post rerun state tracking
-        if st.session_state.scan_active_loading and selected_tuples:
-            records = run_spatial_layer_scan(lat_coord, lon_coord, radius_val, selected_tuples)
-            st.session_state.scanned_records = records
-            st.session_state.geo_coords = f"{lat_coord}, {lon_coord}"
-            st.session_state.last_scan_lat = lat_coord
-            st.session_state.last_scan_lon = lon_coord
-            st.session_state.scan_active_loading = False
-            st.rerun()
+        # ── Workspace actions ─────────────────────────────────────────────────
+        st.markdown("<hr style='margin:12px 0;border:0;border-top:1px solid #e8eaed;'>", unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("CLEAR ALL", type="primary", key="clear_btn"):
-            st.session_state.scanned_records = []
-            st.session_state.layer_meta = {}
-            st.session_state.legend_layers = []
-            st.session_state.sidebar_error_msg = None
-            st.session_state.scan_active_loading = False
-            for key in list(st.session_state.keys()):
-                if key.startswith("chk_"):
-                    st.session_state[key] = False
-            st.rerun()
+        visible_records = [p for p in st.session_state.scanned_records if p.get("visible", True)]
 
-        st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
         col1, col2 = st.columns(2)
-        visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
-        
         with col1:
-            st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
+            st.download_button(
+                "JSON",
+                data=json.dumps(visible_records, ensure_ascii=True),
+                file_name="scan.json",
+                mime="application/json",
+                use_container_width=True,
+            )
         with col2:
-            st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+            st.download_button(
+                "KML",
+                data=compile_features_kml(st.session_state.scanned_records),
+                file_name="POIs.kml",
+                mime="application/vnd.google-earth.kml+xml",
+                use_container_width=True,
+            )
 
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-        with st.popover("IMPORT FILE", use_container_width=True):
-            imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
-            if imported_file is not None:
-                if st.button("LOAD", type="secondary", use_container_width=True):
+        with st.popover("IMPORT JSON", use_container_width=True):
+            uploaded = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
+            if uploaded is not None:
+                if st.button("Load file", type="secondary", use_container_width=True):
                     try:
-                        data = json.load(imported_file)
-                        st.session_state.scanned_records = data.get("scanned_records", data)
-                        st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
-                        st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
+                        data = json.load(uploaded)
+                        # Support both bare list and structured export
+                        if isinstance(data, list):
+                            st.session_state.scanned_records = data
+                        elif isinstance(data, dict):
+                            st.session_state.scanned_records = data.get("scanned_records", data)
+                            if "coords" in data:
+                                st.session_state.geo_coords = data["coords"]
+                            if "radius" in data:
+                                st.session_state.geo_radius = data["radius"]
+                        st.session_state.layer_meta = {}
                         st.rerun()
-                    except Exception:
-                        st.error("Invalid File Format Input.")
-                        
+                    except (ValueError, KeyError) as exc:
+                        st.error(f"Invalid file: {exc}")
+
+        if st.button("CLEAR ALL", type="primary", key="clear_btn", use_container_width=True):
+            st.session_state.scanned_records = []
+            st.session_state.layer_meta      = {}
+            st.session_state.legend_layers   = []
+            st.session_state.scan_error      = None
+            st.session_state.scan_active_loading = False
+            # Clear all checkbox states
+            for k in list(st.session_state.keys()):
+                if k.startswith("chk_"):
+                    st.session_state[k] = False
+            st.rerun()
+
     return lat_coord, lon_coord, radius_val
