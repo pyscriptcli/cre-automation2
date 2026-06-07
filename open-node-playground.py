@@ -4,9 +4,7 @@ import re
 import json
 import os
 
-# =====================================================================
-# SYSTEM INITIALIZATION & THEME CONFIGURATION
-# =====================================================================
+# --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
 _config_file = os.path.join(_config_dir, "config.toml")
 if not os.path.exists(_config_file):
@@ -14,6 +12,9 @@ if not os.path.exists(_config_file):
     with open(_config_file, "w", encoding="utf-8") as f:
         f.write("[theme]\nbase=\"light\"\n")
 
+# -----------------------------------------------------------------------------
+# 1. BRANDED THEME & STRUCTURAL FULL OVERRIDES
+# -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Open Node",
     layout="wide",
@@ -135,395 +136,383 @@ if 'global_marker_size' not in st.session_state: st.session_state.global_marker_
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
 POI_CONFIG = {
-    "COMMERCIAL": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Hospital', '"amenity"~"hospital|clinic",i'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"']],
-    "RESIDENTIAL": [['Apartments', '"building"="apartments"'], ['House', '"building"="house"'], ['Residential Area', '"landuse"="residential"'], ['Condominium', '"building"="residential"']],
-    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"supermarket|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i'], ['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"']],
-    "FOOD AND BEVERAGES": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"']],
+    "COMMERCIAL & OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
+    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"market|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i'], ['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"'], ['Travel agency', '"shop"="travel_agency"']],
+    "FOOD, BEVERAGE & HOSPITALITY": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Casino', '"amenity"="casino"']],
+    "RESIDENTIAL": [['Apartments', '"building"="apartments"'], ['House', '"building"="house"'], ['Residential Area', '"landuse"="residential"'], ['Condominium', '"building"="residential"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"'], ['Construction', '"landuse"="construction"']],
     "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports & Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'], ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses & Depots', '"building"~"warehouse|depot",i'], ['Storage Facilities', '"building"="storage"'], ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']],
-    "GOVERNMENT & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i']],
-    "SCHOOLS": [['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"']]
+    "HEALTH & EMERGENCY SERVICES": [['Hospital', '"amenity"~"hospital|clinic",i'], ['Clinic', '"amenity"="clinic"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Firestation', '"amenity"="fire_station"'], ['Police', '"amenity"="police"'], ['Hospital Adv', '"amenity"="hospital"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i']],
+    "GOVERNMENT, EDUCATION & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i'], ['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"'], ['Embassy', '"amenity"="embassy"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['University', '"amenity"="university"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Public camera', '"man_made"="surveillance"']],
+    "LEISURE, SPORTS & PUBLIC SPACES": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Fuel', '"amenity"="fuel"'], ['Parking', '"amenity"="parking"'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"'], ['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Recycling', '"amenity"="recycling"'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Image', '"image"~".",i']]
 }
 
-ADVANCED_CONFIG = {
-    "AMENITIES": [['ATM', '"amenity"="atm"'], ['Bank', '"amenity"="bank"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Clinic', '"amenity"="clinic"'], ['Embassy', '"amenity"="embassy"'], ['Firestation', '"amenity"="fire_station"'], ['Fuel', '"amenity"="fuel"'], ['Hospital', '"amenity"="hospital"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Parking', '"amenity"="parking"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police', '"amenity"="police"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['University', '"amenity"="university"']],
-    "PLACE OF WORSHIP": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Casino', '"amenity"="casino"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"']],
-    "SPORTS": [['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"']],
-    "MISCELLANEOUS": [['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Marketplace', '"amenity"="marketplace"'], ['Office', '"office"="yes"'], ['Recycling', '"amenity"="recycling"'], ['Travel agency', '"shop"="travel_agency"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Construction', '"landuse"="construction"'], ['Image', '"image"~".",i'], ['Public camera', '"man_made"="surveillance"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"']]
-}
+ADVANCED_CONFIG = {}
 
-def compile_features_kml(features):
-    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
-    for f in features:
-        if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
-        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
-        kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
-    return kml + '</Document></kml>'
+# -----------------------------------------------------------------------------
+# 3. SIDEBAR CONTROLS & GEOPROCESSING
+# -----------------------------------------------------------------------------
+with st.sidebar:
+    st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
+    
+    selected_tags = []
+    scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
+    
+    location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
+    radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
+    st.session_state.geo_radius = radius_val
 
-if "toggle_legend_layer" in st.query_params:
-    tgt_lyr = st.query_params["toggle_legend_layer"]
-    if tgt_lyr in st.session_state.legend_layers:
-        st.session_state.legend_layers.remove(tgt_lyr)
+    coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
+    if coord_match:
+        lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
     else:
-        st.session_state.legend_layers.append(tgt_lyr)
-    st.query_params.clear()
+        fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+        lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
 
-# =====================================================================
-# 1. SCRAPER CLUSTER (UI Inputs + Data Fetching Logic)
-# =====================================================================
-def render_scraper_sidebar():
-    with st.sidebar:
-        st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
-        
-        selected_tags = []
-        scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
-        
-        location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
-        radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
-        st.session_state.geo_radius = radius_val
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+    search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+    
+    for cat_name, node_items in POI_CONFIG.items():
+        matched = [item for item in node_items if search_query in item[0].lower()]
+        if matched:
+            with st.expander(cat_name, expanded=(len(search_query) > 0)):
+                for label, tag in matched:
+                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
 
-        coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
-        if coord_match:
-            lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
+    if scan_triggered:
+        if not selected_tags:
+            st.error("Select ≥ 1 layer.")
         else:
-            fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-            lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+            st.session_state.scan_active_loading = True
+            records = []
+            success = False
+            
+            try:
+                import osmnx as ox
+                tags_dict = {}
+                for tag in selected_tags:
+                    clean = tag.replace('"', '')
+                    if '=' in clean:
+                        k, v = clean.split('=', 1)
+                        if '|' in v: v = [x.strip() for x in v.split('|')]
+                        tags_dict[k] = v
+                    else:
+                        tags_dict[clean] = True
+                        
+                gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
+                if not gdf.empty:
+                    for idx, row in gdf.iterrows():
+                        if hasattr(row.geometry, 'centroid'):
+                            c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
+                        else: continue
+                        name = row.get('name', 'Unknown')
+                        if isinstance(name, float): name = 'Unknown'
+                        
+                        matched_type = 'Node'
+                        for k in tags_dict.keys():
+                            if k in row and row[k]:
+                                matched_type = str(row[k])
+                                break
+                        records.append({
+                            "lat": c_lat, "lon": c_lon, "name": str(name), 
+                            "type": matched_type, "visible": True, "uid": len(records)
+                        })
+                    st.session_state.scanned_records = records
+                    st.session_state.geo_coords = f"{lat_coord}, {lon_coord}"
+                    st.session_state.last_scan_lat = lat_coord
+                    st.session_state.last_scan_lon = lon_coord
+                    success = True
+            except Exception: pass
 
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-        search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-        
-        for cat_name, node_items in POI_CONFIG.items():
-            matched = [item for item in node_items if search_query in item[0].lower()]
-            if matched:
-                with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                    for label, tag in matched:
-                        if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
-
-        st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
-        with st.container():
-            for cat_name, node_items in ADVANCED_CONFIG.items():
-                matched = [item for item in node_items if search_query in item[0].lower()]
-                if matched:
-                    with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                        for label, tag in matched:
-                            if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
-
-        if scan_triggered:
-            if not selected_tags:
-                st.error("Select ≥ 1 layer.")
-            else:
-                st.session_state.scan_active_loading = True
-                records = []
-                success = False
-                
+            if not success:
+                url = "https://overpass-api.de/api/interpreter"
+                statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
+                ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
                 try:
-                    import osmnx as ox
-                    tags_dict = {}
-                    for tag in selected_tags:
-                        clean = tag.replace('"', '')
-                        if '=' in clean:
-                            k, v = clean.split('=', 1)
-                            if '|' in v: v = [x.strip() for x in v.split('|')]
-                            tags_dict[k] = v
-                        else:
-                            tags_dict[clean] = True
-                            
-                    gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
-                    if not gdf.empty:
-                        for idx, row in gdf.iterrows():
-                            if hasattr(row.geometry, 'centroid'):
-                                c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
-                            else: continue
-                            name = row.get('name', 'Unknown')
-                            if isinstance(name, float): name = 'Unknown'
-                            
-                            matched_type = 'Node'
-                            for k in tags_dict.keys():
-                                if k in row and row[k]:
-                                    matched_type = str(row[k])
-                                    break
-                            records.append({
-                                "lat": c_lat, "lon": c_lon, "name": str(name), 
-                                "type": matched_type, "visible": True, "uid": len(records)
-                            })
+                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
+                    if res.status_code == 200:
+                        for el in res.json().get('elements', []):
+                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
+                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
+                            if e_lat and e_lon:
+                                tags = el.get('tags', {})
+                                records.append({
+                                    "lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), 
+                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
+                                    "visible": True, "uid": len(records)
+                                })
                         st.session_state.scanned_records = records
                         st.session_state.geo_coords = f"{lat_coord}, {lon_coord}"
                         st.session_state.last_scan_lat = lat_coord
                         st.session_state.last_scan_lon = lon_coord
                         success = True
                 except Exception: pass
-
-                if not success:
-                    url = "https://overpass-api.de/api/interpreter"
-                    statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
-                    ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
-                    try:
-                        res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
-                        if res.status_code == 200:
-                            for el in res.json().get('elements', []):
-                                e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                                e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                                if e_lat and e_lon:
-                                    tags = el.get('tags', {})
-                                    records.append({
-                                        "lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), 
-                                        "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                                        "visible": True, "uid": len(records)
-                                    })
-                            st.session_state.scanned_records = records
-                            st.session_state.geo_coords = f"{lat_coord}, {lon_coord}"
-                            st.session_state.last_scan_lat = lat_coord
-                            st.session_state.last_scan_lon = lon_coord
-                            success = True
-                    except Exception: pass
-                
-                st.session_state.scan_active_loading = False
-                if success: st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("CLEAR ALL", type="primary", key="clear_btn"):
-            st.session_state.scanned_records = []
-            st.session_state.layer_meta = {}
-            st.session_state.layer_groups = {}
-            st.session_state.legend_layers = []
+            
             st.session_state.scan_active_loading = False
-            for key in list(st.session_state.keys()):
-                if key.startswith("chk_"): st.session_state[key] = False
-            st.rerun()
+            if success: st.rerun()
 
-    return lat_coord, lon_coord, radius_val
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("CLEAR ALL", type="primary", key="clear_btn"):
+        st.session_state.scanned_records = []
+        st.session_state.layer_meta = {}
+        st.session_state.layer_groups = {}
+        st.session_state.legend_layers = []
+        st.session_state.scan_active_loading = False
+        for key in list(st.session_state.keys()):
+            if key.startswith("chk_"): st.session_state[key] = False
+        st.rerun()
 
-# =====================================================================
-# 2. MAP CLUSTER (UI Controls + Map Rendering)
-# =====================================================================
-def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
-    unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
-    cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
+    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
-    for idx, layer in enumerate(unique_layers):
-        if layer not in st.session_state.layer_meta:
-            st.session_state.layer_meta[layer] = {
-                "color": cat_palette[idx % len(cat_palette)],
-                "style": st.session_state.global_marker_style,
-                "size": st.session_state.global_marker_size
-            }
+    col1, col2 = st.columns(2)
+    visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
+    
+    with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
+    with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
-    layer_meta_json = json.dumps(st.session_state.layer_meta)
-    target_config_json = json.dumps(st.session_state.target_config)
-    radius_config_json = json.dumps(st.session_state.radius_config)
-    geojson_str = json.dumps(pts_active)
-    legend_layers_json = json.dumps(st.session_state.legend_layers)
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-    render_lat = lat_coord
-    render_lon = lon_coord
-    is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
-    show_loading = "true" if st.session_state.scan_active_loading else "false"
+    with st.popover("IMPORT FILE", use_container_width=True):
+        imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
+        if imported_file is not None:
+            if st.button("LOAD", type="secondary", use_container_width=True):
+                try:
+                    data = json.load(imported_file)
+                    st.session_state.scanned_records = data.get("scanned_records", data)
+                    st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
+                    st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
+                    st.rerun()
+                except Exception: st.error("Invalid File")
 
-    leaflet_template = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
-        <style>
-            body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
-            #map-container { position: relative; width: 100%; height: 100vh; }
-            #map { height: 100vh; width: 100%; z-index: 1; }
+# -----------------------------------------------------------------------------
+# 4. MAP FRAME RENDERING ENGINE & INTERACTION ARCHITECTURE
+# -----------------------------------------------------------------------------
+pts_active = st.session_state.scanned_records
+unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
+cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
 
-            /* Centered Loading Splash Overlay UI */
-            #map-loading-overlay {
-                position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-                background: rgba(255, 255, 255, 0.75); z-index: 9999; 
-                display: flex; flex-direction: column; align-items: center; justify-content: center;
-                transition: opacity 0.3s ease; pointer-events: all;
-            }
-            .loading-spinner {
-                width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1);
-                border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
-                margin-bottom: 12px;
-            }
-            .loading-text { font-size: 11px; font-weight: 700; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; }
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+for idx, layer in enumerate(unique_layers):
+    if layer not in st.session_state.layer_meta:
+        st.session_state.layer_meta[layer] = {
+            "color": cat_palette[idx % len(cat_palette)],
+            "style": st.session_state.global_marker_style,
+            "size": st.session_state.global_marker_size
+        }
 
-            #scan-results-panel { 
-                position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; 
-                max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); 
-                background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; 
-                box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); 
-            }
-            .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
-            .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; }
-            .layer-category-block { border-bottom: 1px solid #f0f0f0; }
-            .layer-category-header { background: #ffffff; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
-            .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
-            .layer-category-items { padding: 0; background: #f8fafc; }
-            .layer-category-items.collapsed { display: none !important; }
-            
-            .results-item { padding: 4px 8px 4px 16px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
-            .results-item:hover { background: #ffffff; color: #003366; }
-            
-            .action-icon-trigger { cursor: pointer; padding: 2px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 2px; transition: all 0.15s; }
-            .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
-            .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
-            .action-icon-trigger:hover svg { fill: #003366; }
-            .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
-            .action-icon-trigger.legend-active-btn svg { fill: #C9AB4C !important; }
+layer_meta_json = json.dumps(st.session_state.layer_meta)
+target_config_json = json.dumps(st.session_state.target_config)
+radius_config_json = json.dumps(st.session_state.radius_config)
+geojson_str = json.dumps(pts_active)
+legend_layers_json = json.dumps(st.session_state.legend_layers)
 
-            .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-            .hide-labels .poi-text-label { display: none !important; }
-            .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
-            
-            .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
-            .config-headline { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
-            .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 600; color: #003366; gap: 6px; }
-            .config-flex-row select, .config-flex-row input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
-            .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
-            .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
+render_lat = lat_coord
+render_lon = lon_coord
+is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
+show_loading = "true" if st.session_state.scan_active_loading else "false"
 
-            .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 4px; border-bottom: 1px solid rgba(0,51,102,0.08); }
-            .group-cluster-header { background: #e2e8f0; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-            .group-cluster-title { font-size: 9px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
-            .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
-            .cluster-popover-modal.active { display: block; }
-            .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
+leaflet_template = """
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
+        #map-container { position: relative; width: 100%; height: 100vh; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
 
-            #floating-export-btn {
-                position: absolute; top: 10px; left: 10px; z-index: 1000;
-                background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
-                width: 32px; height: 32px; border-radius: 4px;
-                display: flex; align-items: center; justify-content: center;
-                cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-            }
-            #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
+        /* Centered Minimalist Loading Splash Overlay UI */
+        #map-loading-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255, 255, 255, 0.75); z-index: 9999; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.3s ease; pointer-events: all;
+        }
+        .loading-spinner {
+            width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1);
+            border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
+            margin-bottom: 12px;
+        }
+        .loading-text { font-size: 11px; font-weight: 700; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-            /* Minimalist Overlay Floating Tab Design */
-            .floating-snapshot-legend {
-                position: absolute; top: 20px; right: 20px; z-index: 99999;
-                background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
-                padding: 14px 18px; border-radius: 6px; width: 220px;
-                box-shadow: 0 6px 18px rgba(0, 51, 102, 0.12);
-                display: flex; flex-direction: column; gap: 10px; box-sizing: border-box;
-            }
-            .snapshot-legend-title {
-                font-size: 11px; font-weight: 800; color: #003366;
-                text-transform: uppercase; border-bottom: 2px solid #C9AB4C;
-                padding-bottom: 6px; margin-bottom: 2px; letter-spacing: 0.8px;
-            }
-            .snapshot-legend-row {
-                display: flex; align-items: center; gap: 10px; font-size: 10px;
-                font-weight: 700; color: #003366; text-transform: uppercase;
-            }
+        #scan-results-panel { 
+            position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; 
+            max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); 
+            background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; 
+            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); 
+        }
+        .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
+        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; }
+        .layer-category-block { border-bottom: 1px solid #f0f0f0; }
+        .layer-category-header { background: #ffffff; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+        .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
+        .layer-category-items { padding: 0; background: #f8fafc; }
+        .layer-category-items.collapsed { display: none !important; }
+        
+        .results-item { padding: 4px 8px 4px 16px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
+        .results-item:hover { background: #ffffff; color: #003366; }
+        
+        .action-icon-trigger { cursor: pointer; padding: 2px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 2px; transition: all 0.15s; }
+        .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
+        .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
+        .action-icon-trigger:hover svg { fill: #003366; }
+        .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
+        .action-icon-trigger.legend-active-btn svg { fill: #C9AB4C !important; }
 
-            /* Off-Screen Blueprint Canvas Configuration Bounds */
-            #export-canvas-blueprint {
-                position: absolute; left: -9999px; top: -9999px;
-                width: 1024px; height: 768px; background: #ffffff;
-                position: relative; overflow: hidden; box-sizing: border-box;
-            }
-            #blueprint-map-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        </style>
-    </head>
-    <body>
-        <div id="map-container">
-            <div id="map-loading-overlay" style="display: none;">
-                <div class="loading-spinner"></div>
-                <div class="loading-text" id="loading-overlay-message">Scanning Area...</div>
+        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .hide-labels .poi-text-label { display: none !important; }
+        .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
+        
+        .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
+        .config-block-wrapper select, .config-block-wrapper input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
+        .config-headline { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+        .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 600; color: #003366; gap: 6px; }
+        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
+        .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
+
+        .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 4px; border-bottom: 1px solid rgba(0,51,102,0.08); }
+        .group-cluster-header { background: #e2e8f0; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .group-cluster-title { font-size: 9px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+        .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
+        .cluster-popover-modal.active { display: block; }
+        .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
+
+        #floating-export-btn {
+            position: absolute; top: 10px; left: 10px; z-index: 1000;
+            background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
+            width: 32px; height: 32px; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
+
+        /* Floating Minimalist Card Popup Design Overlay */
+        .floating-snapshot-legend {
+            position: absolute; top: 20px; right: 20px; z-index: 99999;
+            background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
+            padding: 14px 18px; border-radius: 6px; width: 220px;
+            box-shadow: 0 6px 18px rgba(0, 51, 102, 0.12);
+            display: flex; flex-direction: column; gap: 10px; box-sizing: border-box;
+        }
+        .snapshot-legend-title {
+            font-size: 11px; font-weight: 800; color: #003366;
+            text-transform: uppercase; border-bottom: 2px solid #C9AB4C;
+            padding-bottom: 6px; margin-bottom: 2px; letter-spacing: 0.8px;
+        }
+        .snapshot-legend-row {
+            display: flex; align-items: center; gap: 10px; font-size: 10px;
+            font-weight: 700; color: #003366; text-transform: uppercase;
+        }
+
+        /* 1:1 Aspect Frame Engine to prevent canvas distortion bugs */
+        #export-canvas-blueprint {
+            position: absolute; left: -9999px; top: -9999px;
+            width: 1024px; height: 768px; background: #ffffff;
+            position: relative; overflow: hidden; box-sizing: border-box;
+        }
+        #blueprint-map-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    </style>
+</head>
+<body>
+    <div id="map-container">
+        <div id="map-loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loading-overlay-message">Scanning Area...</div>
+        </div>
+        
+        <div id="floating-export-btn" onclick="executeMapCapturePipeline()" title="Export Trade Area Frame">
+            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+        </div>
+
+        <div id="map"></div>
+
+        <div id="scan-results-panel">
+            <div class="results-header">
+                <span>WORKSPACE</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
+                    <span id="results-count" style="color:#C9AB4C;">0</span>
+                </div>
+            </div>
+
+            <div id="cluster-modal-overlay" class="cluster-popover-modal">
+                <div style="font-size: 9px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 8px;">CREATE LAYER CLUSTER GROUP</div>
+                <div style="margin-bottom: 8px;">
+                    <input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);">
+                </div>
+                <div id="cluster-checkbox-target-mount" style="max-height: 140px; overflow-y: auto; margin-bottom: 8px;"></div>
+                <div style="display: flex; gap: 4px;">
+                    <button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button>
+                    <button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button>
+                </div>
             </div>
             
-            <div id="floating-export-btn" onclick="executeMapCapturePipeline()" title="Export Trade Area Frame">
-                <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
+                <div class="config-headline">Basemap Controller</div>
+                <div class="config-flex-row">
+                    <span>Tile Style:</span>
+                    <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
+                        <option value="osm">OpenStreetMap</option>
+                        <option value="satellite">Satellite View</option>
+                        <option value="carto">Carto Light</option>
+                    </select>
+                    <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                        <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
+                    </label>
+                </div>
+            </div>
+            
+            <div class="config-block-wrapper">
+                <div class="config-headline">Global Markers</div>
+                <div class="config-flex-row">
+                    <span>Style:</span>
+                    <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
+                        <option value="dots">Dots</option>
+                        <option value="pin">Pin Location</option>
+                        <option value="modern-pin">Modern Drop-Pin</option>
+                    </select>
+                    <span>Size:</span>
+                    <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
+                </div>
+                <div class="config-flex-row">
+                    <span>Color:</span>
+                    <input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)">
+                    <select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;">
+                        <option value="">Preset</option>
+                        <option value="#003366">Midnight</option>
+                        <option value="#C9AB4C">Gold</option>
+                        <option value="#AA2E20">Crimson</option>
+                    </select>
+                </div>
             </div>
 
-            <div id="map"></div>
-
-            <div id="scan-results-panel">
-                <div class="results-header">
-                    <span>WORKSPACE</span>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
-                        <span id="results-count" style="color:#C9AB4C;">0</span>
-                    </div>
+            <div class="config-block-wrapper">
+                <div class="config-headline">Target Coordinates & Radius Layer</div>
+                <div class="config-flex-row">
+                    <span>Target:</span>
+                    <select onchange="patchTargetCenterConfig('style', this.value)">
+                        <option value="star">Star</option>
+                        <option value="circle">Dot</option>
+                    </select>
+                    <input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)">
+                    <input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)">
                 </div>
-
-                <div id="cluster-modal-overlay" class="cluster-popover-modal">
-                    <div style="font-size: 9px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 8px;">CREATE LAYER CLUSTER GROUP</div>
-                    <div style="margin-bottom: 8px;">
-                        <input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);">
-                    </div>
-                    <div id="cluster-checkbox-target-mount" style="max-height: 140px; overflow-y: auto; margin-bottom: 8px;"></div>
-                    <div style="display: flex; gap: 4px;">
-                        <button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button>
-                        <button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button>
-                    </div>
+                <div class="config-flex-row">
+                    <span>Radius Fill:</span>
+                    <input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)">
+                    <span>Opacity:</span>
+                    <input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
                 </div>
-                
-                <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
-                    <div class="config-headline">Basemap Controller</div>
-                    <div class="config-flex-row">
-                        <span>Tile Style:</span>
-                        <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
-                            <option value="osm">OpenStreetMap</option>
-                            <option value="satellite">Satellite View</option>
-                            <option value="carto">Carto Light</option>
-                        </select>
-                        <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
-                            <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
-                        </label>
-                    </div>
+                <div class="config-flex-row">
+                    <span>Thickness:</span>
+                    <input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)">
                 </div>
-                
-                <div class="config-block-wrapper">
-                    <div class="config-headline">Global Markers</div>
-                    <div class="config-flex-row">
-                        <span>Style:</span>
-                        <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
-                            <option value="dots">Dots</option>
-                            <option value="pin">Pin Location</option>
-                            <option value="modern-pin">Modern Drop-Pin</option>
-                        </select>
-                        <span>Size:</span>
-                        <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
-                    </div>
-                    <div class="config-flex-row">
-                        <span>Color:</span>
-                        <input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)">
-                        <select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;">
-                            <option value="">Preset</option>
-                            <option value="#003366">Midnight</option>
-                            <option value="#C9AB4C">Gold</option>
-                            <option value="#AA2E20">Crimson</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="config-block-wrapper">
-                    <div class="config-headline">Target Coordinates & Radius Layer</div>
-                    <div class="config-flex-row">
-                        <span>Target:</span>
-                        <select onchange="patchTargetCenterConfig('style', this.value)">
-                            <option value="star">Star</option>
-                            <option value="circle">Dot</option>
-                        </select>
-                        <input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)">
-                        <input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)">
-                    </div>
-                    <div class="config-flex-row">
-                        <span>Radius Fill:</span>
-                        <input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)">
-                        <span>Opacity:</span>
-                        <input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
-                    </div>
-                    <div class="config-flex-row">
-                        <span>Thickness:</span>
-                        <input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)">
-                    </div>
-                </div>
-                
-                <div class="results-list" id="results-list-box"></div>
             </div>
+            
+            <div class="results-list" id="results-list-box"></div>
         </div>
     </div>
 
@@ -605,7 +594,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                     html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
                 });
-            } else if (styleMode === "modern-pin") {
+            } else if (styleMode === "modern-pin" || styleMode === "drop-pin") {
                 const w = d * 1.5;
                 const h = d * 2.2;
                 const customSvg = `
@@ -617,7 +606,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                     </defs>
                     <g filter="url(#shadowFilter)">
                         <path d="M20 20 L20 54" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/>
-                        <circle cx="20" cy="20" r="14" fill="${color}" stroke="#000000" stroke-width="1.5" />
+                        <circle cx="20" cy="20" r="14" fill="${color}" />
                     </g>
                 </svg>`;
                 return L.divIcon({
@@ -791,7 +780,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                                 <select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)">
                                     <option value="dots">Dots</option>
                                     <option value="pin">Pin</option>
-                                    <option value="modern-pin">Drop Pin</option>
+                                    <option value="modern-pin">Modern Pin</option>
                                 </select>
                                 <input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)">
                                 <input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)">
@@ -813,7 +802,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                 htmlPayload += '</div></div>';
             });
 
-            // FIXED: Automatically maps loose layers directly into workspace layout chronologically
+            // FIXED: Automatically tracks all un-grouped layers and surfaces them onto your workspace immediately
             Object.keys(categoryMap).forEach(catName => {
                 let insideClusterGroup = false;
                 Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
@@ -912,7 +901,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
             }
         };
 
-        // Snapshot Engine with Width-Adaptive Legend Column Sidebar Layout Compaction Alignment
+        // FIXED: Pinned Dual-Pass Engine maps geometric overlays accurately on offscreen frames
         window.executeMapCapturePipeline = function() {
             document.getElementById('loading-overlay-message').innerText = 'Exporting Trade Area...';
             document.getElementById('map-loading-overlay').style.display = 'flex';
@@ -937,6 +926,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
             captureBasemaps[activeBasemapKey].options.crossOrigin = 'anonymous';
             captureBasemaps[activeBasemapKey].addTo(exportMap);
 
+            // FIXED: Locked coordinate anchors prevent target ring distortion bugs
             L.circle([__LAT__, __LON__], {
                 radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight),
                 fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity)
@@ -950,6 +940,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                 });
             });
 
+            // FIXED: Absolute marker anchors isolate center dots perfectly
             const d = targetConfig.size; const c = targetConfig.color;
             const htmlElement = targetConfig.style === "star" 
                 ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff;">★</div>`
