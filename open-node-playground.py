@@ -108,6 +108,7 @@ st.markdown("""
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
+# Intercept and process targeted viewport locations out of context queries immediately
 if "lat" in st.query_params and "lon" in st.query_params:
     st.session_state.geo_coords = f"{st.query_params['lat']}, {st.query_params['lon']}"
     st.query_params.clear()
@@ -179,7 +180,6 @@ def render_scraper_sidebar():
         coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
         if coord_match:
             lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
-            st.session_state.geo_coords = location_input
         else:
             fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
             lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
@@ -234,6 +234,7 @@ def render_scraper_sidebar():
                                 "type": matched_type, "visible": True, "uid": len(records)
                             })
                         st.session_state.scanned_records = records
+                        st.session_state.geo_coords = f"{lat_coord}, {lon_coord}"
                         st.session_state.last_scan_lat = lat_coord
                         st.session_state.last_scan_lon = lon_coord
                         success = True
@@ -257,6 +258,7 @@ def render_scraper_sidebar():
                                         "visible": True, "uid": len(records)
                                     })
                             st.session_state.scanned_records = records
+                            st.session_state.geo_coords = f"{lat_coord}, {lon_coord}"
                             st.session_state.last_scan_lat = lat_coord
                             st.session_state.last_scan_lon = lon_coord
                             success = True
@@ -383,7 +385,6 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
             #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
             #floating-export-btn:hover { background: #f8fafc; }
 
-            /* Dynamic Overlay Legend Component Block */
             .floating-snapshot-legend {
                 position: absolute; top: 20px; right: 20px; z-index: 99999;
                 background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
@@ -401,7 +402,6 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                 font-weight: 700; color: #003366; text-transform: uppercase;
             }
 
-            /* Single Container Headless Sandbox Blueprint Rendering Viewport */
             #export-canvas-blueprint {
                 position: absolute; left: -9999px; top: -9999px;
                 width: 1024px; height: 768px; background: #ffffff;
@@ -414,7 +414,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
         <div id="map-container">
             <div id="map-loading-overlay" style="display: none;">
                 <div class="loading-spinner"></div>
-                <div class="loading-text" id="loading-overlay-message">Scanning Trade Area</div>
+                <div class="loading-text" id="loading-overlay-message">Scanning Area...</div>
             </div>
             
             <div id="floating-export-btn" onclick="executeMapCapturePipeline()" title="Export Trade Area Frame">
@@ -781,7 +781,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                                 <select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)">
                                     <option value="dots">Dots</option>
                                     <option value="pin">Pin</option>
-                                    <option value="modern-pin">Drop Pin</option>
+                                    <option value="modern-pin">Modern Pin</option>
                                 </select>
                                 <input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)">
                                 <input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)">
@@ -803,6 +803,7 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                 htmlPayload += '</div></div>';
             });
 
+            // FIXED: Automatically maps loose layers directly into workspace layout chronologically
             Object.keys(categoryMap).forEach(catName => {
                 let insideClusterGroup = false;
                 Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
@@ -901,14 +902,11 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
             }
         };
 
-        // Two-Pass Snapshot Capture Engine with Strict Spatial Centering Synchronization
         window.executeMapCapturePipeline = function() {
             document.getElementById('loading-overlay-message').innerText = 'Exporting Trade Area...';
             document.getElementById('map-loading-overlay').style.display = 'flex';
 
             const activeBasemapKey = document.getElementById('basemap-select').value;
-            
-            // Capture target bounds and coordinates from the primary interaction map layer
             const currentCenter = map.getCenter();
             const currentZoom = map.getZoom();
 
@@ -929,7 +927,6 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
             captureBasemaps[activeBasemapKey].options.crossOrigin = 'anonymous';
             captureBasemaps[activeBasemapKey].addTo(exportMap);
 
-            // Bind geometric radius circle layout bounds directly using the original coordinates template state
             L.circle([__LAT__, __LON__], {
                 radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight),
                 fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity)
@@ -943,7 +940,6 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
                 });
             });
 
-            // Map and bind target center icon using hardcoded system spatial parameters to prevent coordinate drift
             const d = targetConfig.size; const c = targetConfig.color;
             const htmlElement = targetConfig.style === "star" 
                 ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff;">★</div>`
@@ -954,7 +950,6 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
             }).addTo(exportMap);
             exportCenterMarker.bringToFront();
 
-            // Populate the floating overlay legend container dynamically
             const legendRowsContainer = document.getElementById('blueprint-legend-rows-holder');
             legendRowsContainer.innerHTML = '';
             
@@ -983,7 +978,6 @@ def render_map_view(lat_coord, lon_coord, radius_val, pts_active):
 
             setTimeout(() => {
                 exportMap.invalidateSize();
-                // Enforce exact synchronization matching the user's active viewport bounding box
                 exportMap.setView(currentCenter, currentZoom);
                 
                 setTimeout(() => {
@@ -1082,25 +1076,6 @@ def render_workspace(scanned_records):
 # MAIN DIRECTOR (App Orchestration)
 # =====================================================================
 if __name__ == "__main__":
-    if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
-    if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
-    if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
-    if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
-    if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
-    if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
-    if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
-    if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
-
-    if 'target_config' not in st.session_state:
-        st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
-
-    if 'radius_config' not in st.session_state:
-        st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
-
-    if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "dots"
-    if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
-    if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
-
     lat_in, lon_in, radius_in = render_scraper_sidebar()
     render_workspace(st.session_state.scanned_records)
     render_map_view(lat_in, lon_in, radius_in, st.session_state.scanned_records)
