@@ -1,11 +1,7 @@
 import streamlit as st
 import json
-import logging
+import os
 from pathlib import Path
-
-# Setup structured system debugging logger
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("OpenNode.Config")
 
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
@@ -28,15 +24,14 @@ DEFAULTS = {
 }
 
 def load_poi_configuration() -> dict:
-    config_path = Path("config.json")
+    current_dir = Path(__file__).parent
+    config_path = current_dir / "config.json"
     if not config_path.exists():
-        logger.error("System structural config.json configuration schema not found.")
         return {"POI_CONFIG": {}}
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception as e:
-        logger.exception(f"Fatal exception raised during JSON schema parse tracking: {e}")
+    except Exception:
         return {"POI_CONFIG": {}}
 
 def initialize_session_states():
