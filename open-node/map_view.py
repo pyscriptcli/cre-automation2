@@ -1,10 +1,16 @@
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 import streamlit as st
 import json
 import html
 from jinja2 import Environment, FileSystemLoader
 
 def render_leaflet_component_iframe(lat: float, lon: float, radius: int, pts_active: list):
-    # Enforce safe HTML asset validation constraints via structural pre-escaping blocks
     safe_pts = []
     for p in pts_active:
         safe_pts.append({
@@ -27,15 +33,13 @@ def render_leaflet_component_iframe(lat: float, lon: float, radius: int, pts_act
                 "size": st.session_state.global_marker_size
             }
 
-    # Bind Jinja2 environment parameters safely
-    env = Environment(loader=FileSystemLoader('.'))
+    env = Environment(loader=FileSystemLoader(current_dir))
     try:
         template = env.get_template('template.html')
-    except Exception as e:
-        st.error("Fatal: Visual asset deployment file matrix template.html was not found.")
+    except Exception:
+        st.error("Fatal: Visual template configuration layer template.html not resolved in build script.")
         return
 
-    # Pack the payload variables safely without risk of code injection
     html_payload = template.render(
         LAT=lat,
         LON=lon,
@@ -52,4 +56,3 @@ def render_leaflet_component_iframe(lat: float, lon: float, radius: int, pts_act
     )
 
     st.components.v1.html(html_payload, height=850, scrolling=False)
-  
