@@ -577,8 +577,8 @@ leaflet_template = """
                     
                     <ellipse cx="20" cy="44" rx="12" ry="3.5" fill="url(#groundShadow)" />
                     
-                    <path d="M20 20 L20 56" stroke="#222222" stroke-width="1.8" stroke-linecap="round"/>
-                    <path d="M20 20 L20 56" stroke="#888888" stroke-width="0.6" stroke-linecap="round"/>
+                    <path d="M20 20 L20 44" stroke="#222222" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M20 20 L20 44" stroke="#888888" stroke-width="0.8" stroke-linecap="round"/>
                     
                     <circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})"/>
                 </svg>`;
