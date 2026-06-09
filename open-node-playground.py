@@ -18,6 +18,136 @@ if not os.path.exists(_config_file):
         f.write("[theme]\nbase=\"light\"\n")
 
 # -----------------------------------------------------------------------------
+# GITHUB POI DATA LOADER (USE THIS INSTEAD OF OVERPASS)
+# -----------------------------------------------------------------------------
+GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
+
+# Province bounding boxes for reverse geocoding (to determine which province file to load)
+PROVINCE_BOUNDS = {
+    "metro_manila": [120.90, 14.40, 121.10, 14.80],
+    "cavite": [120.60, 14.10, 121.00, 14.50],
+    "laguna": [121.00, 14.00, 121.60, 14.50],
+    "bulacan": [120.70, 14.70, 121.20, 15.30],
+    "batangas": [120.70, 13.60, 121.40, 14.20],
+    "rizal": [121.00, 14.40, 121.60, 14.90],
+    "pampanga": [120.50, 14.90, 121.00, 15.40],
+    "nueva_ecija": [120.60, 15.20, 121.50, 16.00],
+    "zambales": [119.80, 14.60, 120.60, 15.80],
+    "tarlac": [120.30, 15.30, 121.00, 15.90],
+    "pangasinan": [119.80, 15.60, 121.00, 16.50],
+    "la_union": [120.20, 16.40, 120.80, 17.00],
+    "ilocos_norte": [120.30, 17.80, 121.00, 18.70],
+    "ilocos_sur": [120.20, 16.90, 120.80, 17.80],
+    # Visayas
+    "cebu": [123.50, 9.50, 124.20, 11.00],
+    "leyte": [124.30, 9.80, 125.60, 11.50],
+    "bohol": [123.70, 9.50, 124.60, 10.10],
+    "negros_oriental": [122.80, 9.00, 123.50, 10.50],
+    "negros_occidental": [122.30, 9.30, 123.40, 11.00],
+    "samar": [124.80, 11.00, 125.80, 12.50],
+    "biliran": [124.30, 11.40, 124.60, 11.70],
+    "siquijor": [123.40, 9.10, 123.70, 9.30],
+    # Mindanao
+    "davao_city": [125.40, 6.90, 125.70, 7.40],
+    "davao_del_sur": [125.00, 6.00, 125.80, 7.00],
+    "davao_oriental": [126.00, 6.50, 126.80, 7.80],
+    "north_cotabato": [124.50, 6.80, 125.30, 7.80],
+    "south_cotabato": [124.50, 5.80, 125.30, 6.80],
+    "sultan_kudarat": [123.80, 6.20, 124.80, 7.20],
+    "zamboanga_del_sur": [122.00, 7.00, 123.80, 8.20],
+    "zamboanga_del_norte": [121.80, 7.50, 123.00, 8.80],
+    "misamis_oriental": [124.00, 8.00, 125.20, 9.30],
+    "misamis_occidental": [123.30, 7.80, 124.00, 8.70],
+    "bukidnon": [124.30, 7.00, 125.50, 8.50],
+    "agusan_del_norte": [125.00, 8.20, 126.00, 9.30],
+    "agusan_del_sur": [125.00, 7.60, 126.20, 8.80],
+    "surigao_del_norte": [125.20, 9.30, 126.30, 10.20],
+    "surigao_del_sur": [125.80, 8.00, 126.50, 9.00],
+    "lanao_del_norte": [123.50, 7.50, 124.50, 8.30],
+    "lanao_del_sur": [123.80, 7.00, 124.80, 8.20],
+    "basilan": [121.80, 6.30, 122.50, 6.80],
+    "sulu": [120.80, 5.50, 121.50, 6.30],
+    "tawi_tawi": [119.50, 4.50, 120.50, 5.50],
+    "dinagat_islands": [125.30, 9.80, 125.80, 10.50],
+}
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_province_list():
+    """Get list of all available provinces from index.json"""
+    url = f"{GITHUB_POI_BASE}/index.json"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return list(data.get('provinces', {}).keys())
+        return []
+    except:
+        return list(PROVINCE_BOUNDS.keys())
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_province_pois(province_name):
+    """Load POI data for a specific province from GitHub"""
+    url = f"{GITHUB_POI_BASE}/{province_name}.json"
+    try:
+        response = requests.get(url, timeout=15)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            add_api_log(f"Failed to load {province_name}: HTTP {response.status_code}", "ERROR")
+            return []
+    except Exception as e:
+        add_api_log(f"Error loading {province_name}: {str(e)[:100]}", "ERROR")
+        return []
+
+def get_province_from_coords(lat, lon):
+    """Determine which province contains the given coordinates"""
+    for province, bbox in PROVINCE_BOUNDS.items():
+        if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
+            return province
+    return None
+
+def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
+    """Filter POIs within a radius using Haversine formula"""
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371000
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        return R * c
+    
+    filtered = []
+    for poi in pois:
+        dist = haversine(center_lat, center_lon, poi['lat'], poi['lon'])
+        if dist <= radius_meters:
+            poi_copy = poi.copy()
+            poi_copy['distance_m'] = round(dist)
+            filtered.append(poi_copy)
+    return filtered
+
+def filter_pois_by_tags(pois, selected_tags):
+    """Filter POIs by selected tag categories"""
+    if not selected_tags:
+        return pois
+    
+    filtered = []
+    for poi in pois:
+        poi_type = poi.get('type', '').lower()
+        for tag in selected_tags:
+            tag_clean = tag.replace('"', '').lower()
+            if '=' in tag_clean:
+                key, value = tag_clean.split('=', 1)
+                if key in poi_type or value in poi_type:
+                    filtered.append(poi)
+                    break
+            else:
+                if tag_clean in poi_type:
+                    filtered.append(poi)
+                    break
+    return filtered
+
+# -----------------------------------------------------------------------------
 # 1. BRANDED THEME & STRUCTURAL FULL OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
@@ -536,7 +666,7 @@ with st.sidebar:
                     add_api_log(f"Import failed: {str(e)[:100]}", "ERROR")
 
 # -----------------------------------------------------------------------------
-# PIPELINE STAGE PIPING CONTROLLER
+# PIPELINE STAGE PIPING CONTROLLER (USING GITHUB POI DATA)
 # -----------------------------------------------------------------------------
 main_canvas = st.empty()
 
@@ -544,49 +674,18 @@ if st.session_state.scan_active_loading:
     records = []
     success = False
     
-    # Get location info for boundaries
-    location_info = reverse_geocode_location(lat_coord, lon_coord)
-    if location_info:
-        st.session_state.current_location_info = location_info
-        add_api_log(f"Location detected: {location_info.get('barangay', '')}, {location_info.get('city', '')}, {location_info.get('province', '')}", "INFO")
-        
-        # Fetch boundary GeoJSON if boundaries are enabled
-        if st.session_state.show_boundaries and st.session_state.boundary_levels:
-            boundary_data = {}
-            level_mapping = {
-                "Region": ("region", "4", location_info.get('region', '')),
-                "Province": ("province", "5", location_info.get('province', '')),
-                "City/Municipality": ("city", "7", location_info.get('city', '')),
-                "Barangay": ("barangay", "9", location_info.get('barangay', ''))
-            }
-            
-            for level_name in st.session_state.boundary_levels:
-                if level_name in level_mapping:
-                    key, admin_level, area_name = level_mapping[level_name]
-                    if area_name and area_name != '':
-                        geojson = get_boundary_geojson(area_name, admin_level)
-                        if geojson:
-                            boundary_data[key] = geojson
-                            add_api_log(f"Loaded {level_name} boundary for: {area_name}", "INFO")
-            
-            st.session_state.boundary_geojson_data = boundary_data
-    else:
-        st.session_state.current_location_info = None
-        st.session_state.boundary_geojson_data = {}
-        add_api_log("Could not determine location hierarchy for boundaries", "WARNING")
-    
     main_canvas.markdown(f'''
         <div class="py-loading-container">
             <div class="py-spinner"></div>
             <div class="py-loading-title">Loading POI Data...</div>
             <div class="py-loading-subtitle">Radius: {radius_val}m | Tags: {len(selected_tags)}</div>
-            <div class="py-loading-subtitle" id="scan-status-text">Loading province data...</div>
+            <div class="py-loading-subtitle" id="scan-status-text">Finding your province...</div>
         </div>
         <script>
             const statusDiv = document.getElementById('scan-status-text');
             const statusMessages = [
                 "Finding province from coordinates...",
-                "Loading province POI data...",
+                "Loading province POI data from GitHub...",
                 "Filtering by radius...",
                 "Applying tag filters...",
                 "Ready!"
@@ -603,22 +702,27 @@ if st.session_state.scan_active_loading:
     
     add_api_log("Starting GitHub POI data load", "INFO")
     
+    # Step 1: Determine province from coordinates
     province_name = get_province_from_coords(lat_coord, lon_coord)
     
     if province_name:
         add_api_log(f"Coordinates map to province: {province_name}", "INFO")
         
+        # Step 2: Load province POI data from GitHub
         all_province_pois = load_province_pois(province_name)
         
         if all_province_pois:
             add_api_log(f"Loaded {len(all_province_pois)} POIs from {province_name}", "INFO")
             
+            # Step 3: Filter by radius
             radius_filtered = filter_pois_by_radius(all_province_pois, lat_coord, lon_coord, radius_val)
             add_api_log(f"After radius filter: {len(radius_filtered)} POIs within {radius_val}m", "INFO")
             
+            # Step 4: Filter by selected tags
             tag_filtered = filter_pois_by_tags(radius_filtered, selected_tags)
             add_api_log(f"After tag filter: {len(tag_filtered)} POIs match selected categories", "INFO")
             
+            # Step 5: Convert to the format expected by the map
             for idx, poi in enumerate(tag_filtered):
                 records.append({
                     "lat": poi['lat'],
@@ -653,7 +757,7 @@ if st.session_state.scan_active_loading:
 
     st.session_state.scan_active_loading = False
     st.rerun()
-
+    
 # -----------------------------------------------------------------------------
 # 4. MAP FRAME RENDERING ENGINE
 # -----------------------------------------------------------------------------
