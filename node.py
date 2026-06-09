@@ -548,51 +548,38 @@ leaflet_template = """
             }).addTo(map);
         }
 
-const generateMarkerElement = (color, styleMode, sizeDimension) => {
-            const d = parseInt(sizeDimension);
-            if (styleMode === "pin") {
-                return L.divIcon({ 
-                    html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
-                    className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
-                });
-            } else if (styleMode === "modern-pin") {
+} else if (styleMode === "modern-pin") {
                 const w = d * 1.5; 
-                const h = d * 2.2;
+                const h = d * 2.5;
                 const r = d * 0.45; // Dynamically computed radius for the 3D sphere head
                 
                 const customSvg = `
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}">
                     <defs>
-                        <filter id="glossyShadow" x="-30%" y="-30%" width="180%" height="180%">
-                            <feDropShadow dx="2" dy="5" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
+                        <filter id="glossyShadow" x="-40%" y="-40%" width="200%" height="200%">
+                            <feDropShadow dx="2.5" dy="6" stdDeviation="3.5" flood-color="#050A15" flood-opacity="0.6"/>
                         </filter>
                         <radialGradient id="sphereGloss-${color.replace('#','')}" cx="35%" cy="35%" r="65%">
-                            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
-                            <stop offset="40%" stop-color="${color}"/>
-                            <stop offset="100%" stop-color="#000000" stop-opacity="0.7"/>
+                            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+                            <stop offset="45%" stop-color="${color}"/>
+                            <stop offset="100%" stop-color="#000000" stop-opacity="0.75"/>
                         </radialGradient>
                     </defs>
                     
                     <g filter="url(#glossyShadow)">
-                        <path d="M20 20 L20 54" stroke="#1A1A1A" stroke-width="2.2" stroke-linecap="round"/>
-                        <path d="M20 20 L20 54" stroke="#4D4D4D" stroke-width="0.6" stroke-linecap="round"/>
+                        <path d="M20 20 L20 56" stroke="#111111" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M20 20 L20 56" stroke="#555555" stroke-width="0.8" stroke-linecap="round"/>
                         
                         <circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})" stroke="#050A10" stroke-width="0.8"/>
                     </g>
                 </svg>`;
                 return L.divIcon({ 
-                    html: `<div style="transform: translate(-50%, -90%); width: ${w}px; height: ${h}px;">${customSvg}</div>`, 
+                    html: `<div style="transform: translate(-50%, -92%); width: ${w}px; height: ${h}px;">${customSvg}</div>`, 
                     className: '', 
                     iconSize: [w, h], 
                     iconAnchor: [0, 0] 
                 });
             }
-            return L.divIcon({ 
-                html: `<div style="background-color: ${color}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, 
-                className: '', iconSize: [d, d], iconAnchor: [d/2, d/2] 
-            });
-        };
-
         const layerGroupsRef = {}; const categoryMap = {};
 
         function compileLayersAndRenderPoints() {
