@@ -18,6 +18,48 @@ if not os.path.exists(_config_file):
         f.write("[theme]\nbase=\"light\"\n")
 
 # -----------------------------------------------------------------------------
+# ENHANCED LOGGING SYSTEM
+# -----------------------------------------------------------------------------
+if 'event_logs' not in st.session_state:
+    st.session_state.event_logs = []
+
+def log_event(event_type, event_name, event_data=None, level="INFO"):
+    """
+    Log events with detailed information for debugging.
+    event_type: 'USER_ACTION', 'STATE_CHANGE', 'API_CALL', 'ERROR', 'BOUNDARY', 'POI'
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    
+    log_entry = {
+        "timestamp": timestamp,
+        "event_type": event_type,
+        "event_name": event_name,
+        "level": level,
+        "session_state": {
+            "show_boundaries": st.session_state.get('show_boundaries', False),
+            "boundary_levels": st.session_state.get('boundary_levels', []),
+            "has_location": st.session_state.get('current_location_info') is not None,
+            "has_boundary_data": len(st.session_state.get('boundary_geojson_data', {})) > 0,
+            "scanned_records_count": len(st.session_state.get('scanned_records', [])),
+            "scan_active": st.session_state.get('scan_active_loading', False)
+        }
+    }
+    
+    if event_data:
+        log_entry["event_data"] = event_data
+    
+    st.session_state.event_logs.append(log_entry)
+    
+    # Also add to existing api_logs for display
+    add_api_log(f"[{event_type}] {event_name}", level)
+    
+    # Keep only last 200 events
+    if len(st.session_state.event_logs) > 200:
+        st.session_state.event_logs = st.session_state.event_logs[-200:]
+    
+    return log_entry
+
+# -----------------------------------------------------------------------------
 # 1. BRANDED THEME & STRUCTURAL FULL OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
@@ -731,10 +773,16 @@ with st.sidebar:
         hide_boundaries_trigger = st.button("HIDE BOUNDARIES", type="primary", use_container_width=True, key="hide_boundaries_btn")
     
     if show_boundaries_trigger:
+        log_event("USER_ACTION", "SHOW_BOUNDARIES_CLICKED", {
+            "boundary_levels": st.session_state.boundary_levels,
+            "has_location": st.session_state.current_location_info is not None,
+            "location": st.session_state.current_location_info
+        })
         st.session_state.show_boundaries = True
         st.rerun()
     
     if hide_boundaries_trigger:
+        log_event("USER_ACTION", "HIDE_BOUNDARIES_CLICKED", {})
         st.session_state.show_boundaries = False
         st.session_state.boundary_geojson_data = {}
         st.rerun()
@@ -746,14 +794,21 @@ with st.sidebar:
     # -------------------------------------------------------------------------
 
     if scan_triggered:
+        log_event("USER_ACTION", "SCAN_BUTTON_CLICKED", {
+            "coordinates": f"{lat_coord}, {lon_coord}",
+            "radius": radius_val,
+            "selected_tags_count": len(selected_tags),
+            "selected_tags": selected_tags[:10]  # First 10 tags
+        })
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
             add_api_log("Scan attempted with no layers selected", "ERROR")
+            log_event("ERROR", "SCAN_FAILED_NO_TAGS", {"reason": "No layers selected"})
         else:
             add_api_log(f"Scan initiated with {len(selected_tags)} tags", "INFO")
             st.session_state.scan_active_loading = True
             st.rerun()
-
+            
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
         st.session_state.scanned_records = []
@@ -796,85 +851,115 @@ with st.sidebar:
     # -------------------------------------------------------------------------
     # SESSION LOGS (Debug Panel)
     # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # SESSION LOGS (Debug Panel)
+    # -------------------------------------------------------------------------
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
     with st.expander("📋 SESSION LOGS", expanded=False):
         st.markdown("<div style='font-size: 10px; font-weight: 600; margin-bottom: 8px;'>Real-time Debug Information</div>", unsafe_allow_html=True)
         
-        # Create three columns for log controls
-        col_log1, col_log2, col_log3 = st.columns(3)
+        # Create columns for log controls
+        col_log1, col_log2, col_log3, col_log4 = st.columns(4)
         with col_log1:
-            if st.button("🔄 REFRESH LOGS", key="refresh_logs", use_container_width=True):
+            if st.button("🔄 REFRESH", key="refresh_logs", use_container_width=True):
                 st.rerun()
         with col_log2:
-            if st.button("🗑️ CLEAR LOGS", key="clear_logs_btn", use_container_width=True):
+            if st.button("🗑️ CLEAR", key="clear_logs_btn", use_container_width=True):
                 st.session_state.api_logs = []
-                st.session_state.debug_logs = []
+                st.session_state.event_logs = []
                 st.rerun()
         with col_log3:
-            # Download logs as JSON
-            if st.session_state.get('api_logs', []):
-                logs_json = json.dumps({
+            # Download all logs as JSON
+            if st.session_state.get('event_logs', []):
+                all_logs = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "session_logs": st.session_state.api_logs,
-                    "boundary_state": {
+                    "events": st.session_state.event_logs,
+                    "api_logs": st.session_state.api_logs,
+                    "final_state": {
                         "show_boundaries": st.session_state.get('show_boundaries', False),
                         "boundary_levels": st.session_state.get('boundary_levels', []),
-                        "current_location": st.session_state.get('current_location_info', None),
-                        "boundary_data_keys": list(st.session_state.get('boundary_geojson_data', {}).keys())
-                    },
-                    "app_state": {
-                        "scanned_records_count": len(st.session_state.get('scanned_records', [])),
-                        "last_scan_coords": f"{st.session_state.get('last_scan_lat', 'N/A')}, {st.session_state.get('last_scan_lon', 'N/A')}",
-                        "scan_active": st.session_state.get('scan_active_loading', False)
+                        "has_location": st.session_state.get('current_location_info') is not None,
+                        "boundary_data_keys": list(st.session_state.get('boundary_geojson_data', {}).keys()),
+                        "poi_count": len(st.session_state.get('scanned_records', []))
                     }
-                }, indent=2)
+                }
+                logs_json = json.dumps(all_logs, indent=2)
                 st.download_button(
-                    "📥 DOWNLOAD LOGS",
+                    "📥 DOWNLOAD",
                     logs_json,
-                    file_name=f"opennode_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    file_name=f"opennode_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json",
                     use_container_width=True
                 )
+        with col_log4:
+            st.caption(f"Events: {len(st.session_state.get('event_logs', []))}")
         
-        # Display logs in a scrollable container
-        if st.session_state.get('api_logs', []):
+        # Display event logs in a scrollable container
+        st.markdown("---")
+        st.markdown("### 📋 Event Timeline")
+        
+        if st.session_state.get('event_logs', []):
             log_text = ""
-            for log in st.session_state.api_logs[-50:]:  # Last 50 logs
+            for log in st.session_state.event_logs[-50:]:  # Last 50 events
+                time_str = log.get('timestamp', '')[-12:-3] if log.get('timestamp') else ''
+                event_type = log.get('event_type', '')
+                event_name = log.get('event_name', '')
                 level = log.get('level', 'INFO')
+                
                 if level == 'ERROR':
                     icon = "🔴"
                 elif level == 'WARNING':
                     icon = "🟡"
+                elif event_type == 'USER_ACTION':
+                    icon = "👆"
+                elif event_type == 'API_CALL':
+                    icon = "🌐"
+                elif event_type == 'BOUNDARY':
+                    icon = "🗺️"
+                elif event_type == 'SUCCESS':
+                    icon = "✅"
                 else:
                     icon = "🟢"
-                log_text += f"{icon} [{log.get('time', '')}] {log.get('message', '')}\n"
+                
+                log_text += f"{icon} [{time_str}] {event_type}: {event_name}\n"
+                
+                # Add event data if present
+                if log.get('event_data'):
+                    data_str = str(log.get('event_data'))[:100]
+                    log_text += f"     📎 {data_str}\n"
             
             st.code(log_text, language="text", line_numbers=False)
         else:
-            st.info("No logs yet. Click SCAN AREA or SHOW BOUNDARIES to generate logs.")
+            st.info("No events logged yet. Click SCAN AREA or SHOW BOUNDARIES to generate logs.")
         
-        # Show boundary state debug info
+        # Show current state
         st.markdown("---")
-        st.markdown("<div style='font-size: 9px; font-weight: 600;'>🔍 Boundary State:</div>", unsafe_allow_html=True)
+        st.markdown("### 🔍 Current Application State")
         st.code(f"""
 show_boundaries: {st.session_state.get('show_boundaries', False)}
 boundary_levels: {st.session_state.get('boundary_levels', [])}
-current_location: {st.session_state.get('current_location_info', {})}
+has_location: {st.session_state.get('current_location_info') is not None}
+location: {st.session_state.get('current_location_info', {})}
 boundary_data_keys: {list(st.session_state.get('boundary_geojson_data', {}).keys())}
+poi_count: {len(st.session_state.get('scanned_records', []))}
+scan_active: {st.session_state.get('scan_active_loading', False)}
         """, language="text", line_numbers=False)
-    # -------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
 # PIPELINE STAGE PIPING CONTROLLER (USING GITHUB POI DATA WITH FALLBACK)
 # -----------------------------------------------------------------------------
-main_canvas = st.empty()
-
 if st.session_state.scan_active_loading:
+    log_event("PROCESS", "POI_LOADING_STARTED", {
+        "coordinates": f"{lat_coord}, {lon_coord}",
+        "radius": radius_val,
+        "tags_count": len(selected_tags)
+    })
+    
     records = []
     success = False
     
-    # Loading overlay already shows in center of map because main_canvas is positioned over the map container
+    # Loading overlay
     main_canvas.markdown(f'''
         <div class="py-loading-container">
             <div class="py-spinner"></div>
@@ -903,14 +988,35 @@ if st.session_state.scan_active_loading:
     
     add_api_log("Starting POI data load (GitHub primary, Overpass fallback)", "INFO")
     
-    # Step 1: Determine province from coordinates
+    # Step 1: Determine province from coordinates (for POI loading)
     province_name = get_province_from_coords(lat_coord, lon_coord)
+    log_event("PROCESS", "PROVINCE_DETECTION", {"province": province_name, "coordinates": f"{lat_coord}, {lon_coord}"})
+    
+    # Step 2: Get location hierarchy for boundaries (reverse geocoding)
+    log_event("API_CALL", "REVERSE_GEOCODING_START", {"lat": lat_coord, "lon": lon_coord})
+    location_info = reverse_geocode_location(lat_coord, lon_coord)
+    
+    if location_info:
+        st.session_state.current_location_info = location_info
+        log_event("SUCCESS", "REVERSE_GEOCODING_SUCCESS", location_info)
+        add_api_log(f"📍 Location detected: {location_info.get('barangay', 'N/A')}, {location_info.get('city', 'N/A')}, {location_info.get('province', 'N/A')}, {location_info.get('region', 'N/A')}", "INFO")
+    else:
+        st.session_state.current_location_info = None
+        log_event("ERROR", "REVERSE_GEOCODING_FAILED", {"lat": lat_coord, "lon": lon_coord})
+        add_api_log("⚠️ Could not determine location hierarchy for boundaries", "WARNING")
     
     if province_name:
         add_api_log(f"Coordinates map to province: {province_name}", "INFO")
+        log_event("PROCESS", "GITHUB_POI_LOAD_START", {"province": province_name})
         
-        # Step 2: Load POIs with fallback
+        # Load POIs with fallback
         records = load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags)
+        
+        log_event("PROCESS", "POI_LOAD_COMPLETE", {
+            "province": province_name,
+            "records_count": len(records),
+            "source": "github" if len(records) > 0 else "overpass"
+        })
         
         if records:
             st.session_state.scanned_records = records
@@ -919,32 +1025,23 @@ if st.session_state.scan_active_loading:
             st.session_state.network_stats = None
             success = True
             add_api_log(f"Final record count: {len(records)} POIs displayed", "INFO")
+            log_event("SUCCESS", "POI_DISPLAYED", {"count": len(records)})
         else:
             add_api_log("No POIs found matching criteria from any source", "WARNING")
+            log_event("WARNING", "NO_POIS_FOUND", {"province": province_name})
     else:
         add_api_log(f"Coordinates ({lat_coord}, {lon_coord}) not within any loaded province boundary", "ERROR")
+        log_event("ERROR", "PROVINCE_NOT_FOUND", {"coordinates": f"{lat_coord}, {lon_coord}"})
     
-    if not success:
-        add_api_log("Scan failed - no data retrieved", "ERROR")
-        main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">No POI data available for this area</div></div>', unsafe_allow_html=True)
-        time.sleep(2)
-    
-    # Step 2: Get location hierarchy for boundaries (reverse geocoding)
-    location_info = reverse_geocode_location(lat_coord, lon_coord)
-    if location_info:
-        st.session_state.current_location_info = location_info
-        add_api_log(f"📍 Location detected: {location_info.get('barangay', 'N/A')}, {location_info.get('city', 'N/A')}, {location_info.get('province', 'N/A')}, {location_info.get('region', 'N/A')}", "INFO")
-    else:
-        st.session_state.current_location_info = None
-        add_api_log("⚠️ Could not determine location hierarchy for boundaries", "WARNING")
-    
-    if province_name:
-        add_api_log(f"Coordinates map to province: {province_name}", "INFO")
-
     # -------------------------------------------------------------------------
     # FETCH BOUNDARIES IF SHOW BOUNDARIES IS ACTIVE
     # -------------------------------------------------------------------------
     if st.session_state.show_boundaries and st.session_state.current_location_info:
+        log_event("BOUNDARY", "BOUNDARY_FETCH_STARTED", {
+            "boundary_levels": st.session_state.boundary_levels,
+            "location": st.session_state.current_location_info
+        })
+        
         add_api_log("DEBUG: Starting boundary fetch process", "INFO")
         add_api_log(f"DEBUG: boundary_levels selected: {st.session_state.boundary_levels}", "INFO")
         add_api_log(f"DEBUG: location_info: {st.session_state.current_location_info}", "INFO")
@@ -961,27 +1058,49 @@ if st.session_state.scan_active_loading:
         
         for level_name in st.session_state.boundary_levels:
             add_api_log(f"DEBUG: Processing level: {level_name}", "INFO")
+            log_event("BOUNDARY", "BOUNDARY_LEVEL_PROCESSING", {"level": level_name})
+            
             if level_name in level_mapping:
                 key, admin_level, area_name = level_mapping[level_name]
                 add_api_log(f"DEBUG: level={level_name}, key={key}, admin_level={admin_level}, area_name='{area_name}'", "INFO")
+                
                 if area_name and area_name != '':
                     add_api_log(f"DEBUG: Fetching boundary for '{area_name}' at admin_level {admin_level}", "INFO")
+                    log_event("API_CALL", "BOUNDARY_FETCH", {"area": area_name, "admin_level": admin_level})
+                    
                     geojson = get_boundary_geojson(area_name, admin_level)
+                    
                     if geojson:
                         boundary_geojson_data[key] = geojson
-                        add_api_log(f"✅ Successfully fetched {level_name} boundary for: {area_name}", "INFO")
+                        feature_count = len(geojson.get('features', []))
+                        add_api_log(f"✅ Successfully fetched {level_name} boundary for: {area_name} ({feature_count} features)", "INFO")
+                        log_event("SUCCESS", "BOUNDARY_FETCH_SUCCESS", {"level": level_name, "area": area_name, "features": feature_count})
                     else:
                         add_api_log(f"❌ Failed to fetch {level_name} boundary for: {area_name}", "ERROR")
+                        log_event("ERROR", "BOUNDARY_FETCH_FAILED", {"level": level_name, "area": area_name})
                 else:
                     add_api_log(f"DEBUG: Skipping {level_name} - area_name is empty", "WARNING")
+                    log_event("WARNING", "BOUNDARY_SKIPPED_EMPTY", {"level": level_name})
         
         st.session_state.boundary_geojson_data = boundary_geojson_data
         add_api_log(f"DEBUG: Final boundary_geojson_data keys: {list(boundary_geojson_data.keys())}", "INFO")
+        log_event("STATE_CHANGE", "BOUNDARY_DATA_UPDATED", {"keys": list(boundary_geojson_data.keys())})
     else:
         add_api_log(f"DEBUG: NOT fetching boundaries - show_boundaries={st.session_state.show_boundaries}, location_info={st.session_state.current_location_info is not None}", "INFO")
+        log_event("SKIP", "BOUNDARY_FETCH_SKIPPED", {
+            "show_boundaries": st.session_state.show_boundaries,
+            "has_location": st.session_state.current_location_info is not None
+        })
     # -------------------------------------------------------------------------
     
+    if not success:
+        add_api_log("Scan failed - no data retrieved", "ERROR")
+        log_event("ERROR", "SCAN_FAILED", {"reason": "No POI data retrieved"})
+        main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">No POI data available for this area</div></div>', unsafe_allow_html=True)
+        time.sleep(2)
+
     st.session_state.scan_active_loading = False
+    log_event("STATE_CHANGE", "SCAN_LOADING_COMPLETE", {"success": success})
     st.rerun()
     
 # -----------------------------------------------------------------------------
