@@ -147,8 +147,8 @@ def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
+        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
@@ -276,7 +276,6 @@ with st.sidebar:
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
-    # Filter only fully visible pins for strict map-sync exports
     visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
     
     with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
@@ -316,8 +315,9 @@ target_config_json = json.dumps(st.session_state.target_config)
 radius_config_json = json.dumps(st.session_state.radius_config)
 geojson_str = json.dumps(pts_active)
 
-render_lat = lat_coord
-render_lon = lon_coord
+fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 
@@ -499,7 +499,6 @@ leaflet_template = """
         let pts = __GEOJSON__;
         let clusters = {}; 
 
-        // Explicit loading engine toggle mapping
         if (__SHOW_LOADING__) {
             document.getElementById('map-loading-overlay').style.display = 'flex';
         }
@@ -540,18 +539,25 @@ leaflet_template = """
             if (centerMarker) map.removeLayer(centerMarker);
             const d = targetConfig.size; const c = targetConfig.color;
             const htmlElement = targetConfig.style === "star" 
-                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">★</div>`
-                : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
+                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);">★</div>`
+                : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);"></div>`;
             
             centerMarker = L.marker([__LAT__, __LON__], { 
                 icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 
             }).addTo(map);
         }
 
-} else if (styleMode === "modern-pin") {
+        const generateMarkerElement = (color, styleMode, sizeDimension) => {
+            const d = parseInt(sizeDimension);
+            if (styleMode === "pin") {
+                return L.divIcon({ 
+                    html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
+                    className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
+                });
+            } else if (styleMode === "modern-pin") {
                 const w = d * 1.5; 
                 const h = d * 2.5;
-                const r = d * 0.45; // Dynamically computed radius for the 3D sphere head
+                const r = d * 0.45; 
                 
                 const customSvg = `
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}">
@@ -580,7 +586,9 @@ leaflet_template = """
                     iconAnchor: [0, 0] 
                 });
             }
-            
+            return L.divIcon({ html: `<div style="background-color: ${color}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, className: '', iconSize: [d, d], iconAnchor: [d/2, d/2] });
+        };
+
         const layerGroupsRef = {}; const categoryMap = {};
 
         function compileLayersAndRenderPoints() {
@@ -661,7 +669,6 @@ leaflet_template = """
             rebuildSidebarControlLayout();
         };
 
-        // Core Feature Update: Intercept and distribute property matrices across cluster layers dynamically
         window.batchStyleGroupCluster = function(clusterId, property, value) {
             const targetedLayers = clusters[clusterId] || [];
             targetedLayers.forEach(layerKey => {
@@ -689,7 +696,6 @@ leaflet_template = """
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
             const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
 
-            // Render Operational Groups with Dynamic Batch Layout Styling Controls Panel Modals
             Object.keys(clusters).forEach(clusterName => {
                 const assignedLayers = clusters[clusterName] || [];
                 let aggregatedCount = 0;
@@ -744,7 +750,6 @@ leaflet_template = """
                 htmlPayload += '</div></div>';
             });
 
-            // Cleanly loop trace remaining loose data sets outside explicit configurations
             Object.keys(categoryMap).forEach(catName => {
                 let insideClusterGroup = false;
                 Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
@@ -865,6 +870,9 @@ leaflet_template = """
 </html>
 """
 
+fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
@@ -876,6 +884,7 @@ leaflet_html = (leaflet_template
                 .replace("__TARGET_CONFIG_JSON__", target_config_json)
                 .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
                 .replace("__LAYER_META_JSON__", layer_meta_json)
-                .replace("__GEOJSON__", geojson_str))
+                .replace("__GEOJSON__", geojson_str)
+                .replace("__BOUNDARY_GEOJSON__", "{}"))
 
 st.components.v1.html(leaflet_html, height=850, scrolling=False)
