@@ -564,7 +564,7 @@ leaflet_template = """
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}">
                     <defs>
                         <radialGradient id="groundShadow" cx="50%" cy="50%" r="50%">
-                            <stop offset="0%" stop-color="#000000" stop-opacity="0.6"/>
+                            <stop offset="0%" stop-color="#000000" stop-opacity="1.0"/>
                             <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
                         </radialGradient>
                         
@@ -575,7 +575,7 @@ leaflet_template = """
                         </radialGradient>
                     </defs>
                     
-                    <ellipse cx="20" cy="56" rx="8" ry="2.5" fill="url(#groundShadow)" />
+                    <ellipse cx="20" cy="44" rx="12" ry="3.5" fill="url(#groundShadow)" />
                     
                     <path d="M20 20 L20 56" stroke="#222222" stroke-width="1.8" stroke-linecap="round"/>
                     <path d="M20 20 L20 56" stroke="#888888" stroke-width="0.6" stroke-linecap="round"/>
