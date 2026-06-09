@@ -6,6 +6,8 @@ import os
 import hashlib
 import time
 import math
+import traceback
+from datetime import datetime
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
@@ -121,6 +123,35 @@ st.markdown("""
         .py-loading-title { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
         .py-loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* API LOG PANEL */
+        .api-log-container {
+            position: absolute; bottom: 12px; right: 12px; width: 380px; max-height: 280px;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); border-radius: 8px;
+            border-left: 3px solid #C9AB4C; z-index: 10000; font-family: 'Monaco', monospace;
+            font-size: 10px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.2s ease; color: #e0e0e0;
+        }
+        .api-log-header {
+            padding: 6px 10px; background: rgba(0,0,0,0.6); border-radius: 8px 8px 0 0;
+            font-weight: 700; font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+            color: #C9AB4C; border-bottom: 1px solid rgba(201, 171, 76, 0.3);
+        }
+        .api-log-content {
+            overflow-y: auto; padding: 6px; flex-grow: 1; max-height: 220px;
+            scrollbar-width: thin;
+        }
+        .api-log-entry {
+            border-bottom: 1px solid rgba(255,255,255,0.1); padding: 6px 4px;
+            font-family: monospace; font-size: 9px; word-break: break-word;
+        }
+        .api-log-time { color: #C9AB4C; font-weight: 600; margin-right: 8px; }
+        .api-log-info { color: #88ffaa; }
+        .api-log-error { color: #ff8888; }
+        .api-log-warning { color: #ffaa66; }
+        .api-log-close { cursor: pointer; padding: 0 6px; font-size: 14px; line-height: 1; }
+        .api-log-close:hover { color: #ff8888; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -135,6 +166,26 @@ def compile_features_kml(features):
         class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
+
+# -----------------------------------------------------------------------------
+# API LOGGING SYSTEM
+# -----------------------------------------------------------------------------
+if 'api_logs' not in st.session_state:
+    st.session_state.api_logs = []
+
+def add_api_log(message, level="INFO"):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    st.session_state.api_logs.append({
+        "time": timestamp,
+        "message": message,
+        "level": level
+    })
+    # Keep only last 100 logs
+    if len(st.session_state.api_logs) > 100:
+        st.session_state.api_logs = st.session_state.api_logs[-100:]
+
+def clear_api_logs():
+    st.session_state.api_logs = []
 
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
@@ -185,19 +236,37 @@ def build_ql(lat, lon, radius, tags):
 
 def query_overpass_robust(ql, max_retries=2, timeout=90):
     for endpoint in OVERPASS_ENDPOINTS:
+        add_api_log(f"Trying endpoint: {endpoint}", "INFO")
         for attempt in range(max_retries):
             try:
+                start_time = time.time()
+                add_api_log(f"POST request to {endpoint} (attempt {attempt+1})", "INFO")
                 res = requests.post(endpoint, data={"data": ql}, headers={"User-Agent": "OpenNode/3.5"}, timeout=timeout)
+                elapsed = time.time() - start_time
                 if res.status_code == 200:
+                    add_api_log(f"Success! Status 200 in {elapsed:.2f}s", "INFO")
                     data = res.json()
-                    if data.get("elements"): return data["elements"]
+                    if data.get("elements"):
+                        add_api_log(f"Retrieved {len(data['elements'])} elements", "INFO")
+                        return data["elements"]
+                    else:
+                        add_api_log("No elements in response", "WARNING")
+                        return []
                 elif res.status_code == 429:
+                    add_api_log(f"Rate limited (429), retrying in {2**attempt}s", "WARNING")
                     time.sleep(2 ** attempt)
                     continue
+                else:
+                    add_api_log(f"HTTP {res.status_code} from endpoint", "ERROR")
             except requests.exceptions.Timeout:
+                add_api_log(f"Timeout after {timeout}s", "ERROR")
                 timeout = timeout * 0.7
                 continue
-            except Exception: break
+            except Exception as e:
+                add_api_log(f"Exception: {str(e)[:100]}", "ERROR")
+                break
+        add_api_log(f"Endpoint {endpoint} failed, trying next", "WARNING")
+    add_api_log("All endpoints exhausted, returning empty", "ERROR")
     return []
 
 def get_cache_key(lat, lon, radius, tags):
@@ -206,22 +275,32 @@ def get_cache_key(lat, lon, radius, tags):
 
 def cached_query(lat, lon, radius, tags, ql):
     key = get_cache_key(lat, lon, radius, tags)
-    if key in st.session_state.query_cache: return st.session_state.query_cache[key]
+    if key in st.session_state.query_cache:
+        add_api_log(f"Cache hit for key {key[:8]}...", "INFO")
+        return st.session_state.query_cache[key]
+    add_api_log(f"Cache miss, executing query", "INFO")
     results = query_overpass_robust(ql)
-    if results: st.session_state.query_cache[key] = results
+    if results:
+        st.session_state.query_cache[key] = results
+        add_api_log(f"Cached {len(results)} results", "INFO")
     return results
 
 def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
-    if radius <= max_chunk: return cached_query(lat, lon, radius, tags, build_ql(lat, lon, radius, tags))
+    if radius <= max_chunk:
+        add_api_log(f"Single query (radius {radius}m <= {max_chunk}m)", "INFO")
+        return cached_query(lat, lon, radius, tags, build_ql(lat, lon, radius, tags))
     offset = radius / (2 * math.sqrt(2) * 111320)
     quadrants = [(lat + offset, lon + offset), (lat + offset, lon - offset), (lat - offset, lon + offset), (lat - offset, lon - offset)]
+    add_api_log(f"Adaptive split: {radius}m -> 4 quadrants", "INFO")
     all_results, seen_ids = [], set()
-    for q_lat, q_lon in quadrants:
+    for idx, (q_lat, q_lon) in enumerate(quadrants):
+        add_api_log(f"Querying quadrant {idx+1}/4", "INFO")
         chunk_results = cached_query(q_lat, q_lon, radius // 2, tags, build_ql(q_lat, q_lon, radius // 2, tags))
         for el in chunk_results:
             if el.get("id") not in seen_ids:
                 seen_ids.add(el["id"])
                 all_results.append(el)
+    add_api_log(f"Merged {len(all_results)} unique elements from quadrants", "INFO")
     return all_results
 
 # -----------------------------------------------------------------------------
@@ -266,8 +345,11 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
     if scan_triggered:
-        if not selected_tags: st.error("Select ≥ 1 layer.")
+        if not selected_tags:
+            st.error("Select ≥ 1 layer.")
+            add_api_log("Scan attempted with no layers selected", "ERROR")
         else:
+            add_api_log(f"Scan initiated with {len(selected_tags)} tags", "INFO")
             st.session_state.scan_active_loading = True
             st.rerun()
 
@@ -278,8 +360,10 @@ with st.sidebar:
         st.session_state.layer_groups = {}
         st.session_state.network_stats = None
         st.session_state.scan_active_loading = False
+        clear_api_logs()
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
+        add_api_log("Cleared all data and logs", "INFO")
         st.rerun()
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
@@ -298,8 +382,11 @@ with st.sidebar:
                     st.session_state.scanned_records = data.get("scanned_records", data)
                     st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
                     st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
+                    add_api_log(f"Imported {len(st.session_state.scanned_records)} records from file", "INFO")
                     st.rerun()
-                except Exception: st.error("Invalid File")
+                except Exception as e:
+                    st.error("Invalid File")
+                    add_api_log(f"Import failed: {str(e)[:100]}", "ERROR")
 
 # -----------------------------------------------------------------------------
 # PIPELINE STAGE PIPING CONTROLLER
@@ -309,9 +396,33 @@ main_canvas = st.empty()
 if st.session_state.scan_active_loading:
     records = []
     success = False
-    main_canvas.markdown(f'<div class="py-loading-container"><div class="py-spinner"></div><div class="py-loading-title">Compiling Spatial Layers...</div><div class="py-loading-subtitle">Processing Radius: {radius_val}m</div></div>', unsafe_allow_html=True)
+    main_canvas.markdown(f'''
+        <div class="py-loading-container">
+            <div class="py-spinner"></div>
+            <div class="py-loading-title">Compiling Spatial Layers...</div>
+            <div class="py-loading-subtitle">Radius: {radius_val}m | Tags: {len(selected_tags)}</div>
+            <div class="py-loading-subtitle" id="scan-status-text">Initializing engines...</div>
+        </div>
+        <script>
+            const statusDiv = document.getElementById('scan-status-text');
+            const statusMessages = [
+                "Querying OSM database...",
+                "Processing geometry features...",
+                "Fetching network graph...",
+                "Compiling results..."
+            ];
+            let idx = 0;
+            if(statusDiv) {{
+                setInterval(() => {{
+                    idx = (idx + 1) % statusMessages.length;
+                    statusDiv.innerText = statusMessages[idx];
+                }}, 1200);
+            }}
+        </script>
+    ''', unsafe_allow_html=True)
     
     # --- PASS 1: OSMnx Engine Ingestion ---
+    add_api_log("Starting OSMnx engine ingestion", "INFO")
     try:
         import osmnx as ox
         tags_dict = {}
@@ -322,9 +433,11 @@ if st.session_state.scan_active_loading:
                 if '|' in v: v = [x.strip() for x in v.split('|')]
                 tags_dict[k] = v
             else: tags_dict[clean] = True
-                
+        add_api_log(f"OSMnx tags_dict: {tags_dict}", "INFO")
+        
         gdf = ox.features_from_point((lat_coord, lon_coord), tags=tags_dict, dist=radius_val)
         if not gdf.empty:
+            add_api_log(f"OSMnx returned {len(gdf)} features", "INFO")
             for idx, row in gdf.iterrows():
                 name = row.get('name', 'Unknown')
                 if isinstance(name, float): name = 'Unknown'
@@ -347,21 +460,34 @@ if st.session_state.scan_active_loading:
                     "footprint_geojson": geom.__geo_interface__ if geom.geom_type in ['Polygon', 'MultiPolygon'] else None,
                     "visible": True, "uid": len(records)
                 })
+            add_api_log(f"Processed {len(records)} records from OSMnx", "INFO")
             
             try:
+                add_api_log("Fetching street network graph", "INFO")
                 G = ox.graph_from_point((lat_coord, lon_coord), dist=radius_val, network_type='drive')
                 st.session_state.network_stats = ox.stats.basic_stats(G)
-            except Exception: st.session_state.network_stats = None
+                add_api_log("Network stats computed successfully", "INFO")
+            except Exception as e:
+                add_api_log(f"Network graph failed: {str(e)[:100]}", "WARNING")
+                st.session_state.network_stats = None
 
             st.session_state.scanned_records = records
             st.session_state.last_scan_lat = lat_coord
             st.session_state.last_scan_lon = lon_coord
             success = True
-    except Exception: pass
+        else:
+            add_api_log("OSMnx returned empty GeoDataFrame", "WARNING")
+    except ImportError:
+        add_api_log("OSMnx not installed, skipping", "WARNING")
+    except Exception as e:
+        add_api_log(f"OSMnx error: {str(e)[:200]}", "ERROR")
+        add_api_log(traceback.format_exc()[-300:], "ERROR")
 
     # --- PASS 2: Balanced Fallback Engine Overpass Loop ---
     if not success:
+        add_api_log("Falling back to Overpass API", "INFO")
         elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
+        add_api_log(f"Overpass returned {len(elements)} raw elements", "INFO")
         for el in elements:
             e_lat = el.get('lat') or el.get('center', {}).get('lat')
             e_lon = el.get('lon') or el.get('center', {}).get('lon')
@@ -369,7 +495,6 @@ if st.session_state.scan_active_loading:
                 tags = el.get('tags', {})
                 name = tags.get('name', 'Unknown')
                 
-                # SANITIZATION FILTER MATRIX: Clean duplicate parameters from fallback payload
                 if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']: continue
                     
                 records.append({
@@ -382,6 +507,14 @@ if st.session_state.scan_active_loading:
             st.session_state.last_scan_lat = lat_coord
             st.session_state.last_scan_lon = lon_coord
             success = True
+            add_api_log(f"Final record count: {len(records)}", "INFO")
+        else:
+            add_api_log("No records found from any source", "ERROR")
+
+    if not success:
+        add_api_log("Scan failed completely - no data retrieved", "ERROR")
+        main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">Check API logs for details</div></div>', unsafe_allow_html=True)
+        time.sleep(2)
 
     st.session_state.scan_active_loading = False
     st.rerun()
@@ -410,6 +543,43 @@ render_lat, render_lon = lat_coord, lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 
+# Build API log HTML
+api_logs_html = ""
+for log in st.session_state.api_logs[-30:]:  # Show last 30 logs
+    level_class = f"api-log-{log['level'].lower()}"
+    api_logs_html += f'<div class="api-log-entry"><span class="api-log-time">[{log["time"]}]</span> <span class="{level_class}">{log["message"]}</span></div>'
+
+api_log_panel = f'''
+<div class="api-log-container" id="apiLogPanel">
+    <div class="api-log-header" onclick="toggleApiLog()">
+        <span>📡 API ACTIVITY LOG</span>
+        <span class="api-log-close" onclick="event.stopPropagation(); clearApiLogsFromUI();">✕</span>
+    </div>
+    <div class="api-log-content" id="apiLogContent">
+        {api_logs_html if api_logs_html else '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>No logs yet. Click SCAN to start.</span></div>'}
+    </div>
+</div>
+<script>
+    function toggleApiLog() {{
+        const content = document.getElementById('apiLogContent');
+        if (content) {{
+            if (content.style.display === 'none') {{
+                content.style.display = 'block';
+            }} else {{
+                content.style.display = 'none';
+            }}
+        }}
+    }}
+    function clearApiLogsFromUI() {{
+        const content = document.getElementById('apiLogContent');
+        if (content) {{
+            content.innerHTML = '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>Logs cleared.</span></div>';
+        }}
+        // Also notify Streamlit to clear via a hidden component? We'll handle via button in sidebar.
+    }}
+</script>
+'''
+
 if st.session_state.network_stats:
     s = st.session_state.network_stats
     st.markdown(f"""<div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>📈 STREET GRAPH DESCRIPTOR METRICS — Intersection Count: <b>{s.get('n', 0)}</b> | Edge Count: <b>{s.get('m', 0)}</b> | Total Street Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Clean Intersections Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
@@ -427,18 +597,21 @@ leaflet_template = """
         #map { height: 100vh; width: 100%; z-index: 1; }
         #map-loading-overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 320px; background: #ffffff; z-index: 99999; 
+            width: 340px; background: #ffffff; z-index: 99999; 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             padding: 24px; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.15);
             box-shadow: 0 10px 25px rgba(0, 51, 102, 0.15); pointer-events: all;
         }
         .loading-spinner { width: 44px; height: 44px; border: 4px solid rgba(0, 51, 102, 0.1); border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
         .loading-text { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
+        .loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; margin-top: 6px; }
         .elapsed-timer { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; letter-spacing: 0.5px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
+        #scan-results-panel {
+            position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
+        }
         .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
-        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; }
+        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; max-height: calc(100vh - 280px); }
         .layer-category-block { border-bottom: 1px solid #f0f0f0; }
         .layer-category-header { background: #ffffff; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
         .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
@@ -466,13 +639,30 @@ leaflet_template = """
         .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
+        
+        /* API LOG OVERRIDES for map integration */
+        .api-log-panel-map {
+            position: absolute; bottom: 12px; right: 12px; width: 380px; max-height: 280px;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); border-radius: 8px;
+            border-left: 3px solid #C9AB4C; z-index: 10000; font-family: 'Monaco', monospace;
+            font-size: 10px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            color: #e0e0e0;
+        }
+        .api-log-header-map { padding: 6px 10px; background: rgba(0,0,0,0.6); border-radius: 8px 8px 0 0; font-weight: 700; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: #C9AB4C; border-bottom: 1px solid rgba(201, 171, 76, 0.3); }
+        .api-log-content-map { overflow-y: auto; padding: 6px; flex-grow: 1; max-height: 220px; scrollbar-width: thin; }
+        .api-log-entry-map { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 6px 4px; font-family: monospace; font-size: 9px; word-break: break-word; }
+        .api-log-time-map { color: #C9AB4C; font-weight: 600; margin-right: 8px; }
+        .api-log-info-map { color: #88ffaa; }
+        .api-log-error-map { color: #ff8888; }
+        .api-log-warning-map { color: #ffaa66; }
     </style>
 </head>
 <body>
     <div id="map-container">
-        <div id="map-loading-overlay" style="display: none;">
+        <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
             <div class="loading-spinner"></div>
-            <div class="loading-text">Scanning Spatial Engine...</div>
+            <div class="loading-text">Scanning Spatial Engine</div>
+            <div class="loading-subtitle" id="scan-status-text-map">Initializing queries...</div>
             <div class="elapsed-timer" id="timer-output">Elapsed: 0.0s</div>
         </div>
         <div id="map"></div>
@@ -489,19 +679,38 @@ leaflet_template = """
             <div class="config-block-wrapper"><div class="config-headline">Target Coordinates & Radius Layer</div><div class="config-flex-row"><span>Target:</span><select onchange="patchTargetCenterConfig('style', this.value)"><option value="star">Star</option><option value="circle">Dot</option></select><input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)"><input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)"></div><div class="config-flex-row"><span>Radius Fill:</span><input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)"><span>Opacity:</span><input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)"></div><div class="config-flex-row"><span>Thickness:</span><input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)"></div></div>
             <div class="results-list" id="results-list-box"></div>
         </div>
+        __API_LOG_PANEL__
     </div>
 
     <script>
         const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
         let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
-
+        let scanStartTime = null;
+        
         if (__SHOW_LOADING__) {
-            document.getElementById('map-loading-overlay').style.display = 'flex';
-            let start = performance.now();
-            setInterval(() => {
-                let current = (performance.now() - start) / 1000;
-                document.getElementById('timer-output').innerText = "Time Elapsed: " + current.toFixed(1) + "s";
+            const overlay = document.getElementById('map-loading-overlay');
+            if (overlay) overlay.style.display = 'flex';
+            scanStartTime = performance.now();
+            const timerInterval = setInterval(() => {
+                if (scanStartTime) {
+                    let current = (performance.now() - scanStartTime) / 1000;
+                    const timerEl = document.getElementById('timer-output');
+                    if (timerEl) timerEl.innerText = "Time Elapsed: " + current.toFixed(1) + "s";
+                    if (!__SHOW_LOADING__) clearInterval(timerInterval);
+                }
             }, 100);
+            
+            // Rotating status messages
+            const statusDiv = document.getElementById('scan-status-text-map');
+            const messages = ["Connecting to OSM...", "Fetching features...", "Processing geometry...", "Building network graph...", "Compiling results..."];
+            let msgIdx = 0;
+            if(statusDiv) {
+                const msgInterval = setInterval(() => {
+                    msgIdx = (msgIdx + 1) % messages.length;
+                    if(statusDiv) statusDiv.innerText = messages[msgIdx];
+                    if (!__SHOW_LOADING__) clearInterval(msgInterval);
+                }, 1500);
+            }
         }
 
         const basemaps = {
@@ -668,17 +877,21 @@ leaflet_template = """
 fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
 render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
 
+show_loading_display = "flex" if st.session_state.scan_active_loading else "none"
+
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__IS_STALE__", is_stale)
-                .replace("__SHOW_LOADING__", show_loading)
+                .replace("__SHOW_LOADING__", "true" if st.session_state.scan_active_loading else "false")
+                .replace("__SHOW_LOADING_DISPLAY__", show_loading_display)
                 .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
                 .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
                 .replace("__TARGET_CONFIG_JSON__", target_config_json)
                 .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
                 .replace("__LAYER_META_JSON__", layer_meta_json)
-                .replace("__GEOJSON__", geojson_str))
+                .replace("__GEOJSON__", geojson_str)
+                .replace("__API_LOG_PANEL__", api_log_panel))
 
 st.components.v1.html(leaflet_html, height=850, scrolling=False)
