@@ -22,8 +22,9 @@ if not os.path.exists(_config_file):
 # -----------------------------------------------------------------------------
 GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
 
-# Province bounding boxes for reverse geocoding (to determine which province file to load)
+# Province bounding boxes for reverse geocoding (COMPLETE - Luzon, Visayas, Mindanao)
 PROVINCE_BOUNDS = {
+    # === LUZON ===
     "metro_manila": [120.90, 14.40, 121.10, 14.80],
     "cavite": [120.60, 14.10, 121.00, 14.50],
     "laguna": [121.00, 14.00, 121.60, 14.50],
@@ -38,8 +39,8 @@ PROVINCE_BOUNDS = {
     "la_union": [120.20, 16.40, 120.80, 17.00],
     "ilocos_norte": [120.30, 17.80, 121.00, 18.70],
     "ilocos_sur": [120.20, 16.90, 120.80, 17.80],
-    # Visayas
-    "cebu": [123.50, 9.50, 124.20, 11.00],
+    # === VISAYAS ===
+    "cebu": [123.00, 9.40, 124.20, 11.20],
     "leyte": [124.30, 9.80, 125.60, 11.50],
     "bohol": [123.70, 9.50, 124.60, 10.10],
     "negros_oriental": [122.80, 9.00, 123.50, 10.50],
@@ -47,7 +48,7 @@ PROVINCE_BOUNDS = {
     "samar": [124.80, 11.00, 125.80, 12.50],
     "biliran": [124.30, 11.40, 124.60, 11.70],
     "siquijor": [123.40, 9.10, 123.70, 9.30],
-    # Mindanao
+    # === MINDANAO ===
     "davao_city": [125.40, 6.90, 125.70, 7.40],
     "davao_del_sur": [125.00, 6.00, 125.80, 7.00],
     "davao_oriental": [126.00, 6.50, 126.80, 7.80],
