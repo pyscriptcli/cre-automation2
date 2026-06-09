@@ -580,6 +580,7 @@ leaflet_template = """
                     iconAnchor: [0, 0] 
                 });
             }
+            
         const layerGroupsRef = {}; const categoryMap = {};
 
         function compileLayersAndRenderPoints() {
