@@ -98,7 +98,7 @@ st.markdown("""
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
 
-        /* ABSOLUTE STYLING PROTOCOL: Hard-Lock Color Picker to UpperCase HEX primitives only */
+        /* Hex-Only Color Picker Formatter overrides */
         [data-testid="stColorPicker"] div[data-baseweb="select"] { text-transform: uppercase !important; }
         div[data-baseweb="color-picker-popover"] div[data-baseweb="select"] { display: none !important; }
         div[data-baseweb="color-picker-popover"] div:has(> input) + div { display: none !important; }
@@ -106,17 +106,20 @@ st.markdown("""
         div[data-baseweb="color-picker-popover"] input[type="number"] { display: none !important; }
         div[data-baseweb="color-picker-popover"] input[type="text"] { width: 100% !important; text-transform: uppercase !important; font-family: 'Montserrat', sans-serif !important; font-weight: 700 !important; font-size: 11px !important; text-align: center !important; color: var(--brand-midnight) !important; }
         
-        /* Python Engine Core Centered Progress Stopwatch HUD Panel Overlay */
+        /* Map-Bounded Center-Aligned UI Loading Block Layout CSS */
+        .map-loading-wrapper {
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; height: 850px; background: #fafafa; border: 1px dashed rgba(0, 51, 102, 0.15);
+        }
         .py-loading-container {
-            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            width: 340px; background: #ffffff; padding: 24px; border-radius: 4px;
-            border: 1px solid rgba(0, 51, 102, 0.15); box-shadow: 0 10px 30px rgba(0, 51, 102, 0.15);
-            text-align: center; z-index: 999999; font-family: 'Montserrat', sans-serif;
+            width: 360px; background: #ffffff; padding: 28px; border-radius: 4px;
+            border: 1px solid rgba(0, 51, 102, 0.15); box-shadow: 0 10px 30px rgba(0, 51, 102, 0.12);
+            text-align: center; font-family: 'Montserrat', sans-serif;
         }
         .py-spinner {
-            width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1);
+            width: 44px; height: 44px; border: 4px solid rgba(0, 51, 102, 0.1);
             border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
-            margin: 0 auto 16px auto;
+            margin: 0 auto 18px auto;
         }
         .py-loading-title { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
         .py-loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; }
@@ -125,7 +128,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# GLOBAL HELPER DEFINITIONS (Placed at top root scope to fully resolve NameErrors)
+# GLOBAL HELPER DEFINITIONS & PERSISTENCE INITIALIZATION
 # -----------------------------------------------------------------------------
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
@@ -136,9 +139,6 @@ def compile_features_kml(features):
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
-# -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE & DATA CONFIGURATIONS
-# -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
@@ -152,6 +152,7 @@ if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
 if 'network_stats' not in st.session_state: st.session_state.network_stats = None
 if 'query_cache' not in st.session_state: st.session_state.query_cache = {}
+if 'pipeline_logs' not in st.session_state: st.session_state.pipeline_logs = []
 
 if 'target_config' not in st.session_state: st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
 if 'radius_config' not in st.session_state: st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
@@ -172,19 +173,16 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
-OVERPASS_ENDPOINTS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-    "https://overpass.openstreetmap.ru/api/interpreter",
-]
-
-def build_ql(lat, lon, radius, tags):
+# -----------------------------------------------------------------------------
+# ADAPTIVE SPATIAL DEUPLICATOR MODULES & RETRY LAYERS
+# -----------------------------------------------------------------------------
+def build_overpass_query_string(lat, lon, radius, tags):
     statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
     return f"[out:json][timeout:90];(\n{statements}\n);out center;"
 
-def query_overpass_robust(ql, max_retries=2, timeout=90):
+def execute_mirror_failover_routing(ql, max_retries=2, timeout=90):
     for endpoint in OVERPASS_ENDPOINTS:
+        st.session_state.pipeline_logs.append(f"[MIRROR ROUTER] Contacting cluster node connection pointer: {endpoint}")
         for attempt in range(max_retries):
             try:
                 res = requests.post(endpoint, data={"data": ql}, headers={"User-Agent": "OpenNode/3.5"}, timeout=timeout)
@@ -192,32 +190,37 @@ def query_overpass_robust(ql, max_retries=2, timeout=90):
                     data = res.json()
                     if data.get("elements"): return data["elements"]
                 elif res.status_code == 429:
+                    st.session_state.pipeline_logs.append(f"[RATE LIMIT] Code 429 encountered. Executing backoff cooldown retry block.")
                     time.sleep(2 ** attempt)
                     continue
             except requests.exceptions.Timeout:
+                st.session_state.pipeline_logs.append(f"[TIMEOUT ENCOUNTERED] Endpoint target connection timed out. Decreasing latency window.")
                 timeout = timeout * 0.7
                 continue
-            except Exception: break
+            except Exception as e:
+                st.session_state.pipeline_logs.append(f"[EXCEPTION ERROR] Connection breakdown: {str(e)}")
+                break
     return []
 
-def get_cache_key(lat, lon, radius, tags):
-    payload = f"{lat:.4f}_{lon:.4f}_{radius}_{sorted(tags)}"
-    return hashlib.md5(payload.encode()).hexdigest()
-
-def cached_query(lat, lon, radius, tags, ql):
+def resolve_cached_elements_query(lat, lon, radius, tags, ql):
     key = get_cache_key(lat, lon, radius, tags)
-    if key in st.session_state.query_cache: return st.session_state.query_cache[key]
-    results = query_overpass_robust(ql)
+    if key in st.session_state.query_cache:
+        st.session_state.pipeline_logs.append("[MEMORY CACHE HIT] Instant load triggered. Match resolved in session storage memory array.")
+        return st.session_state.query_cache[key]
+    st.session_state.pipeline_logs.append("[MEMORY CACHE MISS] Forwarding extraction command thread straight to external geospatial database.")
+    results = execute_mirror_failover_routing(ql)
     if results: st.session_state.query_cache[key] = results
     return results
 
-def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
-    if radius <= max_chunk: return cached_query(lat, lon, radius, tags, build_ql(lat, lon, radius, tags))
+def adaptive_radius_query_matrix(lat, lon, radius, tags, max_chunk=2000):
+    if radius <= max_chunk: 
+        return resolve_cached_elements_query(lat, lon, radius, tags, build_overpass_query_string(lat, lon, radius, tags))
+    st.session_state.pipeline_logs.append(f"[PARTITION ENGINE] Radius limits exceed {max_chunk}m boundary limit thresholds. Splitting context into quadrant sub-queries.")
     offset = radius / (2 * math.sqrt(2) * 111320)
     quadrants = [(lat + offset, lon + offset), (lat + offset, lon - offset), (lat - offset, lon + offset), (lat - offset, lon - offset)]
     all_results, seen_ids = [], set()
     for q_lat, q_lon in quadrants:
-        chunk_results = cached_query(q_lat, q_lon, radius // 2, tags, build_ql(q_lat, q_lon, radius // 2, tags))
+        chunk_results = resolve_cached_elements_query(q_lat, q_lon, radius // 2, tags, build_overpass_query_string(q_lat, q_lon, radius // 2, tags))
         for el in chunk_results:
             if el.get("id") not in seen_ids:
                 seen_ids.add(el["id"])
@@ -269,6 +272,7 @@ with st.sidebar:
         if not selected_tags: st.error("Select ≥ 1 layer.")
         else:
             st.session_state.scan_active_loading = True
+            st.session_state.pipeline_logs = ["[START INITIALIZATION] Initializing active pipeline geoprocessing sequence thread..."]
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -278,6 +282,7 @@ with st.sidebar:
         st.session_state.layer_groups = {}
         st.session_state.network_stats = None
         st.session_state.scan_active_loading = False
+        st.session_state.pipeline_logs = []
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
         st.rerun()
@@ -302,16 +307,50 @@ with st.sidebar:
                 except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# PIPELINE STAGE PIPING CONTROLLER
+# DASHBOARD CONTROLS, METRICS & FLOATING LIVE LOG CONSOLE PIPELINE
 # -----------------------------------------------------------------------------
+ctrl_bar_1, ctrl_bar_2 = st.columns([6, 2])
+
+with ctrl_bar_1:
+    if st.session_state.network_stats:
+        s = st.session_state.network_stats
+        st.markdown(f"""<div style='background:#f1f5f9; padding:8px 14px; border-left:4px solid #C9AB4C; font-size:11px; font-weight:600; color:#003366;'>📈 STREET GRAPH DESCRIPTOR METRICS — Intersection Count: <b>{s.get('n', 0)}</b> | Edge Count: <b>{s.get('m', 0)}</b> | Total Street Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Clean Intersections Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("<div style='height:2px;'></div>", unsafe_allow_html=True)
+
+# ASYNC EXTRACTION LOGS COMPONENT DECODER WINDOW POP-UP CAPABILITIES
+with ctrl_bar_2:
+    with st.popover("📋 VIEW API CALL LOGS", use_container_width=True):
+        st.markdown("<div style='font-size:10px; font-weight:700; color:#003366; margin-bottom:6px; border-bottom:1px solid #C9AB4C;'>ACTIVE PIPELINE LOG MONITOR</div>", unsafe_allow_html=True)
+        if st.session_state.pipeline_logs:
+            log_box_content = "\\n".join(st.session_state.pipeline_logs)
+            st.text_area(label="Extraction Status Console", value=log_box_content, height=220, label_visibility="collapsed")
+        else:
+            st.caption("No log vectors found for this session.")
+
 main_canvas = st.empty()
 
+# -----------------------------------------------------------------------------
+# DUAL ENGINE EXTRACTION LIFECYCLE PIPELINE (Blocks on Server-Side Execution)
+# -----------------------------------------------------------------------------
 if st.session_state.scan_active_loading:
     records = []
     success = False
-    main_canvas.markdown(f'<div class="py-loading-container"><div class="py-spinner"></div><div class="py-loading-title">Compiling Spatial Layers...</div><div class="py-loading-subtitle">Processing Radius: {radius_val}m</div></div>', unsafe_allow_html=True)
     
-    # --- PASS 1: OSMnx Engine Ingestion ---
+    # STRUCTURAL COMPONENT: Renders a map-bounded center-aligned loading box card context panel placeholder
+    main_canvas.markdown("""
+        <div class="map-loading-wrapper">
+            <div class="py-loading-container">
+                <div class="py-spinner"></div>
+                <div class="py-loading-title">Compiling Spatial Layers...</div>
+                <div class="py-loading-subtitle" id="py-stopwatch">Processing Request Thread...</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # --- PASS 1: OSMnx High-Fidelity Vector Geometric Footprint Ingestion ---
+    start_engine_time = time.time()
+    st.session_state.pipeline_logs.append("[PASS 1] Initiating rich topology extraction sequence via internal OSMnx library context layers.")
     try:
         import osmnx as ox
         tags_dict = {}
@@ -329,7 +368,7 @@ if st.session_state.scan_active_loading:
                 name = row.get('name', 'Unknown')
                 if isinstance(name, float): name = 'Unknown'
                 
-                # SANITIZATION FILTER MATRIX: Instantly purge generic tags or empty properties
+                # HARD SANITIZATION LAYER FILTER: Suppress generic markers or nameless elements completely
                 if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']: continue
                     
                 geom = row.geometry
@@ -357,11 +396,14 @@ if st.session_state.scan_active_loading:
             st.session_state.last_scan_lat = lat_coord
             st.session_state.last_scan_lon = lon_coord
             success = True
-    except Exception: pass
+            st.session_state.pipeline_logs.append(f"[PASS 1 SUCCESS] Extracted {len(records)} active structural features. Step finished in {time.time()-start_engine_time:.2f}s.")
+    except Exception as e:
+        st.session_state.pipeline_logs.append(f"[PASS 1 EXCEPTION] OSMnx routing layer generated an operational fault: {str(e)}")
 
-    # --- PASS 2: Balanced Fallback Engine Overpass Loop ---
+    # --- PASS 2: Multi-Mirror Overpass Fallback Array Matrix ---
     if not success:
-        elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
+        st.session_state.pipeline_logs.append("[PASS 2] Entering Pass 2: Deploying Robust Quadrant-Partitioned Overpass Mirror array pipeline.")
+        elements = adaptive_radius_query_matrix(lat_coord, lon_coord, radius_val, selected_tags)
         for el in elements:
             e_lat = el.get('lat') or el.get('center', {}).get('lat')
             e_lon = el.get('lon') or el.get('center', {}).get('lon')
@@ -369,7 +411,7 @@ if st.session_state.scan_active_loading:
                 tags = el.get('tags', {})
                 name = tags.get('name', 'Unknown')
                 
-                # SANITIZATION FILTER MATRIX: Clean duplicate parameters from fallback payload
+                # HARD SANITIZATION LAYER FILTER: Synchronized nameless entity removal logic
                 if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']: continue
                     
                 records.append({
@@ -382,38 +424,16 @@ if st.session_state.scan_active_loading:
             st.session_state.last_scan_lat = lat_coord
             st.session_state.last_scan_lon = lon_coord
             success = True
+            st.session_state.pipeline_logs.append(f"[PASS 2 SUCCESS] Robust failover engine compiled {len(records)} points successfully.")
+        else:
+            st.session_state.pipeline_logs.append("[PIPELINE EXHAUSTED] All nodes and network mirror queries returned zero elements.")
 
     st.session_state.scan_active_loading = False
     st.rerun()
 
 # -----------------------------------------------------------------------------
-# 4. MAP FRAME RENDERING ENGINE & INTERACTION ARCHITECTURE
+# 4. LEAFLET ASYNC CANVAS RENDERING ENGINE
 # -----------------------------------------------------------------------------
-pts_active = st.session_state.scanned_records
-unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
-cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
-
-for idx, layer in enumerate(unique_layers):
-    if layer not in st.session_state.layer_meta:
-        st.session_state.layer_meta[layer] = {
-            "color": cat_palette[idx % len(cat_palette)],
-            "style": st.session_state.global_marker_style,
-            "size": st.session_state.global_marker_size
-        }
-
-layer_meta_json = json.dumps(st.session_state.layer_meta)
-target_config_json = json.dumps(st.session_state.target_config)
-radius_config_json = json.dumps(st.session_state.radius_config)
-geojson_str = json.dumps(pts_active)
-
-render_lat, render_lon = lat_coord, lon_coord
-is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
-show_loading = "true" if st.session_state.scan_active_loading else "false"
-
-if st.session_state.network_stats:
-    s = st.session_state.network_stats
-    st.markdown(f"""<div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>📈 STREET GRAPH DESCRIPTOR METRICS — Intersection Count: <b>{s.get('n', 0)}</b> | Edge Count: <b>{s.get('m', 0)}</b> | Total Street Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Clean Intersections Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
-
 leaflet_template = """
 <!DOCTYPE html>
 <html>
@@ -425,6 +445,8 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map { height: 100vh; width: 100%; z-index: 1; }
+        
+        /* Map Layer Loading Blocker HUD Box (Triggers asynchronously inside client browser tab) */
         #map-loading-overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 320px; background: #ffffff; z-index: 99999; 
@@ -436,6 +458,7 @@ leaflet_template = """
         .loading-text { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
         .elapsed-timer { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; letter-spacing: 0.5px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
         #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
         .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; }
@@ -475,7 +498,9 @@ leaflet_template = """
             <div class="loading-text">Scanning Spatial Engine...</div>
             <div class="elapsed-timer" id="timer-output">Elapsed: 0.0s</div>
         </div>
+        
         <div id="map"></div>
+
         <div id="scan-results-panel">
             <div class="results-header"><span>WORKSPACE</span><div style="display: flex; align-items: center; gap: 8px;"><span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span><span id="results-count" style="color:#C9AB4C;">0</span></div></div>
             <div id="cluster-modal-overlay" class="cluster-popover-modal">
@@ -495,6 +520,7 @@ leaflet_template = """
         const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
         let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
 
+        // Center-Aligned client browser tab asynchronous stopwatch handler
         if (__SHOW_LOADING__) {
             document.getElementById('map-loading-overlay').style.display = 'flex';
             let start = performance.now();
@@ -546,7 +572,7 @@ leaflet_template = """
                 return L.divIcon({ html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] });
             } else if (styleMode === "modern-pin") {
                 const w = d * 1.5; const h = d * 2.5; const r = d * 0.45; 
-                const customSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}"><defs><radialGradient id="groundShadow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#000000" stop-opacity="1.0"/><stop offset="100%" stop-color="#000000" stop-opacity="0"/></radialGradient><radialGradient id="sphereGloss-${color.replace('#','')}" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="50%" stop-color="${color}"/><stop offset="100%" stop-color="${color}" stop-opacity="0.75"/></radialGradient></defs><ellipse cx="20" cy="44" rx="12" ry="3.5" fill="url(#groundShadow)" /><path d="M20 20 L20 44" stroke="#222222" stroke-width="2.5" stroke-linecap="round"/><path d="M20 20 L20 44" stroke="#888888" stroke-width="0.8" stroke-linecap="round"/><circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})"/></svg>`;
+                const customSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}"><defs><radialGradient id="groundShadow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#000000" stop-opacity="1.0"/><stop offset="100%" stop-color="#000000" stop-opacity="0"/></radialGradient><radialGradient id="sphereGloss-${color.replace('#','')}" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="45%" stop-color="${color}"/><stop offset="100%" stop-color="${color}" stop-opacity="0.75"/></radialGradient></defs><ellipse cx="20" cy="44" rx="12" ry="3.5" fill="url(#groundShadow)" /><path d="M20 20 L20 44" stroke="#222222" stroke-width="2.5" stroke-linecap="round"/><path d="M20 20 L20 44" stroke="#888888" stroke-width="0.8" stroke-linecap="round"/><circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})"/></svg>`;
                 return L.divIcon({ html: `<div style="transform: translate(-50%, -92%); width: ${w}px; height: ${h}px;">${customSvg}</div>`, className: '', iconSize: [w, h], iconAnchor: [0, 0] });
             }
             return L.divIcon({ html: `<div style="background-color: ${color}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, className: '', iconSize: [d, d], iconAnchor: [d/2, d/2] });
@@ -609,7 +635,7 @@ leaflet_template = """
         window.patchGlobalMarkerSize = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v)); compileLayersAndRenderPoints(); };
         window.patchGlobalMarkerColor = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].color = v); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
-        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderRadiusCircleBounds(); };
+        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderTargetCenterIcon(); };
         window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
 
         function rebuildSidebarControlLayout() {
@@ -664,21 +690,5 @@ leaflet_template = """
 </body>
 </html>
 """
-
-fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
-
-leaflet_html = (leaflet_template
-                .replace("__LAT__", str(render_lat))
-                .replace("__LON__", str(render_lon))
-                .replace("__RADIUS__", str(radius_val))
-                .replace("__IS_STALE__", is_stale)
-                .replace("__SHOW_LOADING__", show_loading)
-                .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
-                .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
-                .replace("__TARGET_CONFIG_JSON__", target_config_json)
-                .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
-                .replace("__LAYER_META_JSON__", layer_meta_json)
-                .replace("__GEOJSON__", geojson_str))
 
 st.components.v1.html(leaflet_html, height=850, scrolling=False)
