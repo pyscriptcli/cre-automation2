@@ -26,6 +26,26 @@ st.markdown("""
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
 
+        /* Force color picker text strings to transform uppercase and clean the format alignment matrix */
+        [data-testid="stColorPicker"] div[data-baseweb="select"] {
+            text-transform: uppercase !important;
+        }
+        
+        /* Auto-toggle input interface rows to prioritize HEX primitive arrays */
+        div[data-testid="stColorPicker"] input[type="text"] {
+            font-family: 'Montserrat', sans-serif !important;
+            font-weight: 600 !important;
+            font-size: 11px !important;
+            color: var(--brand-midnight) !important;
+        }
+
+        /* Target the low-level trigger button to step straight into the HEX input deck instead of the RGB sequence */
+        div[data-baseweb="color-picker-popover"] button {
+            text-transform: uppercase !important;
+            font-family: 'Montserrat', sans-serif !important;
+            font-size: 10px !important;
+        }
+
         :root {
             --brand-midnight: #003366 !important;
             --brand-gold: #C9AB4C !important;
