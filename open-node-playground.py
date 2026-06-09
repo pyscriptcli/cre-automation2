@@ -289,6 +289,9 @@ PROVINCE_BOUNDS = {
     "zamboanga": [121.80, 6.80, 123.80, 8.50],
 }
 
+
+
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_province_list():
     """Get list of all available provinces from index.json"""
@@ -322,6 +325,44 @@ def get_province_from_coords(lat, lon):
     for province, bbox in PROVINCE_BOUNDS.items():
         if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
             return province
+    return None
+
+def get_province_from_coords(lat, lon):
+    """Determine which province contains the given coordinates"""
+    for province, bbox in PROVINCE_BOUNDS.items():
+        if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
+            return province
+    return None
+
+# ===== ADD THIS FUNCTION RIGHT HERE =====
+def get_location_from_province_bounds(lat, lon):
+    """
+    Fallback: Get location info from PROVINCE_BOUNDS dictionary.
+    This provides at least province-level info for boundaries.
+    """
+    province_name = get_province_from_coords(lat, lon)
+    
+    if province_name:
+        # Convert province name to readable format
+        display_name = province_name.replace('_', ' ').title()
+        
+        # Create a basic location info dict
+        location_info = {
+            "region": "Philippines",
+            "province": display_name,
+            "city": "Unknown",
+            "barangay": "Unknown",
+            "lat": lat,
+            "lon": lon,
+            "full_display_name": f"{display_name}, Philippines",
+            "source": "province_bounds_fallback"
+        }
+        
+        log_event("SUCCESS", "PROVINCE_BOUNDS_FALLBACK", {"province": province_name})
+        add_api_log(f"📍 Using fallback location from province bounds: {display_name}", "INFO")
+        
+        return location_info
+    
     return None
 
 def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
@@ -404,30 +445,96 @@ def load_github_boundary(area_name, boundary_type):
         add_api_log(f"GitHub boundary error for {area_name}: {str(e)[:100]}", "WARNING")
         return None
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def reverse_geocode_location(lat, lon):
-    """Get administrative hierarchy from coordinates"""
+    """
+    Get administrative hierarchy from coordinates using Nominatim API.
+    Returns dict with region, province, city, barangay.
+    """
+    log_event("API_CALL", "REVERSE_GEOCODING_START", {"lat": lat, "lon": lon})
+    
     try:
-        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json&addressdetails=1"
-        headers = {"User-Agent": "OpenNode/1.0"}
-        response = requests.get(url, headers=headers, timeout=10)
+        # Use a more reliable URL with better parameters
+        url = "https://nominatim.openstreetmap.org/reverse"
+        params = {
+            "lat": lat,
+            "lon": lon,
+            "format": "json",
+            "addressdetails": 1,
+            "zoom": 18,
+            "accept-language": "en"
+        }
+        headers = {"User-Agent": "OpenNode/2.0 (https://opennode.app; contact@opennode.app)"}
+        
+        add_api_log(f"Calling Nominatim API: {url}?lat={lat}&lon={lon}", "INFO")
+        
+        response = requests.get(url, params=params, headers=headers, timeout=15)
+        
+        add_api_log(f"Nominatim response status: {response.status_code}", "INFO")
         
         if response.status_code == 200:
             data = response.json()
+            add_api_log(f"Nominatim returned data: {list(data.keys()) if data else 'None'}", "INFO")
+            
             address = data.get('address', {})
             
-            return {
-                "region": address.get('state', ''),
+            # Extract Philippine administrative hierarchy
+            # Common field names in Nominatim for Philippines
+            location_info = {
+                "region": address.get('state', '') or address.get('region', ''),
                 "province": address.get('province', '') or address.get('state_district', ''),
                 "city": address.get('city', '') or address.get('municipality', '') or address.get('town', ''),
                 "barangay": address.get('suburb', '') or address.get('neighbourhood', '') or address.get('village', ''),
                 "lat": lat,
-                "lon": lon
+                "lon": lon,
+                "full_display_name": data.get('display_name', '')
             }
-        return None
+            
+            # If province is still empty, try to get from OSM data
+            if not location_info["province"]:
+                # Try to extract from displayed name or other fields
+                osm_type = data.get('osm_type')
+                if osm_type == 'node':
+                    location_info["province"] = address.get('county', '')
+            
+            # Clean up empty values
+            for key in location_info:
+                if location_info[key] == '' or location_info[key] is None:
+                    location_info[key] = 'Unknown'
+            
+            log_event("SUCCESS", "REVERSE_GEOCODING_SUCCESS", {
+                "region": location_info["region"],
+                "province": location_info["province"],
+                "city": location_info["city"],
+                "barangay": location_info["barangay"]
+            })
+            
+            add_api_log(f"📍 Location detected: Barangay: {location_info['barangay']}, City: {location_info['city']}, Province: {location_info['province']}, Region: {location_info['region']}", "INFO")
+            
+            return location_info
+        else:
+            add_api_log(f"Nominatim API error: HTTP {response.status_code}", "ERROR")
+            log_event("ERROR", "REVERSE_GEOCODING_HTTP_ERROR", {"status_code": response.status_code})
+            
+            # FALLBACK: Use PROVINCE_BOUNDS if Nominatim fails
+            add_api_log("Nominatim failed, trying fallback from province bounds", "WARNING")
+            return get_location_from_province_bounds(lat, lon)
+            
+    except requests.exceptions.Timeout:
+        add_api_log("Nominatim API timeout after 15 seconds", "ERROR")
+        log_event("ERROR", "REVERSE_GEOCODING_TIMEOUT", {"lat": lat, "lon": lon})
+        
+        # FALLBACK: Use PROVINCE_BOUNDS on timeout
+        add_api_log("Nominatim timeout, trying fallback from province bounds", "WARNING")
+        return get_location_from_province_bounds(lat, lon)
+        
     except Exception as e:
-        add_api_log(f"Reverse geocoding error: {str(e)[:100]}", "ERROR")
-        return None
+        add_api_log(f"Reverse geocoding error: {str(e)[:200]}", "ERROR")
+        log_event("ERROR", "REVERSE_GEOCODING_EXCEPTION", {"error": str(e)[:200]})
+        
+        # FALLBACK: Use PROVINCE_BOUNDS on exception
+        add_api_log("Nominatim exception, trying fallback from province bounds", "WARNING")
+        return get_location_from_province_bounds(lat, lon)
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_boundary_geojson(area_name, admin_level):
