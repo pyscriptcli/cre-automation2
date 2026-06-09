@@ -696,29 +696,40 @@ with st.sidebar:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
     # -------------------------------------------------------------------------
-    # BOUNDARY CONTROLS
+    # BOUNDARY CONTROLS (Dropdown first, then Show button)
     # -------------------------------------------------------------------------
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     st.markdown("<div style='font-weight: 700; font-size: 11px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>🗺️ ADMINISTRATIVE BOUNDARIES</div>", unsafe_allow_html=True)
     
-    show_boundaries_toggle = st.checkbox("Show Administrative Boundaries", key="show_boundaries_toggle", value=st.session_state.show_boundaries)
+    # Dropdown first (always visible)
+    boundary_options = st.multiselect(
+        "Select boundary levels:",
+        options=["Region", "Province", "City/Municipality", "Barangay"],
+        default=st.session_state.boundary_levels,
+        key="boundary_selector"
+    )
+    st.session_state.boundary_levels = boundary_options
     
-    if show_boundaries_toggle:
+    # Show and Hide buttons
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        show_boundaries_trigger = st.button("SHOW BOUNDARIES", type="secondary", use_container_width=True, key="show_boundaries_btn")
+    with col_btn2:
+        hide_boundaries_trigger = st.button("HIDE BOUNDARIES", type="primary", use_container_width=True, key="hide_boundaries_btn")
+    
+    if show_boundaries_trigger:
         st.session_state.show_boundaries = True
-        boundary_options = st.multiselect(
-            "Select boundary levels:",
-            options=["Region", "Province", "City/Municipality", "Barangay"],
-            default=st.session_state.boundary_levels,
-            key="boundary_selector"
-        )
-        st.session_state.boundary_levels = boundary_options
-        
-        if st.session_state.current_location_info:
-            loc_info = st.session_state.current_location_info
-            st.info(f"📍 {loc_info.get('barangay', '?')}, {loc_info.get('city', '?')}, {loc_info.get('province', '?')}")
-    else:
+        st.rerun()
+    
+    if hide_boundaries_trigger:
         st.session_state.show_boundaries = False
-        st.session_state.boundary_levels = []
+        st.session_state.boundary_geojson_data = {}
+        st.rerun()
+    
+    # Show current location info if boundaries are active
+    if st.session_state.current_location_info and st.session_state.show_boundaries:
+        loc_info = st.session_state.current_location_info
+        st.info(f"📍 {loc_info.get('barangay', '?')}, {loc_info.get('city', '?')}, {loc_info.get('province', '?')}")
     # -------------------------------------------------------------------------
 
     if scan_triggered:
@@ -778,10 +789,11 @@ if st.session_state.scan_active_loading:
     records = []
     success = False
     
+    # Loading overlay already shows in center of map because main_canvas is positioned over the map container
     main_canvas.markdown(f'''
         <div class="py-loading-container">
             <div class="py-spinner"></div>
-            <div class="py-loading-title">Loading POI Data...</div>
+            <div class="py-loading-title">LOADING POI DATA...</div>
             <div class="py-loading-subtitle">Radius: {radius_val}m | Tags: {len(selected_tags)}</div>
             <div class="py-loading-subtitle" id="scan-status-text">Finding your province...</div>
         </div>
@@ -799,7 +811,7 @@ if st.session_state.scan_active_loading:
                 setInterval(() => {{
                     idx = (idx + 1) % statusMessages.length;
                     statusDiv.innerText = statusMessages[idx];
-                }}, 1200);
+                }}, 1000);
             }}
         </script>
     ''', unsafe_allow_html=True)
