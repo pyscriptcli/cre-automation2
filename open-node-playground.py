@@ -18,6 +18,197 @@ if not os.path.exists(_config_file):
         f.write("[theme]\nbase=\"light\"\n")
 
 # -----------------------------------------------------------------------------
+# HYBRID SOURCE ENDPOINTS & STRUCTURAL CONFIGURATIONS
+# -----------------------------------------------------------------------------
+GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
+GITHUB_BOUNDARY_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/boundaries"
+
+PROVINCE_BOUNDS = {
+    "metro_manila": [120.90, 14.40, 121.10, 14.80],
+    "cavite": [120.60, 14.10, 121.00, 14.50],
+    "laguna": [121.00, 14.00, 121.60, 14.50],
+    "bulacan": [120.70, 14.70, 121.20, 15.30],
+    "batangas": [120.70, 13.60, 121.40, 14.20],
+    "rizal": [121.00, 14.40, 121.60, 14.90],
+    "pampanga": [120.50, 14.90, 121.00, 15.40],
+    "nueva_ecija": [120.60, 15.20, 121.50, 16.00],
+    "zambales": [119.80, 14.60, 120.60, 15.80],
+    "tarlac": [120.30, 15.30, 121.00, 15.90],
+    "pangasinan": [119.80, 15.60, 121.00, 16.50],
+    "la_union": [120.20, 16.40, 120.80, 17.00],
+    "ilocos_norte": [120.30, 17.80, 121.00, 18.70],
+    "ilocos_sur": [120.20, 16.90, 120.80, 17.80],
+    "cebu": [123.50, 9.50, 124.20, 11.00],
+    "leyte": [124.30, 9.80, 125.60, 11.50],
+    "bohol": [123.70, 9.50, 124.60, 10.10],
+    "negros_oriental": [122.80, 9.00, 123.50, 10.50],
+    "negros_occidental": [122.30, 9.30, 123.40, 11.00],
+    "samar": [124.80, 11.00, 125.80, 12.50],
+    "biliran": [124.30, 11.40, 124.60, 11.70],
+    "siquijor": [123.40, 9.10, 123.70, 9.30],
+    "davao_city": [125.40, 6.90, 125.70, 7.40],
+    "davao_del_sur": [125.00, 6.00, 125.80, 7.00],
+    "davao_oriental": [126.00, 6.50, 126.80, 7.80],
+    "north_cotabato": [124.50, 6.80, 125.30, 7.80],
+    "south_cotabato": [124.50, 5.80, 125.30, 6.80],
+    "sultan_kudarat": [123.80, 6.20, 124.80, 7.20],
+    "zamboanga_del_sur": [122.00, 7.00, 123.80, 8.20],
+    "zamboanga_del_norte": [121.80, 7.50, 123.00, 8.80],
+    "misamis_oriental": [124.00, 8.00, 125.20, 9.30],
+    "misamis_occidental": [123.30, 7.80, 124.00, 8.70],
+    "bukidnon": [124.30, 7.00, 125.50, 8.50],
+    "agusan_del_norte": [125.00, 8.20, 126.00, 9.30],
+    "agusan_del_sur": [125.00, 7.60, 126.20, 8.80],
+    "surigao_del_norte": [125.20, 9.30, 126.30, 10.20],
+    "surigao_del_sur": [125.80, 8.00, 126.50, 9.00],
+    "lanao_del_norte": [123.50, 7.50, 124.50, 8.30],
+    "lanao_del_sur": [123.80, 7.00, 124.80, 8.20],
+    "basilan": [121.80, 6.30, 122.50, 6.80],
+    "sulu": [120.80, 5.50, 121.50, 6.30],
+    "tawi_tawi": [119.50, 4.50, 120.50, 5.50],
+    "dinagat_islands": [125.30, 9.80, 125.80, 10.50],
+}
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_province_list():
+    url = f"{GITHUB_POI_BASE}/index.json"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return list(data.get('provinces', {}).keys())
+        return []
+    except:
+        return list(PROVINCE_BOUNDS.keys())
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_province_pois(province_name):
+    url = f"{GITHUB_POI_BASE}/{province_name}.json"
+    try:
+        response = requests.get(url, timeout=15)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            add_api_log(f"Failed to load {province_name}: HTTP {response.status_code}", "ERROR")
+            return []
+    except Exception as e:
+        add_api_log(f"Error loading {province_name}: {str(e)[:100]}", "ERROR")
+        return []
+
+def get_province_from_coords(lat, lon):
+    for province, bbox in PROVINCE_BOUNDS.items():
+        if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
+            return province
+    return None
+
+def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371000
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        return R * c
+    
+    filtered = []
+    for poi in pois:
+        dist = haversine(center_lat, center_lon, poi['lat'], poi['lon'])
+        if dist <= radius_meters:
+            poi_copy = poi.copy()
+            poi_copy['distance_m'] = round(dist)
+            filtered.append(poi_copy)
+    return filtered
+
+def filter_pois_by_tags(pois, selected_tags):
+    if not selected_tags:
+        return pois
+    
+    filtered = []
+    for poi in pois:
+        poi_type = poi.get('type', '').lower()
+        for tag in selected_tags:
+            tag_clean = tag.replace('"', '').lower()
+            if '=' in tag_clean:
+                key, value = tag_clean.split('=', 1)
+                if key in poi_type or value in poi_type:
+                    filtered.append(poi)
+                    break
+            else:
+                if tag_clean in poi_type:
+                    filtered.append(poi)
+                    break
+    return filtered
+
+# -----------------------------------------------------------------------------
+# CORE BACKWARD-COMPATIBLE MULTI-LAYER OVERPASS FALLBACK POI ENGINE
+# -----------------------------------------------------------------------------
+def execute_overpass_fallback_query(lat, lon, radius, tags_list):
+    """Executes structural cluster scans over public OSM vectors when local pools fail."""
+    add_api_log("Firing Overpass QL Sub-Engine Cluster Scans", "WARNING")
+    
+    tag_clauses = ""
+    for full_tag in tags_list:
+        clean = full_tag.replace('"', '')
+        if '=' in clean:
+            k, v = clean.split('=', 1)
+            if '~' in v or '|' in v:
+                tag_clauses += f'    node["{k}"~"{v.replace("~","")}"](around:{radius},{lat},{lon});\n'
+                tag_clauses += f'    way["{k}"~"{v.replace("~","")}"](around:{radius},{lat},{lon});\n'
+            else:
+                tag_clauses += f'    node["{k}"="{v}"](around:{radius},{lat},{lon});\n'
+                tag_clauses += f'    way["{k}"="{v}"](around:{radius},{lat},{lon});\n'
+        else:
+            tag_clauses += f'    node["{clean}"](around:{radius},{lat},{lon});\n'
+            tag_clauses += f'    way["{clean}"](around:{radius},{lat},{lon});\n'
+
+    query = f"""[out:json][timeout:30];
+(
+{tag_clauses});
+out body center;
+"""
+    try:
+        response = requests.post("https://overpass-api.de/api/interpreter", data={"data": query}, timeout=30)
+        if response.status_code == 200:
+            raw_elements = response.json().get('elements', [])
+            fallback_records = []
+            for idx, el in enumerate(raw_elements):
+                pos_lat = el.get('lat') or el.get('center', {}).get('lat')
+                pos_lon = el.get('lon') or el.get('center', {}).get('lon')
+                if not pos_lat or not pos_lon:
+                    continue
+                
+                tags = el.get('tags', {})
+                name = tags.get('name') or tags.get('brand') or tags.get('operator') or 'Unknown'
+                
+                # Derive display type signature out of raw definitions
+                resolved_type = "poi"
+                for t_item in tags_list:
+                    clean_item = t_item.replace('"', '')
+                    if '=' in clean_item:
+                        k, _ = clean_item.split('=', 1)
+                        if k in tags:
+                            resolved_type = f"{k}={tags[k]}"
+                            break
+                
+                fallback_records.append({
+                    "lat": pos_lat,
+                    "lon": pos_lon,
+                    "name": name,
+                    "type": resolved_type,
+                    "source": "overpass",
+                    "has_footprint": False,
+                    "footprint_geojson": None,
+                    "visible": True,
+                    "uid": int(hashlib.md5(f"{pos_lat}-{pos_lon}-{name}".encode()).hexdigest(), 16) % 1000000
+                })
+            return fallback_records
+        return []
+    except Exception as e:
+        add_api_log(f"Overpass asset loop failed completely: {str(e)[:100]}", "ERROR")
+        return []
+
+# -----------------------------------------------------------------------------
 # 1. BRANDED THEME & STRUCTURAL FULL OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
@@ -100,7 +291,6 @@ st.markdown("""
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
 
-        /* ABSOLUTE STYLING PROTOCOL: Hard-Lock Color Picker to UpperCase HEX primitives only */
         [data-testid="stColorPicker"] div[data-baseweb="select"] { text-transform: uppercase !important; }
         div[data-baseweb="color-picker-popover"] div[data-baseweb="select"] { display: none !important; }
         div[data-baseweb="color-picker-popover"] div:has(> input) + div { display: none !important; }
@@ -108,7 +298,6 @@ st.markdown("""
         div[data-baseweb="color-picker-popover"] input[type="number"] { display: none !important; }
         div[data-baseweb="color-picker-popover"] input[type="text"] { width: 100% !important; text-transform: uppercase !important; font-family: 'Montserrat', sans-serif !important; font-weight: 700 !important; font-size: 11px !important; text-align: center !important; color: var(--brand-midnight) !important; }
         
-        /* Python Engine Core Centered Progress Stopwatch HUD Panel Overlay */
         .py-loading-container {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
             width: 340px; background: #ffffff; padding: 24px; border-radius: 4px;
@@ -124,7 +313,6 @@ st.markdown("""
         .py-loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* API LOG PANEL */
         .api-log-container {
             position: absolute; bottom: 12px; right: 12px; width: 380px; max-height: 280px;
             background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); border-radius: 8px;
@@ -153,7 +341,6 @@ st.markdown("""
         .api-log-close { cursor: pointer; padding: 0 6px; font-size: 14px; line-height: 1; }
         .api-log-close:hover { color: #ff8888; }
         
-        /* Boundary styles */
         .boundary-tooltip {
             font-family: 'Montserrat', sans-serif;
             font-size: 9px;
@@ -185,152 +372,15 @@ def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
-        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
-
-# -----------------------------------------------------------------------------
-# GITHUB POI DATA LOADER & FALLBACK
-# -----------------------------------------------------------------------------
-GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
-GITHUB_BOUNDARY_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/boundaries"
-
-# Province bounding boxes for reverse geocoding (COMPLETE - Luzon, Visayas, Mindanao)
-PROVINCE_BOUNDS = {
-    # === LUZON ===
-    "metro_manila": [120.90, 14.40, 121.10, 14.80],
-    "cavite": [120.60, 14.10, 121.00, 14.50],
-    "laguna": [121.00, 14.00, 121.60, 14.50],
-    "bulacan": [120.70, 14.70, 121.20, 15.30],
-    "batangas": [120.70, 13.60, 121.40, 14.20],
-    "rizal": [121.00, 14.40, 121.60, 14.90],
-    "pampanga": [120.50, 14.90, 121.00, 15.40],
-    "nueva_ecija": [120.60, 15.20, 121.50, 16.00],
-    "zambales": [119.80, 14.60, 120.60, 15.80],
-    "tarlac": [120.30, 15.30, 121.00, 15.90],
-    "pangasinan": [119.80, 15.60, 121.00, 16.50],
-    "la_union": [120.20, 16.40, 120.80, 17.00],
-    "ilocos_norte": [120.30, 17.80, 121.00, 18.70],
-    "ilocos_sur": [120.20, 16.90, 120.80, 17.80],
-    # === VISAYAS ===
-    "cebu": [123.00, 9.40, 124.20, 11.20],
-    "leyte": [124.30, 9.80, 125.60, 11.50],
-    "bohol": [123.70, 9.50, 124.60, 10.10],
-    "negros_oriental": [122.80, 9.00, 123.50, 10.50],
-    "negros_occidental": [122.30, 9.30, 123.40, 11.00],
-    "samar": [124.80, 11.00, 125.80, 12.50],
-    "biliran": [124.30, 11.40, 124.60, 11.70],
-    "siquijor": [123.40, 9.10, 123.70, 9.30],
-    # === MINDANAO ===
-    "davao_city": [125.40, 6.90, 125.70, 7.40],
-    "davao_del_sur": [125.00, 6.00, 125.80, 7.00],
-    "davao_oriental": [126.00, 6.50, 126.80, 7.80],
-    "north_cotabato": [124.50, 6.80, 125.30, 7.80],
-    "south_cotabato": [124.50, 5.80, 125.30, 6.80],
-    "sultan_kudarat": [123.80, 6.20, 124.80, 7.20],
-    "zamboanga_del_sur": [122.00, 7.00, 123.80, 8.20],
-    "zamboanga_del_norte": [121.80, 7.50, 123.00, 8.80],
-    "misamis_oriental": [124.00, 8.00, 125.20, 9.30],
-    "misamis_occidental": [123.30, 7.80, 124.00, 8.70],
-    "bukidnon": [124.30, 7.00, 125.50, 8.50],
-    "agusan_del_norte": [125.00, 8.20, 126.00, 9.30],
-    "agusan_del_sur": [125.00, 7.60, 126.20, 8.80],
-    "surigao_del_norte": [125.20, 9.30, 126.30, 10.20],
-    "surigao_del_sur": [125.80, 8.00, 126.50, 9.00],
-    "lanao_del_norte": [123.50, 7.50, 124.50, 8.30],
-    "lanao_del_sur": [123.80, 7.00, 124.80, 8.20],
-    "basilan": [121.80, 6.30, 122.50, 6.80],
-    "sulu": [120.80, 5.50, 121.50, 6.30],
-    "tawi_tawi": [119.50, 4.50, 120.50, 5.50],
-    "dinagat_islands": [125.30, 9.80, 125.80, 10.50],
-    "zamboanga": [121.80, 6.80, 123.80, 8.50],
-}
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def get_province_list():
-    """Get list of all available provinces from index.json"""
-    url = f"{GITHUB_POI_BASE}/index.json"
-    try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return list(data.get('provinces', {}).keys())
-        return []
-    except:
-        return list(PROVINCE_BOUNDS.keys())
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def load_province_pois(province_name):
-    """Load POI data for a specific province from GitHub"""
-    url = f"{GITHUB_POI_BASE}/{province_name}.json"
-    try:
-        response = requests.get(url, timeout=15)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            add_api_log(f"Failed to load {province_name}: HTTP {response.status_code}", "ERROR")
-            return None
-    except Exception as e:
-        add_api_log(f"Error loading {province_name}: {str(e)[:100]}", "ERROR")
-        return None
-
-def get_province_from_coords(lat, lon):
-    """Determine which province contains the given coordinates"""
-    for province, bbox in PROVINCE_BOUNDS.items():
-        if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
-            return province
-    return None
-
-def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
-    """Filter POIs within a radius using Haversine formula"""
-    def haversine(lat1, lon1, lat2, lon2):
-        R = 6371000
-        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-        c = 2 * math.asin(math.sqrt(a))
-        return R * c
-    
-    filtered = []
-    for poi in pois:
-        dist = haversine(center_lat, center_lon, poi['lat'], poi['lon'])
-        if dist <= radius_meters:
-            poi_copy = poi.copy()
-            poi_copy['distance_m'] = round(dist)
-            filtered.append(poi_copy)
-    return filtered
-
-def filter_pois_by_tags(pois, selected_tags):
-    """Filter POIs by selected tag categories"""
-    if not selected_tags:
-        return pois
-    
-    filtered = []
-    for poi in pois:
-        poi_type = poi.get('type', '').lower()
-        for tag in selected_tags:
-            tag_clean = tag.replace('"', '').lower()
-            if '=' in tag_clean:
-                key, value = tag_clean.split('=', 1)
-                if key in poi_type or value in poi_type:
-                    filtered.append(poi)
-                    break
-            else:
-                if tag_clean in poi_type:
-                    filtered.append(poi)
-                    break
-    return filtered
 
 # -----------------------------------------------------------------------------
 # BOUNDARY FUNCTIONS (Primary: GitHub, Fallback: Overpass API)
 # -----------------------------------------------------------------------------
 def load_github_boundary(area_name, boundary_type):
-    """
-    Load boundary GeoJSON from GitHub repository.
-    boundary_type: 'regions', 'provinces', 'cities'
-    """
     filename_map = {
         "region": "regions.geojson",
         "province": "provinces.geojson",
@@ -350,7 +400,7 @@ def load_github_boundary(area_name, boundary_type):
                 filtered_features = []
                 for feature in data.get('features', []):
                     props = feature.get('properties', {})
-                    feature_name = props.get('name', '')
+                    feature_name = props.get('name', '') or props.get('NAME_1', '') or props.get('NAME_2', '')
                     if feature_name.lower() == area_name.lower():
                         filtered_features.append(feature)
                 
@@ -364,7 +414,6 @@ def load_github_boundary(area_name, boundary_type):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def reverse_geocode_location(lat, lon):
-    """Get administrative hierarchy from coordinates"""
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json&addressdetails=1"
         headers = {"User-Agent": "OpenNode/1.0"}
@@ -389,11 +438,6 @@ def reverse_geocode_location(lat, lon):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_boundary_geojson(area_name, admin_level):
-    """
-    Fetch boundary GeoJSON.
-    Primary: Load from GitHub repository.
-    Fallback: Overpass API if GitHub file not found or area not matched.
-    """
     if not area_name or area_name == '':
         return None
     
@@ -436,19 +480,23 @@ def get_boundary_geojson(area_name, admin_level):
         if response.status_code == 200:
             data = response.json()
             features = []
+            
+            # Group nodes into lines/polygons from relations
             for element in data.get('elements', []):
                 if element.get('type') == 'relation':
-                    coords = []
-                    for node in element.get('members', []):
-                        if node.get('type') == 'node' and 'lat' in node and 'lon' in node:
-                            coords.append([node['lon'], node['lat']])
+                    coordinates = []
+                    for member in element.get('members', []):
+                        if member.get('type') == 'way' and 'geometry' in member:
+                            way_coords = [[pt['lon'], pt['lat']] for pt in member['geometry']]
+                            coordinates.append(way_coords)
                     
-                    if coords and len(coords) >= 3:
+                    if coordinates:
+                        # Convert line segments to spatial Feature arrays
                         features.append({
                             "type": "Feature",
                             "geometry": {
-                                "type": "Polygon",
-                                "coordinates": [coords]
+                                "type": "MultiLineString",
+                                "coordinates": coordinates
                             },
                             "properties": {
                                 "name": element.get('tags', {}).get('name', area_name),
@@ -463,131 +511,6 @@ def get_boundary_geojson(area_name, admin_level):
     except Exception as e:
         add_api_log(f"Boundary fetch error for {area_name}: {str(e)[:100]}", "ERROR")
         return None
-
-# -----------------------------------------------------------------------------
-# OVERPASS API FALLBACK FOR POIS
-# -----------------------------------------------------------------------------
-OVERPASS_ENDPOINTS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-    "https://overpass.openstreetmap.ru/api/interpreter",
-]
-
-def build_ql(lat, lon, radius, tags):
-    statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
-    return f"[out:json][timeout:90];(\n{statements}\n);out center;"
-
-def query_overpass_robust(ql, max_retries=2, timeout=90):
-    for endpoint in OVERPASS_ENDPOINTS:
-        add_api_log(f"Trying endpoint: {endpoint}", "INFO")
-        for attempt in range(max_retries):
-            try:
-                start_time = time.time()
-                add_api_log(f"POST request to {endpoint} (attempt {attempt+1})", "INFO")
-                res = requests.post(endpoint, data={"data": ql}, headers={"User-Agent": "OpenNode/3.5"}, timeout=timeout)
-                elapsed = time.time() - start_time
-                if res.status_code == 200:
-                    add_api_log(f"Success! Status 200 in {elapsed:.2f}s", "INFO")
-                    data = res.json()
-                    if data.get("elements"):
-                        add_api_log(f"Retrieved {len(data['elements'])} elements", "INFO")
-                        return data["elements"]
-                    else:
-                        add_api_log("No elements in response", "WARNING")
-                        return []
-                elif res.status_code == 429:
-                    add_api_log(f"Rate limited (429), retrying in {2**attempt}s", "WARNING")
-                    time.sleep(2 ** attempt)
-                    continue
-                else:
-                    add_api_log(f"HTTP {res.status_code} from endpoint", "ERROR")
-            except requests.exceptions.Timeout:
-                add_api_log(f"Timeout after {timeout}s", "ERROR")
-                timeout = timeout * 0.7
-                continue
-            except Exception as e:
-                add_api_log(f"Exception: {str(e)[:100]}", "ERROR")
-                break
-        add_api_log(f"Endpoint {endpoint} failed, trying next", "WARNING")
-    add_api_log("All endpoints exhausted, returning empty", "ERROR")
-    return []
-
-def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
-    if radius <= max_chunk:
-        add_api_log(f"Single query (radius {radius}m <= {max_chunk}m)", "INFO")
-        return query_overpass_robust(build_ql(lat, lon, radius, tags))
-    offset = radius / (2 * math.sqrt(2) * 111320)
-    quadrants = [(lat + offset, lon + offset), (lat + offset, lon - offset), (lat - offset, lon + offset), (lat - offset, lon - offset)]
-    add_api_log(f"Adaptive split: {radius}m -> 4 quadrants", "INFO")
-    all_results, seen_ids = [], set()
-    for idx, (q_lat, q_lon) in enumerate(quadrants):
-        add_api_log(f"Querying quadrant {idx+1}/4", "INFO")
-        chunk_results = query_overpass_robust(build_ql(q_lat, q_lon, radius // 2, tags))
-        for el in chunk_results:
-            if el.get("id") not in seen_ids:
-                seen_ids.add(el["id"])
-                all_results.append(el)
-    add_api_log(f"Merged {len(all_results)} unique elements from quadrants", "INFO")
-    return all_results
-
-def load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags):
-    """Primary: Load from GitHub. Fallback: Overpass API."""
-    records = []
-    
-    # Try GitHub first
-    all_province_pois = load_province_pois(province_name)
-    
-    if all_province_pois:
-        add_api_log(f"Loaded {len(all_province_pois)} POIs from GitHub for {province_name}", "INFO")
-        
-        radius_filtered = filter_pois_by_radius(all_province_pois, lat_coord, lon_coord, radius_val)
-        add_api_log(f"After radius filter: {len(radius_filtered)} POIs within {radius_val}m", "INFO")
-        
-        tag_filtered = filter_pois_by_tags(radius_filtered, selected_tags)
-        add_api_log(f"After tag filter: {len(tag_filtered)} POIs match selected categories", "INFO")
-        
-        for idx, poi in enumerate(tag_filtered):
-            records.append({
-                "lat": poi['lat'],
-                "lon": poi['lon'],
-                "name": poi.get('name', 'Unknown'),
-                "type": poi.get('type', 'poi'),
-                "source": "github",
-                "has_footprint": False,
-                "footprint_geojson": None,
-                "visible": True,
-                "uid": idx
-            })
-        return records
-    
-    # Fallback to Overpass API
-    add_api_log(f"No GitHub data for {province_name}, falling back to Overpass API", "WARNING")
-    elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
-    add_api_log(f"Overpass returned {len(elements)} raw elements", "INFO")
-    
-    for idx, el in enumerate(elements):
-        e_lat = el.get('lat') or el.get('center', {}).get('lat')
-        e_lon = el.get('lon') or el.get('center', {}).get('lon')
-        if e_lat and e_lon:
-            tags = el.get('tags', {})
-            name = tags.get('name', 'Unknown')
-            if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']:
-                continue
-            records.append({
-                "lat": e_lat,
-                "lon": e_lon,
-                "name": name,
-                "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                "source": "overpass",
-                "has_footprint": False,
-                "footprint_geojson": None,
-                "visible": True,
-                "uid": idx
-            })
-    
-    add_api_log(f"Final record count from Overpass: {len(records)} POIs", "INFO")
-    return records
 
 # -----------------------------------------------------------------------------
 # API LOGGING SYSTEM
@@ -609,7 +532,7 @@ def clear_api_logs():
     st.session_state.api_logs = []
 
 # -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE & DATA CONFIGURATIONS
+# STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
@@ -631,15 +554,10 @@ if 'global_marker_style' not in st.session_state: st.session_state.global_marker
 if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 16
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
-# Boundary state
-if 'show_boundaries' not in st.session_state:
-    st.session_state.show_boundaries = False
-if 'boundary_levels' not in st.session_state:
-    st.session_state.boundary_levels = []
-if 'current_location_info' not in st.session_state:
-    st.session_state.current_location_info = None
-if 'boundary_geojson_data' not in st.session_state:
-    st.session_state.boundary_geojson_data = {}
+if 'show_boundaries' not in st.session_state: st.session_state.show_boundaries = False
+if 'boundary_levels' not in st.session_state: st.session_state.boundary_levels = []
+if 'current_location_info' not in st.session_state: st.session_state.current_location_info = None
+if 'boundary_geojson_data' not in st.session_state: st.session_state.boundary_geojson_data = {}
 
 POI_CONFIG = {
     "COMMERCIAL & OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
@@ -713,12 +631,29 @@ with st.sidebar:
         )
         st.session_state.boundary_levels = boundary_options
         
+        # Load location contextual levels inside active updates
+        if not st.session_state.current_location_info or scan_triggered:
+            st.session_state.current_location_info = reverse_geocode_location(lat_coord, lon_coord)
+            
         if st.session_state.current_location_info:
             loc_info = st.session_state.current_location_info
             st.info(f"📍 {loc_info.get('barangay', '?')}, {loc_info.get('city', '?')}, {loc_info.get('province', '?')}")
+            
+            # Repopulate boundary GeoJSON properties
+            level_map = {"Region": (loc_info.get('region'), 4), "Province": (loc_info.get('province'), 5), "City/Municipality": (loc_info.get('city'), 6), "Barangay": (loc_info.get('barangay'), 8)}
+            new_geojson_store = {}
+            for target_opt in boundary_options:
+                area_name, adv_lvl = level_map.get(target_opt, (None, None))
+                if area_name:
+                    geojson_res = get_boundary_geojson(area_name, adv_lvl)
+                    if geojson_res:
+                        key_name = target_opt.lower().split('/')[0]
+                        new_geojson_store[key_name] = geojson_res
+            st.session_state.boundary_geojson_data = new_geojson_store
     else:
         st.session_state.show_boundaries = False
         st.session_state.boundary_levels = []
+        st.session_state.boundary_geojson_data = {}
     # -------------------------------------------------------------------------
 
     if scan_triggered:
@@ -747,7 +682,6 @@ with st.sidebar:
         add_api_log("Cleared all data and logs", "INFO")
         st.rerun()
 
-    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
     with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
@@ -770,7 +704,7 @@ with st.sidebar:
                     add_api_log(f"Import failed: {str(e)[:100]}", "ERROR")
 
 # -----------------------------------------------------------------------------
-# PIPELINE STAGE PIPING CONTROLLER (USING GITHUB POI DATA WITH FALLBACK)
+# DUAL-SOURCE POI SCANNER IMPLEMENTATION (GitHub -> Fallback Overpass)
 # -----------------------------------------------------------------------------
 main_canvas = st.empty()
 
@@ -783,53 +717,55 @@ if st.session_state.scan_active_loading:
             <div class="py-spinner"></div>
             <div class="py-loading-title">Loading POI Data...</div>
             <div class="py-loading-subtitle">Radius: {radius_val}m | Tags: {len(selected_tags)}</div>
-            <div class="py-loading-subtitle" id="scan-status-text">Finding your province...</div>
+            <div class="py-loading-subtitle" id="scan-status-text">Resolving regional scopes...</div>
         </div>
-        <script>
-            const statusDiv = document.getElementById('scan-status-text');
-            const statusMessages = [
-                "Finding province from coordinates...",
-                "Loading province POI data from GitHub...",
-                "Filtering by radius...",
-                "Applying tag filters...",
-                "Ready!"
-            ];
-            let idx = 0;
-            if(statusDiv) {{
-                setInterval(() => {{
-                    idx = (idx + 1) % statusMessages.length;
-                    statusDiv.innerText = statusMessages[idx];
-                }}, 1200);
-            }}
-        </script>
     ''', unsafe_allow_html=True)
     
-    add_api_log("Starting POI data load (GitHub primary, Overpass fallback)", "INFO")
-    
-    # Step 1: Determine province from coordinates
+    add_api_log("Starting primary GitHub POI parsing routine", "INFO")
     province_name = get_province_from_coords(lat_coord, lon_coord)
     
     if province_name:
-        add_api_log(f"Coordinates map to province: {province_name}", "INFO")
+        add_api_log(f"Coordinates mapped to province bounds: {province_name}", "INFO")
+        all_province_pois = load_province_pois(province_name)
         
-        # Step 2: Load POIs with fallback
-        records = load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags)
-        
+        if all_province_pois:
+            add_api_log(f"Retrieved {len(all_province_pois)} points from GitHub data block", "INFO")
+            radius_filtered = filter_pois_by_radius(all_province_pois, lat_coord, lon_coord, radius_val)
+            tag_filtered = filter_pois_by_tags(radius_filtered, selected_tags)
+            
+            for idx, poi in enumerate(tag_filtered):
+                records.append({
+                    "lat": poi['lat'],
+                    "lon": poi['lon'],
+                    "name": poi.get('name', 'Unknown'),
+                    "type": poi.get('type', 'poi'),
+                    "source": "github",
+                    "has_footprint": False,
+                    "footprint_geojson": None,
+                    "visible": True,
+                    "uid": idx
+                })
+            
+            if records:
+                st.session_state.scanned_records = records
+                success = True
+                add_api_log(f"GitHub pipeline complete. {len(records)} items added to layer map.", "INFO")
+    
+    # Trigger multi-layer fallback pipeline if GitHub records return empty arrays
+    if not success:
+        add_api_log("GitHub asset pool empty or missing. Diverting sequence to Overpass API.", "WARNING")
+        records = execute_overpass_fallback_query(lat_coord, lon_coord, radius_val, selected_tags)
         if records:
             st.session_state.scanned_records = records
-            st.session_state.last_scan_lat = lat_coord
-            st.session_state.last_scan_lon = lon_coord
-            st.session_state.network_stats = None
             success = True
-            add_api_log(f"Final record count: {len(records)} POIs displayed", "INFO")
-        else:
-            add_api_log("No POIs found matching criteria from any source", "WARNING")
+            add_api_log(f"Overpass fallback loop accepted. Mapped {len(records)} elements successfully.", "INFO")
+            
+    if success:
+        st.session_state.last_scan_lat = lat_coord
+        st.session_state.last_scan_lon = lon_coord
     else:
-        add_api_log(f"Coordinates ({lat_coord}, {lon_coord}) not within any loaded province boundary", "ERROR")
-    
-    if not success:
-        add_api_log("Scan failed - no data retrieved", "ERROR")
-        main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">No POI data available for this area</div></div>', unsafe_allow_html=True)
+        add_api_log("Dual-Source Engine failed to locate target query parameters", "ERROR")
+        main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">No features returned by GitHub or Overpass networks</div></div>', unsafe_allow_html=True)
         time.sleep(2)
 
     st.session_state.scan_active_loading = False
@@ -859,11 +795,9 @@ render_lat, render_lon = lat_coord, lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 
-# Get boundary data from session state
 boundary_geojson_data = st.session_state.get('boundary_geojson_data', {})
 boundary_data_json = json.dumps(boundary_geojson_data)
 
-# Build API log HTML
 api_logs_html = ""
 for log in st.session_state.api_logs[-30:]:
     level_class = f"api-log-{log['level'].lower()}"
@@ -958,28 +892,6 @@ leaflet_template = """
         .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
-        
-        .boundary-tooltip {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 9px;
-            font-weight: 600;
-            background: rgba(0, 51, 102, 0.9);
-            color: white;
-            padding: 2px 6px;
-            border-radius: 2px;
-            border-left: 2px solid #C9AB4C;
-        }
-        .boundary-legend {
-            background: rgba(255,255,255,0.95);
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-size: 9px;
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            color: #003366;
-            border: 1px solid rgba(0,51,102,0.1);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        }
     </style>
 </head>
 <body>
@@ -1031,17 +943,6 @@ leaflet_template = """
                     if (!__SHOW_LOADING__) clearInterval(timerInterval);
                 }
             }, 100);
-            
-            const statusDiv = document.getElementById('scan-status-text-map');
-            const messages = ["Connecting to OSM...", "Fetching features...", "Processing geometry...", "Building network graph...", "Compiling results..."];
-            let msgIdx = 0;
-            if(statusDiv) {
-                const msgInterval = setInterval(() => {
-                    msgIdx = (msgIdx + 1) % messages.length;
-                    if(statusDiv) statusDiv.innerText = messages[msgIdx];
-                    if (!__SHOW_LOADING__) clearInterval(msgInterval);
-                }, 1500);
-            }
         }
 
         const basemaps = {
@@ -1120,13 +1021,13 @@ leaflet_template = """
             clearBoundaries();
             
             const styles = {
-                region: { color: "#FF6B6B", weight: 2, fillOpacity: 0.08, opacity: 0.8, dashArray: "2, 4" },
-                province: { color: "#4ECDC4", weight: 1.5, fillOpacity: 0.06, opacity: 0.7, dashArray: "3, 4" },
-                city: { color: "#45B7D1", weight: 1, fillOpacity: 0.04, opacity: 0.6 },
-                barangay: { color: "#96CEB4", weight: 0.8, fillOpacity: 0.03, opacity: 0.5 }
+                region: { color: "#FF6B6B", weight: 2.5, fillOpacity: 0.08, opacity: 0.85, dashArray: "4, 4" },
+                province: { color: "#4ECDC4", weight: 2.0, fillOpacity: 0.06, opacity: 0.75, dashArray: "3, 3" },
+                city: { color: "#45B7D1", weight: 1.5, fillOpacity: 0.04, opacity: 0.65 },
+                barangay: { color: "#96CEB4", weight: 1.0, fillOpacity: 0.03, opacity: 0.55 }
             };
             
-            const levelNames = { region: "Region", province: "Province", city: "City", barangay: "Barangay" };
+            const levelNames = { region: "Region", province: "Province", city: "City/Municipality", barangay: "Barangay" };
             let addedCount = 0;
             
             for (const [key, data] of Object.entries(boundaryData)) {
@@ -1135,13 +1036,13 @@ leaflet_template = """
                         const layer = L.geoJSON(data, {
                             style: styles[key],
                             onEachFeature: function(feature, layer) {
-                                const name = feature.properties?.name || levelNames[key];
+                                const name = feature.properties?.name || feature.properties?.NAME_1 || feature.properties?.NAME_2 || levelNames[key];
                                 layer.bindTooltip(name, { sticky: true, className: 'boundary-tooltip' });
                             }
                         }).addTo(map);
                         boundaryLayers[key] = layer;
                         addedCount++;
-                    } catch(e) { console.error("Error rendering boundary:", e); }
+                    } catch(e) { console.error("Error rendering boundary polygon configuration:", e); }
                 }
             }
             
@@ -1164,6 +1065,7 @@ leaflet_template = """
             const legend = L.control({position: 'bottomleft'});
             legend.onAdd = function() {
                 const div = L.DomUtil.create('div', 'boundary-legend');
+                div.id = 'boundary-legend';
                 div.innerHTML = '<div style="font-weight:800; margin-bottom:4px;">🗺️ BOUNDARY LEGEND</div>';
                 activeKeys.forEach(key => {
                     if (colorMap[key]) {
@@ -1251,7 +1153,7 @@ leaflet_template = """
 
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const menuHtml = `<div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;"><div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div></div>`;
+            const menuHtml = `<div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;"><div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div></div>`;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
 
