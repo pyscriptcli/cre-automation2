@@ -23,24 +23,36 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* Force color picker text strings to transform uppercase and clean the format alignment matrix */
+    /* Force color input fields to upper case formatting array layout profiles */
         [data-testid="stColorPicker"] div[data-baseweb="select"] {
             text-transform: uppercase !important;
         }
-        
-        /* Auto-toggle input interface rows to prioritize HEX primitive arrays */
-        div[data-testid="stColorPicker"] input[type="text"] {
-            font-family: 'Montserrat', sans-serif !important;
-            font-weight: 600 !important;
-            font-size: 11px !important;
-            color: var(--brand-midnight) !important;
+
+        /* HARD OVERRIDE: Hide the RGB conversion option toggle menu dropdown arrow box completely */
+        div[data-baseweb="color-picker-popover"] div[data-baseweb="select"] {
+            display: none !important;
         }
 
-        /* Target the low-level trigger button to step straight into the HEX input deck instead of the RGB sequence */
-        div[data-baseweb="color-picker-popover"] button {
+        /* HARD OVERRIDE: Strip out the multi-field container that holds the partitioned R, G, B inputs */
+        div[data-baseweb="color-picker-popover"] div:has(> input) + div {
+            display: none !important;
+        }
+
+        /* HARD OVERRIDE: target and force the formatting text element row blocks out of document flow */
+        div[data-baseweb="color-picker-popover"] label, 
+        div[data-baseweb="color-picker-popover"] span {
+            display: none !important;
+        }
+
+        /* Sanatize and center expand the single remaining HEX input box to match panel alignment matrix width boundaries */
+        div[data-baseweb="color-picker-popover"] input[type="text"] {
+            width: 100% !important;
             text-transform: uppercase !important;
             font-family: 'Montserrat', sans-serif !important;
-            font-size: 10px !important;
+            font-weight: 700 !important;
+            font-size: 11px !important;
+            text-align: center !important;
+            color: var(--brand-midnight) !important;
         }
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
