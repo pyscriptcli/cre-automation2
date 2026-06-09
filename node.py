@@ -388,10 +388,10 @@ with st.sidebar:
             st.error("Select ≥ 1 layer.")
         else:
             st.session_state.scan_active_loading = True
-            st.rerun()
+            st.rerun()  # 👈 INSTANTLY FORCES SIDEBAR RERUN TO RENDER CANVAS OVERLAY
 
 # -----------------------------------------------------------------------------
-# PIPELINE EXECUTION FORWARD CONTROL
+# PIPELINE EXECUTION FORWARD CONTROL (Runs instantly on the isolated rerun frame)
 # -----------------------------------------------------------------------------
 if st.session_state.scan_active_loading:
     province_name = get_province_from_coords(lat_coord, lon_coord)
@@ -482,17 +482,18 @@ leaflet_template = """
         /* Centered Loading Splash Overlay UI */
         #map-loading-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(255, 255, 255, 0.9); z-index: 9999; 
+            background: rgba(255, 255, 255, 0.95); z-index: 9999; 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.3s ease; pointer-events: all;
         }
+        .loading-wrapper { text-align: center; background: #ffffff; padding: 30px 50px; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
         .loading-spinner {
-            width: 50px; height: 50px; border: 5px solid rgba(0, 51, 102, 0.1);
-            border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
-            margin-bottom: 16px;
+            width: 60px; height: 60px; border: 5px solid rgba(0, 51, 102, 0.08);
+            border-left-color: #003366; border-radius: 50%; animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px auto;
         }
-        .loading-text { font-size: 13px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 2px; }
-        .loading-subtext { font-size: 10px; font-weight: 600; color: #C9AB4C; margin-top: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+        .loading-text { font-size: 14px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 2px; }
+        .loading-subtext { font-size: 10px; font-weight: 600; color: #C9AB4C; margin-top: 8px; letter-spacing: 0.5px; text-transform: uppercase; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         #scan-results-panel { 
@@ -540,9 +541,11 @@ leaflet_template = """
 <body>
     <div id="map-container">
         <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
-            <div class="loading-spinner"></div>
-            <div class="loading-text">Scanning Spatial Engine</div>
-            <div class="loading-subtext">Executing Layer Query Fallbacks...</div>
+            <div class="loading-wrapper">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Scanning Spatial Engine</div>
+                <div class="loading-subtext">Executing Fallback Layer Routing...</div>
+            </div>
         </div>
         
         <div id="map"></div>
