@@ -886,6 +886,39 @@ with st.sidebar:
             "location": st.session_state.current_location_info
         })
         st.session_state.show_boundaries = True
+        
+        # Fetch boundaries immediately if location is available
+        if st.session_state.current_location_info:
+            log_event("BOUNDARY", "BOUNDARY_FETCH_STARTED", {
+                "boundary_levels": st.session_state.boundary_levels,
+                "location": st.session_state.current_location_info
+            })
+            
+            loc = st.session_state.current_location_info
+            boundary_geojson_data = {}
+            
+            level_mapping = {
+                "Region": ("region", "4", loc.get('region', '')),
+                "Province": ("province", "5", loc.get('province', '')),
+                "City/Municipality": ("city", "7", loc.get('city', '')),
+                "Barangay": ("barangay", "9", loc.get('barangay', ''))
+            }
+            
+            for level_name in st.session_state.boundary_levels:
+                if level_name in level_mapping:
+                    key, admin_level, area_name = level_mapping[level_name]
+                    if area_name and area_name != 'Unknown':
+                        add_api_log(f"Fetching {level_name} boundary for: {area_name}", "INFO")
+                        geojson = get_boundary_geojson(area_name, admin_level)
+                        if geojson:
+                            boundary_geojson_data[key] = geojson
+                            add_api_log(f"✅ Loaded {level_name} boundary", "INFO")
+                        else:
+                            add_api_log(f"❌ Failed to load {level_name} boundary", "ERROR")
+            
+            st.session_state.boundary_geojson_data = boundary_geojson_data
+            log_event("STATE_CHANGE", "BOUNDARY_DATA_UPDATED", {"keys": list(boundary_geojson_data.keys())})
+        
         st.rerun()
     
     if hide_boundaries_trigger:
