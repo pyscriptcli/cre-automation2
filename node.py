@@ -130,8 +130,8 @@ if 'target_config' not in st.session_state:
 if 'radius_config' not in st.session_state:
     st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
 
-if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "dots"
-if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
+if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "modern-pin"
+if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 20
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
 POI_CONFIG = {
@@ -388,20 +388,26 @@ with st.sidebar:
             st.error("Select ≥ 1 layer.")
         else:
             st.session_state.scan_active_loading = True
-            
-            province_name = get_province_from_coords(lat_coord, lon_coord)
-            records = load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags)
-            
-            if records:
-                st.session_state.scanned_records = records
-                st.session_state.last_scan_lat = lat_coord
-                st.session_state.last_scan_lon = lon_coord
-            else:
-                st.session_state.scanned_records = []
-                
-            st.session_state.scan_active_loading = False
             st.rerun()
 
+# -----------------------------------------------------------------------------
+# PIPELINE EXECUTION FORWARD CONTROL
+# -----------------------------------------------------------------------------
+if st.session_state.scan_active_loading:
+    province_name = get_province_from_coords(lat_coord, lon_coord)
+    records = load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags)
+    
+    if records:
+        st.session_state.scanned_records = records
+        st.session_state.last_scan_lat = lat_coord
+        st.session_state.last_scan_lon = lon_coord
+    else:
+        st.session_state.scanned_records = []
+        
+    st.session_state.scan_active_loading = False
+
+# --- CONTINUATION OF SIDEBAR CONTROLS ---
+with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
         st.session_state.scanned_records = []
@@ -459,6 +465,7 @@ render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.g
 
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
+show_loading_display = "flex" if st.session_state.scan_active_loading else "none"
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -475,16 +482,17 @@ leaflet_template = """
         /* Centered Loading Splash Overlay UI */
         #map-loading-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(255, 255, 255, 0.75); z-index: 9999; 
+            background: rgba(255, 255, 255, 0.9); z-index: 9999; 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.3s ease; pointer-events: all;
         }
         .loading-spinner {
-            width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1);
+            width: 50px; height: 50px; border: 5px solid rgba(0, 51, 102, 0.1);
             border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
-        .loading-text { font-size: 11px; font-weight: 700; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; }
+        .loading-text { font-size: 13px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 2px; }
+        .loading-subtext { font-size: 10px; font-weight: 600; color: #C9AB4C; margin-top: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         #scan-results-panel { 
@@ -531,9 +539,10 @@ leaflet_template = """
 </head>
 <body>
     <div id="map-container">
-        <div id="map-loading-overlay" style="display: none;">
+        <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
             <div class="loading-spinner"></div>
-            <div class="loading-text">Scanning Area...</div>
+            <div class="loading-text">Scanning Spatial Engine</div>
+            <div class="loading-subtext">Executing Layer Query Fallbacks...</div>
         </div>
         
         <div id="map"></div>
@@ -581,7 +590,7 @@ leaflet_template = """
                     <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
                         <option value="dots">Dots</option>
                         <option value="pin">Pin Location</option>
-                        <option value="modern-pin">Modern Drop-Pin</option>
+                        <option value="modern-pin" selected>Modern Drop-Pin</option>
                     </select>
                     <span>Size:</span>
                     <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
@@ -637,10 +646,6 @@ leaflet_template = """
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
         let clusters = {}; 
-
-        if (__SHOW_LOADING__) {
-            document.getElementById('map-loading-overlay').style.display = 'flex';
-        }
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
@@ -744,7 +749,7 @@ leaflet_template = """
 
             Object.keys(categoryMap).forEach(key => {
                 layerGroupsRef[key] = L.layerGroup().addTo(map);
-                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
+                const meta = layerMeta[key] || { color: "#003366", style: "modern-pin", size: 20 };
                 
                 categoryMap[key].forEach(p => {
                     if (p.visible === false) return;
@@ -870,9 +875,9 @@ leaflet_template = """
                                 <select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)">
                                     <option value="dots">Dots</option>
                                     <option value="pin">Pin</option>
-                                    <option value="modern-pin">Modern Pin</option>
+                                    <option value="modern-pin" selected>Modern Pin</option>
                                 </select>
-                                <input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)">
+                                <input type="range" min="10" max="40" value="20" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)">
                                 <input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)">
                             </div>
                         </div>
@@ -882,7 +887,7 @@ leaflet_template = """
 
                 assignedLayers.forEach(catName => {
                     if(!categoryMap[catName]) return;
-                    const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
+                    const meta = layerMeta[catName] || { color: "#003366", style: "modern-pin", size: 20 };
                     const layerPts = categoryMap[catName] || [];
                     const isLayerVisible = layerPts.some(p => p.visible !== false);
 
@@ -897,7 +902,7 @@ leaflet_template = """
                 Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
                 if (insideClusterGroup) return;
 
-                const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
+                const meta = layerMeta[catName] || { color: "#003366", style: "modern-pin", size: 20 };
                 const layerPts = categoryMap[catName] || [];
                 const isLayerVisible = layerPts.some(p => p.visible !== false);
 
@@ -1012,15 +1017,13 @@ leaflet_template = """
 </html>
 """
 
-fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
-
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__IS_STALE__", is_stale)
                 .replace("__SHOW_LOADING__", show_loading)
+                .replace("__SHOW_LOADING_DISPLAY__", show_loading_display)
                 .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
                 .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
                 .replace("__TARGET_CONFIG_JSON__", target_config_json)
