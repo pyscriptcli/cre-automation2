@@ -928,6 +928,18 @@ if st.session_state.scan_active_loading:
         add_api_log("Scan failed - no data retrieved", "ERROR")
         main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">No POI data available for this area</div></div>', unsafe_allow_html=True)
         time.sleep(2)
+    
+    # Step 2: Get location hierarchy for boundaries (reverse geocoding)
+    location_info = reverse_geocode_location(lat_coord, lon_coord)
+    if location_info:
+        st.session_state.current_location_info = location_info
+        add_api_log(f"📍 Location detected: {location_info.get('barangay', 'N/A')}, {location_info.get('city', 'N/A')}, {location_info.get('province', 'N/A')}, {location_info.get('region', 'N/A')}", "INFO")
+    else:
+        st.session_state.current_location_info = None
+        add_api_log("⚠️ Could not determine location hierarchy for boundaries", "WARNING")
+    
+    if province_name:
+        add_api_log(f"Coordinates map to province: {province_name}", "INFO")
 
     # -------------------------------------------------------------------------
     # FETCH BOUNDARIES IF SHOW BOUNDARIES IS ACTIVE
