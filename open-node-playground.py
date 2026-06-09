@@ -3,8 +3,10 @@ import requests
 import re
 import json
 import os
+import hashlib
 import time
 import math
+import traceback
 from datetime import datetime
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
@@ -154,26 +156,102 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# GLOBAL HELPER DEFINITIONS
+# GLOBAL HELPER DEFINITIONS (Placed at top root scope to fully resolve NameErrors)
 # -----------------------------------------------------------------------------
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
+        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
-def haversine_distance(lat1, lon1, lat2, lon2):
-    """Calculate distance between two points in meters using Haversine formula"""
-    R = 6371000  # Earth's radius in meters
-    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    c = 2 * math.asin(math.sqrt(a))
-    return R * c
+# -----------------------------------------------------------------------------
+# GITHUB POI DATA LOADER (NEW - REPLACES OVERPASS/OSMnx)
+# -----------------------------------------------------------------------------
+GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
+
+# Province bounding boxes for reverse geocoding
+PROVINCE_BOUNDS = {
+    "metro_manila": [120.90, 14.40, 121.10, 14.80],
+    "cavite": [120.60, 14.10, 121.00, 14.50],
+    "laguna": [121.00, 14.00, 121.60, 14.50],
+    "bulacan": [120.70, 14.70, 121.20, 15.30],
+    "batangas": [120.70, 13.60, 121.40, 14.20],
+    "rizal": [121.00, 14.40, 121.60, 14.90],
+    "pampanga": [120.50, 14.90, 121.00, 15.40],
+    "nueva_ecija": [120.60, 15.20, 121.50, 16.00],
+    "zambales": [119.80, 14.60, 120.60, 15.80],
+    "tarlac": [120.30, 15.30, 121.00, 15.90],
+    "pangasinan": [119.80, 15.60, 121.00, 16.50],
+    "la_union": [120.20, 16.40, 120.80, 17.00],
+    "ilocos_norte": [120.30, 17.80, 121.00, 18.70],
+    "ilocos_sur": [120.20, 16.90, 120.80, 17.80],
+}
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_province_pois(province_name):
+    """Load POI data for a specific province from GitHub"""
+    url = f"{GITHUB_POI_BASE}/{province_name}.json"
+    try:
+        response = requests.get(url, timeout=15)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            add_api_log(f"Failed to load {province_name}: HTTP {response.status_code}", "ERROR")
+            return []
+    except Exception as e:
+        add_api_log(f"Error loading {province_name}: {str(e)[:100]}", "ERROR")
+        return []
+
+def get_province_from_coords(lat, lon):
+    """Determine which province contains the given coordinates"""
+    for province, bbox in PROVINCE_BOUNDS.items():
+        if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
+            return province
+    return None
+
+def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
+    """Filter POIs within a radius using Haversine formula"""
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371000
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        return R * c
+    
+    filtered = []
+    for poi in pois:
+        dist = haversine(center_lat, center_lon, poi['lat'], poi['lon'])
+        if dist <= radius_meters:
+            poi_copy = poi.copy()
+            poi_copy['distance_m'] = round(dist)
+            filtered.append(poi_copy)
+    return filtered
+
+def filter_pois_by_tags(pois, selected_tags):
+    """Filter POIs by selected tag categories"""
+    if not selected_tags:
+        return pois
+    
+    filtered = []
+    for poi in pois:
+        poi_type = poi.get('type', '').lower()
+        for tag in selected_tags:
+            tag_clean = tag.replace('"', '').lower()
+            if '=' in tag_clean:
+                key, value = tag_clean.split('=', 1)
+                if key in poi_type or value in poi_type:
+                    filtered.append(poi)
+                    break
+            else:
+                if tag_clean in poi_type:
+                    filtered.append(poi)
+                    break
+    return filtered
 
 # -----------------------------------------------------------------------------
 # API LOGGING SYSTEM
@@ -195,57 +273,6 @@ def clear_api_logs():
     st.session_state.api_logs = []
 
 # -----------------------------------------------------------------------------
-# GITHUB POI DATA LOADER
-# -----------------------------------------------------------------------------
-GITHUB_POI_BASE_URL = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def get_available_provinces():
-    """Get list of all available provinces from GitHub"""
-    try:
-        url = f"{GITHUB_POI_BASE_URL}/index.json"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            provinces = list(data.get('provinces', {}).keys())
-            add_api_log(f"Loaded {len(provinces)} provinces from index", "INFO")
-            return provinces
-    except Exception as e:
-        add_api_log(f"Failed to load province index: {e}", "ERROR")
-    
-    # Fallback hardcoded list
-    return ["batangas", "bulacan", "cavite", "ilocos_norte", "ilocos_sur",
-            "la_union", "laguna", "metro_manila", "nueva_ecija", "pampanga",
-            "pangasinan", "rizal", "tarlac", "zambales"]
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def load_province_pois(province_name):
-    """Load all POIs for a specific province from GitHub"""
-    url = f"{GITHUB_POI_BASE_URL}/{province_name}.json"
-    try:
-        response = requests.get(url, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            add_api_log(f"Loaded {len(data)} POIs from {province_name}", "INFO")
-            return data
-        else:
-            add_api_log(f"Failed to load {province_name}: HTTP {response.status_code}", "ERROR")
-            return []
-    except Exception as e:
-        add_api_log(f"Error loading {province_name}: {e}", "ERROR")
-        return []
-
-def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
-    """Filter POIs within a specified radius"""
-    filtered = []
-    for poi in pois:
-        distance = haversine_distance(center_lat, center_lon, poi['lat'], poi['lon'])
-        if distance <= radius_meters:
-            filtered.append(poi)
-    add_api_log(f"Filtered {len(filtered)} POIs within {radius_meters}m radius", "INFO")
-    return filtered
-
-# -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
@@ -260,8 +287,7 @@ if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
 if 'network_stats' not in st.session_state: st.session_state.network_stats = None
-if 'current_province' not in st.session_state: st.session_state.current_province = None
-if 'province_pois_cache' not in st.session_state: st.session_state.province_pois_cache = {}
+if 'query_cache' not in st.session_state: st.session_state.query_cache = {}
 
 if 'target_config' not in st.session_state: st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
 if 'radius_config' not in st.session_state: st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
@@ -269,29 +295,28 @@ if 'global_marker_style' not in st.session_state: st.session_state.global_marker
 if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
+POI_CONFIG = {
+    "COMMERCIAL & OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
+    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"market|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i'], ['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"'], ['Travel agency', '"shop"="travel_agency"']],
+    "FOOD, BEVERAGE & HOSPITALITY": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Casino', '"amenity"="casino"']],
+    "RESIDENTIAL": [['Apartments', '"building"="apartments"'], ['House', '"building"="house"'], ['Residential Area', '"landuse"="residential"'], ['Condominium', '"building"="residential"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"'], ['Construction', '"landuse"="construction"']],
+    "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports & Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'], ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses & Depots', '"building"~"warehouse|depot",i'], ['Storage Facilities', '"building"="storage"'], ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']],
+    "HEALTH & EMERGENCY SERVICES": [['Hospital', '"amenity"~"hospital|clinic",i'], ['Clinic', '"amenity"="clinic"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Firestation', '"amenity"="fire_station"'], ['Police', '"amenity"="police"'], ['Hospital Adv', '"amenity"="hospital"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i']],
+    "GOVERNMENT, EDUCATION & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i'], ['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"'], ['Embassy', '"amenity"="embassy"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['University', '"amenity"="university"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Public camera', '"man_made"="surveillance"']],
+    "LEISURE, SPORTS & PUBLIC SPACES": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Fuel', '"amenity"="fuel"'], ['Parking', '"amenity"="parking"'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"'], ['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Recycling', '"amenity"="recycling"'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Image', '"image"~".",i']]
+}
+
+ADVANCED_CONFIG = {}
+
 # -----------------------------------------------------------------------------
-# 3. SIDEBAR CONTROLS
+# 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
-    # Province selector
-    st.markdown("### 📍 SELECT PROVINCE")
-    available_provinces = get_available_provinces()
-    selected_province = st.selectbox("Province", available_provinces, key="province_selector")
+    selected_tags = []
+    scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
     
-    # Load province button
-    if st.button("LOAD PROVINCE DATA", type="secondary", use_container_width=True, key="load_province_btn"):
-        if selected_province:
-            add_api_log(f"Loading province: {selected_province}", "INFO")
-            st.session_state.scan_active_loading = True
-            st.session_state.current_province = selected_province
-            st.rerun()
-    
-    st.markdown("<hr style='margin: 12px 0;'>", unsafe_allow_html=True)
-    
-    # Radius scan section (using loaded province data)
-    st.markdown("### 🔍 RADIUS FILTER")
     location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
     st.session_state.geo_radius = radius_val
@@ -304,61 +329,53 @@ with st.sidebar:
         fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
         lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
 
-    scan_triggered = st.button("FILTER BY RADIUS", type="secondary", use_container_width=True, key="scan_btn")
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+    search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     
+    for cat_name, node_items in POI_CONFIG.items():
+        matched = [item for item in node_items if search_query in item[0].lower()]
+        if matched:
+            with st.expander(cat_name, expanded=(len(search_query) > 0)):
+                for label, tag in matched:
+                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
+
+    st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
+    with st.container():
+        for cat_name, node_items in ADVANCED_CONFIG.items():
+            matched = [item for item in node_items if search_query in item[0].lower()]
+            if matched:
+                with st.expander(cat_name, expanded=(len(search_query) > 0)):
+                    for label, tag in matched:
+                        if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
+
     if scan_triggered:
-        if st.session_state.province_pois_cache:
-            add_api_log(f"Filtering POIs within {radius_val}m radius", "INFO")
-            filtered_pois = filter_pois_by_radius(
-                st.session_state.province_pois_cache, 
-                lat_coord, 
-                lon_coord, 
-                radius_val
-            )
-            # Convert to format expected by map
-            records = []
-            for idx, poi in enumerate(filtered_pois):
-                records.append({
-                    "lat": poi['lat'],
-                    "lon": poi['lon'],
-                    "name": poi.get('name', 'Unknown'),
-                    "type": poi.get('type', 'poi'),
-                    "source": "github",
-                    "has_footprint": False,
-                    "footprint_geojson": None,
-                    "visible": True,
-                    "uid": idx
-                })
-            st.session_state.scanned_records = records
-            st.session_state.last_scan_lat = lat_coord
-            st.session_state.last_scan_lon = lon_coord
-            add_api_log(f"Found {len(records)} POIs in radius", "INFO")
-            st.rerun()
+        if not selected_tags:
+            st.error("Select ≥ 1 layer.")
+            add_api_log("Scan attempted with no layers selected", "ERROR")
         else:
-            st.error("Please load a province first!")
-            add_api_log("Radius filter attempted without loaded province", "ERROR")
+            add_api_log(f"Scan initiated with {len(selected_tags)} tags", "INFO")
+            st.session_state.scan_active_loading = True
+            st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
-    
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
         st.session_state.network_stats = None
         st.session_state.scan_active_loading = False
-        st.session_state.current_province = None
-        st.session_state.province_pois_cache = {}
         clear_api_logs()
+        for key in list(st.session_state.keys()):
+            if key.startswith("chk_"): st.session_state[key] = False
         add_api_log("Cleared all data and logs", "INFO")
         st.rerun()
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
-    with col1: 
-        st.download_button("EXPORT JSON", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
-    with col2: 
-        st.download_button("EXPORT KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+    with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
+    with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     with st.popover("IMPORT FILE", use_container_width=True):
@@ -377,25 +394,29 @@ with st.sidebar:
                     add_api_log(f"Import failed: {str(e)[:100]}", "ERROR")
 
 # -----------------------------------------------------------------------------
-# PIPELINE STAGE PIPING CONTROLLER
+# PIPELINE STAGE PIPING CONTROLLER (MODIFIED TO USE GITHUB POI DATA)
 # -----------------------------------------------------------------------------
 main_canvas = st.empty()
 
 if st.session_state.scan_active_loading:
+    records = []
+    success = False
+    
     main_canvas.markdown(f'''
         <div class="py-loading-container">
             <div class="py-spinner"></div>
-            <div class="py-loading-title">Loading Province Data...</div>
-            <div class="py-loading-subtitle">Province: {st.session_state.current_province}</div>
-            <div class="py-loading-subtitle" id="scan-status-text">Downloading from GitHub...</div>
+            <div class="py-loading-title">Loading POI Data...</div>
+            <div class="py-loading-subtitle">Radius: {radius_val}m | Tags: {len(selected_tags)}</div>
+            <div class="py-loading-subtitle" id="scan-status-text">Loading province data...</div>
         </div>
         <script>
             const statusDiv = document.getElementById('scan-status-text');
             const statusMessages = [
-                "Fetching from GitHub...",
-                "Loading POI data...",
-                "Processing coordinates...",
-                "Ready to display!"
+                "Finding province from coordinates...",
+                "Loading province POI data...",
+                "Filtering by radius...",
+                "Applying tag filters...",
+                "Ready!"
             ];
             let idx = 0;
             if(statusDiv) {{
@@ -407,20 +428,61 @@ if st.session_state.scan_active_loading:
         </script>
     ''', unsafe_allow_html=True)
     
-    # Load province data from GitHub
-    add_api_log(f"Loading {st.session_state.current_province} from GitHub", "INFO")
-    province_pois = load_province_pois(st.session_state.current_province)
+    add_api_log("Starting GitHub POI data load", "INFO")
     
-    if province_pois:
-        st.session_state.province_pois_cache = province_pois
-        st.session_state.scanned_records = []
-        st.session_state.last_scan_lat = lat_coord
-        st.session_state.last_scan_lon = lon_coord
-        add_api_log(f"Successfully loaded {len(province_pois)} POIs from {st.session_state.current_province}", "INFO")
+    # Step 1: Determine province from coordinates
+    province_name = get_province_from_coords(lat_coord, lon_coord)
+    
+    if province_name:
+        add_api_log(f"Coordinates map to province: {province_name}", "INFO")
+        
+        # Step 2: Load province POI data from GitHub
+        all_province_pois = load_province_pois(province_name)
+        
+        if all_province_pois:
+            add_api_log(f"Loaded {len(all_province_pois)} POIs from {province_name}", "INFO")
+            
+            # Step 3: Filter by radius
+            radius_filtered = filter_pois_by_radius(all_province_pois, lat_coord, lon_coord, radius_val)
+            add_api_log(f"After radius filter: {len(radius_filtered)} POIs within {radius_val}m", "INFO")
+            
+            # Step 4: Filter by selected tags
+            tag_filtered = filter_pois_by_tags(radius_filtered, selected_tags)
+            add_api_log(f"After tag filter: {len(tag_filtered)} POIs match selected categories", "INFO")
+            
+            # Step 5: Convert to the format expected by the map
+            for idx, poi in enumerate(tag_filtered):
+                records.append({
+                    "lat": poi['lat'],
+                    "lon": poi['lon'],
+                    "name": poi.get('name', 'Unknown'),
+                    "type": poi.get('type', 'poi'),
+                    "source": "github",
+                    "has_footprint": False,
+                    "footprint_geojson": None,
+                    "visible": True,
+                    "uid": idx
+                })
+            
+            if records:
+                st.session_state.scanned_records = records
+                st.session_state.last_scan_lat = lat_coord
+                st.session_state.last_scan_lon = lon_coord
+                st.session_state.network_stats = None  # No network stats from GitHub data
+                success = True
+                add_api_log(f"Final record count: {len(records)} POIs displayed", "INFO")
+            else:
+                add_api_log("No POIs found matching criteria", "WARNING")
+        else:
+            add_api_log(f"No data available for province: {province_name}", "ERROR")
     else:
-        add_api_log(f"Failed to load {st.session_state.current_province}", "ERROR")
-        st.session_state.province_pois_cache = {}
+        add_api_log(f"Coordinates ({lat_coord}, {lon_coord}) not within any loaded province boundary", "ERROR")
     
+    if not success:
+        add_api_log("Scan failed - no data retrieved", "ERROR")
+        main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">No POI data available for this area</div></div>', unsafe_allow_html=True)
+        time.sleep(2)
+
     st.session_state.scan_active_loading = False
     st.rerun()
 
@@ -444,12 +506,9 @@ target_config_json = json.dumps(st.session_state.target_config)
 radius_config_json = json.dumps(st.session_state.radius_config)
 geojson_str = json.dumps(pts_active)
 
-# Get current coordinates for map center
-fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
-
+render_lat, render_lon = lat_coord, lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
-show_loading = "false"  # No loading for map display
+show_loading = "true" if st.session_state.scan_active_loading else "false"
 
 # Build API log HTML
 api_logs_html = ""
@@ -464,7 +523,7 @@ api_log_panel = f'''
         <span class="api-log-close" onclick="event.stopPropagation(); clearApiLogsFromUI();">✕</span>
     </div>
     <div class="api-log-content" id="apiLogContent">
-        {api_logs_html if api_logs_html else '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>No logs yet. Load a province to start.</span></div>'}
+        {api_logs_html if api_logs_html else '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>No logs yet. Click SCAN to start.</span></div>'}
     </div>
 </div>
 <script>
@@ -487,10 +546,9 @@ api_log_panel = f'''
 </script>
 '''
 
-# Network stats placeholder (not using OSMnx anymore)
 if st.session_state.network_stats:
     s = st.session_state.network_stats
-    st.markdown(f"""<div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>📊 Province: {st.session_state.current_province or 'None'} | POIs Loaded: {len(st.session_state.province_pois_cache):,} | Displayed: {len(pts_active):,}</div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>📈 STREET GRAPH DESCRIPTOR METRICS — Intersection Count: <b>{s.get('n', 0)}</b> | Edge Count: <b>{s.get('m', 0)}</b> | Total Street Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Clean Intersections Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -503,6 +561,18 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map { height: 100vh; width: 100%; z-index: 1; }
+        #map-loading-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 340px; background: #ffffff; z-index: 99999; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 24px; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.15);
+            box-shadow: 0 10px 25px rgba(0, 51, 102, 0.15); pointer-events: all;
+        }
+        .loading-spinner { width: 44px; height: 44px; border: 4px solid rgba(0, 51, 102, 0.1); border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+        .loading-text { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
+        .loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; margin-top: 6px; }
+        .elapsed-timer { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; letter-spacing: 0.5px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         #scan-results-panel {
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
         }
@@ -535,10 +605,32 @@ leaflet_template = """
         .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
+        
+        /* API LOG OVERRIDES for map integration */
+        .api-log-panel-map {
+            position: absolute; bottom: 12px; right: 12px; width: 380px; max-height: 280px;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); border-radius: 8px;
+            border-left: 3px solid #C9AB4C; z-index: 10000; font-family: 'Monaco', monospace;
+            font-size: 10px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            color: #e0e0e0;
+        }
+        .api-log-header-map { padding: 6px 10px; background: rgba(0,0,0,0.6); border-radius: 8px 8px 0 0; font-weight: 700; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: #C9AB4C; border-bottom: 1px solid rgba(201, 171, 76, 0.3); }
+        .api-log-content-map { overflow-y: auto; padding: 6px; flex-grow: 1; max-height: 220px; scrollbar-width: thin; }
+        .api-log-entry-map { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 6px 4px; font-family: monospace; font-size: 9px; word-break: break-word; }
+        .api-log-time-map { color: #C9AB4C; font-weight: 600; margin-right: 8px; }
+        .api-log-info-map { color: #88ffaa; }
+        .api-log-error-map { color: #ff8888; }
+        .api-log-warning-map { color: #ffaa66; }
     </style>
 </head>
 <body>
     <div id="map-container">
+        <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Scanning Spatial Engine</div>
+            <div class="loading-subtitle" id="scan-status-text-map">Initializing queries...</div>
+            <div class="elapsed-timer" id="timer-output">Elapsed: 0.0s</div>
+        </div>
         <div id="map"></div>
         <div id="scan-results-panel">
             <div class="results-header"><span>WORKSPACE</span><div style="display: flex; align-items: center; gap: 8px;"><span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span><span id="results-count" style="color:#C9AB4C;">0</span></div></div>
@@ -557,8 +649,35 @@ leaflet_template = """
     </div>
 
     <script>
-        const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 13);
+        const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
         let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
+        let scanStartTime = null;
+        
+        if (__SHOW_LOADING__) {
+            const overlay = document.getElementById('map-loading-overlay');
+            if (overlay) overlay.style.display = 'flex';
+            scanStartTime = performance.now();
+            const timerInterval = setInterval(() => {
+                if (scanStartTime) {
+                    let current = (performance.now() - scanStartTime) / 1000;
+                    const timerEl = document.getElementById('timer-output');
+                    if (timerEl) timerEl.innerText = "Time Elapsed: " + current.toFixed(1) + "s";
+                    if (!__SHOW_LOADING__) clearInterval(timerInterval);
+                }
+            }, 100);
+            
+            // Rotating status messages
+            const statusDiv = document.getElementById('scan-status-text-map');
+            const messages = ["Connecting to OSM...", "Fetching features...", "Processing geometry...", "Building network graph...", "Compiling results..."];
+            let msgIdx = 0;
+            if(statusDiv) {
+                const msgInterval = setInterval(() => {
+                    msgIdx = (msgIdx + 1) % messages.length;
+                    if(statusDiv) statusDiv.innerText = messages[msgIdx];
+                    if (!__SHOW_LOADING__) clearInterval(msgInterval);
+                }, 1500);
+            }
+        }
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
@@ -670,7 +789,7 @@ leaflet_template = """
 
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box'); document.getElementById('results-count').innerText = pts.length;
-            if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:9px; padding:12px; color:#888780;'>No items mapped. Load a province first.</div>"; return; }
+            if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:9px; padding:12px; color:#888780;'>No items mapped.</div>"; return; }
             let htmlPayload = '';
             const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
@@ -721,14 +840,17 @@ leaflet_template = """
 </html>
 """
 
-show_loading_display = "none"
+fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+
+show_loading_display = "flex" if st.session_state.scan_active_loading else "none"
 
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__IS_STALE__", is_stale)
-                .replace("__SHOW_LOADING__", "false")
+                .replace("__SHOW_LOADING__", "true" if st.session_state.scan_active_loading else "false")
                 .replace("__SHOW_LOADING_DISPLAY__", show_loading_display)
                 .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
                 .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
