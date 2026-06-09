@@ -23,10 +23,7 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
-
-        /* Force color picker text strings to transform uppercase and clean the format alignment matrix */
+    /* Force color picker text strings to transform uppercase and clean the format alignment matrix */
         [data-testid="stColorPicker"] div[data-baseweb="select"] {
             text-transform: uppercase !important;
         }
@@ -45,6 +42,8 @@ st.markdown("""
             font-family: 'Montserrat', sans-serif !important;
             font-size: 10px !important;
         }
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
 
         :root {
             --brand-midnight: #003366 !important;
