@@ -3,6 +3,9 @@ import requests
 import re
 import json
 import os
+import math
+import time
+from datetime import datetime
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
@@ -154,6 +157,192 @@ def compile_features_kml(features):
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
+# HYBRID ENGINE ARCHITECTURE (GitHub Base Repository & Robust Overpass Fallback)
+# -----------------------------------------------------------------------------
+GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
+
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass.openstreetmap.ru/api/interpreter",
+]
+
+PROVINCE_BOUNDS = {
+    "metro_manila": [120.90, 14.40, 121.10, 14.80],
+    "cavite": [120.60, 14.10, 121.00, 14.50],
+    "laguna": [121.00, 14.00, 121.60, 14.50],
+    "bulacan": [120.70, 14.70, 121.20, 15.30],
+    "batangas": [120.70, 13.60, 121.40, 14.20],
+    "rizal": [121.00, 14.40, 121.60, 14.90],
+    "pampanga": [120.50, 14.90, 121.00, 15.40],
+    "nueva_ecija": [120.60, 15.20, 121.50, 16.00],
+    "zambales": [119.80, 14.60, 120.60, 15.80],
+    "tarlac": [120.30, 15.30, 121.00, 15.90],
+    "pangasinan": [119.80, 15.60, 121.00, 16.50],
+    "la_union": [120.20, 16.40, 120.80, 17.00],
+    "ilocos_norte": [120.30, 17.80, 121.00, 18.70],
+    "ilocos_sur": [120.20, 16.90, 120.80, 17.80],
+    "cebu": [123.00, 9.40, 124.20, 11.20],
+    "leyte": [124.30, 9.80, 125.60, 11.50],
+    "bohol": [123.70, 9.50, 124.60, 10.10],
+    "negros_oriental": [122.80, 9.00, 123.50, 10.50],
+    "negros_occidental": [122.30, 9.30, 123.40, 11.00],
+    "samar": [124.80, 11.00, 125.80, 12.50],
+    "biliran": [124.30, 11.40, 124.60, 11.70],
+    "siquijor": [123.40, 9.10, 123.70, 9.30],
+    "davao_city": [125.40, 6.90, 125.70, 7.40],
+    "davao_del_sur": [125.00, 6.00, 125.80, 7.00],
+    "davao_oriental": [126.00, 6.50, 126.80, 7.80],
+    "north_cotabato": [124.50, 6.80, 125.30, 7.80],
+    "south_cotabato": [124.50, 5.80, 125.30, 6.80],
+    "sultan_kudarat": [123.80, 6.20, 124.80, 7.20],
+    "zamboanga_del_sur": [122.00, 7.00, 123.80, 8.20],
+    "zamboanga_del_norte": [121.80, 7.50, 123.00, 8.80],
+    "misamis_oriental": [124.00, 8.00, 125.20, 9.30],
+    "misamis_occidental": [123.30, 7.80, 124.00, 8.70],
+    "bukidnon": [124.30, 7.00, 125.50, 8.50],
+    "agusan_del_norte": [125.00, 8.20, 126.00, 9.30],
+    "agusan_del_sur": [125.00, 7.60, 126.20, 8.80],
+    "surigao_del_norte": [125.20, 9.30, 126.30, 10.20],
+    "surigao_del_sur": [125.80, 8.00, 126.50, 9.00],
+    "lanao_del_norte": [123.50, 7.50, 124.50, 8.30],
+    "lanao_del_sur": [123.80, 7.00, 124.80, 8.20],
+    "basilan": [121.80, 6.30, 122.50, 6.80],
+    "sulu": [120.80, 5.50, 121.50, 6.30],
+    "tawi_tawi": [119.50, 4.50, 120.50, 5.50],
+    "dinagat_islands": [125.30, 9.80, 125.80, 10.50],
+    "zamboanga": [121.80, 6.80, 123.80, 8.50],
+}
+
+def get_province_from_coords(lat, lon):
+    for province, bbox in PROVINCE_BOUNDS.items():
+        if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
+            return province
+    return None
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_province_pois(province_name):
+    url = f"{GITHUB_POI_BASE}/{province_name}.json"
+    try:
+        response = requests.get(url, timeout=15)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception:
+        return None
+
+def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371000
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        return R * c
+    
+    filtered = []
+    for poi in pois:
+        dist = haversine(center_lat, center_lon, poi['lat'], poi['lon'])
+        if dist <= radius_meters:
+            poi_copy = poi.copy()
+            poi_copy['distance_m'] = round(dist)
+            filtered.append(poi_copy)
+    return filtered
+
+def filter_pois_by_tags(pois, selected_tags):
+    if not selected_tags:
+        return pois
+    filtered = []
+    for poi in pois:
+        poi_type = poi.get('type', '').lower()
+        for tag in selected_tags:
+            tag_clean = tag.replace('"', '').lower()
+            if '=' in tag_clean:
+                key, value = tag_clean.split('=', 1)
+                if key in poi_type or value in poi_type:
+                    filtered.append(poi)
+                    break
+            else:
+                if tag_clean in poi_type:
+                    filtered.append(poi)
+                    break
+    return filtered
+
+def build_ql(lat, lon, radius, tags):
+    statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
+    return f"[out:json][timeout:90];(\n{statements}\n);out center;"
+
+def query_overpass_robust(ql, max_retries=2, timeout=90):
+    for endpoint in OVERPASS_ENDPOINTS:
+        for attempt in range(max_retries):
+            try:
+                res = requests.post(endpoint, data={"data": ql}, headers={"User-Agent": "OpenNode/3.5"}, timeout=timeout)
+                if res.status_code == 200:
+                    data = res.json()
+                    return data.get("elements", [])
+                elif res.status_code == 429:
+                    time.sleep(2 ** attempt)
+                    continue
+                else:
+                    break
+            except Exception:
+                continue
+    return []
+
+def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
+    if radius <= max_chunk:
+        return query_overpass_robust(build_ql(lat, lon, radius, tags))
+    offset = radius / (2 * math.sqrt(2) * 111320)
+    quadrants = [(lat + offset, lon + offset), (lat + offset, lon - offset), (lat - offset, lon + offset), (lat - offset, lon - offset)]
+    all_results, seen_ids = [], set()
+    for q_lat, q_lon in quadrants:
+        chunk_results = query_overpass_robust(build_ql(q_lat, q_lon, radius // 2, tags))
+        for el in chunk_results:
+            if el.get("id") not in seen_ids:
+                seen_ids.add(el["id"])
+                all_results.append(el)
+    return all_results
+
+def load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags):
+    records = []
+    if province_name:
+        all_province_pois = load_province_pois(province_name)
+        if all_province_pois:
+            radius_filtered = filter_pois_by_radius(all_province_pois, lat_coord, lon_coord, radius_val)
+            tag_filtered = filter_pois_by_tags(radius_filtered, selected_tags)
+            for idx, poi in enumerate(tag_filtered):
+                records.append({
+                    "lat": poi['lat'],
+                    "lon": poi['lon'],
+                    "name": poi.get('name', 'Unknown'),
+                    "type": poi.get('type', 'poi'),
+                    "visible": True,
+                    "uid": idx
+                })
+            return records
+
+    elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
+    for idx, el in enumerate(elements):
+        e_lat = el.get('lat') or el.get('center', {}).get('lat')
+        e_lon = el.get('lon') or el.get('center', {}).get('lon')
+        if e_lat and e_lon:
+            tags = el.get('tags', {})
+            name = tags.get('name', 'Unknown')
+            if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']:
+                continue
+            records.append({
+                "lat": e_lat,
+                "lon": e_lon,
+                "name": name,
+                "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
+                "visible": True,
+                "uid": idx
+            })
+    return records
+
+# -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 with st.sidebar:
@@ -199,70 +388,17 @@ with st.sidebar:
             st.error("Select ≥ 1 layer.")
         else:
             st.session_state.scan_active_loading = True
-            records = []
-            success = False
             
-            try:
-                import osmnx as ox
-                tags_dict = {}
-                for tag in selected_tags:
-                    clean = tag.replace('"', '')
-                    if '=' in clean:
-                        k, v = clean.split('=', 1)
-                        if '|' in v: v = [x.strip() for x in v.split('|')]
-                        tags_dict[k] = v
-                    else:
-                        tags_dict[clean] = True
-                        
-                gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
-                if not gdf.empty:
-                    for idx, row in gdf.iterrows():
-                        if hasattr(row.geometry, 'centroid'):
-                            c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
-                        else: continue
-                        name = row.get('name', 'Unknown')
-                        if isinstance(name, float): name = 'Unknown'
-                        
-                        matched_type = 'Node'
-                        for k in tags_dict.keys():
-                            if k in row and row[k]:
-                                matched_type = str(row[k])
-                                break
-                        records.append({
-                            "lat": c_lat, "lon": c_lon, "name": str(name), 
-                            "type": matched_type, "visible": True, "uid": len(records)
-                        })
-                    st.session_state.scanned_records = records
-                    st.session_state.last_scan_lat = lat_coord
-                    st.session_state.last_scan_lon = lon_coord
-                    success = True
-            except Exception: pass
-
-            if not success:
-                url = "https://overpass-api.de/api/interpreter"
-                statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
-                ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
-                try:
-                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
-                    if res.status_code == 200:
-                        for el in res.json().get('elements', []):
-                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                            if e_lat and e_lon:
-                                tags = el.get('tags', {})
-                                records.append({
-                                    "lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), 
-                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                                    "visible": True, "uid": len(records)
-                                })
-                        st.session_state.scanned_records = records
-                        st.session_state.last_scan_lat = lat_coord
-                        st.session_state.last_scan_lon = lon_coord
-                        success = True
-                except Exception: pass
+            province_name = get_province_from_coords(lat_coord, lon_coord)
+            records = load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags)
             
+            if records:
+                st.session_state.scanned_records = records
+                st.session_state.last_scan_lat = lat_coord
+                st.session_state.last_scan_lon = lon_coord
+                
             st.session_state.scan_active_loading = False
-            if success: st.rerun()
+            st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
