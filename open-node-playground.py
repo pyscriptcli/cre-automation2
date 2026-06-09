@@ -3,10 +3,8 @@ import requests
 import re
 import json
 import os
-import hashlib
 import time
 import math
-import traceback
 from datetime import datetime
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
@@ -156,16 +154,26 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# GLOBAL HELPER DEFINITIONS (Placed at top root scope to fully resolve NameErrors)
+# GLOBAL HELPER DEFINITIONS
 # -----------------------------------------------------------------------------
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
-        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """Calculate distance between two points in meters using Haversine formula"""
+    R = 6371000  # Earth's radius in meters
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a))
+    return R * c
 
 # -----------------------------------------------------------------------------
 # API LOGGING SYSTEM
@@ -180,12 +188,62 @@ def add_api_log(message, level="INFO"):
         "message": message,
         "level": level
     })
-    # Keep only last 100 logs
     if len(st.session_state.api_logs) > 100:
         st.session_state.api_logs = st.session_state.api_logs[-100:]
 
 def clear_api_logs():
     st.session_state.api_logs = []
+
+# -----------------------------------------------------------------------------
+# GITHUB POI DATA LOADER
+# -----------------------------------------------------------------------------
+GITHUB_POI_BASE_URL = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_available_provinces():
+    """Get list of all available provinces from GitHub"""
+    try:
+        url = f"{GITHUB_POI_BASE_URL}/index.json"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            provinces = list(data.get('provinces', {}).keys())
+            add_api_log(f"Loaded {len(provinces)} provinces from index", "INFO")
+            return provinces
+    except Exception as e:
+        add_api_log(f"Failed to load province index: {e}", "ERROR")
+    
+    # Fallback hardcoded list
+    return ["batangas", "bulacan", "cavite", "ilocos_norte", "ilocos_sur",
+            "la_union", "laguna", "metro_manila", "nueva_ecija", "pampanga",
+            "pangasinan", "rizal", "tarlac", "zambales"]
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_province_pois(province_name):
+    """Load all POIs for a specific province from GitHub"""
+    url = f"{GITHUB_POI_BASE_URL}/{province_name}.json"
+    try:
+        response = requests.get(url, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            add_api_log(f"Loaded {len(data)} POIs from {province_name}", "INFO")
+            return data
+        else:
+            add_api_log(f"Failed to load {province_name}: HTTP {response.status_code}", "ERROR")
+            return []
+    except Exception as e:
+        add_api_log(f"Error loading {province_name}: {e}", "ERROR")
+        return []
+
+def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
+    """Filter POIs within a specified radius"""
+    filtered = []
+    for poi in pois:
+        distance = haversine_distance(center_lat, center_lon, poi['lat'], poi['lon'])
+        if distance <= radius_meters:
+            filtered.append(poi)
+    add_api_log(f"Filtered {len(filtered)} POIs within {radius_meters}m radius", "INFO")
+    return filtered
 
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
@@ -202,7 +260,8 @@ if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
 if 'network_stats' not in st.session_state: st.session_state.network_stats = None
-if 'query_cache' not in st.session_state: st.session_state.query_cache = {}
+if 'current_province' not in st.session_state: st.session_state.current_province = None
+if 'province_pois_cache' not in st.session_state: st.session_state.province_pois_cache = {}
 
 if 'target_config' not in st.session_state: st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
 if 'radius_config' not in st.session_state: st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
@@ -210,108 +269,29 @@ if 'global_marker_style' not in st.session_state: st.session_state.global_marker
 if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
-POI_CONFIG = {
-    "COMMERCIAL & OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
-    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"market|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i'], ['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"'], ['Travel agency', '"shop"="travel_agency"']],
-    "FOOD, BEVERAGE & HOSPITALITY": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Casino', '"amenity"="casino"']],
-    "RESIDENTIAL": [['Apartments', '"building"="apartments"'], ['House', '"building"="house"'], ['Residential Area', '"landuse"="residential"'], ['Condominium', '"building"="residential"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"'], ['Construction', '"landuse"="construction"']],
-    "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports & Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'], ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses & Depots', '"building"~"warehouse|depot",i'], ['Storage Facilities', '"building"="storage"'], ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']],
-    "HEALTH & EMERGENCY SERVICES": [['Hospital', '"amenity"~"hospital|clinic",i'], ['Clinic', '"amenity"="clinic"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Firestation', '"amenity"="fire_station"'], ['Police', '"amenity"="police"'], ['Hospital Adv', '"amenity"="hospital"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i']],
-    "GOVERNMENT, EDUCATION & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i'], ['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"'], ['Embassy', '"amenity"="embassy"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['University', '"amenity"="university"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Public camera', '"man_made"="surveillance"']],
-    "LEISURE, SPORTS & PUBLIC SPACES": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Fuel', '"amenity"="fuel"'], ['Parking', '"amenity"="parking"'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"'], ['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Recycling', '"amenity"="recycling"'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Image', '"image"~".",i']]
-}
-
-ADVANCED_CONFIG = {}
-
-OVERPASS_ENDPOINTS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-    "https://overpass.openstreetmap.ru/api/interpreter",
-]
-
-def build_ql(lat, lon, radius, tags):
-    statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
-    return f"[out:json][timeout:90];(\n{statements}\n);out center;"
-
-def query_overpass_robust(ql, max_retries=2, timeout=90):
-    for endpoint in OVERPASS_ENDPOINTS:
-        add_api_log(f"Trying endpoint: {endpoint}", "INFO")
-        for attempt in range(max_retries):
-            try:
-                start_time = time.time()
-                add_api_log(f"POST request to {endpoint} (attempt {attempt+1})", "INFO")
-                res = requests.post(endpoint, data={"data": ql}, headers={"User-Agent": "OpenNode/3.5"}, timeout=timeout)
-                elapsed = time.time() - start_time
-                if res.status_code == 200:
-                    add_api_log(f"Success! Status 200 in {elapsed:.2f}s", "INFO")
-                    data = res.json()
-                    if data.get("elements"):
-                        add_api_log(f"Retrieved {len(data['elements'])} elements", "INFO")
-                        return data["elements"]
-                    else:
-                        add_api_log("No elements in response", "WARNING")
-                        return []
-                elif res.status_code == 429:
-                    add_api_log(f"Rate limited (429), retrying in {2**attempt}s", "WARNING")
-                    time.sleep(2 ** attempt)
-                    continue
-                else:
-                    add_api_log(f"HTTP {res.status_code} from endpoint", "ERROR")
-            except requests.exceptions.Timeout:
-                add_api_log(f"Timeout after {timeout}s", "ERROR")
-                timeout = timeout * 0.7
-                continue
-            except Exception as e:
-                add_api_log(f"Exception: {str(e)[:100]}", "ERROR")
-                break
-        add_api_log(f"Endpoint {endpoint} failed, trying next", "WARNING")
-    add_api_log("All endpoints exhausted, returning empty", "ERROR")
-    return []
-
-def get_cache_key(lat, lon, radius, tags):
-    payload = f"{lat:.4f}_{lon:.4f}_{radius}_{sorted(tags)}"
-    return hashlib.md5(payload.encode()).hexdigest()
-
-def cached_query(lat, lon, radius, tags, ql):
-    key = get_cache_key(lat, lon, radius, tags)
-    if key in st.session_state.query_cache:
-        add_api_log(f"Cache hit for key {key[:8]}...", "INFO")
-        return st.session_state.query_cache[key]
-    add_api_log(f"Cache miss, executing query", "INFO")
-    results = query_overpass_robust(ql)
-    if results:
-        st.session_state.query_cache[key] = results
-        add_api_log(f"Cached {len(results)} results", "INFO")
-    return results
-
-def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
-    if radius <= max_chunk:
-        add_api_log(f"Single query (radius {radius}m <= {max_chunk}m)", "INFO")
-        return cached_query(lat, lon, radius, tags, build_ql(lat, lon, radius, tags))
-    offset = radius / (2 * math.sqrt(2) * 111320)
-    quadrants = [(lat + offset, lon + offset), (lat + offset, lon - offset), (lat - offset, lon + offset), (lat - offset, lon - offset)]
-    add_api_log(f"Adaptive split: {radius}m -> 4 quadrants", "INFO")
-    all_results, seen_ids = [], set()
-    for idx, (q_lat, q_lon) in enumerate(quadrants):
-        add_api_log(f"Querying quadrant {idx+1}/4", "INFO")
-        chunk_results = cached_query(q_lat, q_lon, radius // 2, tags, build_ql(q_lat, q_lon, radius // 2, tags))
-        for el in chunk_results:
-            if el.get("id") not in seen_ids:
-                seen_ids.add(el["id"])
-                all_results.append(el)
-    add_api_log(f"Merged {len(all_results)} unique elements from quadrants", "INFO")
-    return all_results
-
 # -----------------------------------------------------------------------------
-# 3. SIDEBAR CONTROLS & GEOPROCESSING
+# 3. SIDEBAR CONTROLS
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
-    selected_tags = []
-    scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
+    # Province selector
+    st.markdown("### 📍 SELECT PROVINCE")
+    available_provinces = get_available_provinces()
+    selected_province = st.selectbox("Province", available_provinces, key="province_selector")
     
+    # Load province button
+    if st.button("LOAD PROVINCE DATA", type="secondary", use_container_width=True, key="load_province_btn"):
+        if selected_province:
+            add_api_log(f"Loading province: {selected_province}", "INFO")
+            st.session_state.scan_active_loading = True
+            st.session_state.current_province = selected_province
+            st.rerun()
+    
+    st.markdown("<hr style='margin: 12px 0;'>", unsafe_allow_html=True)
+    
+    # Radius scan section (using loaded province data)
+    st.markdown("### 🔍 RADIUS FILTER")
     location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
     st.session_state.geo_radius = radius_val
@@ -324,53 +304,61 @@ with st.sidebar:
         fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
         lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
 
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-    search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+    scan_triggered = st.button("FILTER BY RADIUS", type="secondary", use_container_width=True, key="scan_btn")
     
-    for cat_name, node_items in POI_CONFIG.items():
-        matched = [item for item in node_items if search_query in item[0].lower()]
-        if matched:
-            with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                for label, tag in matched:
-                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
-
-    st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
-    with st.container():
-        for cat_name, node_items in ADVANCED_CONFIG.items():
-            matched = [item for item in node_items if search_query in item[0].lower()]
-            if matched:
-                with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                    for label, tag in matched:
-                        if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
-
     if scan_triggered:
-        if not selected_tags:
-            st.error("Select ≥ 1 layer.")
-            add_api_log("Scan attempted with no layers selected", "ERROR")
-        else:
-            add_api_log(f"Scan initiated with {len(selected_tags)} tags", "INFO")
-            st.session_state.scan_active_loading = True
+        if st.session_state.province_pois_cache:
+            add_api_log(f"Filtering POIs within {radius_val}m radius", "INFO")
+            filtered_pois = filter_pois_by_radius(
+                st.session_state.province_pois_cache, 
+                lat_coord, 
+                lon_coord, 
+                radius_val
+            )
+            # Convert to format expected by map
+            records = []
+            for idx, poi in enumerate(filtered_pois):
+                records.append({
+                    "lat": poi['lat'],
+                    "lon": poi['lon'],
+                    "name": poi.get('name', 'Unknown'),
+                    "type": poi.get('type', 'poi'),
+                    "source": "github",
+                    "has_footprint": False,
+                    "footprint_geojson": None,
+                    "visible": True,
+                    "uid": idx
+                })
+            st.session_state.scanned_records = records
+            st.session_state.last_scan_lat = lat_coord
+            st.session_state.last_scan_lon = lon_coord
+            add_api_log(f"Found {len(records)} POIs in radius", "INFO")
             st.rerun()
+        else:
+            st.error("Please load a province first!")
+            add_api_log("Radius filter attempted without loaded province", "ERROR")
 
     st.markdown("<br>", unsafe_allow_html=True)
+    
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
         st.session_state.network_stats = None
         st.session_state.scan_active_loading = False
+        st.session_state.current_province = None
+        st.session_state.province_pois_cache = {}
         clear_api_logs()
-        for key in list(st.session_state.keys()):
-            if key.startswith("chk_"): st.session_state[key] = False
         add_api_log("Cleared all data and logs", "INFO")
         st.rerun()
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
-    with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
-    with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+    with col1: 
+        st.download_button("EXPORT JSON", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
+    with col2: 
+        st.download_button("EXPORT KML", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     with st.popover("IMPORT FILE", use_container_width=True):
@@ -394,22 +382,20 @@ with st.sidebar:
 main_canvas = st.empty()
 
 if st.session_state.scan_active_loading:
-    records = []
-    success = False
     main_canvas.markdown(f'''
         <div class="py-loading-container">
             <div class="py-spinner"></div>
-            <div class="py-loading-title">Compiling Spatial Layers...</div>
-            <div class="py-loading-subtitle">Radius: {radius_val}m | Tags: {len(selected_tags)}</div>
-            <div class="py-loading-subtitle" id="scan-status-text">Initializing engines...</div>
+            <div class="py-loading-title">Loading Province Data...</div>
+            <div class="py-loading-subtitle">Province: {st.session_state.current_province}</div>
+            <div class="py-loading-subtitle" id="scan-status-text">Downloading from GitHub...</div>
         </div>
         <script>
             const statusDiv = document.getElementById('scan-status-text');
             const statusMessages = [
-                "Querying OSM database...",
-                "Processing geometry features...",
-                "Fetching network graph...",
-                "Compiling results..."
+                "Fetching from GitHub...",
+                "Loading POI data...",
+                "Processing coordinates...",
+                "Ready to display!"
             ];
             let idx = 0;
             if(statusDiv) {{
@@ -421,101 +407,20 @@ if st.session_state.scan_active_loading:
         </script>
     ''', unsafe_allow_html=True)
     
-    # --- PASS 1: OSMnx Engine Ingestion ---
-    add_api_log("Starting OSMnx engine ingestion", "INFO")
-    try:
-        import osmnx as ox
-        tags_dict = {}
-        for tag in selected_tags:
-            clean = tag.replace('"', '')
-            if '=' in clean:
-                k, v = clean.split('=', 1)
-                if '|' in v: v = [x.strip() for x in v.split('|')]
-                tags_dict[k] = v
-            else: tags_dict[clean] = True
-        add_api_log(f"OSMnx tags_dict: {tags_dict}", "INFO")
-        
-        gdf = ox.features_from_point((lat_coord, lon_coord), tags=tags_dict, dist=radius_val)
-        if not gdf.empty:
-            add_api_log(f"OSMnx returned {len(gdf)} features", "INFO")
-            for idx, row in gdf.iterrows():
-                name = row.get('name', 'Unknown')
-                if isinstance(name, float): name = 'Unknown'
-                
-                # SANITIZATION FILTER MATRIX: Instantly purge generic tags or empty properties
-                if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']: continue
-                    
-                geom = row.geometry
-                c_lat = geom.centroid.y if hasattr(geom, 'centroid') else geom.y
-                c_lon = geom.centroid.x if hasattr(geom, 'centroid') else geom.x
-                
-                matched_type = 'Node'
-                for k in tags_dict.keys():
-                    if k in row and row[k]:
-                        matched_type = str(row[k])
-                        break
-                records.append({
-                    "lat": c_lat, "lon": c_lon, "name": str(name), "type": matched_type, "source": "osmnx",
-                    "has_footprint": geom.geom_type in ['Polygon', 'MultiPolygon'],
-                    "footprint_geojson": geom.__geo_interface__ if geom.geom_type in ['Polygon', 'MultiPolygon'] else None,
-                    "visible": True, "uid": len(records)
-                })
-            add_api_log(f"Processed {len(records)} records from OSMnx", "INFO")
-            
-            try:
-                add_api_log("Fetching street network graph", "INFO")
-                G = ox.graph_from_point((lat_coord, lon_coord), dist=radius_val, network_type='drive')
-                st.session_state.network_stats = ox.stats.basic_stats(G)
-                add_api_log("Network stats computed successfully", "INFO")
-            except Exception as e:
-                add_api_log(f"Network graph failed: {str(e)[:100]}", "WARNING")
-                st.session_state.network_stats = None
-
-            st.session_state.scanned_records = records
-            st.session_state.last_scan_lat = lat_coord
-            st.session_state.last_scan_lon = lon_coord
-            success = True
-        else:
-            add_api_log("OSMnx returned empty GeoDataFrame", "WARNING")
-    except ImportError:
-        add_api_log("OSMnx not installed, skipping", "WARNING")
-    except Exception as e:
-        add_api_log(f"OSMnx error: {str(e)[:200]}", "ERROR")
-        add_api_log(traceback.format_exc()[-300:], "ERROR")
-
-    # --- PASS 2: Balanced Fallback Engine Overpass Loop ---
-    if not success:
-        add_api_log("Falling back to Overpass API", "INFO")
-        elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
-        add_api_log(f"Overpass returned {len(elements)} raw elements", "INFO")
-        for el in elements:
-            e_lat = el.get('lat') or el.get('center', {}).get('lat')
-            e_lon = el.get('lon') or el.get('center', {}).get('lon')
-            if e_lat and e_lon:
-                tags = el.get('tags', {})
-                name = tags.get('name', 'Unknown')
-                
-                if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']: continue
-                    
-                records.append({
-                    "lat": e_lat, "lon": e_lon, "name": name,
-                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                    "source": "overpass", "has_footprint": False, "footprint_geojson": None, "visible": True, "uid": len(records)
-                })
-        if records:
-            st.session_state.scanned_records = records
-            st.session_state.last_scan_lat = lat_coord
-            st.session_state.last_scan_lon = lon_coord
-            success = True
-            add_api_log(f"Final record count: {len(records)}", "INFO")
-        else:
-            add_api_log("No records found from any source", "ERROR")
-
-    if not success:
-        add_api_log("Scan failed completely - no data retrieved", "ERROR")
-        main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">Check API logs for details</div></div>', unsafe_allow_html=True)
-        time.sleep(2)
-
+    # Load province data from GitHub
+    add_api_log(f"Loading {st.session_state.current_province} from GitHub", "INFO")
+    province_pois = load_province_pois(st.session_state.current_province)
+    
+    if province_pois:
+        st.session_state.province_pois_cache = province_pois
+        st.session_state.scanned_records = []
+        st.session_state.last_scan_lat = lat_coord
+        st.session_state.last_scan_lon = lon_coord
+        add_api_log(f"Successfully loaded {len(province_pois)} POIs from {st.session_state.current_province}", "INFO")
+    else:
+        add_api_log(f"Failed to load {st.session_state.current_province}", "ERROR")
+        st.session_state.province_pois_cache = {}
+    
     st.session_state.scan_active_loading = False
     st.rerun()
 
@@ -539,13 +444,16 @@ target_config_json = json.dumps(st.session_state.target_config)
 radius_config_json = json.dumps(st.session_state.radius_config)
 geojson_str = json.dumps(pts_active)
 
-render_lat, render_lon = lat_coord, lon_coord
+# Get current coordinates for map center
+fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
-show_loading = "true" if st.session_state.scan_active_loading else "false"
+show_loading = "false"  # No loading for map display
 
 # Build API log HTML
 api_logs_html = ""
-for log in st.session_state.api_logs[-30:]:  # Show last 30 logs
+for log in st.session_state.api_logs[-30:]:
     level_class = f"api-log-{log['level'].lower()}"
     api_logs_html += f'<div class="api-log-entry"><span class="api-log-time">[{log["time"]}]</span> <span class="{level_class}">{log["message"]}</span></div>'
 
@@ -556,7 +464,7 @@ api_log_panel = f'''
         <span class="api-log-close" onclick="event.stopPropagation(); clearApiLogsFromUI();">✕</span>
     </div>
     <div class="api-log-content" id="apiLogContent">
-        {api_logs_html if api_logs_html else '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>No logs yet. Click SCAN to start.</span></div>'}
+        {api_logs_html if api_logs_html else '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>No logs yet. Load a province to start.</span></div>'}
     </div>
 </div>
 <script>
@@ -575,14 +483,14 @@ api_log_panel = f'''
         if (content) {{
             content.innerHTML = '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>Logs cleared.</span></div>';
         }}
-        // Also notify Streamlit to clear via a hidden component? We'll handle via button in sidebar.
     }}
 </script>
 '''
 
+# Network stats placeholder (not using OSMnx anymore)
 if st.session_state.network_stats:
     s = st.session_state.network_stats
-    st.markdown(f"""<div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>📈 STREET GRAPH DESCRIPTOR METRICS — Intersection Count: <b>{s.get('n', 0)}</b> | Edge Count: <b>{s.get('m', 0)}</b> | Total Street Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Clean Intersections Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>📊 Province: {st.session_state.current_province or 'None'} | POIs Loaded: {len(st.session_state.province_pois_cache):,} | Displayed: {len(pts_active):,}</div>""", unsafe_allow_html=True)
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -595,18 +503,6 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map { height: 100vh; width: 100%; z-index: 1; }
-        #map-loading-overlay {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 340px; background: #ffffff; z-index: 99999; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 24px; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.15);
-            box-shadow: 0 10px 25px rgba(0, 51, 102, 0.15); pointer-events: all;
-        }
-        .loading-spinner { width: 44px; height: 44px; border: 4px solid rgba(0, 51, 102, 0.1); border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
-        .loading-text { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
-        .loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; margin-top: 6px; }
-        .elapsed-timer { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; letter-spacing: 0.5px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         #scan-results-panel {
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
         }
@@ -639,32 +535,10 @@ leaflet_template = """
         .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
-        
-        /* API LOG OVERRIDES for map integration */
-        .api-log-panel-map {
-            position: absolute; bottom: 12px; right: 12px; width: 380px; max-height: 280px;
-            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); border-radius: 8px;
-            border-left: 3px solid #C9AB4C; z-index: 10000; font-family: 'Monaco', monospace;
-            font-size: 10px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            color: #e0e0e0;
-        }
-        .api-log-header-map { padding: 6px 10px; background: rgba(0,0,0,0.6); border-radius: 8px 8px 0 0; font-weight: 700; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: #C9AB4C; border-bottom: 1px solid rgba(201, 171, 76, 0.3); }
-        .api-log-content-map { overflow-y: auto; padding: 6px; flex-grow: 1; max-height: 220px; scrollbar-width: thin; }
-        .api-log-entry-map { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 6px 4px; font-family: monospace; font-size: 9px; word-break: break-word; }
-        .api-log-time-map { color: #C9AB4C; font-weight: 600; margin-right: 8px; }
-        .api-log-info-map { color: #88ffaa; }
-        .api-log-error-map { color: #ff8888; }
-        .api-log-warning-map { color: #ffaa66; }
     </style>
 </head>
 <body>
     <div id="map-container">
-        <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
-            <div class="loading-spinner"></div>
-            <div class="loading-text">Scanning Spatial Engine</div>
-            <div class="loading-subtitle" id="scan-status-text-map">Initializing queries...</div>
-            <div class="elapsed-timer" id="timer-output">Elapsed: 0.0s</div>
-        </div>
         <div id="map"></div>
         <div id="scan-results-panel">
             <div class="results-header"><span>WORKSPACE</span><div style="display: flex; align-items: center; gap: 8px;"><span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span><span id="results-count" style="color:#C9AB4C;">0</span></div></div>
@@ -683,35 +557,8 @@ leaflet_template = """
     </div>
 
     <script>
-        const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
+        const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 13);
         let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
-        let scanStartTime = null;
-        
-        if (__SHOW_LOADING__) {
-            const overlay = document.getElementById('map-loading-overlay');
-            if (overlay) overlay.style.display = 'flex';
-            scanStartTime = performance.now();
-            const timerInterval = setInterval(() => {
-                if (scanStartTime) {
-                    let current = (performance.now() - scanStartTime) / 1000;
-                    const timerEl = document.getElementById('timer-output');
-                    if (timerEl) timerEl.innerText = "Time Elapsed: " + current.toFixed(1) + "s";
-                    if (!__SHOW_LOADING__) clearInterval(timerInterval);
-                }
-            }, 100);
-            
-            // Rotating status messages
-            const statusDiv = document.getElementById('scan-status-text-map');
-            const messages = ["Connecting to OSM...", "Fetching features...", "Processing geometry...", "Building network graph...", "Compiling results..."];
-            let msgIdx = 0;
-            if(statusDiv) {
-                const msgInterval = setInterval(() => {
-                    msgIdx = (msgIdx + 1) % messages.length;
-                    if(statusDiv) statusDiv.innerText = messages[msgIdx];
-                    if (!__SHOW_LOADING__) clearInterval(msgInterval);
-                }, 1500);
-            }
-        }
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
@@ -823,7 +670,7 @@ leaflet_template = """
 
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box'); document.getElementById('results-count').innerText = pts.length;
-            if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:9px; padding:12px; color:#888780;'>No items mapped.</div>"; return; }
+            if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:9px; padding:12px; color:#888780;'>No items mapped. Load a province first.</div>"; return; }
             let htmlPayload = '';
             const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
@@ -874,17 +721,14 @@ leaflet_template = """
 </html>
 """
 
-fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
-
-show_loading_display = "flex" if st.session_state.scan_active_loading else "none"
+show_loading_display = "none"
 
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
                 .replace("__RADIUS__", str(radius_val))
                 .replace("__IS_STALE__", is_stale)
-                .replace("__SHOW_LOADING__", "true" if st.session_state.scan_active_loading else "false")
+                .replace("__SHOW_LOADING__", "false")
                 .replace("__SHOW_LOADING_DISPLAY__", show_loading_display)
                 .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
                 .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
