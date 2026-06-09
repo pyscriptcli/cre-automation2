@@ -289,9 +289,6 @@ PROVINCE_BOUNDS = {
     "zamboanga": [121.80, 6.80, 123.80, 8.50],
 }
 
-
-
-
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_province_list():
     """Get list of all available provinces from index.json"""
@@ -327,14 +324,7 @@ def get_province_from_coords(lat, lon):
             return province
     return None
 
-def get_province_from_coords(lat, lon):
-    """Determine which province contains the given coordinates"""
-    for province, bbox in PROVINCE_BOUNDS.items():
-        if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
-            return province
-    return None
-
-# ===== ADD THIS FUNCTION RIGHT HERE =====
+# ===== FALLBACK FUNCTION FOR BOUNDARIES =====
 def get_location_from_province_bounds(lat, lon):
     """
     Fallback: Get location info from PROVINCE_BOUNDS dictionary.
@@ -866,7 +856,7 @@ with st.sidebar:
     # Dropdown first (always visible)
     boundary_options = st.multiselect(
         "Select boundary levels:",
-        options=["Region", "Province", "City/Municipality", "Barangay"],
+        options=["Region", "Province", "City/Municipality"],
         default=st.session_state.boundary_levels,
         key="boundary_selector"
     )
@@ -900,8 +890,7 @@ with st.sidebar:
             level_mapping = {
                 "Region": ("region", "4", loc.get('region', '')),
                 "Province": ("province", "5", loc.get('province', '')),
-                "City/Municipality": ("city", "7", loc.get('city', '')),
-                "Barangay": ("barangay", "9", loc.get('barangay', ''))
+                "City/Municipality": ("city", "7", loc.get('city', ''))
             }
             
             for level_name in st.session_state.boundary_levels:
@@ -938,7 +927,7 @@ with st.sidebar:
             "coordinates": f"{lat_coord}, {lon_coord}",
             "radius": radius_val,
             "selected_tags_count": len(selected_tags),
-            "selected_tags": selected_tags[:10]  # First 10 tags
+            "selected_tags": selected_tags[:10]
         })
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -991,9 +980,6 @@ with st.sidebar:
     # -------------------------------------------------------------------------
     # SESSION LOGS (Debug Panel)
     # -------------------------------------------------------------------------
-    # -------------------------------------------------------------------------
-    # SESSION LOGS (Debug Panel)
-    # -------------------------------------------------------------------------
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
     with st.expander("📋 SESSION LOGS", expanded=False):
@@ -1041,7 +1027,7 @@ with st.sidebar:
         
         if st.session_state.get('event_logs', []):
             log_text = ""
-            for log in st.session_state.event_logs[-50:]:  # Last 50 events
+            for log in st.session_state.event_logs[-50:]:
                 time_str = log.get('timestamp', '')[-12:-3] if log.get('timestamp') else ''
                 event_type = log.get('event_type', '')
                 event_name = log.get('event_name', '')
@@ -1064,7 +1050,6 @@ with st.sidebar:
                 
                 log_text += f"{icon} [{time_str}] {event_type}: {event_name}\n"
                 
-                # Add event data if present
                 if log.get('event_data'):
                     data_str = str(log.get('event_data'))[:100]
                     log_text += f"     📎 {data_str}\n"
@@ -1089,7 +1074,7 @@ scan_active: {st.session_state.get('scan_active_loading', False)}
 # -----------------------------------------------------------------------------
 # PIPELINE STAGE PIPING CONTROLLER (USING GITHUB POI DATA WITH FALLBACK)
 # -----------------------------------------------------------------------------
-main_canvas = st.empty() 
+main_canvas = st.empty()
 
 if st.session_state.scan_active_loading:
     log_event("PROCESS", "POI_LOADING_STARTED", {
@@ -1151,7 +1136,6 @@ if st.session_state.scan_active_loading:
         add_api_log(f"Coordinates map to province: {province_name}", "INFO")
         log_event("PROCESS", "GITHUB_POI_LOAD_START", {"province": province_name})
         
-        # Load POIs with fallback
         records = load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags)
         
         log_event("PROCESS", "POI_LOAD_COMPLETE", {
@@ -1194,8 +1178,7 @@ if st.session_state.scan_active_loading:
         level_mapping = {
             "Region": ("region", "4", loc.get('region', '')),
             "Province": ("province", "5", loc.get('province', '')),
-            "City/Municipality": ("city", "7", loc.get('city', '')),
-            "Barangay": ("barangay", "9", loc.get('barangay', ''))
+            "City/Municipality": ("city", "7", loc.get('city', ''))
         }
         
         for level_name in st.session_state.boundary_levels:
@@ -1269,11 +1252,9 @@ render_lat, render_lon = lat_coord, lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 
-# Get boundary data from session state
 boundary_geojson_data = st.session_state.get('boundary_geojson_data', {})
 boundary_data_json = json.dumps(boundary_geojson_data)
 
-# Build API log HTML
 api_logs_html = ""
 for log in st.session_state.api_logs[-30:]:
     level_class = f"api-log-{log['level'].lower()}"
