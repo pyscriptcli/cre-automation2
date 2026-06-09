@@ -3,6 +3,9 @@ import requests
 import re
 import json
 import os
+import matplotlib.pyplot as plt
+import io
+import base64
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
@@ -111,10 +114,6 @@ st.markdown("""
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
-if "lat" in st.query_params and "lon" in st.query_params:
-    st.session_state.geo_coords = f"{st.query_params['lat']}, {st.query_params['lon']}"
-    st.query_params.clear()
-
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
@@ -123,7 +122,10 @@ if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
-if 'legend_layers' not in st.session_state: st.session_state.legend_layers = []
+
+# New Multi-mode Boundary States
+if 'active_scan_mode' not in st.session_state: st.session_state.active_scan_mode = "Radius"
+if 'boundary_geojson' not in st.session_state: st.session_state.boundary_geojson = "{}"
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -148,30 +150,69 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
+def compile_features_kml(features):
+    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
+    for f in features:
+        if not f.get('visible', True): continue
+        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
+        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
+    return kml + '</Document></kml>'
+
+# Helper function to query administrative geometry structures
+def fetch_boundary_geojson_payload(name, admin_level):
+    try:
+        url = "https://overpass-api.de/api/interpreter"
+        ql = f'[out:json][timeout:25];relation["boundary"="administrative"]["admin_level"="{admin_level}"]["name"~"{name}",i];out geom;'
+        res = requests.post(url, data={"data": ql}, timeout=25)
+        if res.status_code == 200:
+            elements = res.json().get('elements', [])
+            if elements:
+                coordinates = []
+                for member in elements[0].get('members', []):
+                    if member.get('type') == 'way' and 'geometry' in member:
+                        coordinates.extend([[pt['lon'], pt['lat']] for pt in member['geometry']])
+                if coordinates:
+                    return {
+                        "type": "Feature",
+                        "geometry": {"type": "LineString", "coordinates": coordinates},
+                        "properties": {"name": name}
+                    }
+    except Exception: pass
+    return None
+
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
-    selected_tags = []
-    scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
+    # NEW COMPONENT: Scan Mode Pipeline Controller Selector Switch Matrix
+    scan_mode = st.selectbox("SCAN CONFIGURATION MODE", ["Radius", "Street Stretch", "Barangay", "City"])
+    st.session_state.active_scan_mode = scan_mode
     
-    location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
-    radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
-    st.session_state.geo_radius = radius_val
-
-    coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
-    if coord_match:
-        lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
-    else:
-        fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-        lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+    selected_tags = []
+    
+    # Render Contextual Input Widgets depending on Active Scan Mode selection parameters
+    if scan_mode == "Radius":
+        location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
+        radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, step=100)
+        st.session_state.geo_radius = radius_val
+    elif scan_mode == "Street Stretch":
+        street_name = st.text_input("STREET DESCRIPTOR NAME", placeholder="e.g. Ayala Avenue")
+        radius_val = st.number_input("CORRIDOR BUFFER (METERS)", min_value=10, max_value=2000, value=100, step=10)
+    elif scan_mode == "Barangay":
+        brgy_city_context = st.text_input("CITY ANCHOR CONTEXT", placeholder="e.g. Makati")
+        brgy_names_input = st.text_input("BARANGAY NAMES (COMMA SEPARATED)", placeholder="e.g. Bel-Air, San Lorenzo")
+    elif scan_mode == "City":
+        city_name_input = st.text_input("TARGET CITY NAME", placeholder="e.g. PasIG")
+        st.caption("⚠️ Rate Limit Active: Restriced to maximum of 1 or 2 active POI layer paths.")
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     
+    # Layer Option Renders
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
@@ -179,57 +220,76 @@ with st.sidebar:
                 for label, tag in matched:
                     if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
 
+    st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
+    with st.container():
+        for cat_name, node_items in ADVANCED_CONFIG.items():
+            matched = [item for item in node_items if search_query in item[0].lower()]
+            if matched:
+                with st.expander(cat_name, expanded=(len(search_query) > 0)):
+                    for label, tag in matched:
+                        if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
+
+    # PROCESS TRIGGERS PIPELINE ENGINE
+    scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
+    
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
+        elif scan_mode == "City" and len(selected_tags) > 2:
+            st.error("City Rate Limit Exceeded. Select a maximum of 2 layer taxonomy boxes.")
         else:
             st.session_state.scan_active_loading = True
             records = []
             success = False
+            statements = ""
+            overpass_url = "https://overpass-api.de/api/interpreter"
             
-            try:
-                import osmnx as ox
-                tags_dict = {}
-                for tag in selected_tags:
-                    clean = tag.replace('"', '')
-                    if '=' in clean:
-                        k, v = clean.split('=', 1)
-                        if '|' in v: v = [x.strip() for x in v.split('|')]
-                        tags_dict[k] = v
-                    else:
-                        tags_dict[clean] = True
-                        
-                gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
-                if not gdf.empty:
-                    for idx, row in gdf.iterrows():
-                        if hasattr(row.geometry, 'centroid'):
-                            c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
-                        else: continue
-                        name = row.get('name', 'Unknown')
-                        if isinstance(name, float): name = 'Unknown'
-                        
-                        matched_type = 'Node'
-                        for k in tags_dict.keys():
-                            if k in row and row[k]:
-                                matched_type = str(row[k])
-                                break
-                        records.append({
-                            "lat": c_lat, "lon": c_lon, "name": str(name), 
-                            "type": matched_type, "visible": True, "uid": len(records)
-                        })
-                    st.session_state.scanned_records = records
-                    st.session_state.geo_coords = f"{lat_coord}, {lon_coord}"
-                    st.session_state.last_scan_lat = lat_coord
-                    st.session_state.last_scan_lon = lon_coord
-                    success = True
-            except Exception: pass
-
-            if not success:
-                url = "https://overpass-api.de/api/interpreter"
+            # Coordinate assignment validation tracking structures
+            if scan_mode == "Radius":
+                coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
+                if coord_match:
+                    lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
+                    st.session_state.geo_coords = location_input
+                else:
+                    fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+                    lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+                
                 statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
-                ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
+                st.session_state.boundary_geojson = "{}"
+                
+            elif scan_mode == "Street Stretch" and street_name:
+                # Extracts line street components dynamically from Overpass via linear area traces
+                statements = f'  way["highway"]["name"~"{street_name}",i];\n'
+                statements += "\n".join([f"  nwr[{tag}](around:{radius_val});" for tag in selected_tags])
+                st.session_state.boundary_geojson = "{}"
+                lat_coord, lon_coord = 14.5995, 120.9842 # Anchor reference reset
+                
+            elif scan_mode == "Barangay" and brgy_names_input:
+                brgy_list = [b.strip() for b in brgy_names_input.split(',')]
+                features_collection = []
+                for brgy in brgy_list:
+                    statements += f'  area["name"~"{brgy}",i]["boundary"="administrative"]["admin_level"="10"]->.a{brgy.replace(" ","")};\n'
+                    for tag in selected_tags:
+                        statements += f'  nwr[{tag}](area.a{brgy.replace(" ","")});\n'
+                    feat = fetch_boundary_geojson_payload(brgy, "10")
+                    if feat: features_collection.append(feat)
+                if features_collection:
+                    st.session_state.boundary_geojson = json.dumps({"type": "FeatureCollection", "features": features_collection})
+                lat_coord, lon_coord = 14.5995, 120.9842
+                
+            elif scan_mode == "City" and city_name_input:
+                statements = f'  area["name"~"{city_name_input}",i]["boundary"="administrative"]["admin_level"~"7|8"]->.cityArea;\n'
+                for tag in selected_tags:
+                    statements += f'  nwr[{tag}](area.cityArea);\n'
+                feat = fetch_boundary_geojson_payload(city_name_input, "7") or fetch_boundary_geojson_payload(city_name_input, "8")
+                if feat:
+                    st.session_state.boundary_geojson = json.dumps({"type": "FeatureCollection", "features": [feat]})
+                lat_coord, lon_coord = 14.5995, 120.9842
+
+            if statements:
+                ql = f"[out:json][timeout:120];(\n{statements}\n);\nout center;"
                 try:
-                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
+                    res = requests.post(overpass_url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.5"}, timeout=120)
                     if res.status_code == 200:
                         for el in res.json().get('elements', []):
                             e_lat = el.get('lat') or el.get('center', {}).get('lat')
@@ -242,9 +302,12 @@ with st.sidebar:
                                     "visible": True, "uid": len(records)
                                 })
                         st.session_state.scanned_records = records
-                        st.session_state.geo_coords = f"{lat_coord}, {lon_coord}"
-                        st.session_state.last_scan_lat = lat_coord
-                        st.session_state.last_scan_lon = lon_coord
+                        if scan_mode == "Radius":
+                            st.session_state.last_scan_lat = lat_coord
+                            st.session_state.last_scan_lon = lon_coord
+                        elif records:
+                            st.session_state.last_scan_lat = records[0]['lat']
+                            st.session_state.last_scan_lon = records[0]['lon']
                         success = True
                 except Exception: pass
             
@@ -256,8 +319,8 @@ with st.sidebar:
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
-        st.session_state.legend_layers = []
         st.session_state.scan_active_loading = False
+        st.session_state.boundary_geojson = "{}"
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
         st.rerun()
@@ -303,10 +366,10 @@ layer_meta_json = json.dumps(st.session_state.layer_meta)
 target_config_json = json.dumps(st.session_state.target_config)
 radius_config_json = json.dumps(st.session_state.radius_config)
 geojson_str = json.dumps(pts_active)
-legend_layers_json = json.dumps(st.session_state.legend_layers)
+boundary_json_str = st.session_state.boundary_geojson
 
-render_lat = lat_coord
-render_lon = lon_coord
+render_lat = st.session_state.last_scan_lat if scan_mode != "Radius" and pts_active else lat_coord
+render_lon = st.session_state.last_scan_lon if scan_mode != "Radius" and pts_active else lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 
@@ -316,14 +379,12 @@ leaflet_template = """
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
-        /* Centered Minimalist Loading Splash Overlay UI */
         #map-loading-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(255, 255, 255, 0.75); z-index: 9999; 
@@ -360,16 +421,15 @@ leaflet_template = """
         .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
         .action-icon-trigger:hover svg { fill: #003366; }
         .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
-        .action-icon-trigger.legend-active-btn svg { fill: #C9AB4C !important; }
 
         .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .hide-labels .poi-text-label { display: none !important; }
         .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
         
         .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
-        .config-block-wrapper select, .config-block-wrapper input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
         .config-headline { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
         .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 600; color: #003366; gap: 6px; }
+        .config-flex-row select, .config-flex-row input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
         .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
         .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
 
@@ -379,54 +439,15 @@ leaflet_template = """
         .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
-
-        #floating-export-btn {
-            position: absolute; top: 10px; left: 10px; z-index: 1000;
-            background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
-            width: 32px; height: 32px; border-radius: 4px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        }
-        #floating-export-btn svg { fill: #003366; width: 16px; height: 16px; }
-
-        /* Floating Minimalist Card Popup Design Overlay */
-        .floating-snapshot-legend {
-            position: absolute; top: 20px; right: 20px; z-index: 99999;
-            background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15);
-            padding: 14px 18px; border-radius: 6px; width: 220px;
-            box-shadow: 0 6px 18px rgba(0, 51, 102, 0.12);
-            display: flex; flex-direction: column; gap: 10px; box-sizing: border-box;
-        }
-        .snapshot-legend-title {
-            font-size: 11px; font-weight: 800; color: #003366;
-            text-transform: uppercase; border-bottom: 2px solid #C9AB4C;
-            padding-bottom: 6px; margin-bottom: 2px; letter-spacing: 0.8px;
-        }
-        .snapshot-legend-row {
-            display: flex; align-items: center; gap: 10px; font-size: 10px;
-            font-weight: 700; color: #003366; text-transform: uppercase;
-        }
-
-        /* 1:1 Aspect Frame Engine to prevent canvas distortion bugs */
-        #export-canvas-blueprint {
-            position: absolute; left: -9999px; top: -9999px;
-            width: 1024px; height: 768px; background: #ffffff;
-            position: relative; overflow: hidden; box-sizing: border-box;
-        }
-        #blueprint-map-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
     </style>
 </head>
 <body>
     <div id="map-container">
         <div id="map-loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
-            <div class="loading-text" id="loading-overlay-message">Scanning Area...</div>
+            <div class="loading-text">Scanning Area...</div>
         </div>
         
-        <div id="floating-export-btn" onclick="executeMapCapturePipeline()" title="Export Trade Area Frame">
-            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
-        </div>
-
         <div id="map"></div>
 
         <div id="scan-results-panel">
@@ -516,14 +537,6 @@ leaflet_template = """
         </div>
     </div>
 
-    <div id="export-canvas-blueprint">
-        <div id="blueprint-map-frame"></div>
-        <div id="blueprint-floating-legend-overlay" class="floating-snapshot-legend">
-            <div class="snapshot-legend-title">Trade Area Legend</div>
-            <div id="blueprint-legend-rows-holder" style="display: flex; flex-direction: column; gap: 8px;"></div>
-        </div>
-    </div>
-
     <script>
         const map = L.map('map', { 
             zoomControl: false, 
@@ -535,11 +548,10 @@ leaflet_template = """
         let targetConfig = __TARGET_CONFIG_JSON__;
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
+        let boundaryGeoJSON = __BOUNDARY_GEOJSON__;
         let clusters = {}; 
-        let legendLayers = __LEGEND_LAYERS_JSON__;
 
         if (__SHOW_LOADING__) {
-            document.getElementById('loading-overlay-message').innerText = 'Scanning Area...';
             document.getElementById('map-loading-overlay').style.display = 'flex';
         }
 
@@ -565,13 +577,31 @@ leaflet_template = """
             localStorage.setItem('ts_persistent_labels', isShown);
         }
 
-        let radiusCircle = null;
-        function renderRadiusCircleBounds() {
-            if (radiusCircle) map.removeLayer(radiusCircle);
-            radiusCircle = L.circle([__LAT__, __LON__], {
-                radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight),
-                fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity)
+        // NEW COMPONENT: Dynamic Administrative Boundaries layer mounting logic
+        if (boundaryGeoJSON && boundaryGeoJSON.features && boundaryGeoJSON.features.length > 0) {
+            L.geoJSON(boundaryGeoJSON, {
+                style: {
+                    color: '#C9AB4C',
+                    weight: 2.5,
+                    fillColor: '#003366',
+                    fillOpacity: 0.05,
+                    dashArray: '5, 8'
+                }
             }).addTo(map);
+            
+            // Adjust map container framing metrics around vector geometry coordinates
+            const boundaryGroup = L.geoJSON(boundaryGeoJSON);
+            map.fitBounds(boundaryGroup.getBounds().pad(0.05));
+        } else {
+            let radiusCircle = null;
+            function renderRadiusCircleBounds() {
+                if (radiusCircle) map.removeLayer(radiusCircle);
+                radiusCircle = L.circle([__LAT__, __LON__], {
+                    radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight),
+                    fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity)
+                }).addTo(map);
+            }
+            renderRadiusCircleBounds();
         }
 
         let centerMarker = null;
@@ -579,8 +609,8 @@ leaflet_template = """
             if (centerMarker) map.removeLayer(centerMarker);
             const d = targetConfig.size; const c = targetConfig.color;
             const htmlElement = targetConfig.style === "star" 
-                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">★</div>`
-                : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
+                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);">★</div>`
+                : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);"></div>`;
             
             centerMarker = L.marker([__LAT__, __LON__], { 
                 icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 
@@ -594,7 +624,7 @@ leaflet_template = """
                     html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
                 });
-            } else if (styleMode === "modern-pin" || styleMode === "drop-pin") {
+            } else if (styleMode === "modern-pin") {
                 const w = d * 1.5;
                 const h = d * 2.2;
                 const customSvg = `
@@ -606,7 +636,7 @@ leaflet_template = """
                     </defs>
                     <g filter="url(#shadowFilter)">
                         <path d="M20 20 L20 54" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/>
-                        <circle cx="20" cy="20" r="14" fill="${color}" />
+                        <circle cx="20" cy="20" r="14" fill="${color}" stroke="#000000" stroke-width="1.5" />
                     </g>
                 </svg>`;
                 return L.divIcon({
@@ -645,7 +675,6 @@ leaflet_template = """
                     marker.addTo(layerGroupsRef[key]);
                 });
             });
-            if (centerMarker) { centerMarker.bringToFront(); }
         }
 
         window.openClusterModalWindow = function() {
@@ -701,18 +730,6 @@ leaflet_template = """
             rebuildSidebarControlLayout();
         };
 
-        window.toggleClusterGroupLegendState = function(clusterId, currentlyLegendActive) {
-            const targetedLayers = clusters[clusterId] || [];
-            targetedLayers.forEach(layerKey => {
-                if (currentlyLegendActive) {
-                    legendLayers = legendLayers.filter(item => item !== layerKey);
-                } else {
-                    if (!legendLayers.includes(layerKey)) legendLayers.push(layerKey);
-                }
-            });
-            window.parent.location.search = `?toggle_legend_layer=__FORCE_REFRESH__`;
-        };
-
         window.batchStyleGroupCluster = function(clusterId, property, value) {
             const targetedLayers = clusters[clusterId] || [];
             targetedLayers.forEach(layerKey => {
@@ -727,12 +744,8 @@ leaflet_template = """
         window.patchGlobalMarkerSize = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v)); compileLayersAndRenderPoints(); };
         window.patchGlobalMarkerColor = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].color = v); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
-        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderTargetCenterIcon(); renderRadiusCircleBounds(); if (centerMarker) centerMarker.bringToFront(); };
+        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderTargetCenterIcon(); };
         window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
-
-        window.toggleLegendLayerState = function(layerKey) {
-            window.parent.location.search = `?toggle_legend_layer=${encodeURIComponent(layerKey)}`;
-        };
 
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box');
@@ -743,19 +756,16 @@ leaflet_template = """
             const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
             const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
-            const listSvg = `<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>`;
 
             Object.keys(clusters).forEach(clusterName => {
                 const assignedLayers = clusters[clusterName] || [];
                 let aggregatedCount = 0;
                 let groupIsVisible = false;
-                let groupIsLegendActive = false;
 
                 assignedLayers.forEach(lKey => {
                     if (categoryMap[lKey]) {
                         aggregatedCount += categoryMap[lKey].length;
                         if (categoryMap[lKey].some(p => p.visible !== false)) groupIsVisible = true;
-                        if (legendLayers.includes(lKey)) groupIsLegendActive = true;
                     }
                 });
 
@@ -767,7 +777,6 @@ leaflet_template = """
                                 <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span>
                             </div>
                             <div style="display:flex; align-items:center; gap:2px;">
-                                <a class="action-icon-trigger ${groupIsLegendActive ? 'legend-active-btn' : ''}" title="Toggle Legend Representation for Group" onclick="toggleClusterGroupLegendState('${clusterName}', ${groupIsLegendActive})">${listSvg}</a>
                                 <a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a>
                                 <a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a>
                                 <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span>
@@ -796,13 +805,12 @@ leaflet_template = """
                     const layerPts = categoryMap[catName] || [];
                     const isLayerVisible = layerPts.some(p => p.visible !== false);
 
-                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg);
+                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
                 });
 
                 htmlPayload += '</div></div>';
             });
 
-            // FIXED: Automatically tracks all un-grouped layers and surfaces them onto your workspace immediately
             Object.keys(categoryMap).forEach(catName => {
                 let insideClusterGroup = false;
                 Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
@@ -815,15 +823,14 @@ leaflet_template = """
                 htmlPayload += `
                     <div class="layer-category-block" id="cat-block-${catName}">
                 `;
-                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg);
+                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
                 htmlPayload += '</div>';
             });
 
             listBox.innerHTML = htmlPayload;
         }
 
-        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg, listSvg) {
-            const isLegendActive = legendLayers.includes(catName);
+        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg) {
             let chunk = `
                 <div class="layer-category-header">
                     <div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')">
@@ -831,7 +838,6 @@ leaflet_template = """
                         <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
                     </div>
                     <div style="display:flex; align-items:center; gap:1px;">
-                        <a class="action-icon-trigger ${isLegendActive ? 'legend-active-btn' : ''}" title="Include/Exclude from Legend Panel" onclick="toggleLegendLayerState('${catName}')">${listSvg}</a>
                         <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
                         <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
                         <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
@@ -843,7 +849,7 @@ leaflet_template = """
                         <select onchange="triggerLayerUpdate('${catName}', 'style', this.value)">
                             <option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option>
                             <option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option>
-                            <option value="modern-pin" ${meta.style==='modern-pin'||meta.style==='drop-pin'?'selected':''}>Drop Pin</option>
+                            <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
                         </select>
                         <input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
                         <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
@@ -901,124 +907,22 @@ leaflet_template = """
             }
         };
 
-        // FIXED: Pinned Dual-Pass Engine maps geometric overlays accurately on offscreen frames
-        window.executeMapCapturePipeline = function() {
-            document.getElementById('loading-overlay-message').innerText = 'Exporting Trade Area...';
-            document.getElementById('map-loading-overlay').style.display = 'flex';
-
-            const activeBasemapKey = document.getElementById('basemap-select').value;
-            const currentCenter = map.getCenter();
-            const currentZoom = map.getZoom();
-
-            const blueprintMapContainer = document.getElementById('blueprint-map-frame');
-            blueprintMapContainer.innerHTML = '';
-            
-            const exportMap = L.map('blueprint-map-frame', {
-                zoomControl: false, attributionControl: false, preferCanvas: false
-            }).setView(currentCenter, currentZoom);
-
-            const captureBasemaps = {
-                osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-                satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-                carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
-            };
-            
-            captureBasemaps[activeBasemapKey].options.crossOrigin = 'anonymous';
-            captureBasemaps[activeBasemapKey].addTo(exportMap);
-
-            // FIXED: Locked coordinate anchors prevent target ring distortion bugs
-            L.circle([__LAT__, __LON__], {
-                radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight),
-                fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity)
-            }).addTo(exportMap);
-
-            Object.keys(categoryMap).forEach(key => {
-                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
-                categoryMap[key].forEach(p => {
-                    if (p.visible === false) return;
-                    L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).addTo(exportMap);
-                });
-            });
-
-            // FIXED: Absolute marker anchors isolate center dots perfectly
-            const d = targetConfig.size; const c = targetConfig.color;
-            const htmlElement = targetConfig.style === "star" 
-                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff;">★</div>`
-                : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff;"></div>`;
-            
-            const exportCenterMarker = L.marker([__LAT__, __LON__], { 
-                icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 
-            }).addTo(exportMap);
-            exportCenterMarker.bringToFront();
-
-            const legendRowsContainer = document.getElementById('blueprint-legend-rows-holder');
-            legendRowsContainer.innerHTML = '';
-            
-            let layersToRender = legendLayers.filter(key => categoryMap[key]);
-            if (layersToRender.length === 0) {
-                layersToRender = Object.keys(categoryMap);
-            }
-
-            layersToRender.forEach(key => {
-                const meta = layerMeta[key] || { color: "#003366" };
-                const pointsCount = categoryMap[key] ? categoryMap[key].length : 0;
-                legendRowsContainer.innerHTML += `
-                    <div class="snapshot-legend-row">
-                        <span class="color-dot" style="background-color: ${meta.color}; width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
-                        <span>${key} <span style="font-size: 8px; opacity: 0.7; font-weight: 500;">(${pointsCount} PINS)</span></span>
-                    </div>
-                `;
-            });
-
-            const floatingLegendBox = document.getElementById('blueprint-floating-legend-overlay');
-            if (layersToRender.length === 0) {
-                floatingLegendBox.style.display = 'none';
-            } else {
-                floatingLegendBox.style.display = 'flex';
-            }
-
-            setTimeout(() => {
-                exportMap.invalidateSize();
-                exportMap.setView(currentCenter, currentZoom);
-                
-                setTimeout(() => {
-                    html2canvas(document.getElementById('export-canvas-blueprint'), {
-                        useCORS: true, 
-                        allowTaint: false, 
-                        scale: 2,
-                        logging: false
-                    }).then(canvas => {
-                        const link = document.createElement('a');
-                        link.download = `trade-area-export-${Date.now()}.png`;
-                        link.href = canvas.toDataURL('image/png');
-                        link.click();
-                        document.getElementById('map-loading-overlay').style.display = 'none';
-                    }).catch(err => {
-                        console.error(err);
-                        document.getElementById('map-loading-overlay').style.display = 'none';
-                    });
-                }, 800);
-            }, 1000);
-        };
-
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const setTargetUrl = `?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`;
             const menuHtml = `
                 <div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;">
                     <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.parent.location.search='${setTargetUrl}';">set as the target coordinates</div>
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div>
                     <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div>
-                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
                 </div>
             `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
 
-        renderTargetCenterIcon(); renderRadiusCircleBounds(); compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
+        renderTargetCenterIcon(); compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
 
-        if (pts.length > 0 && !__IS_STALE__) {
+        if (pts.length > 0 && !__IS_STALE__ && (!boundaryGeoJSON || !boundaryGeoJSON.features || boundaryGeoJSON.features.length === 0)) {
             const validPts = pts.filter(p => p.visible !== false);
             if (validPts.length > 0) { map.fitBounds(L.featureGroup([L.marker([__LAT__, __LON__]), ...validPts.map(p => L.marker([p.lat, p.lon]))]).getBounds().pad(0.05)); }
         }
@@ -1027,56 +931,20 @@ leaflet_template = """
 </html>
 """
 
-    leaflet_html = (leaflet_template
-                    .replace("__LAT__", str(render_lat))
-                    .replace("__LON__", str(render_lon))
-                    .replace("__RADIUS__", str(radius_val))
-                    .replace("__IS_STALE__", is_stale)
-                    .replace("__SHOW_LOADING__", show_loading)
-                    .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
-                    .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
-                    .replace("__TARGET_CONFIG_JSON__", target_config_json)
-                    .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
-                    .replace("__LAYER_META_JSON__", layer_meta_json)
-                    .replace("__GEOJSON__", geojson_str)
-                    .replace("__LEGEND_LAYERS_JSON__", legend_layers_json))
+leaflet_html = (leaflet_template
+                .replace("__LAT__", str(render_lat))
+                .replace("__LON__", str(render_lon))
+                .replace("__RADIUS__", str(radius_val))
+                .replace("__IS_STALE__", is_stale)
+                .replace("__SHOW_LOADING__", show_loading)
+                .replace("__BASEMAP_STYLE__", str(st.session_state.basemap_style))
+                .replace("__SHOW_LABELS__", "true" if st.session_state.show_labels else "false")
+                .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
+                .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
+                .replace("__TARGET_CONFIG_JSON__", target_config_json)
+                .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
+                .replace("__LAYER_META_JSON__", layer_meta_json)
+                .replace("__GEOJSON__", geojson_str)
+                .replace("__BOUNDARY_GEOJSON__", boundary_json_str))
 
-    st.components.v1.html(leaflet_html, height=850, scrolling=False)
-
-# =====================================================================
-# 3. WORKSPACE CLUSTER (UI Tables + Data Actions)
-# =====================================================================
-def render_workspace(scanned_records):
-    with st.sidebar:
-        st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
-
-        col1, col2 = st.columns(2)
-        visible_only_records = [p for p in scanned_records if p.get('visible', True)]
-        
-        with col1: 
-            st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
-        with col2: 
-            st.download_button("MARKERS", compile_features_kml(scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
-
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-
-        with st.popover("IMPORT FILE", use_container_width=True):
-            imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
-            if imported_file is not None:
-                if st.button("LOAD", type="secondary", use_container_width=True):
-                    try:
-                        data = json.load(imported_file)
-                        st.session_state.scanned_records = data.get("scanned_records", data)
-                        st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
-                        st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
-                        st.rerun()
-                    except Exception: 
-                        st.error("Invalid File")
-
-# =====================================================================
-# MAIN DIRECTOR (App Orchestration)
-# =====================================================================
-if __name__ == "__main__":
-    lat_in, lon_in, radius_in = render_scraper_sidebar()
-    render_workspace(st.session_state.scanned_records)
-    render_map_view(lat_in, lon_in, radius_in, st.session_state.scanned_records)
+st.components.v1.html(leaflet_html, height=850, scrolling=False)
