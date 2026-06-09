@@ -405,6 +405,7 @@ if st.session_state.scan_active_loading:
         st.session_state.scanned_records = []
         
     st.session_state.scan_active_loading = False
+    st.rerun()  # Add this to force rerun and hide loading overlay
 
 # --- CONTINUATION OF SIDEBAR CONTROLS ---
 with st.sidebar:
@@ -481,11 +482,72 @@ leaflet_template = """
 
         /* Centered Loading Splash Overlay UI */
         #map-loading-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(255, 255, 255, 0.95); z-index: 9999; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 0.3s ease; pointer-events: all;
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%; 
+            background: rgba(255, 255, 255, 0.98); 
+            z-index: 99999; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            transition: opacity 0.3s ease; 
+            pointer-events: all;
         }
+        .loading-wrapper { 
+            text-align: center; 
+            background: #ffffff; 
+            padding: 30px 50px; 
+            border-radius: 12px; 
+            border: 1px solid rgba(0, 51, 102, 0.15); 
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.1);
+            min-width: 300px;
+        }
+        .loading-spinner {
+            width: 60px; 
+            height: 60px; 
+            border: 4px solid rgba(0, 51, 102, 0.1);
+            border-left-color: #003366; 
+            border-radius: 50%; 
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px auto;
+        }
+        .loading-text { 
+            font-size: 14px; 
+            font-weight: 800; 
+            color: #003366; 
+            text-transform: uppercase; 
+            letter-spacing: 2px; 
+            margin-bottom: 8px;
+        }
+        .loading-subtext { 
+            font-size: 10px; 
+            font-weight: 600; 
+            color: #C9AB4C; 
+            margin-top: 4px; 
+            letter-spacing: 0.5px; 
+            font-family: monospace;
+        }
+        .loading-progress {
+            width: 100%;
+            height: 2px;
+            background: rgba(0, 51, 102, 0.1);
+            margin-top: 16px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .loading-progress-bar {
+            width: 0%;
+            height: 100%;
+            background: #003366;
+            animation: progress 2s ease-in-out infinite;
+            border-radius: 2px;
+        }
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        
         .loading-wrapper { text-align: center; background: #ffffff; padding: 30px 50px; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
         .loading-spinner {
             width: 60px; height: 60px; border: 5px solid rgba(0, 51, 102, 0.08);
@@ -540,13 +602,41 @@ leaflet_template = """
 </head>
 <body>
     <div id="map-container">
-        <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
+                <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
             <div class="loading-wrapper">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">Scanning Spatial Engine</div>
-                <div class="loading-subtext">Executing Fallback Layer Routing...</div>
+                <div class="loading-text">LOADING POI DATA</div>
+                <div class="loading-subtext" id="loading-status">Initializing engine...</div>
+                <div class="loading-progress">
+                    <div class="loading-progress-bar"></div>
+                </div>
             </div>
         </div>
+        <script>
+            if (__SHOW_LOADING__ === "true") {
+                const statusMessages = [
+                    "Locating coordinates...",
+                    "Finding province...",
+                    "Loading from GitHub...",
+                    "Filtering POIs...",
+                    "Applying tag filters...",
+                    "Rendering map..."
+                ];
+                let msgIdx = 0;
+                const statusEl = document.getElementById('loading-status');
+                if (statusEl) {
+                    const interval = setInterval(() => {
+                        if (__SHOW_LOADING__ !== "true") {
+                            clearInterval(interval);
+                            return;
+                        }
+                        msgIdx = (msgIdx + 1) % statusMessages.length;
+                        statusEl.innerText = statusMessages[msgIdx];
+                    }, 1500);
+                }
+            }
+        </script>
+
         
         <div id="map"></div>
 
