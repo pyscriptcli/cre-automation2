@@ -394,7 +394,10 @@ def get_boundary_geojson(area_name, admin_level):
     Primary: Load from GitHub repository.
     Fallback: Overpass API if GitHub file not found or area not matched.
     """
+    add_api_log(f"DEBUG: get_boundary_geojson called with area_name='{area_name}', admin_level='{admin_level}'", "INFO")
+    
     if not area_name or area_name == '':
+        add_api_log(f"DEBUG: area_name is empty, returning None", "WARNING")
         return None
     
     boundary_type_map = {
@@ -407,16 +410,18 @@ def get_boundary_geojson(area_name, admin_level):
     }
     
     boundary_type = boundary_type_map.get(str(admin_level), "province")
+    add_api_log(f"DEBUG: boundary_type mapped to '{boundary_type}'", "INFO")
     
     # Try GitHub first
+    add_api_log(f"DEBUG: Attempting to load from GitHub: {area_name} as {boundary_type}", "INFO")
     github_data = load_github_boundary(area_name, boundary_type)
     if github_data and github_data.get('features') and len(github_data['features']) > 0:
-        add_api_log(f"Loaded {area_name} boundary from GitHub", "INFO")
+        add_api_log(f"✅ Loaded {area_name} boundary from GitHub ({len(github_data['features'])} features)", "INFO")
         return github_data
     
-    # Fallback to Overpass API
-    add_api_log(f"GitHub boundary not found for {area_name}, falling back to Overpass API", "WARNING")
+    add_api_log(f"DEBUG: GitHub boundary not found for {area_name}, falling back to Overpass API", "WARNING")
     
+    # Fallback to Overpass API
     query = f"""
     [out:json][timeout:30];
     (
@@ -426,6 +431,7 @@ def get_boundary_geojson(area_name, admin_level):
     (._;>;);
     out geom;
     """
+    add_api_log(f"DEBUG: Overpass query for {area_name}: {query[:200]}...", "INFO")
     
     try:
         response = requests.post(
@@ -433,8 +439,11 @@ def get_boundary_geojson(area_name, admin_level):
             data={"data": query},
             timeout=30
         )
+        add_api_log(f"DEBUG: Overpass response status: {response.status_code}", "INFO")
+        
         if response.status_code == 200:
             data = response.json()
+            add_api_log(f"DEBUG: Overpass returned {len(data.get('elements', []))} elements", "INFO")
             features = []
             for element in data.get('elements', []):
                 if element.get('type') == 'relation':
@@ -457,11 +466,15 @@ def get_boundary_geojson(area_name, admin_level):
                         })
             
             if features:
-                add_api_log(f"Loaded {area_name} boundary from Overpass API", "INFO")
+                add_api_log(f"✅ Loaded {area_name} boundary from Overpass API ({len(features)} features)", "INFO")
                 return {"type": "FeatureCollection", "features": features}
+            else:
+                add_api_log(f"DEBUG: No valid features found for {area_name}", "WARNING")
+        else:
+            add_api_log(f"DEBUG: Overpass API error: {response.status_code}", "ERROR")
         return None
     except Exception as e:
-        add_api_log(f"Boundary fetch error for {area_name}: {str(e)[:100]}", "ERROR")
+        add_api_log(f"❌ Boundary fetch error for {area_name}: {str(e)[:200]}", "ERROR")
         return None
 
 # -----------------------------------------------------------------------------
@@ -916,6 +929,46 @@ if st.session_state.scan_active_loading:
         main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">No POI data available for this area</div></div>', unsafe_allow_html=True)
         time.sleep(2)
 
+    # -------------------------------------------------------------------------
+    # FETCH BOUNDARIES IF SHOW BOUNDARIES IS ACTIVE
+    # -------------------------------------------------------------------------
+    if st.session_state.show_boundaries and st.session_state.current_location_info:
+        add_api_log("DEBUG: Starting boundary fetch process", "INFO")
+        add_api_log(f"DEBUG: boundary_levels selected: {st.session_state.boundary_levels}", "INFO")
+        add_api_log(f"DEBUG: location_info: {st.session_state.current_location_info}", "INFO")
+        
+        loc = st.session_state.current_location_info
+        boundary_geojson_data = {}
+        
+        level_mapping = {
+            "Region": ("region", "4", loc.get('region', '')),
+            "Province": ("province", "5", loc.get('province', '')),
+            "City/Municipality": ("city", "7", loc.get('city', '')),
+            "Barangay": ("barangay", "9", loc.get('barangay', ''))
+        }
+        
+        for level_name in st.session_state.boundary_levels:
+            add_api_log(f"DEBUG: Processing level: {level_name}", "INFO")
+            if level_name in level_mapping:
+                key, admin_level, area_name = level_mapping[level_name]
+                add_api_log(f"DEBUG: level={level_name}, key={key}, admin_level={admin_level}, area_name='{area_name}'", "INFO")
+                if area_name and area_name != '':
+                    add_api_log(f"DEBUG: Fetching boundary for '{area_name}' at admin_level {admin_level}", "INFO")
+                    geojson = get_boundary_geojson(area_name, admin_level)
+                    if geojson:
+                        boundary_geojson_data[key] = geojson
+                        add_api_log(f"✅ Successfully fetched {level_name} boundary for: {area_name}", "INFO")
+                    else:
+                        add_api_log(f"❌ Failed to fetch {level_name} boundary for: {area_name}", "ERROR")
+                else:
+                    add_api_log(f"DEBUG: Skipping {level_name} - area_name is empty", "WARNING")
+        
+        st.session_state.boundary_geojson_data = boundary_geojson_data
+        add_api_log(f"DEBUG: Final boundary_geojson_data keys: {list(boundary_geojson_data.keys())}", "INFO")
+    else:
+        add_api_log(f"DEBUG: NOT fetching boundaries - show_boundaries={st.session_state.show_boundaries}, location_info={st.session_state.current_location_info is not None}", "INFO")
+    # -------------------------------------------------------------------------
+    
     st.session_state.scan_active_loading = False
     st.rerun()
     
