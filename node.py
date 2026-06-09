@@ -548,7 +548,7 @@ leaflet_template = """
             }).addTo(map);
         }
 
-        const generateMarkerElement = (color, styleMode, sizeDimension) => {
+const generateMarkerElement = (color, styleMode, sizeDimension) => {
             const d = parseInt(sizeDimension);
             if (styleMode === "pin") {
                 return L.divIcon({ 
@@ -556,24 +556,35 @@ leaflet_template = """
                     className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
                 });
             } else if (styleMode === "modern-pin") {
-                const w = d * 1.5;
+                const w = d * 1.5; 
                 const h = d * 2.2;
-                // Core Update: Removed white inner dot matrix core, added flat black pin stalk with custom drop-shadow filter styling
+                const r = d * 0.45; // Dynamically computed radius for the 3D sphere head
+                
                 const customSvg = `
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60" width="${w}" height="${h}">
                     <defs>
-                        <filter id="shadowFilter" x="-40%" y="-40%" width="180%" height="180%">
-                            <feDropShadow dx="0" dy="5" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.4"/>
+                        <filter id="glossyShadow" x="-30%" y="-30%" width="180%" height="180%">
+                            <feDropShadow dx="2" dy="5" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
                         </filter>
+                        <radialGradient id="sphereGloss-${color.replace('#','')}" cx="35%" cy="35%" r="65%">
+                            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+                            <stop offset="40%" stop-color="${color}"/>
+                            <stop offset="100%" stop-color="#000000" stop-opacity="0.7"/>
+                        </radialGradient>
                     </defs>
-                    <g filter="url(#shadowFilter)">
-                        <path d="M20 20 L20 54" stroke="#000000" stroke-width="3.5" stroke-linecap="round"/>
-                        <circle cx="20" cy="20" r="14" fill="${color}" stroke="#000000" stroke-width="1.5" />
+                    
+                    <g filter="url(#glossyShadow)">
+                        <path d="M20 20 L20 54" stroke="#1A1A1A" stroke-width="2.2" stroke-linecap="round"/>
+                        <path d="M20 20 L20 54" stroke="#4D4D4D" stroke-width="0.6" stroke-linecap="round"/>
+                        
+                        <circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})" stroke="#050A10" stroke-width="0.8"/>
                     </g>
                 </svg>`;
-                return L.divIcon({
-                    html: `<div style="transform: translate(-50%, -88%); width: ${w}px; height: ${h}px;">${customSvg}</div>`,
-                    className: '', iconSize: [w, h], iconAnchor: [0, 0]
+                return L.divIcon({ 
+                    html: `<div style="transform: translate(-50%, -90%); width: ${w}px; height: ${h}px;">${customSvg}</div>`, 
+                    className: '', 
+                    iconSize: [w, h], 
+                    iconAnchor: [0, 0] 
                 });
             }
             return L.divIcon({ 
