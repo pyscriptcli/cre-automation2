@@ -3,6 +3,9 @@ import requests
 import re
 import json
 import os
+import hashlib
+import time
+import math
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
@@ -103,7 +106,7 @@ st.markdown("""
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
 
-        /* Custom color picker override styles */
+        /* Hex-Only Color Picker Formatter overrides */
         [data-testid="stColorPicker"] div[data-baseweb="select"] { text-transform: uppercase !important; }
         div[data-baseweb="color-picker-popover"] div[data-baseweb="select"] { display: none !important; }
         div[data-baseweb="color-picker-popover"] div:has(> input) + div { display: none !important; }
@@ -127,6 +130,7 @@ if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
 if 'network_stats' not in st.session_state: st.session_state.network_stats = None
+if 'query_cache' not in st.session_state: st.session_state.query_cache = {}
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -151,6 +155,13 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass.openstreetmap.ru/api/interpreter",
+]
+
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
@@ -161,10 +172,77 @@ def compile_features_kml(features):
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
+# PERFORMANCE ARCHITECTURE UTILITIES: Caching & Mirror Routing Engine
+# -----------------------------------------------------------------------------
+def build_ql(lat, lon, radius, tags):
+    statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
+    return f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
+
+def query_overpass_robust(ql, max_retries=2, timeout=90):
+    for endpoint in OVERPASS_ENDPOINTS:
+        for attempt in range(max_retries):
+            try:
+                res = requests.post(
+                    endpoint,
+                    data={"data": ql},
+                    headers={"User-Agent": "OpenNode/3.5"},
+                    timeout=timeout
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    if data.get("elements"):
+                        return data["elements"]
+                elif res.status_code == 429:
+                    time.sleep(2 ** attempt)
+                    continue
+            except requests.exceptions.Timeout:
+                timeout = timeout * 0.7
+                continue
+            except Exception:
+                break
+    return []
+
+def get_cache_key(lat, lon, radius, tags):
+    payload = f"{lat:.4f}_{lon:.4f}_{radius}_{sorted(tags)}"
+    return hashlib.md5(payload.encode()).hexdigest()
+
+def cached_query(lat, lon, radius, tags, ql):
+    key = get_cache_key(lat, lon, radius, tags)
+    if key in st.session_state.query_cache:
+        return st.session_state.query_cache[key]
+    
+    results = query_overpass_robust(ql)
+    if results:
+        st.session_state.query_cache[key] = results
+    return results
+
+def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
+    if radius <= max_chunk:
+        return cached_query(lat, lon, radius, tags, build_ql(lat, lon, radius, tags))
+    
+    offset = radius / (2 * math.sqrt(2) * 111320)
+    quadrants = [
+        (lat + offset, lon + offset),
+        (lat + offset, lon - offset),
+        (lat - offset, lon + offset),
+        (lat - offset, lon - offset),
+    ]
+    
+    all_results = []
+    seen_ids = set()
+    
+    for q_lat, q_lon in quadrants:
+        chunk_results = cached_query(q_lat, q_lon, radius // 2, tags, build_ql(q_lat, q_lon, radius // 2, tags))
+        for el in chunk_results:
+            if el.get("id") not in seen_ids:
+                seen_ids.add(el["id"])
+                all_results.append(el)
+                
+    return all_results
+
+# -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
-scan_mode = "Radius"
-
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
@@ -203,6 +281,9 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
+    # -------------------------------------------------------------------------
+    # MULTI-PASS ENGINE EXECUTION ROUTER: OSMnx (Pass 1) -> Robust Overpass fall-back (Pass 2)
+    # -------------------------------------------------------------------------
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -211,7 +292,7 @@ with st.sidebar:
             records = []
             success = False
             
-            # UPGRADED PRIMARY DATA TUNNEL ENGINE: OSMnx Features & Topology Analytics
+            # --- PASS 1: OSMnx Rich Structural Engine Execution ---
             try:
                 import osmnx as ox
                 tags_dict = {}
@@ -224,23 +305,13 @@ with st.sidebar:
                     else:
                         tags_dict[clean] = True
                         
-                # Fix deprecated methods using the modern features_from_point pipeline
                 gdf = ox.features_from_point((lat_coord, lon_coord), tags=tags_dict, dist=radius_val)
-                
                 if not gdf.empty:
                     for idx, row in gdf.iterrows():
                         geom = row.geometry
-                        footprint_data = None
+                        c_lat = geom.centroid.y if hasattr(geom, 'centroid') else geom.y
+                        c_lon = geom.centroid.x if hasattr(geom, 'centroid') else geom.x
                         
-                        # Retain actual polygon footprint shapes instead of discarding structural layout geometry
-                        if geom.geom_type == 'Point':
-                            c_lat, c_lon = geom.y, geom.x
-                        elif geom.geom_type in ['Polygon', 'MultiPolygon']:
-                            c_lat, c_lon = geom.centroid.y, geom.centroid.x
-                            footprint_data = geom.__geo_interface__
-                        else:
-                            continue
-                            
                         name = row.get('name', 'Unknown')
                         if isinstance(name, float): name = 'Unknown'
                         
@@ -249,51 +320,48 @@ with st.sidebar:
                             if k in row and row[k]:
                                 matched_type = str(row[k])
                                 break
-                                
                         records.append({
-                            "lat": c_lat, "lon": c_lon, 
-                            "name": str(name), "type": matched_type, "visible": True, "uid": len(records),
-                            "has_footprint": footprint_data is not None,
-                            "footprint_geojson": footprint_data
+                            "lat": c_lat, "lon": c_lon,
+                            "name": str(name), "type": matched_type,
+                            "source": "osmnx",
+                            "has_footprint": geom.geom_type in ['Polygon', 'MultiPolygon'],
+                            "footprint_geojson": geom.__geo_interface__ if geom.geom_type in ['Polygon', 'MultiPolygon'] else None,
+                            "visible": True, "uid": len(records)
                         })
                     
-                    # Core Road network graph analytics execution
                     try:
                         G = ox.graph_from_point((lat_coord, lon_coord), dist=radius_val, network_type='drive')
                         st.session_state.network_stats = ox.stats.basic_stats(G)
                     except Exception:
                         st.session_state.network_stats = None
-                        
+
                     st.session_state.scanned_records = records
                     st.session_state.last_scan_lat = lat_coord
                     st.session_state.last_scan_lon = lon_coord
                     success = True
             except Exception: pass
 
-            # FALLBACK ENGINE: Direct Overpass API POST Query
+            # --- PASS 2: Adaptive, Quadrant-Partitioned Overpass Layer Fall-back Engine ---
             if not success:
-                url = "https://overpass-api.de/api/interpreter"
-                statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
-                ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
-                try:
-                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
-                    if res.status_code == 200:
-                        for el in res.json().get('elements', []):
-                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                            if e_lat and e_lon:
-                                tags = el.get('tags', {})
-                                records.append({
-                                    "lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), 
-                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                                    "visible": True, "uid": len(records),
-                                    "has_footprint": False, "footprint_geojson": None
-                                })
-                        st.session_state.scanned_records = records
-                        st.session_state.last_scan_lat = lat_coord
-                        st.session_state.last_scan_lon = lon_coord
-                        success = True
-                except Exception: pass
+                elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
+                for el in elements:
+                    e_lat = el.get('lat') or el.get('center', {}).get('lat')
+                    e_lon = el.get('lon') or el.get('center', {}).get('lon')
+                    if e_lat and e_lon:
+                        tags = el.get('tags', {})
+                        records.append({
+                            "lat": e_lat, "lon": e_lon,
+                            "name": tags.get('name', 'Unknown'),
+                            "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
+                            "source": "overpass",
+                            "has_footprint": False, "footprint_geojson": None,
+                            "visible": True, "uid": len(records)
+                        })
+                if records:
+                    st.session_state.scanned_records = records
+                    st.session_state.last_scan_lat = lat_coord
+                    st.session_state.last_scan_lon = lon_coord
+                    success = True
             
             st.session_state.scan_active_loading = False
             if success: st.rerun()
@@ -310,8 +378,10 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
+
     col1, col2 = st.columns(2)
     visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
+    
     with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
     with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
@@ -349,13 +419,11 @@ target_config_json = json.dumps(st.session_state.target_config)
 radius_config_json = json.dumps(st.session_state.radius_config)
 geojson_str = json.dumps(pts_active)
 
-fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
-
+render_lat = lat_coord
+render_lon = lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 
-# RENDER STREET TOPOLOGY METRICS IF AVAILABLE DIRECTLY ON DASHBOARD FRAME
 if st.session_state.network_stats:
     s = st.session_state.network_stats
     st.markdown(f"""
@@ -375,11 +443,30 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map { height: 100vh; width: 100%; z-index: 1; }
-        #map-loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.75); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .loading-spinner { width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1); border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px; }
-        .loading-text { font-size: 11px; font-weight: 700; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; }
+
+        /* Center-Aligned UI Stop-Watch Overlay Container Block */
+        #map-loading-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 320px; background: #ffffff; z-index: 99999; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 24px; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.15);
+            box-shadow: 0 10px 25px rgba(0, 51, 102, 0.15); pointer-events: all;
+        }
+        .loading-spinner {
+            width: 44px; height: 44px; border: 4px solid rgba(0, 51, 102, 0.1);
+            border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        .loading-text { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
+        .elapsed-timer { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; letter-spacing: 0.5px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
+
+        #scan-results-panel { 
+            position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; 
+            max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); 
+            background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; 
+            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); 
+        }
         .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; }
         .layer-category-block { border-bottom: 1px solid #f0f0f0; }
@@ -387,15 +474,27 @@ leaflet_template = """
         .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
         .layer-category-items { padding: 0; background: #f8fafc; }
         .layer-category-items.collapsed { display: none !important; }
+        
         .results-item { padding: 4px 8px 4px 16px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
         .results-item:hover { background: #ffffff; color: #003366; }
+        
         .action-icon-trigger { cursor: pointer; padding: 2px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 2px; transition: all 0.15s; }
         .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
         .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
         .action-icon-trigger:hover svg { fill: #003366; }
+        .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
+
         .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .hide-labels .poi-text-label { display: none !important; }
         .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
+        
+        .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
+        .config-headline { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+        .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 600; color: #003366; gap: 6px; }
+        .config-flex-row select, .config-flex-row input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
+        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
+        .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
+
         .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 4px; border-bottom: 1px solid rgba(0,51,102,0.08); }
         .group-cluster-header { background: #e2e8f0; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
         .group-cluster-title { font-size: 9px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
@@ -408,7 +507,8 @@ leaflet_template = """
     <div id="map-container">
         <div id="map-loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
-            <div class="loading-text">Scanning Area...</div>
+            <div class="loading-text">Scanning Spatial Engine...</div>
+            <div class="elapsed-timer" id="timer-output">Elapsed: 0.0s</div>
         </div>
         
         <div id="map"></div>
@@ -501,7 +601,11 @@ leaflet_template = """
     </div>
 
     <script>
-        const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
+        const map = L.map('map', { 
+            zoomControl: false, 
+            attributionControl: false, 
+            preferCanvas: true 
+        }).setView([__LAT__, __LON__], 14);
 
         let layerMeta = __LAYER_META_JSON__;
         let targetConfig = __TARGET_CONFIG_JSON__;
@@ -509,8 +613,14 @@ leaflet_template = """
         let pts = __GEOJSON__;
         let clusters = {}; 
 
+        // Active stopwatch initialization sequence loop
         if (__SHOW_LOADING__) {
             document.getElementById('map-loading-overlay').style.display = 'flex';
+            let start = performance.now();
+            setInterval(() => {
+                let current = (performance.now() - start) / 1000;
+                document.getElementById('timer-output').innerText = "Time Elapsed: " + current.toFixed(1) + "s";
+            }, 100);
         }
 
         const basemaps = {
@@ -552,17 +662,47 @@ leaflet_template = """
                 ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);">★</div>`
                 : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);"></div>`;
             
-            centerMarker = L.marker([__LAT__, __LON__], { icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 }).addTo(map);
+            centerMarker = L.marker([__LAT__, __LON__], { 
+                icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 
+            }).addTo(map);
         }
 
         const generateMarkerElement = (color, styleMode, sizeDimension) => {
             const d = parseInt(sizeDimension);
             if (styleMode === "pin") {
-                return L.divIcon({ html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] });
+                return L.divIcon({ 
+                    html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, 
+                    className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] 
+                });
             } else if (styleMode === "modern-pin") {
-                const w = d * 1.5; const h = d * 2.5; const r = d * 0.45; 
-                const customSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}"><defs><radialGradient id="groundShadow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#000000" stop-opacity="1.0"/><stop offset="100%" stop-color="#000000" stop-opacity="0"/></radialGradient><radialGradient id="sphereGloss-${color.replace('#','')}" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="50%" stop-color="${color}"/><stop offset="100%" stop-color="${color}" stop-opacity="0.75"/></radialGradient></defs><ellipse cx="20" cy="44" rx="12" ry="3.5" fill="url(#groundShadow)" /><path d="M20 20 L20 44" stroke="#222222" stroke-width="2.5" stroke-linecap="round"/><path d="M20 20 L20 44" stroke="#888888" stroke-width="0.8" stroke-linecap="round"/><circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})"/></svg>`;
-                return L.divIcon({ html: `<div style="transform: translate(-50%, -92%); width: ${w}px; height: ${h}px;">${customSvg}</div>`, className: '', iconSize: [w, h], iconAnchor: [0, 0] });
+                const w = d * 1.5; 
+                const h = d * 2.5;
+                const r = d * 0.45; 
+                
+                const customSvg = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}">
+                    <defs>
+                        <radialGradient id="groundShadow" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stop-color="#000000" stop-opacity="1.0"/>
+                            <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+                        </radialGradient>
+                        <radialGradient id="sphereGloss-${color.replace('#','')}" cx="35%" cy="35%" r="65%">
+                            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+                            <stop offset="50%" stop-color="${color}"/>
+                            <stop offset="100%" stop-color="${color}" stop-opacity="0.75"/>
+                        </radialGradient>
+                    </defs>
+                    <ellipse cx="20" cy="44" rx="12" ry="3.5" fill="url(#groundShadow)" />
+                    <path d="M20 20 L20 44" stroke="#222222" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M20 20 L20 44" stroke="#888888" stroke-width="0.8" stroke-linecap="round"/>
+                    <circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})"/>
+                </svg>`;
+                return L.divIcon({ 
+                    html: `<div style="transform: translate(-50%, -92%); width: ${w}px; height: ${h}px;">${customSvg}</div>`, 
+                    className: '', 
+                    iconSize: [w, h], 
+                    iconAnchor: [0, 0] 
+                });
             }
             return L.divIcon({ html: `<div style="background-color: ${color}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, className: '', iconSize: [d, d], iconAnchor: [d/2, d/2] });
         };
@@ -572,59 +712,97 @@ leaflet_template = """
         function compileLayersAndRenderPoints() {
             Object.keys(layerGroupsRef).forEach(k => { map.removeLayer(layerGroupsRef[k]); delete layerGroupsRef[k]; });
             Object.keys(categoryMap).forEach(k => delete categoryMap[k]);
+            
             pts.forEach(p => {
                 const layerKey = p.type || 'Unclassified';
                 if (!categoryMap[layerKey]) categoryMap[layerKey] = []; categoryMap[layerKey].push(p);
             });
+
             Object.keys(categoryMap).forEach(key => {
                 layerGroupsRef[key] = L.layerGroup().addTo(map);
                 const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
+                
                 categoryMap[key].forEach(p => {
                     if (p.visible === false) return;
                     
-                    // RENDER DYNAMIC SHAPELY FOOTPRINT POLYGON IF RETURNED VIA THE OSMNX PIPELINE
+                    // Render dynamic spatial footprint layer if polygon geometry parameters exist
                     if (p.has_footprint && p.footprint_geojson) {
                         L.geoJSON(p.footprint_geojson, {
                             style: { color: meta.color, weight: 1.5, fillColor: meta.color, fillOpacity: 0.35 }
                         }).addTo(layerGroupsRef[key]);
                     }
                     
-                    const marker = L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).bindPopup(`<b>${p.name}</b><br><span style="color:#888780;font-size:9px;">${p.type}</span>`);
-                    if (p.name && p.name !== 'Unknown') marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -10], className: 'poi-text-label' });
+                    const marker = L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) })
+                                    .bindPopup(`<b>${p.name}</b><br><span style="color:#888780;font-size:9px;">${p.type}</span>`);
+                    if (p.name && p.name !== 'Unknown') {
+                        marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -10], className: 'poi-text-label' });
+                    }
                     marker.addTo(layerGroupsRef[key]);
                 });
             });
         }
 
         window.openClusterModalWindow = function() {
-            const container = document.getElementById('cluster-checkbox-target-mount'); container.innerHTML = '';
+            const container = document.getElementById('cluster-checkbox-target-mount');
+            container.innerHTML = '';
             const layers = Object.keys(categoryMap);
-            if(layers.length === 0) container.innerHTML = '<div style="font-size:9px; padding:4px; color:#888780;">No active layers to compile.</div>';
-            else {
-                layers.forEach(lyr => { container.innerHTML += `<div class="cluster-selection-row"><input type="checkbox" class="cluster-matrix-select-target" value="${lyr}" style="accent-color:#003366;"><span>${lyr} (${categoryMap[lyr].length})</span></div>`; });
+            
+            if(layers.length === 0) {
+                container.innerHTML = '<div style="font-size:9px; padding:4px; color:#888780;">No active layers to compile.</div>';
+            } else {
+                layers.forEach(lyr => {
+                    container.innerHTML += `
+                        <div class="cluster-selection-row">
+                            <input type="checkbox" class="cluster-matrix-select-target" value="${lyr}" style="accent-color:#003366;">
+                            <span>${lyr} (${categoryMap[lyr].length})</span>
+                        </div>
+                    `;
+                });
             }
             document.getElementById('cluster-modal-overlay').classList.add('active');
         };
 
-        window.closeClusterModalWindow = function() { document.getElementById('cluster-modal-overlay').classList.remove('active'); document.getElementById('new-cluster-name-input').value = ''; };
-        window.commitStructuralLayerCluster = function() {
-            const titleInput = document.getElementById('new-cluster-name-input').value.trim(); if (!titleInput) return;
-            const selectedCheckboxes = document.querySelectorAll('.cluster-matrix-select-target:checked');
-            const layerKeys = Array.from(selectedCheckboxes).map(cb => cb.value); if (layerKeys.length === 0) return;
-            clusters[titleInput] = layerKeys; closeClusterModalWindow(); rebuildSidebarControlLayout();
+        window.closeClusterModalWindow = function() {
+            document.getElementById('cluster-modal-overlay').classList.remove('active');
+            document.getElementById('new-cluster-name-input').value = '';
         };
 
-        window.destroyClusterGroupReference = function(clusterId) { delete clusters[clusterId]; rebuildSidebarControlLayout(); };
+        window.commitStructuralLayerCluster = function() {
+            const titleInput = document.getElementById('new-cluster-name-input').value.trim();
+            if (!titleInput) { alert('Cluster designation namespace required.'); return; }
+            
+            const selectedCheckboxes = document.querySelectorAll('.cluster-matrix-select-target:checked');
+            const layerKeys = Array.from(selectedCheckboxes).map(cb => cb.value);
+            
+            if (layerKeys.length === 0) { alert('Select at least 1 layer entry.'); return; }
+            
+            clusters[titleInput] = layerKeys;
+            closeClusterModalWindow();
+            rebuildSidebarControlLayout();
+        };
+
+        window.destroyClusterGroupReference = function(clusterId) {
+            delete clusters[clusterId];
+            rebuildSidebarControlLayout();
+        };
+
         window.toggleClusterGroupVisibility = function(clusterId, currentlyVisible) {
             const targetedLayers = clusters[clusterId] || [];
-            pts.forEach(p => { if (targetedLayers.includes(p.type)) p.visible = !currentlyVisible; });
-            compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
+            pts.forEach(p => {
+                if (targetedLayers.includes(p.type)) p.visible = !currentlyVisible;
+            });
+            compileLayersAndRenderPoints();
+            rebuildSidebarControlLayout();
         };
 
         window.batchStyleGroupCluster = function(clusterId, property, value) {
             const targetedLayers = clusters[clusterId] || [];
-            targetedLayers.forEach(layerKey => { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; });
-            compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
+            targetedLayers.forEach(layerKey => {
+                if (!layerMeta[layerKey]) layerMeta[layerKey] = {};
+                layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value;
+            });
+            compileLayersAndRenderPoints();
+            rebuildSidebarControlLayout();
         };
 
         window.patchGlobalMarkerStyle = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].style = v); compileLayersAndRenderPoints(); };
@@ -635,46 +813,175 @@ leaflet_template = """
         window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
 
         function rebuildSidebarControlLayout() {
-            const listBox = document.getElementById('results-list-box'); document.getElementById('results-count').innerText = pts.length;
+            const listBox = document.getElementById('results-list-box');
+            document.getElementById('results-count').innerText = pts.length;
             if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:9px; padding:12px; color:#888780;'>No items mapped.</div>"; return; }
+
             let htmlPayload = '';
             const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
             const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
 
             Object.keys(clusters).forEach(clusterName => {
-                const assignedLayers = clusters[clusterName] || []; let aggregatedCount = 0; let groupIsVisible = false;
-                assignedLayers.forEach(lKey => { if (categoryMap[lKey]) { aggregatedCount += categoryMap[lKey].length; if (categoryMap[lKey].some(p => p.visible !== false)) groupIsVisible = true; } });
-                htmlPayload += `<div class="group-cluster-block" id="cluster-block-${clusterName}"><div class="group-cluster-header"><div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')"><span style="color:#C9AB4C;">⚡</span><span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span></div><div style="display:flex; align-items:center; gap:2px;"><a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a><span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span></div></div><div class="config-block-wrapper" style="background: #e2e8f0; border-bottom: 1px solid rgba(0,51,102,0.15);"><div class="config-headline" style="font-size:7.5px; opacity:0.8;">Batch Group Style Controller</div><div class="config-flex-row"><select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)"><option value="dots">Dots</option><option value="pin">Pin</option><option value="modern-pin">Modern Pin</option></select><input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)"><input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)"></div></div><div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 8px; background: rgba(0,0,0,0.02);">`;
-                assignedLayers.forEach(catName => { if(!categoryMap[catName]) return; const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 }; const layerPts = categoryMap[catName] || []; const isLayerVisible = layerPts.some(p => p.visible !== false); htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg); });
+                const assignedLayers = clusters[clusterName] || [];
+                let aggregatedCount = 0;
+                let groupIsVisible = false;
+
+                assignedLayers.forEach(lKey => {
+                    if (categoryMap[lKey]) {
+                        aggregatedCount += categoryMap[lKey].length;
+                        if (categoryMap[lKey].some(p => p.visible !== false)) groupIsVisible = true;
+                    }
+                });
+
+                htmlPayload += `
+                    <div class="group-cluster-block" id="cluster-block-${clusterName}">
+                        <div class="group-cluster-header">
+                            <div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')">
+                                <span style="color:#C9AB4C;">⚡</span>
+                                <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:2px;">
+                                <a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a>
+                                <a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a>
+                                <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span>
+                            </div>
+                        </div>
+                        
+                        <div class="config-block-wrapper" style="background: #e2e8f0; border-bottom: 1px solid rgba(0,51,102,0.15);">
+                            <div class="config-headline" style="font-size:7.5px; opacity:0.8;">Batch Group Style Controller</div>
+                            <div class="config-flex-row">
+                                <select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)">
+                                    <option value="dots">Dots</option>
+                                    <option value="pin">Pin</option>
+                                    <option value="modern-pin">Modern Pin</option>
+                                </select>
+                                <input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)">
+                                <input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)">
+                            </div>
+                        </div>
+
+                        <div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 8px; background: rgba(0,0,0,0.02);">
+                `;
+
+                assignedLayers.forEach(catName => {
+                    if(!categoryMap[catName]) return;
+                    const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
+                    const layerPts = categoryMap[catName] || [];
+                    const isLayerVisible = layerPts.some(p => p.visible !== false);
+
+                    htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
+                });
+
                 htmlPayload += '</div></div>';
             });
 
             Object.keys(categoryMap).forEach(catName => {
-                let insideClusterGroup = false; Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; }); if (insideClusterGroup) return;
-                const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 }; const layerPts = categoryMap[catName] || []; const isLayerVisible = layerPts.some(p => p.visible !== false);
-                htmlPayload += `<div class="layer-category-block" id="cat-block-${catName}">`; htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg); htmlPayload += '</div>';
+                let insideClusterGroup = false;
+                Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; });
+                if (insideClusterGroup) return;
+
+                const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 };
+                const layerPts = categoryMap[catName] || [];
+                const isLayerVisible = layerPts.some(p => p.visible !== false);
+
+                htmlPayload += `
+                    <div class="layer-category-block" id="cat-block-${catName}">
+                `;
+                htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg);
+                htmlPayload += '</div>';
             });
+
             listBox.innerHTML = htmlPayload;
         }
 
         function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg) {
-            let chunk = `<div class="layer-category-header"><div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')"><span class="color-dot" style="background-color: ${meta.color};"></span><span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span></div><div style="display:flex; align-items:center; gap:1px;"><a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a><a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a><span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">▼</span></div></div><div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);"><div class="config-flex-row"><select onchange="triggerLayerUpdate('${catName}', 'style', this.value)"><option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option><option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option><option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option></select><input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)"><input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();"></div></div><div class="layer-category-items collapsed" id="items-${catName}">`;
-            layerPts.forEach(p => { const itemVisible = p.visible !== false; chunk += `<div class="results-item" id="res-item-${p.uid}" style="${itemVisible ? '' : 'opacity:0.4;'}"><div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">${p.name || 'Unknown'}</div><div style="display:flex; align-items:center; gap:1px;"><a class="action-icon-trigger" onclick="promptRenamePoi(${p.uid}, '${p.name}')">${editSvg}</a><a class="action-icon-trigger" onclick="togglePoiVisibility(${p.uid})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" onclick="removePoiInstance(${p.uid}, '${catName}')">${trashSvg}</a></div></div>`; });
-            chunk += '</div>'; return chunk;
+            let chunk = `
+                <div class="layer-category-header">
+                    <div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')">
+                        <span class="color-dot" style="background-color: ${meta.color};"></span>
+                        <span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:1px;">
+                        <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
+                        <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
+                        <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
+                        <span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">▼</span>
+                    </div>
+                </div>
+                <div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);">
+                    <div class="config-flex-row">
+                        <select onchange="triggerLayerUpdate('${catName}', 'style', this.value)">
+                            <option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option>
+                            <option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option>
+                            <option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option>
+                        </select>
+                        <input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)">
+                        <input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();">
+                    </div>
+                </div>
+                <div class="layer-category-items collapsed" id="items-${catName}">
+            `;
+            layerPts.forEach(p => {
+                const itemVisible = p.visible !== false;
+                chunk += `
+                <div class="results-item" id="res-item-${p.uid}" style="${itemVisible ? '' : 'opacity:0.4;'}">
+                    <div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">
+                        ${p.name || 'Unknown'}
+                    </div>
+                    <div style="display:flex; align-items:center; gap:1px;">
+                        <a class="action-icon-trigger" onclick="promptRenamePoi(${p.uid}, '${p.name}')">${editSvg}</a>
+                        <a class="action-icon-trigger" onclick="togglePoiVisibility(${p.uid})">${eyeSvg}</a>
+                        <a class="action-icon-trigger delete-btn" onclick="removePoiInstance(${p.uid}, '${catName}')">${trashSvg}</a>
+                    </div>
+                </div>`;
+            });
+            chunk += '</div>';
+            return chunk;
         }
 
-        window.toggleAccordionCollapse = function(catKey) { const panel = document.getElementById('items-' + catKey); const chev = document.getElementById('chevron-' + catKey); if(panel) { panel.classList.toggle('collapsed'); chev.innerText = panel.classList.contains('collapsed') ? '▼' : '▲'; } };
+        window.toggleAccordionCollapse = function(catKey) {
+            const panel = document.getElementById('items-' + catKey); const chev = document.getElementById('chevron-' + catKey);
+            if(panel) { panel.classList.toggle('collapsed'); chev.innerText = panel.classList.contains('collapsed') ? '▼' : '▲'; }
+        };
+
         window.togglePoiVisibility = function(uid) { const p = pts.find(item => item.uid === uid); if (p) { p.visible = (p.visible === false); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
         window.promptRenamePoi = function(uid, oldName) { const newName = prompt("Rename asset description Name:", oldName); if (newName && newName.trim() !== "") { const p = pts.find(item => item.uid === uid); if (p) { p.name = newName; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } } };
         window.removePoiInstance = function(uid, catKey) { pts = pts.filter(item => item.uid !== uid); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) { pts.forEach(p => { if (p.type === catKey) p.visible = !currentlyVisible; }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
-        window.promptRenameLayer = function(oldKey) { const newKey = prompt("Rename layer designation path description:", oldKey); if (newKey && newKey.trim() !== "" && newKey !== oldKey) { pts.forEach(p => { if (p.type === oldKey) p.type = newKey; }); if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; } Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].map(item => item === oldKey ? newKey : item); }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
-        window.triggerLayerDeletion = function(catKey) { if (confirm(`Remove entire layer cluster: "${catKey}"?`)) { pts = pts.filter(p => p.type !== catKey); delete layerMeta[catKey]; Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].filter(item => item !== catKey); }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
+
+        window.promptRenameLayer = function(oldKey) {
+            const newKey = prompt("Rename layer designation path description:", oldKey);
+            if (newKey && newKey.trim() !== "" && newKey !== oldKey) {
+                pts.forEach(p => { if (p.type === oldKey) p.type = newKey; });
+                if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; }
+                
+                Object.keys(clusters).forEach(cName => {
+                    clusters[cName] = clusters[cName].map(item => item === oldKey ? newKey : item);
+                });
+                compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
+            }
+        };
+
+        window.triggerLayerDeletion = function(catKey) {
+            if (confirm(`Remove entire layer cluster: "${catKey}"?`)) { 
+                pts = pts.filter(p => p.type !== catKey); 
+                delete layerMeta[catKey]; 
+                Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].filter(item => item !== catKey); });
+                compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); 
+            }
+        };
 
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const menuHtml = `<div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;"><div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div></div>`;
+            const menuHtml = `
+                <div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;">
+                    <div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div>
+                    <div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div>
+                </div>
+            `;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
 
@@ -700,7 +1007,6 @@ leaflet_html = (leaflet_template
                 .replace("__TARGET_CONFIG_JSON__", target_config_json)
                 .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
                 .replace("__LAYER_META_JSON__", layer_meta_json)
-                .replace("__GEOJSON__", geojson_str)
-                .replace("__BOUNDARY_GEOJSON__", "{}"))
+                .replace("__GEOJSON__", geojson_str))
 
 st.components.v1.html(leaflet_html, height=850, scrolling=False)
