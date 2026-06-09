@@ -589,7 +589,7 @@ if 'query_cache' not in st.session_state: st.session_state.query_cache = {}
 if 'target_config' not in st.session_state: st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
 if 'radius_config' not in st.session_state: st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
 if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "modern-pin"
-if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 18
+if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 16
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
 # Boundary state
