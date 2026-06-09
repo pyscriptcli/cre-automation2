@@ -879,6 +879,10 @@ with st.sidebar:
         hide_boundaries_trigger = st.button("HIDE BOUNDARIES", type="primary", use_container_width=True, key="hide_boundaries_btn")
     
     if show_boundaries_trigger:
+        add_api_log("🔍 DEBUG: SHOW_BOUNDARIES button was clicked!", "INFO")
+        add_api_log(f"🔍 DEBUG: boundary_levels = {st.session_state.boundary_levels}", "INFO")
+        add_api_log(f"🔍 DEBUG: current_location_info = {st.session_state.current_location_info}", "INFO")
+        
         log_event("USER_ACTION", "SHOW_BOUNDARIES_CLICKED", {
             "boundary_levels": st.session_state.boundary_levels,
             "has_location": st.session_state.current_location_info is not None,
@@ -888,6 +892,7 @@ with st.sidebar:
         
         # Fetch boundaries immediately if location is available
         if st.session_state.current_location_info:
+            add_api_log("🔍 DEBUG: Location available, starting boundary fetch...", "INFO")
             log_event("BOUNDARY", "BOUNDARY_FETCH_STARTED", {
                 "boundary_levels": st.session_state.boundary_levels,
                 "location": st.session_state.current_location_info
@@ -902,25 +907,34 @@ with st.sidebar:
                 "City/Municipality": ("city", "7", loc.get('city', ''))
             }
             
+            add_api_log(f"🔍 DEBUG: level_mapping created with region='{loc.get('region', '')}', province='{loc.get('province', '')}', city='{loc.get('city', '')}'", "INFO")
+            
             for level_name in st.session_state.boundary_levels:
+                add_api_log(f"🔍 DEBUG: Processing level: {level_name}", "INFO")
                 if level_name in level_mapping:
                     key, admin_level, area_name = level_mapping[level_name]
-                    # DEBUG: Log what we're about to fetch
-                    add_api_log(f"🔍 DEBUG: level_name={level_name}, area_name='{area_name}', admin_level={admin_level}", "INFO")
+                    add_api_log(f"🔍 DEBUG: level_name={level_name}, key={key}, admin_level={admin_level}, area_name='{area_name}'", "INFO")
                     
                     if area_name and area_name != 'Unknown':
-                        add_api_log(f"Fetching {level_name} boundary for: {area_name}", "INFO")
+                        add_api_log(f"🔍 DEBUG: Fetching {level_name} boundary for: {area_name} at admin_level {admin_level}", "INFO")
                         geojson = get_boundary_geojson(area_name, admin_level)
+                        add_api_log(f"🔍 DEBUG: get_boundary_geojson returned: {geojson is not None}", "INFO")
                         if geojson:
                             boundary_geojson_data[key] = geojson
-                            add_api_log(f"✅ Loaded {level_name} boundary", "INFO")
+                            feature_count = len(geojson.get('features', []))
+                            add_api_log(f"✅ Loaded {level_name} boundary with {feature_count} features", "INFO")
                         else:
-                            add_api_log(f"❌ Failed to load {level_name} boundary", "ERROR")
+                            add_api_log(f"❌ Failed to load {level_name} boundary for {area_name}", "ERROR")
                     else:
                         add_api_log(f"⚠️ Skipping {level_name} - area_name is '{area_name}'", "WARNING")
+                else:
+                    add_api_log(f"⚠️ Level {level_name} not found in level_mapping", "WARNING")
             
             st.session_state.boundary_geojson_data = boundary_geojson_data
+            add_api_log(f"🔍 DEBUG: Final boundary_geojson_data keys: {list(boundary_geojson_data.keys())}", "INFO")
             log_event("STATE_CHANGE", "BOUNDARY_DATA_UPDATED", {"keys": list(boundary_geojson_data.keys())})
+        else:
+            add_api_log("🔍 DEBUG: No location info available, cannot fetch boundaries", "WARNING")
         
         st.rerun()
     
