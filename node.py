@@ -23,30 +23,31 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* Force color input fields to upper case formatting array layout profiles */
+    /* Force color input fields to uppercase formatting layout profiles */
         [data-testid="stColorPicker"] div[data-baseweb="select"] {
             text-transform: uppercase !important;
         }
 
-        /* HARD OVERRIDE: Hide the RGB conversion option toggle menu dropdown arrow box completely */
+        /* HARD OVERRIDE: Remove the RGB format switcher dropdown matrix completely from document flow */
         div[data-baseweb="color-picker-popover"] div[data-baseweb="select"] {
             display: none !important;
         }
 
-        /* HARD OVERRIDE: Strip out the multi-field container that holds the partitioned R, G, B inputs */
-        div[data-baseweb="color-picker-popover"] div:has(> input) + div {
+        /* HARD OVERRIDE: Locate the grid section split holding individual R, G, B inputs and force hide it */
+        div[data-baseweb="color-picker-popover"] > div > div + div {
             display: none !important;
         }
 
-        /* HARD OVERRIDE: target and force the formatting text element row blocks out of document flow */
+        /* HARD OVERRIDE: Hide lowercase format strings, labels, and helper spans */
         div[data-baseweb="color-picker-popover"] label, 
         div[data-baseweb="color-picker-popover"] span {
             display: none !important;
         }
 
-        /* Sanatize and center expand the single remaining HEX input box to match panel alignment matrix width boundaries */
+        /* Re-engineer and center expand the single remaining HEX field to fill out panel width constraints cleanly */
         div[data-baseweb="color-picker-popover"] input[type="text"] {
             width: 100% !important;
+            min-width: 100% !important;
             text-transform: uppercase !important;
             font-family: 'Montserrat', sans-serif !important;
             font-weight: 700 !important;
