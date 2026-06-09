@@ -21,10 +21,10 @@ if not os.path.exists(_config_file):
 # GITHUB POI DATA LOADER (USE THIS INSTEAD OF OVERPASS)
 # -----------------------------------------------------------------------------
 GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
+GITHUB_BOUNDARY_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/boundaries"
 
-# Province bounding boxes for reverse geocoding (COMPLETE - Luzon, Visayas, Mindanao)
+# Province bounding boxes for reverse geocoding (to determine which province file to load)
 PROVINCE_BOUNDS = {
-    # === LUZON ===
     "metro_manila": [120.90, 14.40, 121.10, 14.80],
     "cavite": [120.60, 14.10, 121.00, 14.50],
     "laguna": [121.00, 14.00, 121.60, 14.50],
@@ -39,8 +39,8 @@ PROVINCE_BOUNDS = {
     "la_union": [120.20, 16.40, 120.80, 17.00],
     "ilocos_norte": [120.30, 17.80, 121.00, 18.70],
     "ilocos_sur": [120.20, 16.90, 120.80, 17.80],
-    # === VISAYAS ===
-    "cebu": [123.00, 9.40, 124.20, 11.20],
+    # Visayas
+    "cebu": [123.50, 9.50, 124.20, 11.00],
     "leyte": [124.30, 9.80, 125.60, 11.50],
     "bohol": [123.70, 9.50, 124.60, 10.10],
     "negros_oriental": [122.80, 9.00, 123.50, 10.50],
@@ -48,7 +48,7 @@ PROVINCE_BOUNDS = {
     "samar": [124.80, 11.00, 125.80, 12.50],
     "biliran": [124.30, 11.40, 124.60, 11.70],
     "siquijor": [123.40, 9.10, 123.70, 9.30],
-    # === MINDANAO ===
+    # Mindanao
     "davao_city": [125.40, 6.90, 125.70, 7.40],
     "davao_del_sur": [125.00, 6.00, 125.80, 7.00],
     "davao_oriental": [126.00, 6.50, 126.80, 7.80],
@@ -407,8 +407,46 @@ def filter_pois_by_tags(pois, selected_tags):
     return filtered
 
 # -----------------------------------------------------------------------------
-# BOUNDARY FUNCTIONS (Overpass API only - NOT for POIs)
+# BOUNDARY FUNCTIONS (Primary: GitHub, Fallback: Overpass API)
 # -----------------------------------------------------------------------------
+def load_github_boundary(area_name, boundary_type):
+    """
+    Load boundary GeoJSON from GitHub repository.
+    boundary_type: 'regions', 'provinces', 'cities'
+    """
+    # Map boundary type to filename
+    filename_map = {
+        "region": "regions.geojson",
+        "province": "provinces.geojson",
+        "city": "cities.geojson"
+    }
+    
+    filename = filename_map.get(boundary_type)
+    if not filename:
+        return None
+    
+    url = f"{GITHUB_BOUNDARY_BASE}/{filename}"
+    try:
+        response = requests.get(url, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            # Filter features for the specific area name
+            if area_name:
+                filtered_features = []
+                for feature in data.get('features', []):
+                    props = feature.get('properties', {})
+                    feature_name = props.get('name', '')
+                    if feature_name.lower() == area_name.lower():
+                        filtered_features.append(feature)
+                
+                if filtered_features:
+                    return {"type": "FeatureCollection", "features": filtered_features}
+            return data
+        return None
+    except Exception as e:
+        add_api_log(f"GitHub boundary error for {area_name}: {str(e)[:100]}", "WARNING")
+        return None
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def reverse_geocode_location(lat, lon):
     """Get administrative hierarchy from coordinates"""
@@ -436,10 +474,35 @@ def reverse_geocode_location(lat, lon):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_boundary_geojson(area_name, admin_level):
-    """Fetch boundary GeoJSON from Overpass API"""
+    """
+    Fetch boundary GeoJSON.
+    Primary: Load from GitHub repository.
+    Fallback: Overpass API if GitHub file not found or area not matched.
+    """
     if not area_name or area_name == '':
         return None
-        
+    
+    # Map admin_level to boundary type
+    boundary_type_map = {
+        "4": "region",
+        "5": "province",
+        "6": "city",
+        "7": "city",
+        "8": "barangay",
+        "9": "barangay"
+    }
+    
+    boundary_type = boundary_type_map.get(str(admin_level), "province")
+    
+    # Try GitHub first
+    github_data = load_github_boundary(area_name, boundary_type)
+    if github_data and github_data.get('features') and len(github_data['features']) > 0:
+        add_api_log(f"Loaded {area_name} boundary from GitHub", "INFO")
+        return github_data
+    
+    # Fallback to Overpass API
+    add_api_log(f"GitHub boundary not found for {area_name}, falling back to Overpass API", "WARNING")
+    
     query = f"""
     [out:json][timeout:30];
     (
@@ -480,6 +543,7 @@ def get_boundary_geojson(area_name, admin_level):
                         })
             
             if features:
+                add_api_log(f"Loaded {area_name} boundary from Overpass API", "INFO")
                 return {"type": "FeatureCollection", "features": features}
         return None
     except Exception as e:
