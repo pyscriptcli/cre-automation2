@@ -49,8 +49,7 @@ st.markdown("""
             color: var(--brand-midnight) !important;
             border-right: 1px solid rgba(0, 51, 102, 0.08) !important;
             width: 280px !important;
-            min-width: 280px !important;
-            max-width: 280px !important;
+            min-width: 280px !important;max-width: 280px !important;
             transform: none !important;
             visibility: visible !important;
             overflow: hidden !important;
@@ -106,20 +105,20 @@ st.markdown("""
         div[data-baseweb="color-picker-popover"] input[type="number"] { display: none !important; }
         div[data-baseweb="color-picker-popover"] input[type="text"] { width: 100% !important; text-transform: uppercase !important; font-family: 'Montserrat', sans-serif !important; font-weight: 700 !important; font-size: 11px !important; text-align: center !important; color: var(--brand-midnight) !important; }
         
-        /* Map-Bounded Center-Aligned UI Loading Block Layout CSS */
+        /* Map-Bounded Bounded Loading Canvas Overrides CSS */
         .map-loading-wrapper {
             display: flex; align-items: center; justify-content: center;
             width: 100%; height: 850px; background: #fafafa; border: 1px dashed rgba(0, 51, 102, 0.15);
         }
         .py-loading-container {
-            width: 360px; background: #ffffff; padding: 28px; border-radius: 4px;
+            width: 340px; background: #ffffff; padding: 24px; border-radius: 4px;
             border: 1px solid rgba(0, 51, 102, 0.15); box-shadow: 0 10px 30px rgba(0, 51, 102, 0.12);
             text-align: center; font-family: 'Montserrat', sans-serif;
         }
         .py-spinner {
-            width: 44px; height: 44px; border: 4px solid rgba(0, 51, 102, 0.1);
+            width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1);
             border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
-            margin: 0 auto 18px auto;
+            margin: 0 auto 16px auto;
         }
         .py-loading-title { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
         .py-loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; }
@@ -130,18 +129,6 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 # GLOBAL HELPER DEFINITIONS & PERSISTENCE INITIALIZATION
 # -----------------------------------------------------------------------------
-def compile_features_kml(features):
-    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
-    for f in features:
-        if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
-        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
-        kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
-    return kml + '</Document></kml>'
-
-DEFAULT_COORDS = "14.5995, 120.9842"
-DEFAULT_RADIUS = 1000
-
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
@@ -173,16 +160,20 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
-# -----------------------------------------------------------------------------
-# ADAPTIVE SPATIAL DEUPLICATOR MODULES & RETRY LAYERS
-# -----------------------------------------------------------------------------
-def build_overpass_query_string(lat, lon, radius, tags):
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass.openstreetmap.ru/api/interpreter",
+]
+
+def build_ql(lat, lon, radius, tags):
     statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
     return f"[out:json][timeout:90];(\n{statements}\n);out center;"
 
-def execute_mirror_failover_routing(ql, max_retries=2, timeout=90):
+def query_overpass_robust(ql, max_retries=2, timeout=90):
     for endpoint in OVERPASS_ENDPOINTS:
-        st.session_state.pipeline_logs.append(f"[MIRROR ROUTER] Contacting cluster node connection pointer: {endpoint}")
+        st.session_state.pipeline_logs.append(f"[MIRROR ROUTER] Routing via node mirror pointer connection: {endpoint}")
         for attempt in range(max_retries):
             try:
                 res = requests.post(endpoint, data={"data": ql}, headers={"User-Agent": "OpenNode/3.5"}, timeout=timeout)
@@ -190,37 +181,40 @@ def execute_mirror_failover_routing(ql, max_retries=2, timeout=90):
                     data = res.json()
                     if data.get("elements"): return data["elements"]
                 elif res.status_code == 429:
-                    st.session_state.pipeline_logs.append(f"[RATE LIMIT] Code 429 encountered. Executing backoff cooldown retry block.")
+                    st.session_state.pipeline_logs.append(f"[RATE COOLDOWN] Encountered 429 restriction. Executing backoff sequence.")
                     time.sleep(2 ** attempt)
                     continue
             except requests.exceptions.Timeout:
-                st.session_state.pipeline_logs.append(f"[TIMEOUT ENCOUNTERED] Endpoint target connection timed out. Decreasing latency window.")
+                st.session_state.pipeline_logs.append(f"[MIRROR TIMEOUT] Reducing mirror timeout response expectation.")
                 timeout = timeout * 0.7
                 continue
             except Exception as e:
-                st.session_state.pipeline_logs.append(f"[EXCEPTION ERROR] Connection breakdown: {str(e)}")
+                st.session_state.pipeline_logs.append(f"[MIRROR FAILURE] Core fault trace parameter mapping error: {str(e)}")
                 break
     return []
 
-def resolve_cached_elements_query(lat, lon, radius, tags, ql):
+def get_cache_key(lat, lon, radius, tags):
+    payload = f"{lat:.4f}_{lon:.4f}_{radius}_{sorted(tags)}"
+    return hashlib.md5(payload.encode()).hexdigest()
+
+def cached_query(lat, lon, radius, tags, ql):
     key = get_cache_key(lat, lon, radius, tags)
     if key in st.session_state.query_cache:
-        st.session_state.pipeline_logs.append("[MEMORY CACHE HIT] Instant load triggered. Match resolved in session storage memory array.")
+        st.session_state.pipeline_logs.append("[CACHE MATRIX] Extraction match successfully intercepted in memory cache database records.")
         return st.session_state.query_cache[key]
-    st.session_state.pipeline_logs.append("[MEMORY CACHE MISS] Forwarding extraction command thread straight to external geospatial database.")
-    results = execute_mirror_failover_routing(ql)
+    st.session_state.pipeline_logs.append("[CACHE MISS] Active record absent from local state maps. Querying remote mirrors.")
+    results = query_overpass_robust(ql)
     if results: st.session_state.query_cache[key] = results
     return results
 
-def adaptive_radius_query_matrix(lat, lon, radius, tags, max_chunk=2000):
-    if radius <= max_chunk: 
-        return resolve_cached_elements_query(lat, lon, radius, tags, build_overpass_query_string(lat, lon, radius, tags))
-    st.session_state.pipeline_logs.append(f"[PARTITION ENGINE] Radius limits exceed {max_chunk}m boundary limit thresholds. Splitting context into quadrant sub-queries.")
+def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
+    if radius <= max_chunk: return cached_query(lat, lon, radius, tags, build_ql(lat, lon, radius, tags))
+    st.session_state.pipeline_logs.append(f"[PARTITION ROUTINE] Scan radius limits exceed safe {max_chunk}m bounds. Deploying sub-quadrant partitions.")
     offset = radius / (2 * math.sqrt(2) * 111320)
     quadrants = [(lat + offset, lon + offset), (lat + offset, lon - offset), (lat - offset, lon + offset), (lat - offset, lon - offset)]
     all_results, seen_ids = [], set()
     for q_lat, q_lon in quadrants:
-        chunk_results = resolve_cached_elements_query(q_lat, q_lon, radius // 2, tags, build_overpass_query_string(q_lat, q_lon, radius // 2, tags))
+        chunk_results = cached_query(q_lat, q_lon, radius // 2, tags, build_ql(q_lat, q_lon, radius // 2, tags))
         for el in chunk_results:
             if el.get("id") not in seen_ids:
                 seen_ids.add(el["id"])
@@ -272,7 +266,7 @@ with st.sidebar:
         if not selected_tags: st.error("Select ≥ 1 layer.")
         else:
             st.session_state.scan_active_loading = True
-            st.session_state.pipeline_logs = ["[START INITIALIZATION] Initializing active pipeline geoprocessing sequence thread..."]
+            st.session_state.pipeline_logs = ["[START TIMELINE] Activating parallel multi-pass geoprocessing thread arrays."]
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -307,7 +301,7 @@ with st.sidebar:
                 except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# DASHBOARD CONTROLS, METRICS & FLOATING LIVE LOG CONSOLE PIPELINE
+# HORIZONTAL CONTROL BAR: TOP METRICS PANEL & FLUID POP-UP LOG WINDOWS
 # -----------------------------------------------------------------------------
 ctrl_bar_1, ctrl_bar_2 = st.columns([6, 2])
 
@@ -318,12 +312,11 @@ with ctrl_bar_1:
     else:
         st.markdown("<div style='height:2px;'></div>", unsafe_allow_html=True)
 
-# ASYNC EXTRACTION LOGS COMPONENT DECODER WINDOW POP-UP CAPABILITIES
 with ctrl_bar_2:
     with st.popover("📋 VIEW API CALL LOGS", use_container_width=True):
         st.markdown("<div style='font-size:10px; font-weight:700; color:#003366; margin-bottom:6px; border-bottom:1px solid #C9AB4C;'>ACTIVE PIPELINE LOG MONITOR</div>", unsafe_allow_html=True)
         if st.session_state.pipeline_logs:
-            log_box_content = "\\n".join(st.session_state.pipeline_logs)
+            log_box_content = "\n".join(st.session_state.pipeline_logs)
             st.text_area(label="Extraction Status Console", value=log_box_content, height=220, label_visibility="collapsed")
         else:
             st.caption("No log vectors found for this session.")
@@ -331,26 +324,26 @@ with ctrl_bar_2:
 main_canvas = st.empty()
 
 # -----------------------------------------------------------------------------
-# DUAL ENGINE EXTRACTION LIFECYCLE PIPELINE (Blocks on Server-Side Execution)
+# ASYNC SERVER-SIDE EXTRACTION FLOW HOOKS
 # -----------------------------------------------------------------------------
 if st.session_state.scan_active_loading:
     records = []
     success = False
     
-    # STRUCTURAL COMPONENT: Renders a map-bounded center-aligned loading box card context panel placeholder
+    # STRUCTURAL COMPONENT: Renders map-bounded loading panel card directly into the central container block
     main_canvas.markdown("""
         <div class="map-loading-wrapper">
             <div class="py-loading-container">
                 <div class="py-spinner"></div>
                 <div class="py-loading-title">Compiling Spatial Layers...</div>
-                <div class="py-loading-subtitle" id="py-stopwatch">Processing Request Thread...</div>
+                <div class="py-loading-subtitle">Processing Data Extraction Thread Matrix...</div>
             </div>
         </div>
     """, unsafe_allow_html=True)
     
-    # --- PASS 1: OSMnx High-Fidelity Vector Geometric Footprint Ingestion ---
-    start_engine_time = time.time()
-    st.session_state.pipeline_logs.append("[PASS 1] Initiating rich topology extraction sequence via internal OSMnx library context layers.")
+    # --- PASS 1: OSMnx High-Fidelity Data Extraction Array ---
+    start_time_token = time.time()
+    st.session_state.pipeline_logs.append("[PASS 1 INITIALIZATION] Commencing rich polygon shape extraction via internal OSMnx layer modules.")
     try:
         import osmnx as ox
         tags_dict = {}
@@ -368,7 +361,7 @@ if st.session_state.scan_active_loading:
                 name = row.get('name', 'Unknown')
                 if isinstance(name, float): name = 'Unknown'
                 
-                # HARD SANITIZATION LAYER FILTER: Suppress generic markers or nameless elements completely
+                # SANITIZATION FILTER SHIELD: Skip and exclude objects lacking clean descriptions
                 if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']: continue
                     
                 geom = row.geometry
@@ -396,14 +389,14 @@ if st.session_state.scan_active_loading:
             st.session_state.last_scan_lat = lat_coord
             st.session_state.last_scan_lon = lon_coord
             success = True
-            st.session_state.pipeline_logs.append(f"[PASS 1 SUCCESS] Extracted {len(records)} active structural features. Step finished in {time.time()-start_engine_time:.2f}s.")
+            st.session_state.pipeline_logs.append(f"[PASS 1 SUCCESS] Ingested {len(records)} active structural vector records in {time.time()-start_time_token:.2f}s.")
     except Exception as e:
-        st.session_state.pipeline_logs.append(f"[PASS 1 EXCEPTION] OSMnx routing layer generated an operational fault: {str(e)}")
+        st.session_state.pipeline_logs.append(f"[PASS 1 FAILURE] OSMnx engine execution faulted: {str(e)}")
 
-    # --- PASS 2: Multi-Mirror Overpass Fallback Array Matrix ---
+    # --- PASS 2: Adaptive, Cache-Backed Overpass Extraction Engine ---
     if not success:
-        st.session_state.pipeline_logs.append("[PASS 2] Entering Pass 2: Deploying Robust Quadrant-Partitioned Overpass Mirror array pipeline.")
-        elements = adaptive_radius_query_matrix(lat_coord, lon_coord, radius_val, selected_tags)
+        st.session_state.pipeline_logs.append("[PASS 2 FAILOVER] Pass 1 returned empty arrays. Deploying quadrant-partitioned Overpass query matrix.")
+        elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
         for el in elements:
             e_lat = el.get('lat') or el.get('center', {}).get('lat')
             e_lon = el.get('lon') or el.get('center', {}).get('lon')
@@ -411,7 +404,7 @@ if st.session_state.scan_active_loading:
                 tags = el.get('tags', {})
                 name = tags.get('name', 'Unknown')
                 
-                # HARD SANITIZATION LAYER FILTER: Synchronized nameless entity removal logic
+                # SANITIZATION FILTER SHIELD: Keep fallback layers fully clean of nameless elements
                 if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']: continue
                     
                 records.append({
@@ -424,16 +417,36 @@ if st.session_state.scan_active_loading:
             st.session_state.last_scan_lat = lat_coord
             st.session_state.last_scan_lon = lon_coord
             success = True
-            st.session_state.pipeline_logs.append(f"[PASS 2 SUCCESS] Robust failover engine compiled {len(records)} points successfully.")
+            st.session_state.pipeline_logs.append(f"[PASS 2 SUCCESS] Ingestion complete. Balanced data compilation array verified.")
         else:
-            st.session_state.pipeline_logs.append("[PIPELINE EXHAUSTED] All nodes and network mirror queries returned zero elements.")
+            st.session_state.pipeline_logs.append("[PIPELINE COMPLETE] Spatial lookup ended. No markers returned across database endpoints.")
 
     st.session_state.scan_active_loading = False
     st.rerun()
 
 # -----------------------------------------------------------------------------
-# 4. LEAFLET ASYNC CANVAS RENDERING ENGINE
+# 4. MAP FRAME RENDERING ENGINE & INTERACTION ARCHITECTURE
 # -----------------------------------------------------------------------------
+pts_active = st.session_state.scanned_records
+unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
+cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
+
+for idx, layer in enumerate(unique_layers):
+    if layer not in st.session_state.layer_meta:
+        st.session_state.layer_meta[layer] = {
+            "color": cat_palette[idx % len(cat_palette)],
+            "style": st.session_state.global_marker_style,
+            "size": st.session_state.global_marker_size
+        }
+
+layer_meta_json = json.dumps(st.session_state.layer_meta)
+target_config_json = json.dumps(st.session_state.target_config)
+radius_config_json = json.dumps(st.session_state.radius_config)
+geojson_str = json.dumps(pts_active)
+
+is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
+show_loading = "true" if st.session_state.scan_active_loading else "false"
+
 leaflet_template = """
 <!DOCTYPE html>
 <html>
@@ -446,7 +459,6 @@ leaflet_template = """
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map { height: 100vh; width: 100%; z-index: 1; }
         
-        /* Map Layer Loading Blocker HUD Box (Triggers asynchronously inside client browser tab) */
         #map-loading-overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 320px; background: #ffffff; z-index: 99999; 
@@ -520,7 +532,6 @@ leaflet_template = """
         const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
         let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
 
-        // Center-Aligned client browser tab asynchronous stopwatch handler
         if (__SHOW_LOADING__) {
             document.getElementById('map-loading-overlay').style.display = 'flex';
             let start = performance.now();
@@ -690,5 +701,3 @@ leaflet_template = """
 </body>
 </html>
 """
-
-st.components.v1.html(leaflet_html, height=850, scrolling=False)
