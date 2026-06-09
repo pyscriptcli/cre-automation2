@@ -92,28 +92,21 @@ st.markdown("""
         .stCheckbox label p { font-size: 10px !important; font-weight: 500 !important; color: var(--brand-midnight) !important; display: inline-block !important; margin: 0 !important; line-height: 1.2 !important; }
         div[data-baseweb="checkbox"] { align-self: center !important; }
         
-        div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
-            background-color: #003366 !important;
-            border-color: #003366 !important;
-        }
-        div[data-baseweb="checkbox"] input:checked + div, 
-        div[data-baseweb="checkbox"] div[aria-checked="true"],
-        div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] > div { 
-            background-color: #003366 !important; 
-            border-color: #003366 !important; 
-        }
+        div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] { background-color: #003366 !important; border-color: #003366 !important; }
+        div[data-baseweb="checkbox"] input:checked + div, div[data-baseweb="checkbox"] div[aria-checked="true"], div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] > div { background-color: #003366 !important; border-color: #003366 !important; }
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
 
-        /* Hex-Only Color Picker Formatter overrides */
+        /* ABSOLUTE STYLING PROTOCOL: Hard-Lock Color Picker to UpperCase HEX primitives only */
         [data-testid="stColorPicker"] div[data-baseweb="select"] { text-transform: uppercase !important; }
         div[data-baseweb="color-picker-popover"] div[data-baseweb="select"] { display: none !important; }
         div[data-baseweb="color-picker-popover"] div:has(> input) + div { display: none !important; }
         div[data-baseweb="color-picker-popover"] label, div[data-baseweb="color-picker-popover"] span { display: none !important; }
+        div[data-baseweb="color-picker-popover"] input[type="number"] { display: none !important; }
         div[data-baseweb="color-picker-popover"] input[type="text"] { width: 100% !important; text-transform: uppercase !important; font-family: 'Montserrat', sans-serif !important; font-weight: 700 !important; font-size: 11px !important; text-align: center !important; color: var(--brand-midnight) !important; }
         
-        /* Python-side Centered Loading Overlay Panel Styles */
+        /* Python Engine Core Centered Progress Stopwatch HUD Panel Overlay */
         .py-loading-container {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
             width: 340px; background: #ffffff; padding: 24px; border-radius: 4px;
@@ -132,6 +125,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
+# GLOBAL HELPER DEFINITIONS (Placed at top root scope to fully resolve NameErrors)
+# -----------------------------------------------------------------------------
+def compile_features_kml(features):
+    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
+    for f in features:
+        if not f.get('visible', True): continue
+        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
+        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
+    return kml + '</Document></kml>'
+
+# -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
@@ -148,12 +153,8 @@ if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_l
 if 'network_stats' not in st.session_state: st.session_state.network_stats = None
 if 'query_cache' not in st.session_state: st.session_state.query_cache = {}
 
-if 'target_config' not in st.session_state:
-    st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
-
-if 'radius_config' not in st.session_state:
-    st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
-
+if 'target_config' not in st.session_state: st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
+if 'radius_config' not in st.session_state: st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
 if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "dots"
 if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
@@ -171,35 +172,32 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
-# -----------------------------------------------------------------------------
-# ROBUST MIRROR BACKUP ROUTING ENGINE & ADAPTIVE QUADRANT PARTITIONING
-# -----------------------------------------------------------------------------
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass.openstreetmap.ru/api/interpreter",
+]
+
 def build_ql(lat, lon, radius, tags):
     statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
-    return f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
+    return f"[out:json][timeout:90];(\n{statements}\n);out center;"
 
 def query_overpass_robust(ql, max_retries=2, timeout=90):
     for endpoint in OVERPASS_ENDPOINTS:
         for attempt in range(max_retries):
             try:
-                res = requests.post(
-                    endpoint,
-                    data={"data": ql},
-                    headers={"User-Agent": "OpenNode/3.5"},
-                    timeout=timeout
-                )
+                res = requests.post(endpoint, data={"data": ql}, headers={"User-Agent": "OpenNode/3.5"}, timeout=timeout)
                 if res.status_code == 200:
                     data = res.json()
-                    if data.get("elements"):
-                        return data["elements"]
+                    if data.get("elements"): return data["elements"]
                 elif res.status_code == 429:
                     time.sleep(2 ** attempt)
                     continue
             except requests.exceptions.Timeout:
                 timeout = timeout * 0.7
                 continue
-            except Exception:
-                break
+            except Exception: break
     return []
 
 def get_cache_key(lat, lon, radius, tags):
@@ -208,43 +206,27 @@ def get_cache_key(lat, lon, radius, tags):
 
 def cached_query(lat, lon, radius, tags, ql):
     key = get_cache_key(lat, lon, radius, tags)
-    if key in st.session_state.query_cache:
-        return st.session_state.query_cache[key]
-    
+    if key in st.session_state.query_cache: return st.session_state.query_cache[key]
     results = query_overpass_robust(ql)
-    if results:
-        st.session_state.query_cache[key] = results
+    if results: st.session_state.query_cache[key] = results
     return results
 
 def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
-    if radius <= max_chunk:
-        return cached_query(lat, lon, radius, tags, build_ql(lat, lon, radius, tags))
-    
+    if radius <= max_chunk: return cached_query(lat, lon, radius, tags, build_ql(lat, lon, radius, tags))
     offset = radius / (2 * math.sqrt(2) * 111320)
-    quadrants = [
-        (lat + offset, lon + offset),
-        (lat + offset, lon - offset),
-        (lat - offset, lon + offset),
-        (lat - offset, lon - offset),
-    ]
-    
-    all_results = []
-    seen_ids = set()
-    
+    quadrants = [(lat + offset, lon + offset), (lat + offset, lon - offset), (lat - offset, lon + offset), (lat - offset, lon - offset)]
+    all_results, seen_ids = [], set()
     for q_lat, q_lon in quadrants:
         chunk_results = cached_query(q_lat, q_lon, radius // 2, tags, build_ql(q_lat, q_lon, radius // 2, tags))
         for el in chunk_results:
             if el.get("id") not in seen_ids:
                 seen_ids.add(el["id"])
                 all_results.append(el)
-                
     return all_results
 
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
-scan_mode = "Radius"
-
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
@@ -283,12 +265,8 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
-    # -------------------------------------------------------------------------
-    # MULTI-PASS COMPILATION FLOW TRIGGER
-    # -------------------------------------------------------------------------
     if scan_triggered:
-        if not selected_tags:
-            st.error("Select ≥ 1 layer.")
+        if not selected_tags: st.error("Select ≥ 1 layer.")
         else:
             st.session_state.scan_active_loading = True
             st.rerun()
@@ -305,15 +283,12 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
-
     col1, col2 = st.columns(2)
     visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
-    
     with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
     with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-
     with st.popover("IMPORT FILE", use_container_width=True):
         imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
         if imported_file is not None:
@@ -327,24 +302,16 @@ with st.sidebar:
                 except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
-# LIVE EXECUTION STOPWATCH MONITOR & DUAL-ENGINES LifeCycle Pipeline
+# PIPELINE STAGE PIPING CONTROLLER
 # -----------------------------------------------------------------------------
 main_canvas = st.empty()
 
 if st.session_state.scan_active_loading:
     records = []
     success = False
+    main_canvas.markdown(f'<div class="py-loading-container"><div class="py-spinner"></div><div class="py-loading-title">Compiling Spatial Layers...</div><div class="py-loading-subtitle">Processing Radius: {radius_val}m</div></div>', unsafe_allow_html=True)
     
-    # Render the synchronized python-side progress display while operations execute
-    main_canvas.markdown(f"""
-        <div class="py-loading-container">
-            <div class="py-spinner"></div>
-            <div class="py-loading-title">Compiling Spatial Layers...</div>
-            <div class="py-loading-subtitle">Processing Radius: {radius_val}m</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # --- PASS 1: OSMnx High-Fidelity Geometry Engine ---
+    # --- PASS 1: OSMnx Engine Ingestion ---
     try:
         import osmnx as ox
         tags_dict = {}
@@ -354,8 +321,7 @@ if st.session_state.scan_active_loading:
                 k, v = clean.split('=', 1)
                 if '|' in v: v = [x.strip() for x in v.split('|')]
                 tags_dict[k] = v
-            else:
-                tags_dict[clean] = True
+            else: tags_dict[clean] = True
                 
         gdf = ox.features_from_point((lat_coord, lon_coord), tags=tags_dict, dist=radius_val)
         if not gdf.empty:
@@ -363,9 +329,8 @@ if st.session_state.scan_active_loading:
                 name = row.get('name', 'Unknown')
                 if isinstance(name, float): name = 'Unknown'
                 
-                # SANITIZATION FILTER: Instantly drop nameless markers
-                if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']:
-                    continue
+                # SANITIZATION FILTER MATRIX: Instantly purge generic tags or empty properties
+                if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']: continue
                     
                 geom = row.geometry
                 c_lat = geom.centroid.y if hasattr(geom, 'centroid') else geom.y
@@ -377,9 +342,7 @@ if st.session_state.scan_active_loading:
                         matched_type = str(row[k])
                         break
                 records.append({
-                    "lat": c_lat, "lon": c_lon,
-                    "name": str(name), "type": matched_type,
-                    "source": "osmnx",
+                    "lat": c_lat, "lon": c_lon, "name": str(name), "type": matched_type, "source": "osmnx",
                     "has_footprint": geom.geom_type in ['Polygon', 'MultiPolygon'],
                     "footprint_geojson": geom.__geo_interface__ if geom.geom_type in ['Polygon', 'MultiPolygon'] else None,
                     "visible": True, "uid": len(records)
@@ -388,8 +351,7 @@ if st.session_state.scan_active_loading:
             try:
                 G = ox.graph_from_point((lat_coord, lon_coord), dist=radius_val, network_type='drive')
                 st.session_state.network_stats = ox.stats.basic_stats(G)
-            except Exception:
-                st.session_state.network_stats = None
+            except Exception: st.session_state.network_stats = None
 
             st.session_state.scanned_records = records
             st.session_state.last_scan_lat = lat_coord
@@ -397,7 +359,7 @@ if st.session_state.scan_active_loading:
             success = True
     except Exception: pass
 
-    # --- PASS 2: Adaptive, Cached Overpass Mirror Routing Framework ---
+    # --- PASS 2: Balanced Fallback Engine Overpass Loop ---
     if not success:
         elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
         for el in elements:
@@ -407,17 +369,13 @@ if st.session_state.scan_active_loading:
                 tags = el.get('tags', {})
                 name = tags.get('name', 'Unknown')
                 
-                # SANITIZATION FILTER: Instantly drop nameless fallback elements
-                if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']:
-                    continue
+                # SANITIZATION FILTER MATRIX: Clean duplicate parameters from fallback payload
+                if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']: continue
                     
                 records.append({
-                    "lat": e_lat, "lon": e_lon,
-                    "name": name,
+                    "lat": e_lat, "lon": e_lon, "name": name,
                     "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                    "source": "overpass",
-                    "has_footprint": False, "footprint_geojson": None,
-                    "visible": True, "uid": len(records)
+                    "source": "overpass", "has_footprint": False, "footprint_geojson": None, "visible": True, "uid": len(records)
                 })
         if records:
             st.session_state.scanned_records = records
@@ -448,16 +406,13 @@ target_config_json = json.dumps(st.session_state.target_config)
 radius_config_json = json.dumps(st.session_state.radius_config)
 geojson_str = json.dumps(pts_active)
 
+render_lat, render_lon = lat_coord, lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 
 if st.session_state.network_stats:
     s = st.session_state.network_stats
-    st.markdown(f"""
-    <div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>
-        📈 STREET GRAPH DESCRIPTOR METRICS — Intersection Count: <b>{s.get('n', 0)}</b> | Edge Count: <b>{s.get('m', 0)}</b> | Total Street Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Clean Intersections Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>📈 STREET GRAPH DESCRIPTOR METRICS — Intersection Count: <b>{s.get('n', 0)}</b> | Edge Count: <b>{s.get('m', 0)}</b> | Total Street Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Clean Intersections Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -470,7 +425,6 @@ leaflet_template = """
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map { height: 100vh; width: 100%; z-index: 1; }
-
         #map-loading-overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 320px; background: #ffffff; z-index: 99999; 
@@ -478,15 +432,10 @@ leaflet_template = """
             padding: 24px; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.15);
             box-shadow: 0 10px 25px rgba(0, 51, 102, 0.15); pointer-events: all;
         }
-        .loading-spinner {
-            width: 44px; height: 44px; border: 4px solid rgba(0, 51, 102, 0.1);
-            border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
-            margin-bottom: 16px;
-        }
+        .loading-spinner { width: 44px; height: 44px; border: 4px solid rgba(0, 51, 102, 0.1); border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
         .loading-text { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
         .elapsed-timer { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; letter-spacing: 0.5px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
         #scan-results-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); }
         .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; }
@@ -501,6 +450,7 @@ leaflet_template = """
         .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
         .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
         .action-icon-trigger:hover svg { fill: #003366; }
+        .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
         .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .hide-labels .poi-text-label { display: none !important; }
         .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
@@ -525,104 +475,25 @@ leaflet_template = """
             <div class="loading-text">Scanning Spatial Engine...</div>
             <div class="elapsed-timer" id="timer-output">Elapsed: 0.0s</div>
         </div>
-        
         <div id="map"></div>
-
         <div id="scan-results-panel">
-            <div class="results-header">
-                <span>WORKSPACE</span>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
-                    <span id="results-count" style="color:#C9AB4C;">0</span>
-                </div>
-            </div>
-
+            <div class="results-header"><span>WORKSPACE</span><div style="display: flex; align-items: center; gap: 8px;"><span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span><span id="results-count" style="color:#C9AB4C;">0</span></div></div>
             <div id="cluster-modal-overlay" class="cluster-popover-modal">
                 <div style="font-size: 9px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 8px;">CREATE LAYER CLUSTER GROUP</div>
-                <div style="margin-bottom: 8px;">
-                    <input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);">
-                </div>
+                <div style="margin-bottom: 8px;"><input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);"></div>
                 <div id="cluster-checkbox-target-mount" style="max-height: 140px; overflow-y: auto; margin-bottom: 8px;"></div>
-                <div style="display: flex; gap: 4px;">
-                    <button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button>
-                    <button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button>
-                </div>
+                <div style="display: flex; gap: 4px;"><button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button><button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button></div>
             </div>
-            
-            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
-                <div class="config-headline">Basemap Controller</div>
-                <div class="config-flex-row">
-                    <span>Tile Style:</span>
-                    <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
-                        <option value="osm">OpenStreetMap</option>
-                        <option value="satellite">Satellite View</option>
-                        <option value="carto">Carto Light</option>
-                    </select>
-                    <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
-                        <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
-                    </label>
-                </div>
-            </div>
-            
-            <div class="config-block-wrapper">
-                <div class="config-headline">Global Markers</div>
-                <div class="config-flex-row">
-                    <span>Style:</span>
-                    <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
-                        <option value="dots">Dots</option>
-                        <option value="pin">Pin Location</option>
-                        <option value="modern-pin">Modern Drop-Pin</option>
-                    </select>
-                    <span>Size:</span>
-                    <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
-                </div>
-                <div class="config-flex-row">
-                    <span>Color:</span>
-                    <input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)">
-                    <select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;">
-                        <option value="">Preset</option>
-                        <option value="#003366">Midnight</option>
-                        <option value="#C9AB4C">Gold</option>
-                        <option value="#AA2E20">Crimson</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="config-block-wrapper">
-                <div class="config-headline">Target Coordinates & Radius Layer</div>
-                <div class="config-flex-row">
-                    <span>Target:</span>
-                    <select onchange="patchTargetCenterConfig('style', this.value)">
-                        <option value="star">Star</option>
-                        <option value="circle">Dot</option>
-                    </select>
-                    <input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)">
-                    <input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)">
-                </div>
-                <div class="config-flex-row">
-                    <span>Radius Fill:</span>
-                    <input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)">
-                    <span>Opacity:</span>
-                    <input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
-                </div>
-                <div class="config-flex-row">
-                    <span>Thickness:</span>
-                    <input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)">
-                </div>
-            </div>
-            
+            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);"><div class="config-headline">Basemap Controller</div><div class="config-flex-row"><span>Tile Style:</span><select id="basemap-select" onchange="switchActiveBasemap(this.value)"><option value="osm">OpenStreetMap</option><option value="satellite">Satellite View</option><option value="carto">Carto Light</option></select><label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;"><input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels</label></div></div>
+            <div class="config-block-wrapper"><div class="config-headline">Global Markers</div><div class="config-flex-row"><span>Style:</span><select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)"><option value="dots">Dots</option><option value="pin">Pin Location</option><option value="modern-pin">Modern Drop-Pin</option></select><input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)"></div><div class="config-flex-row"><span>Color:</span><input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)"><select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;"><option value="">Preset</option><option value="#003366">Midnight</option><option value="#C9AB4C">Gold</option><option value="#AA2E20">Crimson</option></select></div></div>
+            <div class="config-block-wrapper"><div class="config-headline">Target Coordinates & Radius Layer</div><div class="config-flex-row"><span>Target:</span><select onchange="patchTargetCenterConfig('style', this.value)"><option value="star">Star</option><option value="circle">Dot</option></select><input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)"><input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)"></div><div class="config-flex-row"><span>Radius Fill:</span><input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)"><span>Opacity:</span><input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)"></div><div class="config-flex-row"><span>Thickness:</span><input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)"></div></div>
             <div class="results-list" id="results-list-box"></div>
         </div>
     </div>
 
     <script>
         const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
-
-        let layerMeta = __LAYER_META_JSON__;
-        let targetConfig = __TARGET_CONFIG_JSON__;
-        let radiusConfig = __RADIUS_CONFIG_JSON__;
-        let pts = __GEOJSON__;
-        let clusters = {}; 
+        let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
 
         if (__SHOW_LOADING__) {
             document.getElementById('map-loading-overlay').style.display = 'flex';
@@ -658,20 +529,14 @@ leaflet_template = """
         let radiusCircle = null;
         function renderRadiusCircleBounds() {
             if (radiusCircle) map.removeLayer(radiusCircle);
-            radiusCircle = L.circle([__LAT__, __LON__], {
-                radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight),
-                fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity)
-            }).addTo(map);
+            radiusCircle = L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight), fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity) }).addTo(map);
         }
 
         let centerMarker = null;
         function renderTargetCenterIcon() {
             if (centerMarker) map.removeLayer(centerMarker);
             const d = targetConfig.size; const c = targetConfig.color;
-            const htmlElement = targetConfig.style === "star" 
-                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);">★</div>`
-                : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);"></div>`;
-            
+            const htmlElement = targetConfig.style === "star" ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);">★</div>` : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);"></div>`;
             centerMarker = L.marker([__LAT__, __LON__], { icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 }).addTo(map);
         }
 
@@ -681,7 +546,7 @@ leaflet_template = """
                 return L.divIcon({ html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] });
             } else if (styleMode === "modern-pin") {
                 const w = d * 1.5; const h = d * 2.5; const r = d * 0.45; 
-                const customSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}"><defs><radialGradient id="groundShadow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#000000" stop-opacity="1.0"/><stop offset="100%" stop-color="#000000" stop-opacity="0"/></radialGradient><radialGradient id="sphereGloss-${color.replace('#','')}" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="45%" stop-color="${color}"/><stop offset="100%" stop-color="${color}" stop-opacity="0.75"/></radialGradient></defs><ellipse cx="20" cy="44" rx="12" ry="3.5" fill="url(#groundShadow)" /><path d="M20 20 L20 44" stroke="#222222" stroke-width="2.5" stroke-linecap="round"/><path d="M20 20 L20 44" stroke="#888888" stroke-width="0.8" stroke-linecap="round"/><circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})"/></svg>`;
+                const customSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}"><defs><radialGradient id="groundShadow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#000000" stop-opacity="1.0"/><stop offset="100%" stop-color="#000000" stop-opacity="0"/></radialGradient><radialGradient id="sphereGloss-${color.replace('#','')}" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="50%" stop-color="${color}"/><stop offset="100%" stop-color="${color}" stop-opacity="0.75"/></radialGradient></defs><ellipse cx="20" cy="44" rx="12" ry="3.5" fill="url(#groundShadow)" /><path d="M20 20 L20 44" stroke="#222222" stroke-width="2.5" stroke-linecap="round"/><path d="M20 20 L20 44" stroke="#888888" stroke-width="0.8" stroke-linecap="round"/><circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})"/></svg>`;
                 return L.divIcon({ html: `<div style="transform: translate(-50%, -92%); width: ${w}px; height: ${h}px;">${customSvg}</div>`, className: '', iconSize: [w, h], iconAnchor: [0, 0] });
             }
             return L.divIcon({ html: `<div style="background-color: ${color}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, className: '', iconSize: [d, d], iconAnchor: [d/2, d/2] });
@@ -715,9 +580,7 @@ leaflet_template = """
             const container = document.getElementById('cluster-checkbox-target-mount'); container.innerHTML = '';
             const layers = Object.keys(categoryMap);
             if(layers.length === 0) container.innerHTML = '<div style="font-size:9px; padding:4px; color:#888780;">No active layers to compile.</div>';
-            else {
-                layers.forEach(lyr => { container.innerHTML += `<div class="cluster-selection-row"><input type="checkbox" class="cluster-matrix-select-target" value="${lyr}" style="accent-color:#003366;"><span>${lyr} (${categoryMap[lyr].length})</span></div>`; });
-            }
+            else { layers.forEach(lyr => { container.innerHTML += `<div class="cluster-selection-row"><input type="checkbox" class="cluster-matrix-select-target" value="${lyr}" style="accent-color:#003366;"><span>${lyr} (${categoryMap[lyr].length})</span></div>`; }); }
             document.getElementById('cluster-modal-overlay').classList.add('active');
         };
 
@@ -794,15 +657,16 @@ leaflet_template = """
         });
 
         renderTargetCenterIcon(); renderRadiusCircleBounds(); compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
-
         if (pts.length > 0 && !__IS_STALE__) {
-            const validPts = pts.filter(p => p.visible !== false);
-            if (validPts.length > 0) { map.fitBounds(L.featureGroup([L.marker([__LAT__, __LON__]), ...validPts.map(p => L.marker([p.lat, p.lon]))]).getBounds().pad(0.05)); }
+            const validPts = pts.filter(p => p.visible !== false); if (validPts.length > 0) map.fitBounds(L.featureGroup([L.marker([__LAT__, __LON__]), ...validPts.map(p => L.marker([p.lat, p.lon]))]).getBounds().pad(0.05));
         }
     </script>
 </body>
 </html>
 """
+
+fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
 
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
