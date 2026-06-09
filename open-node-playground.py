@@ -780,6 +780,78 @@ with st.sidebar:
                     st.error("Invalid File")
                     add_api_log(f"Import failed: {str(e)[:100]}", "ERROR")
 
+    # -------------------------------------------------------------------------
+    # SESSION LOGS (Debug Panel)
+    # -------------------------------------------------------------------------
+    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
+    
+    with st.expander("📋 SESSION LOGS", expanded=False):
+        st.markdown("<div style='font-size: 10px; font-weight: 600; margin-bottom: 8px;'>Real-time Debug Information</div>", unsafe_allow_html=True)
+        
+        # Create three columns for log controls
+        col_log1, col_log2, col_log3 = st.columns(3)
+        with col_log1:
+            if st.button("🔄 REFRESH LOGS", key="refresh_logs", use_container_width=True):
+                st.rerun()
+        with col_log2:
+            if st.button("🗑️ CLEAR LOGS", key="clear_logs_btn", use_container_width=True):
+                st.session_state.api_logs = []
+                st.session_state.debug_logs = []
+                st.rerun()
+        with col_log3:
+            # Download logs as JSON
+            if st.session_state.get('api_logs', []):
+                logs_json = json.dumps({
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "session_logs": st.session_state.api_logs,
+                    "boundary_state": {
+                        "show_boundaries": st.session_state.get('show_boundaries', False),
+                        "boundary_levels": st.session_state.get('boundary_levels', []),
+                        "current_location": st.session_state.get('current_location_info', None),
+                        "boundary_data_keys": list(st.session_state.get('boundary_geojson_data', {}).keys())
+                    },
+                    "app_state": {
+                        "scanned_records_count": len(st.session_state.get('scanned_records', [])),
+                        "last_scan_coords": f"{st.session_state.get('last_scan_lat', 'N/A')}, {st.session_state.get('last_scan_lon', 'N/A')}",
+                        "scan_active": st.session_state.get('scan_active_loading', False)
+                    }
+                }, indent=2)
+                st.download_button(
+                    "📥 DOWNLOAD LOGS",
+                    logs_json,
+                    file_name=f"opennode_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+        
+        # Display logs in a scrollable container
+        if st.session_state.get('api_logs', []):
+            log_text = ""
+            for log in st.session_state.api_logs[-50:]:  # Last 50 logs
+                level = log.get('level', 'INFO')
+                if level == 'ERROR':
+                    icon = "🔴"
+                elif level == 'WARNING':
+                    icon = "🟡"
+                else:
+                    icon = "🟢"
+                log_text += f"{icon} [{log.get('time', '')}] {log.get('message', '')}\n"
+            
+            st.code(log_text, language="text", line_numbers=False)
+        else:
+            st.info("No logs yet. Click SCAN AREA or SHOW BOUNDARIES to generate logs.")
+        
+        # Show boundary state debug info
+        st.markdown("---")
+        st.markdown("<div style='font-size: 9px; font-weight: 600;'>🔍 Boundary State:</div>", unsafe_allow_html=True)
+        st.code(f"""
+show_boundaries: {st.session_state.get('show_boundaries', False)}
+boundary_levels: {st.session_state.get('boundary_levels', [])}
+current_location: {st.session_state.get('current_location_info', {})}
+boundary_data_keys: {list(st.session_state.get('boundary_geojson_data', {}).keys())}
+        """, language="text", line_numbers=False)
+    # -------------------------------------------------------------------------
+
 # -----------------------------------------------------------------------------
 # PIPELINE STAGE PIPING CONTROLLER (USING GITHUB POI DATA WITH FALLBACK)
 # -----------------------------------------------------------------------------
