@@ -130,8 +130,8 @@ if 'target_config' not in st.session_state:
 if 'radius_config' not in st.session_state:
     st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
 
-if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "dots"
-if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
+if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "modern-pin"
+if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 20
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
 POI_CONFIG = {
