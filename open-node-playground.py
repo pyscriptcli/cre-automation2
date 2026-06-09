@@ -168,7 +168,7 @@ def compile_features_kml(features):
     return kml + '</Document></kml>'
 
 # -----------------------------------------------------------------------------
-# GITHUB POI DATA LOADER (NEW - REPLACES OVERPASS/OSMnx)
+# GITHUB POI DATA LOADER (REPLACES OVERPASS/OSMnx)
 # -----------------------------------------------------------------------------
 GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
 
@@ -254,6 +254,90 @@ def filter_pois_by_tags(pois, selected_tags):
     return filtered
 
 # -----------------------------------------------------------------------------
+# BOUNDARY FUNCTIONS (Using Overpass API - NOT for POIs)
+# -----------------------------------------------------------------------------
+@st.cache_data(ttl=86400, show_spinner=False)
+def reverse_geocode_location(lat, lon):
+    """
+    Get administrative hierarchy from coordinates using Nominatim (OSM)
+    Returns dict with region, province, city, barangay
+    """
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json&addressdetails=1&zoom=18"
+        headers = {"User-Agent": "OpenNode/1.0"}
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            address = data.get('address', {})
+            
+            location_info = {
+                "region": address.get('state', ''),
+                "province": address.get('province', '') or address.get('state_district', ''),
+                "city": address.get('city', '') or address.get('municipality', '') or address.get('town', ''),
+                "barangay": address.get('suburb', '') or address.get('neighbourhood', '') or address.get('village', ''),
+                "full_address": data.get('display_name', ''),
+                "lat": lat,
+                "lon": lon
+            }
+            return location_info
+        return None
+    except Exception as e:
+        add_api_log(f"Reverse geocoding error: {str(e)[:100]}", "ERROR")
+        return None
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_boundary_from_overpass(area_name, admin_level):
+    """
+    Fetch boundary GeoJSON for a specific area from Overpass API
+    admin_level: 4=region, 5=province, 6-7=city, 8-9=barangay
+    """
+    query = f"""
+    [out:json][timeout:30];
+    (
+      relation["admin_level"="{admin_level}"]["name"="{area_name}"];
+      relation["admin_level"="{admin_level}"]["name:en"="{area_name}"];
+    );
+    (._;>;);
+    out geom;
+    """
+    
+    try:
+        response = requests.post(
+            "https://overpass-api.de/api/interpreter",
+            data={"data": query},
+            timeout=30
+        )
+        if response.status_code == 200:
+            data = response.json()
+            # Convert OSM JSON to simplified format for JavaScript
+            features = []
+            for element in data.get('elements', []):
+                if element.get('type') == 'relation':
+                    coords = []
+                    for node in element.get('members', []):
+                        if node.get('type') == 'node' and 'lat' in node and 'lon' in node:
+                            coords.append([node['lon'], node['lat']])
+                    
+                    if coords:
+                        features.append({
+                            "type": "Feature",
+                            "geometry": {
+                                "type": "Polygon",
+                                "coordinates": [coords]
+                            },
+                            "properties": {
+                                "name": element.get('tags', {}).get('name', area_name),
+                                "admin_level": admin_level
+                            }
+                        })
+            return {"type": "FeatureCollection", "features": features}
+        return None
+    except Exception as e:
+        add_api_log(f"Boundary fetch error for {area_name}: {str(e)[:100]}", "ERROR")
+        return None
+
+# -----------------------------------------------------------------------------
 # API LOGGING SYSTEM
 # -----------------------------------------------------------------------------
 if 'api_logs' not in st.session_state:
@@ -294,6 +378,14 @@ if 'radius_config' not in st.session_state: st.session_state.radius_config = {"c
 if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "dots"
 if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
+
+# Boundary state variables
+if 'show_boundaries' not in st.session_state:
+    st.session_state.show_boundaries = False
+if 'boundary_levels' not in st.session_state:
+    st.session_state.boundary_levels = []
+if 'current_location_info' not in st.session_state:
+    st.session_state.current_location_info = None
 
 POI_CONFIG = {
     "COMMERCIAL & OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
@@ -349,6 +441,35 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
+    # -------------------------------------------------------------------------
+    # BOUNDARY CONTROLS (ADDED - NO CHANGES TO POI SYSTEM)
+    # -------------------------------------------------------------------------
+    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
+    st.markdown("<div style='font-weight: 700; font-size: 11px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>🗺️ ADMINISTRATIVE BOUNDARIES</div>", unsafe_allow_html=True)
+    
+    show_boundaries_toggle = st.checkbox("Show Administrative Boundaries", key="show_boundaries_toggle", value=st.session_state.show_boundaries)
+    
+    if show_boundaries_toggle:
+        st.session_state.show_boundaries = True
+        boundary_options = st.multiselect(
+            "Select boundary levels:",
+            options=["Region", "Province", "City/Municipality", "Barangay"],
+            default=st.session_state.boundary_levels,
+            key="boundary_selector"
+        )
+        st.session_state.boundary_levels = boundary_options
+        
+        if st.session_state.current_location_info:
+            loc_info = st.session_state.current_location_info
+            st.info(f"📍 Current: {loc_info.get('barangay', '?')}, {loc_info.get('city', '?')}, {loc_info.get('province', '?')}, {loc_info.get('region', '?')}")
+    else:
+        st.session_state.show_boundaries = False
+        st.session_state.boundary_levels = []
+    
+    # -------------------------------------------------------------------------
+    # END OF BOUNDARY CONTROLS
+    # -------------------------------------------------------------------------
+
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -365,6 +486,9 @@ with st.sidebar:
         st.session_state.layer_groups = {}
         st.session_state.network_stats = None
         st.session_state.scan_active_loading = False
+        st.session_state.show_boundaries = False
+        st.session_state.boundary_levels = []
+        st.session_state.current_location_info = None
         clear_api_logs()
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
@@ -401,6 +525,15 @@ main_canvas = st.empty()
 if st.session_state.scan_active_loading:
     records = []
     success = False
+    
+    # Get location info for boundaries (ADDED - DOES NOT AFFECT POI SYSTEM)
+    location_info = reverse_geocode_location(lat_coord, lon_coord)
+    if location_info:
+        st.session_state.current_location_info = location_info
+        add_api_log(f"Location detected: {location_info.get('barangay', '')}, {location_info.get('city', '')}, {location_info.get('province', '')}", "INFO")
+    else:
+        st.session_state.current_location_info = None
+        add_api_log("Could not determine location hierarchy for boundaries", "WARNING")
     
     main_canvas.markdown(f'''
         <div class="py-loading-container">
@@ -468,7 +601,7 @@ if st.session_state.scan_active_loading:
                 st.session_state.scanned_records = records
                 st.session_state.last_scan_lat = lat_coord
                 st.session_state.last_scan_lon = lon_coord
-                st.session_state.network_stats = None  # No network stats from GitHub data
+                st.session_state.network_stats = None
                 success = True
                 add_api_log(f"Final record count: {len(records)} POIs displayed", "INFO")
             else:
@@ -509,6 +642,28 @@ geojson_str = json.dumps(pts_active)
 render_lat, render_lon = lat_coord, lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
+
+# Build boundary data for JavaScript (ADDED)
+boundary_data = {}
+if st.session_state.show_boundaries and st.session_state.current_location_info:
+    loc = st.session_state.current_location_info
+    level_mapping = {
+        "Region": ("region", "4", loc.get('region', '')),
+        "Province": ("province", "5", loc.get('province', '')),
+        "City/Municipality": ("city", "7", loc.get('city', '')),
+        "Barangay": ("barangay", "9", loc.get('barangay', ''))
+    }
+    
+    for level_name in st.session_state.boundary_levels:
+        if level_name in level_mapping:
+            key, admin_level, area_name = level_mapping[level_name]
+            if area_name and area_name != '':
+                boundary_geojson = get_boundary_from_overpass(area_name, admin_level)
+                if boundary_geojson:
+                    boundary_data[key] = boundary_geojson
+                    add_api_log(f"Loaded {level_name} boundary for: {area_name}", "INFO")
+
+boundary_data_json = json.dumps(boundary_data)
 
 # Build API log HTML
 api_logs_html = ""
@@ -621,6 +776,29 @@ leaflet_template = """
         .api-log-info-map { color: #88ffaa; }
         .api-log-error-map { color: #ff8888; }
         .api-log-warning-map { color: #ffaa66; }
+        
+        /* Boundary styles */
+        .boundary-tooltip {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 9px;
+            font-weight: 600;
+            background: rgba(0, 51, 102, 0.9);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 2px;
+            border-left: 2px solid #C9AB4C;
+        }
+        .boundary-legend {
+            background: rgba(255,255,255,0.95);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 600;
+            color: #003366;
+            border: 1px solid rgba(0,51,102,0.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
@@ -653,6 +831,14 @@ leaflet_template = """
         let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
         let scanStartTime = null;
         
+        // Boundary layers storage
+        let boundaryLayers = {
+            region: null,
+            province: null,
+            city: null,
+            barangay: null
+        };
+        
         if (__SHOW_LOADING__) {
             const overlay = document.getElementById('map-loading-overlay');
             if (overlay) overlay.style.display = 'flex';
@@ -666,7 +852,6 @@ leaflet_template = """
                 }
             }, 100);
             
-            // Rotating status messages
             const statusDiv = document.getElementById('scan-status-text-map');
             const messages = ["Connecting to OSM...", "Fetching features...", "Processing geometry...", "Building network graph...", "Compiling results..."];
             let msgIdx = 0;
@@ -749,6 +934,99 @@ leaflet_template = """
                     marker.addTo(layerGroupsRef[key]);
                 });
             });
+        }
+
+        // Boundary rendering functions
+        function renderBoundaries(boundaryData) {
+            clearBoundaries();
+            
+            const styles = {
+                region: { color: "#FF6B6B", weight: 2, fillOpacity: 0.08, opacity: 0.8, dashArray: "2, 4" },
+                province: { color: "#4ECDC4", weight: 1.5, fillOpacity: 0.06, opacity: 0.7, dashArray: "3, 4" },
+                city: { color: "#45B7D1", weight: 1, fillOpacity: 0.04, opacity: 0.6 },
+                barangay: { color: "#96CEB4", weight: 0.8, fillOpacity: 0.03, opacity: 0.5 }
+            };
+            
+            const levelNames = {
+                region: "Region",
+                province: "Province",
+                city: "City",
+                barangay: "Barangay"
+            };
+            
+            let addedCount = 0;
+            
+            for (const [key, data] of Object.entries(boundaryData)) {
+                if (data && data.features && data.features.length > 0 && styles[key]) {
+                    try {
+                        const layer = L.geoJSON(data, {
+                            style: styles[key],
+                            onEachFeature: function(feature, layer) {
+                                const name = feature.properties?.name || levelNames[key];
+                                layer.bindTooltip(`${name}`, {
+                                    sticky: true,
+                                    className: 'boundary-tooltip'
+                                });
+                            }
+                        }).addTo(map);
+                        
+                        boundaryLayers[key] = layer;
+                        addedCount++;
+                    } catch(e) {
+                        console.error("Error rendering boundary:", e);
+                    }
+                }
+            }
+            
+            if (addedCount > 0) {
+                addBoundaryLegend(Object.keys(boundaryData));
+            }
+        }
+        
+        function clearBoundaries() {
+            Object.keys(boundaryLayers).forEach(key => {
+                if (boundaryLayers[key]) {
+                    map.removeLayer(boundaryLayers[key]);
+                    boundaryLayers[key] = null;
+                }
+            });
+            const legend = document.getElementById('boundary-legend');
+            if (legend) legend.remove();
+        }
+        
+        function addBoundaryLegend(activeKeys) {
+            const existingLegend = document.getElementById('boundary-legend');
+            if (existingLegend) existingLegend.remove();
+            
+            const colorMap = {
+                region: "#FF6B6B",
+                province: "#4ECDC4",
+                city: "#45B7D1",
+                barangay: "#96CEB4"
+            };
+            
+            const nameMap = {
+                region: "Region",
+                province: "Province",
+                city: "City/Municipality",
+                barangay: "Barangay"
+            };
+            
+            const legend = L.control({position: 'bottomleft'});
+            legend.onAdd = function() {
+                const div = L.DomUtil.create('div', 'boundary-legend');
+                div.innerHTML = '<div style="font-weight:800; margin-bottom:4px;">🗺️ BOUNDARY LEGEND</div>';
+                activeKeys.forEach(key => {
+                    if (colorMap[key]) {
+                        div.innerHTML += `<div style="display:flex; align-items:center; gap:6px; margin-top:3px;">
+                                            <div style="width:12px; height:12px; background:${colorMap[key]}; border-radius:1px;"></div>
+                                            <span>${nameMap[key]}</span>
+                                         </div>`;
+                    }
+                });
+                return div;
+            };
+            legend.addTo(map);
         }
 
         window.openClusterModalWindow = function() {
@@ -835,6 +1113,12 @@ leaflet_template = """
         if (pts.length > 0 && !__IS_STALE__) {
             const validPts = pts.filter(p => p.visible !== false); if (validPts.length > 0) map.fitBounds(L.featureGroup([L.marker([__LAT__, __LON__]), ...validPts.map(p => L.marker([p.lat, p.lon]))]).getBounds().pad(0.05));
         }
+        
+        // Render boundaries if data is available
+        const boundaryData = __BOUNDARY_DATA__;
+        if (boundaryData && Object.keys(boundaryData).length > 0) {
+            renderBoundaries(boundaryData);
+        }
     </script>
 </body>
 </html>
@@ -858,6 +1142,7 @@ leaflet_html = (leaflet_template
                 .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
                 .replace("__LAYER_META_JSON__", layer_meta_json)
                 .replace("__GEOJSON__", geojson_str)
-                .replace("__API_LOG_PANEL__", api_log_panel))
+                .replace("__API_LOG_PANEL__", api_log_panel)
+                .replace("__BOUNDARY_DATA__", boundary_data_json))
 
 st.components.v1.html(leaflet_html, height=850, scrolling=False)
