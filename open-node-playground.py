@@ -949,6 +949,8 @@ scan_active: {st.session_state.get('scan_active_loading', False)}
 # -----------------------------------------------------------------------------
 # PIPELINE STAGE PIPING CONTROLLER (USING GITHUB POI DATA WITH FALLBACK)
 # -----------------------------------------------------------------------------
+main_canvas = st.empty() 
+
 if st.session_state.scan_active_loading:
     log_event("PROCESS", "POI_LOADING_STARTED", {
         "coordinates": f"{lat_coord}, {lon_coord}",
