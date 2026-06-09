@@ -529,9 +529,7 @@ def reverse_geocode_location(lat, lon):
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_boundary_geojson(area_name, admin_level):
     """
-    Fetch boundary GeoJSON.
-    Primary: Load from GitHub repository.
-    Fallback: Overpass API if GitHub file not found or area not matched.
+    Fetch boundary GeoJSON directly from Overpass API.
     """
     add_api_log(f"DEBUG: get_boundary_geojson called with area_name='{area_name}', admin_level='{admin_level}'", "INFO")
     
@@ -539,28 +537,7 @@ def get_boundary_geojson(area_name, admin_level):
         add_api_log(f"DEBUG: area_name is empty, returning None", "WARNING")
         return None
     
-    boundary_type_map = {
-        "4": "region",
-        "5": "province",
-        "6": "city",
-        "7": "city",
-        "8": "barangay",
-        "9": "barangay"
-    }
-    
-    boundary_type = boundary_type_map.get(str(admin_level), "province")
-    add_api_log(f"DEBUG: boundary_type mapped to '{boundary_type}'", "INFO")
-    
-    # Try GitHub first
-    add_api_log(f"DEBUG: Attempting to load from GitHub: {area_name} as {boundary_type}", "INFO")
-    github_data = load_github_boundary(area_name, boundary_type)
-    if github_data and github_data.get('features') and len(github_data['features']) > 0:
-        add_api_log(f"✅ Loaded {area_name} boundary from GitHub ({len(github_data['features'])} features)", "INFO")
-        return github_data
-    
-    add_api_log(f"DEBUG: GitHub boundary not found for {area_name}, falling back to Overpass API", "WARNING")
-    
-    # Fallback to Overpass API
+    # Build Overpass query
     query = f"""
     [out:json][timeout:30];
     (
@@ -587,9 +564,17 @@ def get_boundary_geojson(area_name, admin_level):
             for element in data.get('elements', []):
                 if element.get('type') == 'relation':
                     coords = []
-                    for node in element.get('members', []):
+                    members = element.get('members', [])
+                    add_api_log(f"DEBUG: Found relation with {len(members)} members", "INFO")
+                    
+                    for node in members:
                         if node.get('type') == 'node' and 'lat' in node and 'lon' in node:
                             coords.append([node['lon'], node['lat']])
+                        elif node.get('type') == 'way':
+                            # For ways, we need to fetch the nodes - simplified approach
+                            # Just use the way's center or skip for now
+                            if 'center' in node:
+                                coords.append([node['center']['lon'], node['center']['lat']])
                     
                     if coords and len(coords) >= 3:
                         features.append({
@@ -603,12 +588,36 @@ def get_boundary_geojson(area_name, admin_level):
                                 "admin_level": admin_level
                             }
                         })
+                        add_api_log(f"✅ Added feature for {area_name} with {len(coords)} coordinates", "INFO")
+                    else:
+                        add_api_log(f"DEBUG: Not enough coordinates for {area_name} (got {len(coords)})", "WARNING")
             
             if features:
                 add_api_log(f"✅ Loaded {area_name} boundary from Overpass API ({len(features)} features)", "INFO")
                 return {"type": "FeatureCollection", "features": features}
             else:
                 add_api_log(f"DEBUG: No valid features found for {area_name}", "WARNING")
+                
+                # Try alternative: search for the area with a more flexible query
+                alt_query = f"""
+                [out:json][timeout:30];
+                (
+                  area["name"="{area_name}"];
+                  relation["name"="{area_name}"];
+                );
+                out geom;
+                """
+                add_api_log(f"DEBUG: Trying alternative query for {area_name}", "INFO")
+                
+                alt_response = requests.post(
+                    "https://overpass-api.de/api/interpreter",
+                    data={"data": alt_query},
+                    timeout=30
+                )
+                
+                if alt_response.status_code == 200:
+                    alt_data = alt_response.json()
+                    add_api_log(f"DEBUG: Alternative query returned {len(alt_data.get('elements', []))} elements", "INFO")
         else:
             add_api_log(f"DEBUG: Overpass API error: {response.status_code}", "ERROR")
         return None
@@ -896,6 +905,9 @@ with st.sidebar:
             for level_name in st.session_state.boundary_levels:
                 if level_name in level_mapping:
                     key, admin_level, area_name = level_mapping[level_name]
+                    # DEBUG: Log what we're about to fetch
+                    add_api_log(f"🔍 DEBUG: level_name={level_name}, area_name='{area_name}', admin_level={admin_level}", "INFO")
+                    
                     if area_name and area_name != 'Unknown':
                         add_api_log(f"Fetching {level_name} boundary for: {area_name}", "INFO")
                         geojson = get_boundary_geojson(area_name, admin_level)
@@ -904,6 +916,8 @@ with st.sidebar:
                             add_api_log(f"✅ Loaded {level_name} boundary", "INFO")
                         else:
                             add_api_log(f"❌ Failed to load {level_name} boundary", "ERROR")
+                    else:
+                        add_api_log(f"⚠️ Skipping {level_name} - area_name is '{area_name}'", "WARNING")
             
             st.session_state.boundary_geojson_data = boundary_geojson_data
             log_event("STATE_CHANGE", "BOUNDARY_DATA_UPDATED", {"keys": list(boundary_geojson_data.keys())})
