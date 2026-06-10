@@ -5,7 +5,70 @@ import json
 import os
 import math
 import time
+import platform
+import uuid
 from datetime import datetime
+from user_agents import parse
+
+# -----------------------------------------------------------------------------
+# TELEMETRY LOGGING CONFIGURATION
+# -----------------------------------------------------------------------------
+TELEMETRY_REPO = "pyscriptcli/opennode-telemetry"
+TELEMETRY_BRANCH = "main"
+TELEMETRY_PATH = "logs"
+
+# Get or create anonymous user ID
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = str(uuid.uuid4())[:8]
+
+def log_telemetry(event_type, event_data=None):
+    """Log telemetry data to local file (will be pushed to GitHub separately)"""
+    try:
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "user_id": st.session_state.user_id,
+            "event_type": event_type,
+            "event_data": event_data or {},
+            "user_agent": st.session_state.get('user_agent', 'unknown'),
+            "platform": platform.platform(),
+            "python_version": platform.python_version()
+        }
+        
+        # Save to local log file
+        log_dir = "telemetry_logs"
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, f"telemetry_{datetime.now().strftime('%Y%m%d')}.jsonl")
+        
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+        
+        # Store in session state for this session
+        if 'telemetry_events' not in st.session_state:
+            st.session_state.telemetry_events = []
+        st.session_state.telemetry_events.append(log_entry)
+        
+    except Exception as e:
+        pass  # Silently fail - don't disrupt user experience
+
+# Capture user agent on first load
+if 'user_agent' not in st.session_state:
+    st.session_state.user_agent = st.request.headers.get('User-Agent', 'unknown') if hasattr(st, 'request') else 'unknown'
+    log_telemetry("session_start", {"user_agent": st.session_state.user_agent})
+
+# -----------------------------------------------------------------------------
+# RATE LIMITER CONFIGURATION
+# -----------------------------------------------------------------------------
+MAX_POI_SELECTIONS = 8
+
+# -----------------------------------------------------------------------------
+# PROGRESS TRACKING INITIALIZATION
+# -----------------------------------------------------------------------------
+if 'scan_progress' not in st.session_state:
+    st.session_state.scan_progress = 0
+if 'scan_status' not in st.session_state:
+    st.session_state.scan_status = ""
+if 'scan_step' not in st.session_state:
+    st.session_state.scan_step = 0
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -27,7 +90,6 @@ st.set_page_config(
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
 
         :root {
             --brand-midnight: #003366 !important;
@@ -449,7 +511,6 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     overpass_priority = 1 if is_luzon else 2
     
     add_api_log(f"Smart hybrid: {'Luzon' if is_luzon else 'Visayas/Mindanao'}", "INFO")
-    add_api_log(f"Priority: GitHub={github_priority}, Overpass={overpass_priority}", "INFO")
     
     if province_name:
         all_province_pois = load_province_pois(province_name)
@@ -469,7 +530,6 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
         else:
             add_api_log(f"No GitHub data for {province_name}", "WARNING")
     
-    add_api_log(f"Overpass query for {lat_coord}, {lon_coord}", "INFO")
     elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
     
     overpass_count = 0
@@ -499,7 +559,7 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     
     github_final = sum(1 for r in records if r['source'] == 'github')
     overpass_final = sum(1 for r in records if r['source'] == 'overpass')
-    add_api_log(f"FINAL: {len(records)} unique POIs (GitHub: {github_final}, Overpass: {overpass_final})", "INFO")
+    add_api_log(f"Final: {len(records)} unique POIs (GitHub: {github_final}, Overpass: {overpass_final})", "INFO")
     
     if len(records) < 20 and selected_tags:
         add_api_log(f"Only {len(records)} POIs, retrying without tags", "WARNING")
@@ -532,13 +592,36 @@ with st.sidebar:
     search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     
+    # Rate Limiter Display
+    col_r1, col_r2 = st.columns(2)
+    with col_r1:
+        st.markdown(f"<div style='font-size: 9px; font-weight: 600; color: #003366;'>Selected: <span id='selected_count'>0</span>/{MAX_POI_SELECTIONS}</div>", unsafe_allow_html=True)
+    with col_r2:
+        st.markdown(f"<div style='font-size: 9px; font-weight: 600; color: #28a745;'>Max: {MAX_POI_SELECTIONS}</div>", unsafe_allow_html=True)
+    
+    st.progress(0, text=f"0/{MAX_POI_SELECTIONS} categories")
+    
+    current_selection_count = 0
+    
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
             with st.expander(cat_name, expanded=(len(search_query) > 0)):
                 for label, tag in matched:
-                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"):
-                        selected_tags.append(tag)
+                    checkbox_key = f"chk_{cat_name}_{label}"
+                    is_checked = st.session_state.get(checkbox_key, False)
+                    is_disabled = not is_checked and current_selection_count >= MAX_POI_SELECTIONS
+                    
+                    if st.checkbox(label, key=checkbox_key, disabled=is_disabled,
+                                   help=f"Max {MAX_POI_SELECTIONS} selections per scan" if is_disabled else None):
+                        if not is_checked:
+                            selected_tags.append(tag)
+                            current_selection_count += 1
+                    else:
+                        if is_checked:
+                            if tag in selected_tags:
+                                selected_tags.remove(tag)
+                                current_selection_count -= 1
 
     st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
     with st.container():
@@ -547,30 +630,85 @@ with st.sidebar:
             if matched:
                 with st.expander(cat_name, expanded=(len(search_query) > 0)):
                     for label, tag in matched:
-                        if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"):
-                            selected_tags.append(tag)
+                        checkbox_key = f"chk_adv_{cat_name}_{label}"
+                        is_checked = st.session_state.get(checkbox_key, False)
+                        is_disabled = not is_checked and current_selection_count >= MAX_POI_SELECTIONS
+                        
+                        if st.checkbox(label, key=checkbox_key, disabled=is_disabled,
+                                       help=f"Max {MAX_POI_SELECTIONS} selections" if is_disabled else None):
+                            if not is_checked:
+                                selected_tags.append(tag)
+                                current_selection_count += 1
+                        else:
+                            if is_checked:
+                                if tag in selected_tags:
+                                    selected_tags.remove(tag)
+                                    current_selection_count -= 1
 
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
+        elif len(selected_tags) > MAX_POI_SELECTIONS:
+            st.error(f"Rate limit exceeded! Maximum {MAX_POI_SELECTIONS} categories. You selected {len(selected_tags)}.")
+            add_api_log(f"Rate limit blocked: {len(selected_tags)} categories", "WARNING")
         else:
+            log_telemetry("scan_started", {
+                "tags_count": len(selected_tags),
+                "radius": radius_val,
+                "coordinates": f"{lat_coord}, {lon_coord}"
+            })
+            add_api_log(f"Scan initiated with {len(selected_tags)} tags", "INFO")
             st.session_state.scan_active_loading = True
             st.rerun()
 
 # -----------------------------------------------------------------------------
-# PIPELINE EXECUTION FORWARD CONTROL
+# PIPELINE EXECUTION FORWARD CONTROL (WITH PROGRESS TRACKING)
 # -----------------------------------------------------------------------------
 if st.session_state.scan_active_loading:
+    progress_placeholder = st.empty()
+    status_placeholder = st.empty()
+    
+    # Step 1
+    status_placeholder.text("Locating province from coordinates...")
+    progress_placeholder.progress(10)
+    
     province_name = get_province_from_coords(lat_coord, lon_coord)
+    
+    # Step 2
+    status_placeholder.text(f"Loading data from {'GitHub' if province_name else 'Overpass API'}...")
+    progress_placeholder.progress(25)
+    
+    # Step 3
+    status_placeholder.text("Fetching POI data...")
+    progress_placeholder.progress(40)
+    
     records = load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, selected_tags)
+    
+    # Step 4
+    status_placeholder.text("Processing and filtering POIs...")
+    progress_placeholder.progress(70)
+    
+    # Step 5
+    status_placeholder.text("Preparing map visualization...")
+    progress_placeholder.progress(85)
     
     if records:
         st.session_state.scanned_records = records
         st.session_state.last_scan_lat = lat_coord
         st.session_state.last_scan_lon = lon_coord
+        status_placeholder.text(f"Complete! Found {len(records)} POIs")
+        progress_placeholder.progress(100)
+        log_telemetry("scan_completed", {"poi_count": len(records), "success": True})
     else:
         st.session_state.scanned_records = []
-        
+        status_placeholder.text("No POIs found in this area")
+        progress_placeholder.progress(100)
+        log_telemetry("scan_completed", {"poi_count": 0, "success": False})
+    
+    time.sleep(1)
+    progress_placeholder.empty()
+    status_placeholder.empty()
+    
     st.session_state.scan_active_loading = False
     st.rerun()
 
@@ -578,6 +716,7 @@ if st.session_state.scan_active_loading:
 with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
+        log_telemetry("clear_all", {"records_cleared": len(st.session_state.scanned_records)})
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
@@ -605,6 +744,7 @@ with st.sidebar:
                     st.session_state.scanned_records = data.get("scanned_records", data)
                     st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
                     st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
+                    log_telemetry("file_imported", {"record_count": len(st.session_state.scanned_records)})
                     st.rerun()
                 except Exception: st.error("Invalid File")
 
@@ -666,7 +806,7 @@ leaflet_template = """
             border-radius: 12px; 
             border: 1px solid rgba(0, 51, 102, 0.15); 
             box-shadow: 0 20px 35px rgba(0, 0, 0, 0.1);
-            min-width: 300px;
+            min-width: 350px;
         }
         .loading-spinner {
             width: 60px; 
@@ -686,32 +826,26 @@ leaflet_template = """
             margin-bottom: 8px;
         }
         .loading-subtext { 
-            font-size: 10px; 
+            font-size: 11px; 
             font-weight: 600; 
             color: #C9AB4C; 
-            margin-top: 4px; 
-            letter-spacing: 0.5px; 
-            font-family: monospace;
+            margin-top: 8px; 
+            letter-spacing: 0.5px;
         }
         .loading-progress {
             width: 100%;
-            height: 2px;
+            height: 6px;
             background: rgba(0, 51, 102, 0.1);
-            margin-top: 16px;
-            border-radius: 2px;
+            margin-top: 20px;
+            border-radius: 3px;
             overflow: hidden;
         }
         .loading-progress-bar {
             width: 0%;
             height: 100%;
             background: #003366;
-            animation: progress 2s ease-in-out infinite;
-            border-radius: 2px;
-        }
-        @keyframes progress {
-            0% { width: 0%; }
-            50% { width: 70%; }
-            100% { width: 100%; }
+            transition: width 0.3s ease;
+            border-radius: 3px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -762,37 +896,13 @@ leaflet_template = """
         <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
             <div class="loading-wrapper">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">LOADING POI DATA</div>
-                <div class="loading-subtext" id="loading-status">Initializing engine...</div>
+                <div class="loading-text">SCANNING AREA</div>
+                <div class="loading-subtext" id="loading-status">Initializing...</div>
                 <div class="loading-progress">
-                    <div class="loading-progress-bar"></div>
+                    <div class="loading-progress-bar" id="progress-bar-fill"></div>
                 </div>
             </div>
         </div>
-        <script>
-            if (__SHOW_LOADING__ === "true") {
-                const statusMessages = [
-                    "Locating coordinates...",
-                    "Finding province...",
-                    "Loading from GitHub...",
-                    "Filtering POIs...",
-                    "Applying tag filters...",
-                    "Rendering map..."
-                ];
-                let msgIdx = 0;
-                const statusEl = document.getElementById('loading-status');
-                if (statusEl) {
-                    const interval = setInterval(() => {
-                        if (__SHOW_LOADING__ !== "true") {
-                            clearInterval(interval);
-                            return;
-                        }
-                        msgIdx = (msgIdx + 1) % statusMessages.length;
-                        statusEl.innerText = statusMessages[msgIdx];
-                    }, 1500);
-                }
-            }
-        </script>
         
         <div id="map"></div>
 
@@ -890,6 +1000,11 @@ leaflet_template = """
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
         let clusters = {}; 
+        
+        function updateProgressBar(progress) {
+            const bar = document.getElementById('progress-bar-fill');
+            if (bar) bar.style.width = progress + '%';
+        }
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
