@@ -5,85 +5,7 @@ import json
 import os
 import math
 import time
-import uuid
-import platform
-import base64
 from datetime import datetime
-
-# -----------------------------------------------------------------------------
-# API LOGGING SYSTEM (Must be defined FIRST)
-# -----------------------------------------------------------------------------
-if 'api_logs' not in st.session_state:
-    st.session_state.api_logs = []
-
-def add_api_log(message, level="INFO"):
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    st.session_state.api_logs.append({
-        "time": timestamp,
-        "message": message,
-        "level": level
-    })
-    if len(st.session_state.api_logs) > 100:
-        st.session_state.api_logs = st.session_state.api_logs[-100:]
-
-def clear_api_logs():
-    st.session_state.api_logs = []
-
-# -----------------------------------------------------------------------------
-# SESSION LOGS (Extensive Debug Logging - No GitHub Push)
-# -----------------------------------------------------------------------------
-if 'session_id' not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())[:8]
-
-if 'session_logs' not in st.session_state:
-    st.session_state.session_logs = []
-
-def log_event(event_type, event_name, event_data=None, level="INFO"):
-    """Extensive event logging for debugging - records every user action"""
-    timestamp = datetime.now().isoformat()
-    log_entry = {
-        "timestamp": timestamp,
-        "session_id": st.session_state.session_id,
-        "event_type": event_type,
-        "event_name": event_name,
-        "level": level,
-        "event_data": event_data or {},
-        "app_state": {
-            "scan_active": st.session_state.get('scan_active_loading', False),
-            "poi_count": len(st.session_state.get('scanned_records', [])),
-            "selected_tags_count": len(st.session_state.get('selected_tags_buffer', []))
-        }
-    }
-    
-    st.session_state.session_logs.append(log_entry)
-    
-    # Also add to display logs
-    add_api_log(f"[{event_type}] {event_name}", level)
-    
-    # Keep only last 500 logs
-    if len(st.session_state.session_logs) > 500:
-        st.session_state.session_logs = st.session_state.session_logs[-500:]
-
-def clear_session_logs():
-    st.session_state.session_logs = []
-    add_api_log("Session logs cleared", "INFO")
-
-def get_session_logs_json():
-    """Export session logs as JSON for download"""
-    return json.dumps({
-        "export_time": datetime.now().isoformat(),
-        "session_id": st.session_state.session_id,
-        "total_events": len(st.session_state.session_logs),
-        "logs": st.session_state.session_logs
-    }, indent=2)
-
-# Log session start
-if 'session_started' not in st.session_state:
-    st.session_state.session_started = True
-    log_event("SESSION", "start", {
-        "platform": platform.platform(),
-        "python_version": platform.python_version()
-    })
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -105,6 +27,7 @@ st.set_page_config(
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
 
         :root {
             --brand-midnight: #003366 !important;
@@ -182,33 +105,33 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
-        
-        /* Hyperlink style for download button */
-        .hyperlink-download button {
-            background: transparent !important;
-            border: none !important;
-            color: #C9AB4C !important;
-            font-size: 9px !important;
-            font-weight: 600 !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            text-decoration: underline !important;
-            box-shadow: none !important;
-            height: auto !important;
-        }
-        .hyperlink-download button:hover {
-            color: #003366 !important;
-            background: transparent !important;
-        }
     </style>
 """, unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# API LOGGING SYSTEM
+# -----------------------------------------------------------------------------
+if 'api_logs' not in st.session_state:
+    st.session_state.api_logs = []
+
+def add_api_log(message, level="INFO"):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    st.session_state.api_logs.append({
+        "time": timestamp,
+        "message": message,
+        "level": level
+    })
+    if len(st.session_state.api_logs) > 100:
+        st.session_state.api_logs = st.session_state.api_logs[-100:]
+
+def clear_api_logs():
+    st.session_state.api_logs = []
 
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
-MAX_POI_SELECTIONS = 8
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
@@ -218,8 +141,6 @@ if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
-if 'selected_tags_buffer' not in st.session_state:
-    st.session_state.selected_tags_buffer = []
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -528,7 +449,7 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     overpass_priority = 1 if is_luzon else 2
     
     add_api_log(f"Smart hybrid: {'Luzon' if is_luzon else 'Visayas/Mindanao'}", "INFO")
-    log_event("DATA", "hybrid_mode", {"region": "Luzon" if is_luzon else "Visayas/Mindanao"})
+    add_api_log(f"Priority: GitHub={github_priority}, Overpass={overpass_priority}", "INFO")
     
     if province_name:
         all_province_pois = load_province_pois(province_name)
@@ -545,11 +466,10 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
                     "visible": True,
                 }, github_priority)
             add_api_log(f"GitHub loaded {len(tag_filtered)} POIs", "INFO")
-            log_event("DATA", "github_load", {"count": len(tag_filtered), "province": province_name})
         else:
             add_api_log(f"No GitHub data for {province_name}", "WARNING")
-            log_event("DATA", "github_load_failed", {"province": province_name}, "WARNING")
     
+    add_api_log(f"Overpass query for {lat_coord}, {lon_coord}", "INFO")
     elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
     
     overpass_count = 0
@@ -573,19 +493,16 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
             overpass_count += 1
     
     add_api_log(f"Overpass loaded {overpass_count} POIs", "INFO")
-    log_event("DATA", "overpass_load", {"count": overpass_count})
     
     for idx, record in enumerate(records):
         record['uid'] = idx
     
     github_final = sum(1 for r in records if r['source'] == 'github')
     overpass_final = sum(1 for r in records if r['source'] == 'overpass')
-    add_api_log(f"Final: {len(records)} unique POIs (GitHub: {github_final}, Overpass: {overpass_final})", "INFO")
-    log_event("DATA", "load_complete", {"total": len(records), "github": github_final, "overpass": overpass_final})
+    add_api_log(f"FINAL: {len(records)} unique POIs (GitHub: {github_final}, Overpass: {overpass_final})", "INFO")
     
     if len(records) < 20 and selected_tags:
         add_api_log(f"Only {len(records)} POIs, retrying without tags", "WARNING")
-        log_event("DATA", "retry_without_tags", {"original_count": len(records)}, "WARNING")
         return load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, [])
     
     return records
@@ -607,7 +524,6 @@ with st.sidebar:
     if coord_match:
         lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
         st.session_state.geo_coords = location_input
-        log_event("UI", "coordinates_changed", {"coords": location_input})
     else:
         fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
         lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
@@ -616,38 +532,13 @@ with st.sidebar:
     search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     
-    # Rate Limiter Display
-    col_r1, col_r2 = st.columns(2)
-    with col_r1:
-        st.markdown(f"<div style='font-size: 9px; font-weight: 600; color: #003366;'>Selected: <span id='selected_count'>0</span>/{MAX_POI_SELECTIONS}</div>", unsafe_allow_html=True)
-    with col_r2:
-        st.markdown(f"<div style='font-size: 9px; font-weight: 600; color: #28a745;'>Max: {MAX_POI_SELECTIONS}</div>", unsafe_allow_html=True)
-    
-    st.progress(0, text=f"0/{MAX_POI_SELECTIONS} categories")
-    
-    current_selection_count = 0
-    
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
             with st.expander(cat_name, expanded=(len(search_query) > 0)):
                 for label, tag in matched:
-                    checkbox_key = f"chk_{cat_name}_{label}"
-                    is_checked = st.session_state.get(checkbox_key, False)
-                    is_disabled = not is_checked and current_selection_count >= MAX_POI_SELECTIONS
-                    
-                    if st.checkbox(label, key=checkbox_key, disabled=is_disabled,
-                                   help=f"Max {MAX_POI_SELECTIONS} selections per scan" if is_disabled else None):
-                        if not is_checked:
-                            selected_tags.append(tag)
-                            current_selection_count += 1
-                            log_event("UI", "tag_selected", {"tag": label, "category": cat_name})
-                    else:
-                        if is_checked:
-                            if tag in selected_tags:
-                                selected_tags.remove(tag)
-                                current_selection_count -= 1
-                                log_event("UI", "tag_deselected", {"tag": label, "category": cat_name})
+                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"):
+                        selected_tags.append(tag)
 
     st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
     with st.container():
@@ -656,92 +547,30 @@ with st.sidebar:
             if matched:
                 with st.expander(cat_name, expanded=(len(search_query) > 0)):
                     for label, tag in matched:
-                        checkbox_key = f"chk_adv_{cat_name}_{label}"
-                        is_checked = st.session_state.get(checkbox_key, False)
-                        is_disabled = not is_checked and current_selection_count >= MAX_POI_SELECTIONS
-                        
-                        if st.checkbox(label, key=checkbox_key, disabled=is_disabled,
-                                       help=f"Max {MAX_POI_SELECTIONS} selections" if is_disabled else None):
-                            if not is_checked:
-                                selected_tags.append(tag)
-                                current_selection_count += 1
-                        else:
-                            if is_checked:
-                                if tag in selected_tags:
-                                    selected_tags.remove(tag)
-                                    current_selection_count -= 1
+                        if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"):
+                            selected_tags.append(tag)
 
-    st.session_state.selected_tags_buffer = selected_tags
-    
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
-            log_event("ERROR", "scan_failed_no_tags", {}, "ERROR")
-        elif len(selected_tags) > MAX_POI_SELECTIONS:
-            st.error(f"Rate limit exceeded! Maximum {MAX_POI_SELECTIONS} categories. You selected {len(selected_tags)}.")
-            add_api_log(f"Rate limit blocked: {len(selected_tags)} categories", "WARNING")
-            log_event("ERROR", "rate_limit_exceeded", {"selected": len(selected_tags), "max": MAX_POI_SELECTIONS}, "ERROR")
         else:
-            log_event("ACTION", "scan_started", {
-                "tags_count": len(selected_tags),
-                "radius": radius_val,
-                "coordinates": f"{lat_coord}, {lon_coord}",
-                "tags": selected_tags[:10]
-            })
-            add_api_log(f"Scan initiated with {len(selected_tags)} tags", "INFO")
             st.session_state.scan_active_loading = True
             st.rerun()
 
 # -----------------------------------------------------------------------------
-# PIPELINE EXECUTION FORWARD CONTROL (WITH PROGRESS TRACKING)
+# PIPELINE EXECUTION FORWARD CONTROL
 # -----------------------------------------------------------------------------
 if st.session_state.scan_active_loading:
-    progress_placeholder = st.empty()
-    status_placeholder = st.empty()
-    
-    # Step 1
-    status_placeholder.text("Locating province from coordinates...")
-    progress_placeholder.progress(10)
-    log_event("PROCESS", "step_1_locating_province", {"lat": lat_coord, "lon": lon_coord})
-    
     province_name = get_province_from_coords(lat_coord, lon_coord)
-    log_event("PROCESS", "province_detected", {"province": province_name})
-    
-    # Step 2
-    status_placeholder.text(f"Loading data from {'GitHub' if province_name else 'Overpass API'}...")
-    progress_placeholder.progress(25)
-    
-    # Step 3
-    status_placeholder.text("Fetching POI data...")
-    progress_placeholder.progress(40)
-    
     records = load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, selected_tags)
-    
-    # Step 4
-    status_placeholder.text("Processing and filtering POIs...")
-    progress_placeholder.progress(70)
-    
-    # Step 5
-    status_placeholder.text("Preparing map visualization...")
-    progress_placeholder.progress(85)
     
     if records:
         st.session_state.scanned_records = records
         st.session_state.last_scan_lat = lat_coord
         st.session_state.last_scan_lon = lon_coord
-        status_placeholder.text(f"Complete! Found {len(records)} POIs")
-        progress_placeholder.progress(100)
-        log_event("SUCCESS", "scan_completed", {"poi_count": len(records)})
     else:
         st.session_state.scanned_records = []
-        status_placeholder.text("No POIs found in this area")
-        progress_placeholder.progress(100)
-        log_event("WARNING", "scan_completed_no_results", {"radius": radius_val, "tags_count": len(selected_tags)}, "WARNING")
-    
-    time.sleep(1)
-    progress_placeholder.empty()
-    status_placeholder.empty()
-    
+        
     st.session_state.scan_active_loading = False
     st.rerun()
 
@@ -749,7 +578,6 @@ if st.session_state.scan_active_loading:
 with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
-        log_event("ACTION", "clear_all", {"records_cleared": len(st.session_state.scanned_records)})
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
@@ -777,63 +605,8 @@ with st.sidebar:
                     st.session_state.scanned_records = data.get("scanned_records", data)
                     st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
                     st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
-                    log_event("ACTION", "file_imported", {"record_count": len(st.session_state.scanned_records)})
                     st.rerun()
-                except Exception: 
-                    st.error("Invalid File")
-                    log_event("ERROR", "file_import_failed", {}, "ERROR")
-    
-    # -------------------------------------------------------------------------
-    # SESSION LOGS PANEL (Hyperlink-style download button)
-    # -------------------------------------------------------------------------
-    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
-    
-    with st.expander("📋 SESSION LOGS", expanded=False):
-        st.markdown("<div style='font-size: 10px; font-weight: 600; margin-bottom: 8px;'>Event Timeline</div>", unsafe_allow_html=True)
-        
-        # Display recent logs in a scrollable container
-        if st.session_state.get('session_logs', []):
-            log_text = ""
-            for log in st.session_state.session_logs[-50:]:
-                time_str = log.get('timestamp', '')[-12:-3] if log.get('timestamp') else ''
-                event_type = log.get('event_type', '')
-                event_name = log.get('event_name', '')
-                level = log.get('level', 'INFO')
-                
-                if level == 'ERROR':
-                    icon = "🔴"
-                elif level == 'WARNING':
-                    icon = "🟡"
-                elif event_type == 'ACTION':
-                    icon = "👆"
-                elif event_type == 'DATA':
-                    icon = "📊"
-                elif event_type == 'SUCCESS':
-                    icon = "✅"
-                elif event_type == 'UI':
-                    icon = "🎨"
-                else:
-                    icon = "🟢"
-                
-                log_text += f"{icon} [{time_str}] {event_type}: {event_name}\n"
-                if log.get('event_data'):
-                    data_str = str(log.get('event_data'))[:80]
-                    log_text += f"     📎 {data_str}\n"
-            
-            st.code(log_text, language="text", line_numbers=False)
-        else:
-            st.info("No events logged yet")
-        
-        st.markdown("---")
-        
-        # Hyperlink-style download button
-        session_logs_json = get_session_logs_json()
-        b64 = base64.b64encode(session_logs_json.encode()).decode()
-        href = f'<a href="data:application/json;base64,{b64}" download="session_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json" style="font-size: 9px; color: #C9AB4C; text-decoration: underline; cursor: pointer;">📥 download session logs</a>'
-        st.markdown(href, unsafe_allow_html=True)
-        
-        # Also show session info
-        st.caption(f"Session ID: {st.session_state.session_id} | Events: {len(st.session_state.session_logs)}")
+                except Exception: st.error("Invalid File")
 
 # -----------------------------------------------------------------------------
 # 4. MAP FRAME RENDERING ENGINE
@@ -861,9 +634,6 @@ render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.g
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 show_loading_display = "flex" if st.session_state.scan_active_loading else "none"
-
-# The leaflet_template continues here (same as before - keeping it short for response)
-# ... (leaflet_template remains the same as in your original code)
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -896,7 +666,7 @@ leaflet_template = """
             border-radius: 12px; 
             border: 1px solid rgba(0, 51, 102, 0.15); 
             box-shadow: 0 20px 35px rgba(0, 0, 0, 0.1);
-            min-width: 350px;
+            min-width: 300px;
         }
         .loading-spinner {
             width: 60px; 
@@ -916,26 +686,32 @@ leaflet_template = """
             margin-bottom: 8px;
         }
         .loading-subtext { 
-            font-size: 11px; 
+            font-size: 10px; 
             font-weight: 600; 
             color: #C9AB4C; 
-            margin-top: 8px; 
-            letter-spacing: 0.5px;
+            margin-top: 4px; 
+            letter-spacing: 0.5px; 
+            font-family: monospace;
         }
         .loading-progress {
             width: 100%;
-            height: 6px;
+            height: 2px;
             background: rgba(0, 51, 102, 0.1);
-            margin-top: 20px;
-            border-radius: 3px;
+            margin-top: 16px;
+            border-radius: 2px;
             overflow: hidden;
         }
         .loading-progress-bar {
             width: 0%;
             height: 100%;
             background: #003366;
-            transition: width 0.3s ease;
-            border-radius: 3px;
+            animation: progress 2s ease-in-out infinite;
+            border-radius: 2px;
+        }
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -986,13 +762,37 @@ leaflet_template = """
         <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
             <div class="loading-wrapper">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">SCANNING AREA</div>
-                <div class="loading-subtext" id="loading-status">Initializing...</div>
+                <div class="loading-text">LOADING POI DATA</div>
+                <div class="loading-subtext" id="loading-status">Initializing engine...</div>
                 <div class="loading-progress">
-                    <div class="loading-progress-bar" id="progress-bar-fill"></div>
+                    <div class="loading-progress-bar"></div>
                 </div>
             </div>
         </div>
+        <script>
+            if (__SHOW_LOADING__ === "true") {
+                const statusMessages = [
+                    "Locating coordinates...",
+                    "Finding province...",
+                    "Loading from GitHub...",
+                    "Filtering POIs...",
+                    "Applying tag filters...",
+                    "Rendering map..."
+                ];
+                let msgIdx = 0;
+                const statusEl = document.getElementById('loading-status');
+                if (statusEl) {
+                    const interval = setInterval(() => {
+                        if (__SHOW_LOADING__ !== "true") {
+                            clearInterval(interval);
+                            return;
+                        }
+                        msgIdx = (msgIdx + 1) % statusMessages.length;
+                        statusEl.innerText = statusMessages[msgIdx];
+                    }, 1500);
+                }
+            }
+        </script>
         
         <div id="map"></div>
 
@@ -1090,11 +890,6 @@ leaflet_template = """
         let radiusConfig = __RADIUS_CONFIG_JSON__;
         let pts = __GEOJSON__;
         let clusters = {}; 
-        
-        function updateProgressBar(progress) {
-            const bar = document.getElementById('progress-bar-fill');
-            if (bar) bar.style.width = progress + '%';
-        }
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
