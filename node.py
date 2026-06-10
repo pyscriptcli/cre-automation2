@@ -5,31 +5,25 @@ import json
 import os
 import math
 import time
-import platform
 import uuid
+import platform
+import subprocess
 from datetime import datetime
-from user_agents import parse
 
 # -----------------------------------------------------------------------------
 # TELEMETRY LOGGING CONFIGURATION
 # -----------------------------------------------------------------------------
-TELEMETRY_REPO = "pyscriptcli/opennode-telemetry"
-TELEMETRY_BRANCH = "main"
-TELEMETRY_PATH = "logs"
-
-# Get or create anonymous user ID
 if 'user_id' not in st.session_state:
     st.session_state.user_id = str(uuid.uuid4())[:8]
 
 def log_telemetry(event_type, event_data=None):
-    """Log telemetry data to local file (will be pushed to GitHub separately)"""
+    """Log telemetry data to local file"""
     try:
         log_entry = {
             "timestamp": datetime.now().isoformat(),
             "user_id": st.session_state.user_id,
             "event_type": event_type,
             "event_data": event_data or {},
-            "user_agent": st.session_state.get('user_agent', 'unknown'),
             "platform": platform.platform(),
             "python_version": platform.python_version()
         }
@@ -42,33 +36,80 @@ def log_telemetry(event_type, event_data=None):
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry) + "\n")
         
-        # Store in session state for this session
+        # Store in session state
         if 'telemetry_events' not in st.session_state:
             st.session_state.telemetry_events = []
         st.session_state.telemetry_events.append(log_entry)
         
+    except Exception:
+        pass  # Silently fail
+
+# Log session start
+if 'telemetry_started' not in st.session_state:
+    st.session_state.telemetry_started = True
+    log_telemetry("session_start")
+
+# -----------------------------------------------------------------------------
+# CREATE TELEMETRY PUSH SCRIPT
+# -----------------------------------------------------------------------------
+def create_telemetry_push_script():
+    """Create a script to push telemetry logs to GitHub"""
+    script_content = '''#!/usr/bin/env python3
+"""
+Telemetry Log Pusher for Open Node
+Run this script periodically to push telemetry logs to GitHub
+"""
+
+import os
+import subprocess
+import json
+from datetime import datetime
+
+# Configuration
+GITHUB_REPO = "pyscriptcli/opennode-telemetry"
+GITHUB_BRANCH = "main"
+
+def push_telemetry():
+    """Push telemetry logs to GitHub repository"""
+    try:
+        # Check if telemetry_logs directory exists
+        if not os.path.exists("telemetry_logs"):
+            print("No telemetry_logs directory found")
+            return
+        
+        # Initialize git repo if not exists
+        if not os.path.exists(".git"):
+            subprocess.run(["git", "init"], check=True)
+            subprocess.run(["git", "remote", "add", "origin", f"https://github.com/{GITHUB_REPO}.git"], check=True)
+            print(f"Initialized git repository for {GITHUB_REPO}")
+        
+        # Add and commit logs
+        subprocess.run(["git", "add", "telemetry_logs/"], check=True)
+        
+        # Check if there are changes to commit
+        status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+        if status.stdout.strip():
+            commit_msg = f"Telemetry update {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+            subprocess.run(["git", "push", "-u", "origin", GITHUB_BRANCH], check=True)
+            print(f"Successfully pushed telemetry logs at {datetime.now()}")
+        else:
+            print("No new telemetry data to push")
+            
     except Exception as e:
-        pass  # Silently fail - don't disrupt user experience
+        print(f"Error pushing telemetry: {e}")
 
-# Capture user agent on first load
-if 'user_agent' not in st.session_state:
-    st.session_state.user_agent = st.request.headers.get('User-Agent', 'unknown') if hasattr(st, 'request') else 'unknown'
-    log_telemetry("session_start", {"user_agent": st.session_state.user_agent})
+if __name__ == "__main__":
+    push_telemetry()
+'''
+    
+    with open("push_telemetry.py", "w", encoding="utf-8") as f:
+        f.write(script_content)
+    os.chmod("push_telemetry.py", 0o755)  # Make executable
 
-# -----------------------------------------------------------------------------
-# RATE LIMITER CONFIGURATION
-# -----------------------------------------------------------------------------
-MAX_POI_SELECTIONS = 8
-
-# -----------------------------------------------------------------------------
-# PROGRESS TRACKING INITIALIZATION
-# -----------------------------------------------------------------------------
-if 'scan_progress' not in st.session_state:
-    st.session_state.scan_progress = 0
-if 'scan_status' not in st.session_state:
-    st.session_state.scan_status = ""
-if 'scan_step' not in st.session_state:
-    st.session_state.scan_step = 0
+# Create the push script on first run
+if not os.path.exists("push_telemetry.py"):
+    create_telemetry_push_script()
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -194,6 +235,7 @@ def clear_api_logs():
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
+MAX_POI_SELECTIONS = 8
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
@@ -747,6 +789,35 @@ with st.sidebar:
                     log_telemetry("file_imported", {"record_count": len(st.session_state.scanned_records)})
                     st.rerun()
                 except Exception: st.error("Invalid File")
+    
+    # -------------------------------------------------------------------------
+    # TELEMETRY ADMIN PANEL
+    # -------------------------------------------------------------------------
+    with st.expander("📊 Telemetry Data (Admin)", expanded=False):
+        if st.session_state.get('telemetry_events', []):
+            st.json(st.session_state.telemetry_events[-5:])
+        else:
+            st.info("No telemetry events yet")
+        
+        # Button to manually push telemetry to GitHub
+        if st.button("Push Telemetry to GitHub", type="secondary"):
+            try:
+                import subprocess
+                result = subprocess.run(["python", "push_telemetry.py"], capture_output=True, text=True)
+                if result.returncode == 0:
+                    st.success("Telemetry pushed successfully!")
+                else:
+                    st.error(f"Push failed: {result.stderr}")
+            except Exception as e:
+                st.error(f"Error: {e}")
+        
+        # Download telemetry logs
+        if os.path.exists("telemetry_logs"):
+            log_files = os.listdir("telemetry_logs")
+            if log_files:
+                latest_log = max(log_files)
+                with open(f"telemetry_logs/{latest_log}", "r") as f:
+                    st.download_button("Download Telemetry Logs", f.read(), "telemetry.jsonl", "application/json")
 
 # -----------------------------------------------------------------------------
 # 4. MAP FRAME RENDERING ENGINE
