@@ -7,109 +7,63 @@ import math
 import time
 import uuid
 import platform
-import subprocess
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
-# TELEMETRY LOGGING CONFIGURATION
+# SESSION LOGS (Extensive Debug Logging - No GitHub Push)
 # -----------------------------------------------------------------------------
-if 'user_id' not in st.session_state:
-    st.session_state.user_id = str(uuid.uuid4())[:8]
+if 'session_id' not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())[:8]
 
-def log_telemetry(event_type, event_data=None):
-    """Log telemetry data to local file"""
-    try:
-        log_entry = {
-            "timestamp": datetime.now().isoformat(),
-            "user_id": st.session_state.user_id,
-            "event_type": event_type,
-            "event_data": event_data or {},
-            "platform": platform.platform(),
-            "python_version": platform.python_version()
+if 'session_logs' not in st.session_state:
+    st.session_state.session_logs = []
+
+def log_event(event_type, event_name, event_data=None, level="INFO"):
+    """Extensive event logging for debugging - records every user action"""
+    timestamp = datetime.now().isoformat()
+    log_entry = {
+        "timestamp": timestamp,
+        "session_id": st.session_state.session_id,
+        "event_type": event_type,
+        "event_name": event_name,
+        "level": level,
+        "event_data": event_data or {},
+        "app_state": {
+            "scan_active": st.session_state.get('scan_active_loading', False),
+            "poi_count": len(st.session_state.get('scanned_records', [])),
+            "selected_tags_count": len(st.session_state.get('selected_tags_buffer', []))
         }
-        
-        # Save to local log file
-        log_dir = "telemetry_logs"
-        os.makedirs(log_dir, exist_ok=True)
-        log_file = os.path.join(log_dir, f"telemetry_{datetime.now().strftime('%Y%m%d')}.jsonl")
-        
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry) + "\n")
-        
-        # Store in session state
-        if 'telemetry_events' not in st.session_state:
-            st.session_state.telemetry_events = []
-        st.session_state.telemetry_events.append(log_entry)
-        
-    except Exception:
-        pass  # Silently fail
+    }
+    
+    st.session_state.session_logs.append(log_entry)
+    
+    # Also add to display logs
+    add_api_log(f"[{event_type}] {event_name}", level)
+    
+    # Keep only last 500 logs
+    if len(st.session_state.session_logs) > 500:
+        st.session_state.session_logs = st.session_state.session_logs[-500:]
+
+def clear_session_logs():
+    st.session_state.session_logs = []
+    add_api_log("Session logs cleared", "INFO")
+
+def get_session_logs_json():
+    """Export session logs as JSON for download"""
+    return json.dumps({
+        "export_time": datetime.now().isoformat(),
+        "session_id": st.session_state.session_id,
+        "total_events": len(st.session_state.session_logs),
+        "logs": st.session_state.session_logs
+    }, indent=2)
 
 # Log session start
-if 'telemetry_started' not in st.session_state:
-    st.session_state.telemetry_started = True
-    log_telemetry("session_start")
-
-# -----------------------------------------------------------------------------
-# CREATE TELEMETRY PUSH SCRIPT
-# -----------------------------------------------------------------------------
-def create_telemetry_push_script():
-    """Create a script to push telemetry logs to GitHub"""
-    script_content = '''#!/usr/bin/env python3
-"""
-Telemetry Log Pusher for Open Node
-Run this script periodically to push telemetry logs to GitHub
-"""
-
-import os
-import subprocess
-import json
-from datetime import datetime
-
-# Configuration
-GITHUB_REPO = "pyscriptcli/opennode-telemetry"
-GITHUB_BRANCH = "main"
-
-def push_telemetry():
-    """Push telemetry logs to GitHub repository"""
-    try:
-        # Check if telemetry_logs directory exists
-        if not os.path.exists("telemetry_logs"):
-            print("No telemetry_logs directory found")
-            return
-        
-        # Initialize git repo if not exists
-        if not os.path.exists(".git"):
-            subprocess.run(["git", "init"], check=True)
-            subprocess.run(["git", "remote", "add", "origin", f"https://github.com/{GITHUB_REPO}.git"], check=True)
-            print(f"Initialized git repository for {GITHUB_REPO}")
-        
-        # Add and commit logs
-        subprocess.run(["git", "add", "telemetry_logs/"], check=True)
-        
-        # Check if there are changes to commit
-        status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
-        if status.stdout.strip():
-            commit_msg = f"Telemetry update {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            subprocess.run(["git", "commit", "-m", commit_msg], check=True)
-            subprocess.run(["git", "push", "-u", "origin", GITHUB_BRANCH], check=True)
-            print(f"Successfully pushed telemetry logs at {datetime.now()}")
-        else:
-            print("No new telemetry data to push")
-            
-    except Exception as e:
-        print(f"Error pushing telemetry: {e}")
-
-if __name__ == "__main__":
-    push_telemetry()
-'''
-    
-    with open("push_telemetry.py", "w", encoding="utf-8") as f:
-        f.write(script_content)
-    os.chmod("push_telemetry.py", 0o755)  # Make executable
-
-# Create the push script on first run
-if not os.path.exists("push_telemetry.py"):
-    create_telemetry_push_script()
+if 'session_started' not in st.session_state:
+    st.session_state.session_started = True
+    log_event("SESSION", "start", {
+        "platform": platform.platform(),
+        "python_version": platform.python_version()
+    })
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -208,6 +162,24 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
+        
+        /* Hyperlink style for download button */
+        .hyperlink-download button {
+            background: transparent !important;
+            border: none !important;
+            color: #C9AB4C !important;
+            font-size: 9px !important;
+            font-weight: 600 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            text-decoration: underline !important;
+            box-shadow: none !important;
+            height: auto !important;
+        }
+        .hyperlink-download button:hover {
+            color: #003366 !important;
+            background: transparent !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -245,6 +217,8 @@ if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
+if 'selected_tags_buffer' not in st.session_state:
+    st.session_state.selected_tags_buffer = []
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -553,6 +527,7 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     overpass_priority = 1 if is_luzon else 2
     
     add_api_log(f"Smart hybrid: {'Luzon' if is_luzon else 'Visayas/Mindanao'}", "INFO")
+    log_event("DATA", "hybrid_mode", {"region": "Luzon" if is_luzon else "Visayas/Mindanao"})
     
     if province_name:
         all_province_pois = load_province_pois(province_name)
@@ -569,8 +544,10 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
                     "visible": True,
                 }, github_priority)
             add_api_log(f"GitHub loaded {len(tag_filtered)} POIs", "INFO")
+            log_event("DATA", "github_load", {"count": len(tag_filtered), "province": province_name})
         else:
             add_api_log(f"No GitHub data for {province_name}", "WARNING")
+            log_event("DATA", "github_load_failed", {"province": province_name}, "WARNING")
     
     elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
     
@@ -595,6 +572,7 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
             overpass_count += 1
     
     add_api_log(f"Overpass loaded {overpass_count} POIs", "INFO")
+    log_event("DATA", "overpass_load", {"count": overpass_count})
     
     for idx, record in enumerate(records):
         record['uid'] = idx
@@ -602,9 +580,11 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     github_final = sum(1 for r in records if r['source'] == 'github')
     overpass_final = sum(1 for r in records if r['source'] == 'overpass')
     add_api_log(f"Final: {len(records)} unique POIs (GitHub: {github_final}, Overpass: {overpass_final})", "INFO")
+    log_event("DATA", "load_complete", {"total": len(records), "github": github_final, "overpass": overpass_final})
     
     if len(records) < 20 and selected_tags:
         add_api_log(f"Only {len(records)} POIs, retrying without tags", "WARNING")
+        log_event("DATA", "retry_without_tags", {"original_count": len(records)}, "WARNING")
         return load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, [])
     
     return records
@@ -626,6 +606,7 @@ with st.sidebar:
     if coord_match:
         lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
         st.session_state.geo_coords = location_input
+        log_event("UI", "coordinates_changed", {"coords": location_input})
     else:
         fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
         lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
@@ -659,11 +640,13 @@ with st.sidebar:
                         if not is_checked:
                             selected_tags.append(tag)
                             current_selection_count += 1
+                            log_event("UI", "tag_selected", {"tag": label, "category": cat_name})
                     else:
                         if is_checked:
                             if tag in selected_tags:
                                 selected_tags.remove(tag)
                                 current_selection_count -= 1
+                                log_event("UI", "tag_deselected", {"tag": label, "category": cat_name})
 
     st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
     with st.container():
@@ -687,17 +670,22 @@ with st.sidebar:
                                     selected_tags.remove(tag)
                                     current_selection_count -= 1
 
+    st.session_state.selected_tags_buffer = selected_tags
+    
     if scan_triggered:
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
+            log_event("ERROR", "scan_failed_no_tags", {}, "ERROR")
         elif len(selected_tags) > MAX_POI_SELECTIONS:
             st.error(f"Rate limit exceeded! Maximum {MAX_POI_SELECTIONS} categories. You selected {len(selected_tags)}.")
             add_api_log(f"Rate limit blocked: {len(selected_tags)} categories", "WARNING")
+            log_event("ERROR", "rate_limit_exceeded", {"selected": len(selected_tags), "max": MAX_POI_SELECTIONS}, "ERROR")
         else:
-            log_telemetry("scan_started", {
+            log_event("ACTION", "scan_started", {
                 "tags_count": len(selected_tags),
                 "radius": radius_val,
-                "coordinates": f"{lat_coord}, {lon_coord}"
+                "coordinates": f"{lat_coord}, {lon_coord}",
+                "tags": selected_tags[:10]
             })
             add_api_log(f"Scan initiated with {len(selected_tags)} tags", "INFO")
             st.session_state.scan_active_loading = True
@@ -713,8 +701,10 @@ if st.session_state.scan_active_loading:
     # Step 1
     status_placeholder.text("Locating province from coordinates...")
     progress_placeholder.progress(10)
+    log_event("PROCESS", "step_1_locating_province", {"lat": lat_coord, "lon": lon_coord})
     
     province_name = get_province_from_coords(lat_coord, lon_coord)
+    log_event("PROCESS", "province_detected", {"province": province_name})
     
     # Step 2
     status_placeholder.text(f"Loading data from {'GitHub' if province_name else 'Overpass API'}...")
@@ -740,12 +730,12 @@ if st.session_state.scan_active_loading:
         st.session_state.last_scan_lon = lon_coord
         status_placeholder.text(f"Complete! Found {len(records)} POIs")
         progress_placeholder.progress(100)
-        log_telemetry("scan_completed", {"poi_count": len(records), "success": True})
+        log_event("SUCCESS", "scan_completed", {"poi_count": len(records)})
     else:
         st.session_state.scanned_records = []
         status_placeholder.text("No POIs found in this area")
         progress_placeholder.progress(100)
-        log_telemetry("scan_completed", {"poi_count": 0, "success": False})
+        log_event("WARNING", "scan_completed_no_results", {"radius": radius_val, "tags_count": len(selected_tags)}, "WARNING")
     
     time.sleep(1)
     progress_placeholder.empty()
@@ -758,7 +748,7 @@ if st.session_state.scan_active_loading:
 with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("CLEAR ALL", type="primary", key="clear_btn"):
-        log_telemetry("clear_all", {"records_cleared": len(st.session_state.scanned_records)})
+        log_event("ACTION", "clear_all", {"records_cleared": len(st.session_state.scanned_records)})
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
@@ -786,42 +776,91 @@ with st.sidebar:
                     st.session_state.scanned_records = data.get("scanned_records", data)
                     st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
                     st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
-                    log_telemetry("file_imported", {"record_count": len(st.session_state.scanned_records)})
+                    log_event("ACTION", "file_imported", {"record_count": len(st.session_state.scanned_records)})
                     st.rerun()
-                except Exception: st.error("Invalid File")
+                except Exception: 
+                    st.error("Invalid File")
+                    log_event("ERROR", "file_import_failed", {}, "ERROR")
     
     # -------------------------------------------------------------------------
-    # TELEMETRY ADMIN PANEL
+    # SESSION LOGS PANEL (Hyperlink-style download button)
     # -------------------------------------------------------------------------
-    with st.expander("📊 Telemetry Data (Admin)", expanded=False):
-        if st.session_state.get('telemetry_events', []):
-            st.json(st.session_state.telemetry_events[-5:])
-        else:
-            st.info("No telemetry events yet")
+    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
+    
+    with st.expander("📋 SESSION LOGS", expanded=False):
+        st.markdown("<div style='font-size: 10px; font-weight: 600; margin-bottom: 8px;'>Event Timeline</div>", unsafe_allow_html=True)
         
-        # Button to manually push telemetry to GitHub
-        if st.button("Push Telemetry to GitHub", type="secondary"):
-            try:
-                import subprocess
-                result = subprocess.run(["python", "push_telemetry.py"], capture_output=True, text=True)
-                if result.returncode == 0:
-                    st.success("Telemetry pushed successfully!")
+        # Display recent logs in a scrollable container
+        if st.session_state.get('session_logs', []):
+            log_text = ""
+            for log in st.session_state.session_logs[-50:]:
+                time_str = log.get('timestamp', '')[-12:-3] if log.get('timestamp') else ''
+                event_type = log.get('event_type', '')
+                event_name = log.get('event_name', '')
+                level = log.get('level', 'INFO')
+                
+                if level == 'ERROR':
+                    icon = "🔴"
+                elif level == 'WARNING':
+                    icon = "🟡"
+                elif event_type == 'ACTION':
+                    icon = "👆"
+                elif event_type == 'DATA':
+                    icon = "📊"
+                elif event_type == 'SUCCESS':
+                    icon = "✅"
+                elif event_type == 'UI':
+                    icon = "🎨"
                 else:
-                    st.error(f"Push failed: {result.stderr}")
-            except Exception as e:
-                st.error(f"Error: {e}")
+                    icon = "🟢"
+                
+                log_text += f"{icon} [{time_str}] {event_type}: {event_name}\n"
+                if log.get('event_data'):
+                    data_str = str(log.get('event_data'))[:80]
+                    log_text += f"     📎 {data_str}\n"
+            
+            st.code(log_text, language="text", line_numbers=False)
+        else:
+            st.info("No events logged yet")
         
-        # Download telemetry logs
-        if os.path.exists("telemetry_logs"):
-            log_files = os.listdir("telemetry_logs")
-            if log_files:
-                latest_log = max(log_files)
-                with open(f"telemetry_logs/{latest_log}", "r") as f:
-                    st.download_button("Download Telemetry Logs", f.read(), "telemetry.jsonl", "application/json")
+        st.markdown("---")
+        
+        # Hyperlink-style download button
+        st.markdown("""
+            <style>
+                .small-download-btn button {
+                    background: transparent !important;
+                    border: none !important;
+                    color: #C9AB4C !important;
+                    font-size: 9px !important;
+                    font-weight: 600 !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    text-decoration: underline !important;
+                    box-shadow: none !important;
+                    height: auto !important;
+                }
+                .small-download-btn button:hover {
+                    color: #003366 !important;
+                    background: transparent !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # Create a small hyperlink-style download button
+        session_logs_json = get_session_logs_json()
+        b64 = base64.b64encode(session_logs_json.encode()).decode()
+        href = f'<a href="data:application/json;base64,{b64}" download="session_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json" style="font-size: 9px; color: #C9AB4C; text-decoration: underline; cursor: pointer;">📥 download session logs</a>'
+        st.markdown(href, unsafe_allow_html=True)
+        
+        # Also show session info
+        st.caption(f"Session ID: {st.session_state.session_id} | Events: {len(st.session_state.session_logs)}")
 
 # -----------------------------------------------------------------------------
 # 4. MAP FRAME RENDERING ENGINE
 # -----------------------------------------------------------------------------
+import base64
+
 pts_active = st.session_state.scanned_records
 unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
 cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
