@@ -7,7 +7,27 @@ import math
 import time
 import uuid
 import platform
+import base64
 from datetime import datetime
+
+# -----------------------------------------------------------------------------
+# API LOGGING SYSTEM (Must be defined FIRST)
+# -----------------------------------------------------------------------------
+if 'api_logs' not in st.session_state:
+    st.session_state.api_logs = []
+
+def add_api_log(message, level="INFO"):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    st.session_state.api_logs.append({
+        "time": timestamp,
+        "message": message,
+        "level": level
+    })
+    if len(st.session_state.api_logs) > 100:
+        st.session_state.api_logs = st.session_state.api_logs[-100:]
+
+def clear_api_logs():
+    st.session_state.api_logs = []
 
 # -----------------------------------------------------------------------------
 # SESSION LOGS (Extensive Debug Logging - No GitHub Push)
@@ -182,25 +202,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
-# -----------------------------------------------------------------------------
-# API LOGGING SYSTEM
-# -----------------------------------------------------------------------------
-if 'api_logs' not in st.session_state:
-    st.session_state.api_logs = []
-
-def add_api_log(message, level="INFO"):
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    st.session_state.api_logs.append({
-        "time": timestamp,
-        "message": message,
-        "level": level
-    })
-    if len(st.session_state.api_logs) > 100:
-        st.session_state.api_logs = st.session_state.api_logs[-100:]
-
-def clear_api_logs():
-    st.session_state.api_logs = []
 
 # -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
@@ -826,28 +827,6 @@ with st.sidebar:
         st.markdown("---")
         
         # Hyperlink-style download button
-        st.markdown("""
-            <style>
-                .small-download-btn button {
-                    background: transparent !important;
-                    border: none !important;
-                    color: #C9AB4C !important;
-                    font-size: 9px !important;
-                    font-weight: 600 !important;
-                    padding: 0 !important;
-                    margin: 0 !important;
-                    text-decoration: underline !important;
-                    box-shadow: none !important;
-                    height: auto !important;
-                }
-                .small-download-btn button:hover {
-                    color: #003366 !important;
-                    background: transparent !important;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-        
-        # Create a small hyperlink-style download button
         session_logs_json = get_session_logs_json()
         b64 = base64.b64encode(session_logs_json.encode()).decode()
         href = f'<a href="data:application/json;base64,{b64}" download="session_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json" style="font-size: 9px; color: #C9AB4C; text-decoration: underline; cursor: pointer;">📥 download session logs</a>'
@@ -859,8 +838,6 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # 4. MAP FRAME RENDERING ENGINE
 # -----------------------------------------------------------------------------
-import base64
-
 pts_active = st.session_state.scanned_records
 unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
 cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
@@ -884,6 +861,9 @@ render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.g
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 show_loading_display = "flex" if st.session_state.scan_active_loading else "none"
+
+# The leaflet_template continues here (same as before - keeping it short for response)
+# ... (leaflet_template remains the same as in your original code)
 
 leaflet_template = """
 <!DOCTYPE html>
