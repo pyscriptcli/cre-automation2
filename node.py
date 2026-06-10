@@ -135,16 +135,169 @@ if 'global_marker_size' not in st.session_state: st.session_state.global_marker_
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
 POI_CONFIG = {
-    "COMMERCIAL & OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
-    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"market|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i'], ['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"'], ['Travel agency', '"shop"="travel_agency"']],
-    "FOOD, BEVERAGE & HOSPITALITY": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Casino', '"amenity"="casino"']],
-    "RESIDENTIAL": [['Apartments', '"building"="apartments"'], ['House', '"building"="house"'], ['Residential Area', '"landuse"="residential"'], ['Condominium', '"building"="residential"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"'], ['Construction', '"landuse"="construction"']],
-    "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports & Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'], ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses & Depots', '"building"~"warehouse|depot",i'], ['Storage Facilities', '"building"="storage"'], ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']],
-    "HEALTH & EMERGENCY SERVICES": [['Hospital', '"amenity"~"hospital|clinic",i'], ['Clinic', '"amenity"="clinic"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Firestation', '"amenity"="fire_station"'], ['Police', '"amenity"="police"'], ['Hospital Adv', '"amenity"="hospital"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i']],
-    "GOVERNMENT, EDUCATION & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i'], ['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"'], ['Embassy', '"amenity"="embassy"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['University', '"amenity"="university"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Public camera', '"man_made"="surveillance"']],
-    "LEISURE, SPORTS & PUBLIC SPACES": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Fuel', '"amenity"="fuel"'], ['Parking', '"amenity"="parking"'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"'], ['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Recycling', '"amenity"="recycling"'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Image', '"image"~".",i']]
+    "🍔 FOOD & DINING": {
+        "icon": "🍽️",
+        "items": [
+            ("Restaurants & Dining", "amenity=restaurant"),
+            ("Fast Food", "amenity=fast_food"),
+            ("Cafes & Coffee Shops", "amenity=cafe"),
+            ("Bakeries & Panaderia", "shop=bakery"),
+            ("Food Courts", "amenity=food_court"),
+            ("Bars & Pubs", "amenity=bar"),
+        ]
+    },
+    
+    "🛍️ RETAIL & SHOPPING": {
+        "icon": "🛒",
+        "items": [
+            ("Malls & Shopping Centers", "shop=mall"),
+            ("Supermarkets & Groceries", "shop=supermarket"),
+            ("Convenience Stores", "shop=convenience"),
+            ("Pharmacies & Drugstores", "amenity=pharmacy"),
+            ("Public Markets / Palengke", "amenity=marketplace"),
+            ("Hardware Stores", "shop=hardware"),
+            ("Department Stores", "shop=department_store"),
+            ("Bookstores", "shop=books"),
+            ("Clothing & Apparel Stores", "shop=clothes"),
+            ("Electronics Stores", "shop=electronics"),
+            ("Mobile Phone Stores", "shop=mobile_phone"),
+            ("Pawnshops", "shop=pawnbroker"),
+        ]
+    },
+    
+    "🏥 HEALTH & EMERGENCY": {
+        "icon": "🏥",
+        "items": [
+            ("Hospitals", "amenity=hospital"),
+            ("Clinics & Health Centers", "amenity=clinic"),
+            ("Police Stations", "amenity=police"),
+            ("Fire Stations", "amenity=fire_station"),
+        ]
+    },
+    
+    "🏛️ GOVERNMENT & PUBLIC SERVICES": {
+        "icon": "🏛️",
+        "items": [
+            ("City / Municipal Halls", "amenity=townhall"),
+            ("Barangay Halls", "amenity=townhall"),
+            ("Post Offices", "amenity=post_office"),
+            ("Public Libraries", "amenity=library"),
+            ("Government Offices (General)", "office=government"),
+            ("Courts / Hall of Justice", "amenity=courthouse"),
+        ]
+    },
+    
+    "🎓 EDUCATION": {
+        "icon": "📚",
+        "items": [
+            ("Universities & Colleges", "amenity=university"),
+            ("Schools (High School & Elementary)", "amenity=school"),
+            ("Kindergarten & Daycares", "amenity=kindergarten"),
+            ("Vocational & TESDA Centers", "amenity=college"),
+        ]
+    },
+    
+    "⛪ RELIGIOUS SITES": {
+        "icon": "⛪",
+        "items": [
+            ("Churches, Chapels & Religious Buildings", "building~church|cathedral|chapel|religious|mosque|temple"),
+        ]
+    },
+    
+    "🚍 TRANSPORTATION": {
+        "icon": "🚍",
+        "items": [
+            ("Bus Stops & Terminals", "highway=bus_stop"),
+            ("Jeepney & Tricycle Terminals", "amenity=taxi"),
+            ("Train Stations (PNR, LRT, MRT)", "railway=station"),
+            ("Ferry Terminals & Piers", "amenity=ferry_terminal"),
+            ("Airports", "aeroway=aerodrome"),
+            ("Gas Stations", "amenity=fuel"),
+            ("Parking Lots", "amenity=parking"),
+        ]
+    },
+    
+    "💰 FINANCIAL SERVICES": {
+        "icon": "💰",
+        "items": [
+            ("ATMs", "amenity=atm"),
+            ("Banks", "amenity=bank"),
+            ("Money Remittance Centers", "amenity=money_transfer"),
+        ]
+    },
+    
+    "📡 TELECOM & UTILITIES": {
+        "icon": "📡",
+        "items": [
+            ("Mobile Phone Stores (Globe, Smart, DITO)", "shop=mobile_phone"),
+            ("Internet Cafes / Computer Shops", "amenity=internet_cafe"),
+            ("Water Refilling Stations", "amenity=water_point"),
+            ("Courier & Shipping Services", "office=courier"),
+        ]
+    },
+    
+    "🏢 OFFICES & COMMERCIAL": {
+        "icon": "🏢",
+        "items": [
+            ("Corporate Offices & Business Centers", "office~company|commercial|business|corporate|it|lawyer|architect|estate_agent|consulting|advertising_agency|telecommunication|financial|insurance|accountant|ngo|diplomatic"),
+        ]
+    },
+    
+    "🌳 PARKS & RECREATION": {
+        "icon": "🌳",
+        "items": [
+            ("Parks & Plazas", "leisure=park"),
+            ("Playgrounds", "leisure=playground"),
+            ("Sports Centers & Gyms", "leisure=sports_centre"),
+            ("Basketball Courts", "sport=basketball"),
+            ("Stadiums & Arenas", "leisure=stadium"),
+            ("Cinemas & Theaters", "amenity=cinema"),
+            ("Museums", "tourism=museum"),
+        ]
+    },
+    
+    "🔧 SERVICES & REPAIRS": {
+        "icon": "🔧",
+        "items": [
+            ("Car Repair & Vulcanizing Shops", "shop=car_repair"),
+            ("Car Washes", "amenity=car_wash"),
+            ("Tailors & Dress Shops", "shop=tailor"),
+            ("Electronics & Phone Repair", "shop=electronics_repair"),
+            ("Printing & Photocopy Shops", "shop=printing"),
+        ]
+    },
+    
+    "🏨 ACCOMMODATION": {
+        "icon": "🏨",
+        "items": [
+            ("Hotels", "tourism=hotel"),
+            ("Resorts", "tourism=resort"),
+            ("Motels & Inns", "tourism=motel"),
+            ("Hostels & Backpackers", "tourism=hostel"),
+        ]
+    },
+    
+    "🚻 PUBLIC FACILITIES": {
+        "icon": "🚻",
+        "items": [
+            ("Public Toilets / CR", "amenity=toilets"),
+            ("Drinking Water Stations", "amenity=drinking_water"),
+            ("Public Benches", "amenity=bench"),
+            ("Viewpoints / Mirador", "tourism=viewpoint"),
+        ]
+    },
+    
+    "🏛️ HISTORICAL & CULTURAL": {
+        "icon": "🏛️",
+        "items": [
+            ("Heritage & Historical Buildings", "building=historic|cathedral"),
+            ("National Shrines", "historic=shrine"),
+            ("Cultural Heritage Sites", "heritage=yes"),
+        ]
+    },
 }
 
+# ADVANCED_CONFIG removed
 ADVANCED_CONFIG = {}
 
 def compile_features_kml(features):
