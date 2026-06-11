@@ -25,7 +25,7 @@ st.markdown("""
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 51, 102, 0.75);
+    background: rgba(0, 51, 102, 0.8);
     backdrop-filter: blur(5px);
     z-index: 9999999;
     display: flex;
@@ -55,35 +55,54 @@ st.markdown("""
             color: #888780;
             cursor: pointer;
         ">×</button>
+        
         <div style="font-size: 40px; margin-bottom: 15px;">🛠️</div>
-        <h3 style="margin: 0 0 10px 0; color: #003366; font-size: 16px; font-weight: 800; text-transform: uppercase;">Under Maintenance</h3>
-        <p style="margin: 0 0 20px 0; color: #555555; font-size: 12px;">Sorry for the inconvenience! We are updating the system. You may dismiss this notice to continue testing.</p>
+        <h3 style="margin: 0 0 10px 0; color: #003366; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
+            Under Maintenance
+        </h3>
+        <p style="margin: 0 0 20px 0; color: #555555; font-size: 12px; line-height: 1.6;">
+            Sorry for the inconvenience! This web app is currently under development and maintenance. You may dismiss this notice to continue testing.
+        </p>
+        
         <button onclick="closeMaintenanceOverlay()" style="
             background: #003366;
             color: #ffffff;
             border: none;
             border-radius: 4px;
-            padding: 8px 20px;
+            padding: 10px 20px;
             font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
-            width: 100%;
+            letter-spacing: 1px;
             cursor: pointer;
-        ">Proceed to Application</button>
+            width: 100%;
+        ">
+            Proceed to Application
+        </button>
     </div>
 </div>
 
 <script>
-    if (sessionStorage.getItem('maintenance_dismissed') === 'true') {
-        document.getElementById('maintenance-overlay').style.display = 'none';
+    // Target the parent window DOM instead of the local iframe document
+    const parentDoc = window.parent.document;
+
+    if (window.parent.sessionStorage.getItem('maintenance_dismissed') === 'true') {
+        const overlay = parentDoc.getElementById('maintenance-overlay') || document.getElementById('maintenance-overlay');
+        if (overlay) overlay.style.display = 'none';
     }
+
     function closeMaintenanceOverlay() {
-        document.getElementById('maintenance-overlay').style.display = 'none';
-        sessionStorage.setItem('maintenance_dismissed', 'true');
+        // Hide it in both local frame and parent container to be safe
+        const localOverlay = document.getElementById('maintenance-overlay');
+        const parentOverlay = parentDoc.getElementById('maintenance-overlay');
+        
+        if (localOverlay) localOverlay.style.display = 'none';
+        if (parentOverlay) parentOverlay.style.display = 'none';
+        
+        window.parent.sessionStorage.setItem('maintenance_dismissed', 'true');
     }
 </script>
 """, unsafe_allow_html=True)
-
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
