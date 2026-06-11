@@ -16,7 +16,7 @@ if not os.path.exists(_config_file):
         f.write("[theme]\nbase=\"light\"\n")
 
 # -----------------------------------------------------------------------------
-# For Maintenance                                                              
+# For Maintenance                     
 # Ensure the snippet ends exactly with the unsafe_allow_html parameter
 st.markdown("""
 <div id="maintenance-overlay" style="
@@ -83,7 +83,6 @@ st.markdown("""
 </div>
 
 <script>
-    // Target the parent window DOM instead of the local iframe document
     const parentDoc = window.parent.document;
 
     if (window.parent.sessionStorage.getItem('maintenance_dismissed') === 'true') {
@@ -92,7 +91,6 @@ st.markdown("""
     }
 
     function closeMaintenanceOverlay() {
-        // Hide it in both local frame and parent container to be safe
         const localOverlay = document.getElementById('maintenance-overlay');
         const parentOverlay = parentDoc.getElementById('maintenance-overlay');
         
