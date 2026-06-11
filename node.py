@@ -28,7 +28,7 @@ if "maintenance_dismissed" not in st.session_state:
 if not st.session_state.maintenance_dismissed:
     
     # Simple invisible button to let Python catch the click event safely
-    if st.button(" Sorry for the inconvinience. This app is under maintenance. You may still continue testing but expects some bugs", key="py_dismiss_btn", use_container_width=True):
+    if st.button(" Sorry for the inconvinience. This app is under maintenance. You may still continue testing but expect some bugs", key="py_dismiss_btn", use_container_width=True):
         st.session_state.maintenance_dismissed = True
         st.rerun()
 
