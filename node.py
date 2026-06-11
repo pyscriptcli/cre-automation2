@@ -585,144 +585,57 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
 # -----------------------------------------------------------------------------
 # LOADING SCREEN HTML (SEMI-TRANSPARENT OVERLAY)
 # -----------------------------------------------------------------------------
-def show_loading_screen():
-    """Display loading screen with source tracking - semi-transparent overlay"""
+# Alternative: Use a placeholder for loading state
+if st.session_state.scan_active_loading:
+    loading_placeholder = st.empty()
     
-    # Get current loading state
-    source = st.session_state.get('loading_source', 'starting')
-    step = st.session_state.get('loading_step', 0)
-    progress = st.session_state.get('loading_progress', 0)
-    
-    # Source display text and icon
-    source_display = {
-        "starting": ("🔄", "Initializing..."),
-        "detecting": ("📍", "Detecting region (Luzon/Visayas/Mindanao)..."),
-        "github_primary": ("📦", "Luzon detected - Using GitHub pre-processed data..."),
-        "overpass_primary": ("🌐", "Visayas/Mindanao detected - Using Overpass live API..."),
-        "github": ("📦", "Loading from GitHub pre-processed data..."),
-        "overpass": ("🌐", "Loading from Overpass live API..."),
-        "complete": ("✅", "Complete! Rendering map..."),
-    }
-    
-    icon, message = source_display.get(source, ("⏳", "Loading..."))
-    
-    # Step messages
-    step_messages = {
-        0: "Starting...",
-        1: "Analyzing coordinates...",
-        2: "Fetching local GitHub data...",
-        3: "Querying Overpass API...",
-        4: "Processing results...",
-        5: "Finalizing...",
-    }
-    
-    step_text = step_messages.get(step, "Working...")
-    
-    # Create loading HTML with semi-transparent overlay
-    loading_html = f"""
-    <div id="custom-loading-overlay" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.65);
-        z-index: 999999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: 'Montserrat', sans-serif;
-        backdrop-filter: blur(2px);
-    ">
+    with loading_placeholder.container():
+        st.markdown("""
         <div style="
-            background: white;
-            padding: 28px 40px;
-            border-radius: 16px;
-            min-width: 360px;
-            text-align: center;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
-            border: 1px solid rgba(0, 51, 102, 0.15);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         ">
-            <!-- Spinner -->
             <div style="
-                width: 48px;
-                height: 48px;
-                border: 3px solid #e0e0e0;
-                border-top-color: #003366;
-                border-radius: 50%;
-                margin: 0 auto 20px auto;
-                animation: spin 0.7s linear infinite;
-            "></div>
-            
-            <!-- Title -->
-            <div style="
-                font-size: 14px;
-                font-weight: 800;
-                color: #003366;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-                margin-bottom: 16px;
-            ">SCANNING AREA</div>
-            
-            <!-- Source Indicator -->
-            <div style="
-                background: #f0f2f6;
-                padding: 10px 12px;
-                border-radius: 10px;
-                margin-bottom: 16px;
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                text-align: center;
             ">
-                <div style="font-size: 26px; margin-bottom: 6px;">{icon}</div>
-                <div style="
-                    font-size: 11px;
-                    font-weight: 600;
-                    color: #003366;
-                ">{message}</div>
+                <div class="spinner"></div>
+                <h3>Scanning Area...</h3>
+                <p>Loading POI data</p>
             </div>
-            
-            <!-- Step Text -->
-            <div style="
-                font-size: 10px;
-                color: #666;
-                margin-bottom: 14px;
-                font-family: monospace;
-            ">{step_text}</div>
-            
-            <!-- Progress Bar -->
-            <div style="
-                width: 100%;
-                height: 4px;
-                background: #e8e8e8;
-                border-radius: 4px;
-                overflow: hidden;
-                margin-bottom: 8px;
-            ">
-                <div style="
-                    width: {progress}%;
-                    height: 100%;
-                    background: #003366;
-                    transition: width 0.2s ease;
-                    border-radius: 4px;
-                "></div>
-            </div>
-            
-            <!-- Progress Text -->
-            <div style="
-                font-size: 9px;
-                color: #999;
-                font-weight: 500;
-            ">{progress}% complete</div>
         </div>
-    </div>
+        <style>
+            .spinner {
+                width: 40px;
+                height: 40px;
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #003366;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 15px auto;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+        """, unsafe_allow_html=True)
     
-    <style>
-        @keyframes spin {{
-            0% {{ transform: rotate(0deg); }}
-            100% {{ transform: rotate(360deg); }}
-        }}
-    </style>
-    """
+    # Do your loading...
+    records = load_pois_smart_hybrid(...)
     
-    return loading_html
+    # Clear the loading overlay
+    loading_placeholder.empty()
 
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
