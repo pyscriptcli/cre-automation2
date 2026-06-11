@@ -5,7 +5,9 @@ import json
 import os
 import math
 import time
+import streamlit.components.v1 as components
 from datetime import datetime
+
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -16,22 +18,22 @@ if not os.path.exists(_config_file):
         f.write("[theme]\nbase=\"light\"\n")
 
 # -----------------------------------------------------------------------------
-# For Maintenance                     
-# Ensure the snippet ends exactly with the unsafe_allow_html parameter
-st.markdown("""
+# For Maintenance (Native Component Execution Engine)
+# -----------------------------------------------------------------------------
+components.html("""
 <div id="maintenance-overlay" style="
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 51, 102, 0.8);
+    background: rgba(0, 51, 102, 0.85);
     backdrop-filter: blur(5px);
     z-index: 9999999;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-family: 'Montserrat', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 ">
     <div style="
         background: #ffffff;
@@ -69,7 +71,7 @@ st.markdown("""
             color: #ffffff;
             border: none;
             border-radius: 4px;
-            padding: 10px 20px;
+            padding: 12px 20px;
             font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
@@ -83,24 +85,54 @@ st.markdown("""
 </div>
 
 <script>
-    const parentDoc = window.parent.document;
+    // Access the true top-level document window bypassing the Streamlit framework shadow DOM
+    const targetDoc = window.parent.document;
 
+    // Inject our CSS styles into the parent page dynamically to make the iframe invisible when needed
+    const style = targetDoc.createElement('style');
+    style.id = 'maintenance-iframe-fix-css';
+    style.innerHTML = `
+        iframe[title="streamlit.components.v1.html"] {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999999 !important;
+            border: none !important;
+        }
+        .st_iframe_hidden {
+            display: none !important;
+        }
+    `;
+    if (!targetDoc.getElementById('maintenance-iframe-fix-css')) {
+        targetDoc.head.appendChild(style);
+    }
+
+    // Locate this specific iframe node inside the parent window
+    let currentIframe = null;
+    const iframes = targetDoc.querySelectorAll('iframe');
+    iframes.forEach(f => {
+        if (f.contentWindow === window) { currentIframe = f; }
+    });
+
+    // Run the visibility check matching the user's local session history
     if (window.parent.sessionStorage.getItem('maintenance_dismissed') === 'true') {
-        const overlay = parentDoc.getElementById('maintenance-overlay') || document.getElementById('maintenance-overlay');
-        if (overlay) overlay.style.display = 'none';
+        if (currentIframe) currentIframe.classList.add('st_iframe_hidden');
+        document.getElementById('maintenance-overlay').style.display = 'none';
     }
 
     function closeMaintenanceOverlay() {
-        const localOverlay = document.getElementById('maintenance-overlay');
-        const parentOverlay = parentDoc.getElementById('maintenance-overlay');
-        
-        if (localOverlay) localOverlay.style.display = 'none';
-        if (parentOverlay) parentOverlay.style.display = 'none';
-        
+        document.getElementById('maintenance-overlay').style.display = 'none';
         window.parent.sessionStorage.setItem('maintenance_dismissed', 'true');
+        
+        // Target and cleanly hide the parent framework iframe wrapper
+        if (currentIframe) {
+            currentIframe.classList.add('st_iframe_hidden');
+        }
     }
 </script>
-""", unsafe_allow_html=True)
+""", height=0)
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
