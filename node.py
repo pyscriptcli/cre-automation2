@@ -105,6 +105,29 @@ st.markdown("""
         
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
+        
+        /* Clear All hyperlink style */
+        .clear-all-hyperlink button {
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            color: #888780 !important;
+            font-size: 10px !important;
+            font-weight: 500 !important;
+            text-decoration: underline !important;
+            text-underline-offset: 3px !important;
+            cursor: pointer !important;
+            box-shadow: none !important;
+        }
+        .clear-all-hyperlink button:hover {
+            color: #003366 !important;
+            background: transparent !important;
+        }
+        .clear-all-hyperlink button p {
+            color: inherit !important;
+            font-size: 10px !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -133,7 +156,7 @@ def clear_api_logs():
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
-# Loading screen state variables (ADDED)
+# Loading screen state variables
 if 'loading_source' not in st.session_state:
     st.session_state.loading_source = ""
 if 'loading_step' not in st.session_state:
@@ -236,8 +259,8 @@ POI_CONFIG = {
     ],
     
     "OFFICE": [
-        ("Corporate Offices", "office~company|commercial|business|corporate|it|lawyer|architect|estate_agent|consulting|advertising_agency|telecommunication|financial|insurance|accountant|ngo|diplomatic"),
-    ],
+    ("Offices", "office=company|office=corporate|office=business|office=it|office=telecommunication|office=financial|office=insurance|office=lawyer|office=architect|office=accountant|office=consulting|office=coworking|office=administrative|office=yes"),
+],
     
     "PARKS & RECREATION": [
         ("Parks & Plazas", "leisure=park"),
@@ -267,13 +290,18 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
-# Unselect all POIs function (ADDED)
-def unselect_all_pois():
-    """Unselect all POI category checkboxes"""
+# Clear all POIs function (clears both data and selections)
+def clear_all_pois():
+    """Clear all POI data and unselect all checkboxes"""
+    st.session_state.scanned_records = []
+    st.session_state.layer_meta = {}
+    st.session_state.layer_groups = {}
+    st.session_state.scan_active_loading = False
+    # Unselect all POI category checkboxes
     for key in list(st.session_state.keys()):
         if key.startswith("chk_"):
             st.session_state[key] = False
-    add_api_log("All POI categories unselected", "INFO")
+    add_api_log("All POIs cleared and selections reset", "INFO")
 
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
@@ -434,7 +462,7 @@ def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
     return all_results
 
 def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, selected_tags):
-    # Track which source is being used (ADDED)
+    # Track which source is being used
     st.session_state.loading_source = "detecting"
     st.session_state.loading_step = 0
     st.session_state.loading_progress = 0
@@ -469,7 +497,7 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     github_priority = 2 if is_luzon else 1
     overpass_priority = 1 if is_luzon else 2
     
-    # Update loading source based on region (ADDED)
+    # Update loading source based on region
     if is_luzon:
         st.session_state.loading_source = "github_primary"
         add_api_log(f"Smart hybrid: Luzon detected - using GitHub as primary", "INFO")
@@ -555,10 +583,10 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     return records
 
 # -----------------------------------------------------------------------------
-# LOADING SCREEN HTML (ADDED - Independent, No Dependencies)
+# LOADING SCREEN HTML (SEMI-TRANSPARENT OVERLAY)
 # -----------------------------------------------------------------------------
 def show_loading_screen():
-    """Display loading screen with source tracking - completely independent"""
+    """Display loading screen with source tracking - semi-transparent overlay"""
     
     # Get current loading state
     source = st.session_state.get('loading_source', 'starting')
@@ -590,7 +618,7 @@ def show_loading_screen():
     
     step_text = step_messages.get(step, "Working...")
     
-    # Create loading HTML (pure HTML/CSS - no external dependencies)
+    # Create loading HTML with semi-transparent overlay
     loading_html = f"""
     <div id="custom-loading-overlay" style="
         position: fixed;
@@ -598,53 +626,54 @@ def show_loading_screen():
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0, 0, 0, 0.65);
         z-index: 999999;
         display: flex;
         align-items: center;
         justify-content: center;
         font-family: 'Montserrat', sans-serif;
+        backdrop-filter: blur(2px);
     ">
         <div style="
             background: white;
-            padding: 30px 40px;
-            border-radius: 12px;
-            min-width: 380px;
+            padding: 28px 40px;
+            border-radius: 16px;
+            min-width: 360px;
             text-align: center;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-            border: 1px solid rgba(0, 51, 102, 0.2);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+            border: 1px solid rgba(0, 51, 102, 0.15);
         ">
             <!-- Spinner -->
             <div style="
-                width: 50px;
-                height: 50px;
-                border: 4px solid #e0e0e0;
+                width: 48px;
+                height: 48px;
+                border: 3px solid #e0e0e0;
                 border-top-color: #003366;
                 border-radius: 50%;
                 margin: 0 auto 20px auto;
-                animation: spin 0.8s linear infinite;
+                animation: spin 0.7s linear infinite;
             "></div>
             
             <!-- Title -->
             <div style="
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: 800;
                 color: #003366;
                 text-transform: uppercase;
                 letter-spacing: 2px;
-                margin-bottom: 15px;
+                margin-bottom: 16px;
             ">SCANNING AREA</div>
             
             <!-- Source Indicator -->
             <div style="
                 background: #f0f2f6;
-                padding: 10px;
-                border-radius: 8px;
-                margin-bottom: 15px;
+                padding: 10px 12px;
+                border-radius: 10px;
+                margin-bottom: 16px;
             ">
-                <div style="font-size: 28px; margin-bottom: 5px;">{icon}</div>
+                <div style="font-size: 26px; margin-bottom: 6px;">{icon}</div>
                 <div style="
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: 600;
                     color: #003366;
                 ">{message}</div>
@@ -652,33 +681,35 @@ def show_loading_screen():
             
             <!-- Step Text -->
             <div style="
-                font-size: 11px;
+                font-size: 10px;
                 color: #666;
-                margin-bottom: 15px;
+                margin-bottom: 14px;
                 font-family: monospace;
             ">{step_text}</div>
             
             <!-- Progress Bar -->
             <div style="
                 width: 100%;
-                height: 6px;
-                background: #e0e0e0;
-                border-radius: 3px;
+                height: 4px;
+                background: #e8e8e8;
+                border-radius: 4px;
                 overflow: hidden;
-                margin-bottom: 10px;
+                margin-bottom: 8px;
             ">
                 <div style="
                     width: {progress}%;
                     height: 100%;
                     background: #003366;
-                    transition: width 0.3s ease;
+                    transition: width 0.2s ease;
+                    border-radius: 4px;
                 "></div>
             </div>
             
             <!-- Progress Text -->
             <div style="
-                font-size: 10px;
-                color: #888;
+                font-size: 9px;
+                color: #999;
+                font-weight: 500;
             ">{progress}% complete</div>
         </div>
     </div>
@@ -689,16 +720,6 @@ def show_loading_screen():
             100% {{ transform: rotate(360deg); }}
         }}
     </style>
-    
-    <script>
-        if (typeof window._loadingInterval === 'undefined') {{
-            window._loadingInterval = setInterval(function() {{
-                fetch(window.location.href)
-                    .then(function() {{}})
-                    .catch(function() {{}});
-            }}, 500);
-        }}
-    </script>
     """
     
     return loading_html
@@ -728,12 +749,12 @@ with st.sidebar:
     search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     
-    # Add Unselect All button near POI categories (ADDED)
-    col_unselect1, col_unselect2 = st.columns([3, 1])
-    with col_unselect2:
-        if st.button("Clear All", key="unselect_top_btn", use_container_width=True):
-            unselect_all_pois()
-            st.rerun()
+    # Clear All hyperlink button (small text hyperlink style)
+    st.markdown('<div class="clear-all-hyperlink">', unsafe_allow_html=True)
+    if st.button("Clear All Selections", key="clear_all_btn", use_container_width=True):
+        clear_all_pois()
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     
@@ -766,7 +787,7 @@ with st.sidebar:
 # PIPELINE EXECUTION FORWARD CONTROL (WITH ENHANCED LOADING SCREEN)
 # -----------------------------------------------------------------------------
 
-# Show loading screen while scanning (ADDED)
+# Show loading screen while scanning
 if st.session_state.scan_active_loading:
     # Display the loading overlay
     st.markdown(show_loading_screen(), unsafe_allow_html=True)
@@ -852,22 +873,12 @@ if st.session_state.scan_active_loading:
 with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Two columns for CLEAR ALL and UNSELECT ALL buttons (ADDED)
-    col_clear1, col_clear2 = st.columns(2)
-    
-    with col_clear1:
-        if st.button("CLEAR ALL", type="primary", key="clear_btn", use_container_width=True):
-            st.session_state.scanned_records = []
-            st.session_state.layer_meta = {}
-            st.session_state.layer_groups = {}
-            st.session_state.scan_active_loading = False
-            unselect_all_pois()
-            st.rerun()
-    
-    with col_clear2:
-        if st.button("UNSELECT ALL POIs", type="secondary", key="unselect_btn", use_container_width=True):
-            unselect_all_pois()
-            st.rerun()
+    # Single CLEAR ALL button (now just the hyperlink style, no separate unselect)
+    st.markdown('<div class="clear-all-hyperlink" style="margin-top: 8px;">', unsafe_allow_html=True)
+    if st.button("Clear All Data", key="clear_data_btn", use_container_width=True):
+        clear_all_pois()
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
@@ -933,7 +944,8 @@ leaflet_template = """
         #map-loading-overlay {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; height: 100%; 
-            background: rgba(255, 255, 255, 0.98); 
+            background: rgba(0, 0, 0, 0.6); 
+            backdrop-filter: blur(3px);
             z-index: 99999; 
             display: flex; 
             flex-direction: column; 
@@ -946,22 +958,22 @@ leaflet_template = """
             text-align: center; 
             background: #ffffff; 
             padding: 30px 50px; 
-            border-radius: 12px; 
+            border-radius: 16px; 
             border: 1px solid rgba(0, 51, 102, 0.15); 
-            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.1);
-            min-width: 300px;
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.2);
+            min-width: 320px;
         }
         .loading-spinner {
-            width: 60px; 
-            height: 60px; 
-            border: 4px solid rgba(0, 51, 102, 0.1);
-            border-left-color: #003366; 
+            width: 50px; 
+            height: 50px; 
+            border: 3px solid rgba(0, 51, 102, 0.15);
+            border-top-color: #003366; 
             border-radius: 50%; 
             animation: spin 0.8s linear infinite;
             margin: 0 auto 20px auto;
         }
         .loading-text { 
-            font-size: 14px; 
+            font-size: 13px; 
             font-weight: 800; 
             color: #003366; 
             text-transform: uppercase; 
@@ -978,18 +990,17 @@ leaflet_template = """
         }
         .loading-progress {
             width: 100%;
-            height: 2px;
+            height: 3px;
             background: rgba(0, 51, 102, 0.1);
             margin-top: 16px;
-            border-radius: 2px;
+            border-radius: 3px;
             overflow: hidden;
         }
         .loading-progress-bar {
             width: 0%;
             height: 100%;
             background: #003366;
-            animation: progress 2s ease-in-out infinite;
-            border-radius: 2px;
+            border-radius: 3px;
         }
         @keyframes progress {
             0% { width: 0%; }
@@ -1048,34 +1059,10 @@ leaflet_template = """
                 <div class="loading-text">LOADING POI DATA</div>
                 <div class="loading-subtext" id="loading-status">Initializing engine...</div>
                 <div class="loading-progress">
-                    <div class="loading-progress-bar"></div>
+                    <div class="loading-progress-bar" style="width: __LOADING_PROGRESS__%;"></div>
                 </div>
             </div>
         </div>
-        <script>
-            if (__SHOW_LOADING__ === "true") {
-                const statusMessages = [
-                    "Locating coordinates...",
-                    "Finding province...",
-                    "Loading from GitHub...",
-                    "Filtering POIs...",
-                    "Applying tag filters...",
-                    "Rendering map..."
-                ];
-                let msgIdx = 0;
-                const statusEl = document.getElementById('loading-status');
-                if (statusEl) {
-                    const interval = setInterval(() => {
-                        if (__SHOW_LOADING__ !== "true") {
-                            clearInterval(interval);
-                            return;
-                        }
-                        msgIdx = (msgIdx + 1) % statusMessages.length;
-                        statusEl.innerText = statusMessages[msgIdx];
-                    }, 1500);
-                }
-            }
-        </script>
         
         <div id="map"></div>
 
@@ -1354,6 +1341,12 @@ leaflet_template = """
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
 
+        // Update progress bar in loading overlay
+        function updateLoadingProgress(progress) {
+            const progressBar = document.querySelector('#map-loading-overlay .loading-progress-bar');
+            if (progressBar) progressBar.style.width = progress + '%';
+        }
+
         renderTargetCenterIcon(); renderRadiusCircleBounds(); compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
         if (pts.length > 0 && !__IS_STALE__) {
             const validPts = pts.filter(p => p.visible !== false);
@@ -1364,6 +1357,7 @@ leaflet_template = """
 </html>
 """
 
+# Update progress in template
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
@@ -1371,6 +1365,7 @@ leaflet_html = (leaflet_template
                 .replace("__IS_STALE__", is_stale)
                 .replace("__SHOW_LOADING__", show_loading)
                 .replace("__SHOW_LOADING_DISPLAY__", show_loading_display)
+                .replace("__LOADING_PROGRESS__", str(st.session_state.loading_progress))
                 .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
                 .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
                 .replace("__TARGET_CONFIG_JSON__", target_config_json)
