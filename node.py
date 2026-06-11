@@ -725,9 +725,9 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     st.session_state.loading_progress = 100
     st.session_state.loading_message = "Complete!"
     
-if len(records) < 20 and selected_tags:
-    add_api_log(f"Low POI count ({len(records)}) found for specific tags.", "INFO")
-    return records
+    if len(records) < 20 and selected_tags:
+        add_api_log(f"Low POI count ({len(records)}) found for specific tags.", "INFO")
+        return records
 
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
