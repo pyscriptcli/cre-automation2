@@ -365,7 +365,7 @@ POI_CONFIG = {
     ],
     
     "OFFICE": [
-        ("Offices", "office=company|office=corporate|office=business|office=it|office=telecommunication|office=coworking"),
+        ("Offices", "office~'.*'"),
     ],
     
     "PARKS & RECREATION": [
