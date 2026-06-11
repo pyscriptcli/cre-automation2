@@ -17,21 +17,6 @@ if not os.path.exists(_config_file):
     with open(_config_file, "w", encoding="utf-8") as f:
         f.write("[theme]\nbase=\"light\"\n")
 
-PROTOCOL: LIFECYCLE_RENDER_STABILIZATION | ACCURACY: 100% (Resolved Streamlit reactive loop iframe execution collision)
-
-The overlay disappears after one second because Streamlit reruns your entire node.py script from top to bottom right after it loads the initial page layout.
-
-When the app first loads, it draws the iframe. Then, your app's main backend logic triggers a state change (like setting up map sessions or loading files), causing a full script rerun. During this rerun, the components.html block is redrawn, wiping out the temporary states and clashing with the parent window styles.
-
-The Permanent Fix: Streamlit Session State Tracking
-To stop this from blinking out, we must handle the visibility control on the Python side using Streamlit's native st.session_state memory engine instead of relying entirely on JavaScript frames. This stops the iframe from rendering completely once it is closed.
-
-Replace your maintenance code block with this structurally sound layout:
-
-Python
-import streamlit as st
-import streamlit.components.v1 as components
-
 # -----------------------------------------------------------------------------
 # For Maintenance (Python + JS Lifecycle Synced Engine)
 # -----------------------------------------------------------------------------
