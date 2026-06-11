@@ -365,7 +365,7 @@ POI_CONFIG = {
     ],
     
     "OFFICE": [
-        ("Offices", "office=company|office=corporate|office=business|office=it|office=telecommunication|office=financial|office=insurance|office=lawyer|office=architect|office=accountant|office=consulting|office=coworking|office=administrative|office=yes"),
+        ("Offices", "office=company|office=corporate|office=business|office=it|office=telecommunication|office=coworking"),
     ],
     
     "PARKS & RECREATION": [
