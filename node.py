@@ -133,6 +133,14 @@ def clear_api_logs():
 DEFAULT_COORDS = "14.5995, 120.9842"
 DEFAULT_RADIUS = 1000
 
+# Loading screen state variables (ADDED)
+if 'loading_source' not in st.session_state:
+    st.session_state.loading_source = ""
+if 'loading_step' not in st.session_state:
+    st.session_state.loading_step = 0
+if 'loading_progress' not in st.session_state:
+    st.session_state.loading_progress = 0
+
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
@@ -258,6 +266,14 @@ POI_CONFIG = {
 }
 
 ADVANCED_CONFIG = {}
+
+# Unselect all POIs function (ADDED)
+def unselect_all_pois():
+    """Unselect all POI category checkboxes"""
+    for key in list(st.session_state.keys()):
+        if key.startswith("chk_"):
+            st.session_state[key] = False
+    add_api_log("All POI categories unselected", "INFO")
 
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
@@ -418,6 +434,11 @@ def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
     return all_results
 
 def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, selected_tags):
+    # Track which source is being used (ADDED)
+    st.session_state.loading_source = "detecting"
+    st.session_state.loading_step = 0
+    st.session_state.loading_progress = 0
+    
     records = []
     seen_locations = {}
     
@@ -448,10 +469,25 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     github_priority = 2 if is_luzon else 1
     overpass_priority = 1 if is_luzon else 2
     
+    # Update loading source based on region (ADDED)
+    if is_luzon:
+        st.session_state.loading_source = "github_primary"
+        add_api_log(f"Smart hybrid: Luzon detected - using GitHub as primary", "INFO")
+    else:
+        st.session_state.loading_source = "overpass_primary"
+        add_api_log(f"Smart hybrid: Visayas/Mindanao detected - using Overpass as primary", "INFO")
+    
+    st.session_state.loading_step = 1
+    st.session_state.loading_progress = 20
+    
     add_api_log(f"Smart hybrid: {'Luzon' if is_luzon else 'Visayas/Mindanao'}", "INFO")
     add_api_log(f"Priority: GitHub={github_priority}, Overpass={overpass_priority}", "INFO")
     
     if province_name:
+        st.session_state.loading_source = "github"
+        st.session_state.loading_step = 2
+        st.session_state.loading_progress = 40
+        
         all_province_pois = load_province_pois(province_name)
         if all_province_pois:
             radius_filtered = filter_pois_by_radius(all_province_pois, lat_coord, lon_coord, radius_val)
@@ -468,6 +504,10 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
             add_api_log(f"GitHub loaded {len(tag_filtered)} POIs", "INFO")
         else:
             add_api_log(f"No GitHub data for {province_name}", "WARNING")
+    
+    st.session_state.loading_source = "overpass"
+    st.session_state.loading_step = 3
+    st.session_state.loading_progress = 70
     
     add_api_log(f"Overpass query for {lat_coord}, {lon_coord}", "INFO")
     elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
@@ -494,6 +534,9 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     
     add_api_log(f"Overpass loaded {overpass_count} POIs", "INFO")
     
+    st.session_state.loading_step = 4
+    st.session_state.loading_progress = 90
+    
     for idx, record in enumerate(records):
         record['uid'] = idx
     
@@ -501,11 +544,164 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     overpass_final = sum(1 for r in records if r['source'] == 'overpass')
     add_api_log(f"FINAL: {len(records)} unique POIs (GitHub: {github_final}, Overpass: {overpass_final})", "INFO")
     
+    st.session_state.loading_source = "complete"
+    st.session_state.loading_step = 5
+    st.session_state.loading_progress = 100
+    
     if len(records) < 20 and selected_tags:
         add_api_log(f"Only {len(records)} POIs, retrying without tags", "WARNING")
         return load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, [])
     
     return records
+
+# -----------------------------------------------------------------------------
+# LOADING SCREEN HTML (ADDED - Independent, No Dependencies)
+# -----------------------------------------------------------------------------
+def show_loading_screen():
+    """Display loading screen with source tracking - completely independent"""
+    
+    # Get current loading state
+    source = st.session_state.get('loading_source', 'starting')
+    step = st.session_state.get('loading_step', 0)
+    progress = st.session_state.get('loading_progress', 0)
+    
+    # Source display text and icon
+    source_display = {
+        "starting": ("🔄", "Initializing..."),
+        "detecting": ("📍", "Detecting region (Luzon/Visayas/Mindanao)..."),
+        "github_primary": ("📦", "Luzon detected - Using GitHub pre-processed data..."),
+        "overpass_primary": ("🌐", "Visayas/Mindanao detected - Using Overpass live API..."),
+        "github": ("📦", "Loading from GitHub pre-processed data..."),
+        "overpass": ("🌐", "Loading from Overpass live API..."),
+        "complete": ("✅", "Complete! Rendering map..."),
+    }
+    
+    icon, message = source_display.get(source, ("⏳", "Loading..."))
+    
+    # Step messages
+    step_messages = {
+        0: "Starting...",
+        1: "Analyzing coordinates...",
+        2: "Fetching local GitHub data...",
+        3: "Querying Overpass API...",
+        4: "Processing results...",
+        5: "Finalizing...",
+    }
+    
+    step_text = step_messages.get(step, "Working...")
+    
+    # Create loading HTML (pure HTML/CSS - no external dependencies)
+    loading_html = f"""
+    <div id="custom-loading-overlay" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Montserrat', sans-serif;
+    ">
+        <div style="
+            background: white;
+            padding: 30px 40px;
+            border-radius: 12px;
+            min-width: 380px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            border: 1px solid rgba(0, 51, 102, 0.2);
+        ">
+            <!-- Spinner -->
+            <div style="
+                width: 50px;
+                height: 50px;
+                border: 4px solid #e0e0e0;
+                border-top-color: #003366;
+                border-radius: 50%;
+                margin: 0 auto 20px auto;
+                animation: spin 0.8s linear infinite;
+            "></div>
+            
+            <!-- Title -->
+            <div style="
+                font-size: 16px;
+                font-weight: 800;
+                color: #003366;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+                margin-bottom: 15px;
+            ">SCANNING AREA</div>
+            
+            <!-- Source Indicator -->
+            <div style="
+                background: #f0f2f6;
+                padding: 10px;
+                border-radius: 8px;
+                margin-bottom: 15px;
+            ">
+                <div style="font-size: 28px; margin-bottom: 5px;">{icon}</div>
+                <div style="
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #003366;
+                ">{message}</div>
+            </div>
+            
+            <!-- Step Text -->
+            <div style="
+                font-size: 11px;
+                color: #666;
+                margin-bottom: 15px;
+                font-family: monospace;
+            ">{step_text}</div>
+            
+            <!-- Progress Bar -->
+            <div style="
+                width: 100%;
+                height: 6px;
+                background: #e0e0e0;
+                border-radius: 3px;
+                overflow: hidden;
+                margin-bottom: 10px;
+            ">
+                <div style="
+                    width: {progress}%;
+                    height: 100%;
+                    background: #003366;
+                    transition: width 0.3s ease;
+                "></div>
+            </div>
+            
+            <!-- Progress Text -->
+            <div style="
+                font-size: 10px;
+                color: #888;
+            ">{progress}% complete</div>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+    </style>
+    
+    <script>
+        if (typeof window._loadingInterval === 'undefined') {{
+            window._loadingInterval = setInterval(function() {{
+                fetch(window.location.href)
+                    .then(function() {{}})
+                    .catch(function() {{}});
+            }}, 500);
+        }}
+    </script>
+    """
+    
+    return loading_html
 
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
@@ -530,6 +726,15 @@ with st.sidebar:
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+    
+    # Add Unselect All button near POI categories (ADDED)
+    col_unselect1, col_unselect2 = st.columns([3, 1])
+    with col_unselect2:
+        if st.button("Clear All", key="unselect_top_btn", use_container_width=True):
+            unselect_all_pois()
+            st.rerun()
+    
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     
     for cat_name, node_items in POI_CONFIG.items():
@@ -558,33 +763,111 @@ with st.sidebar:
             st.rerun()
 
 # -----------------------------------------------------------------------------
-# PIPELINE EXECUTION FORWARD CONTROL
+# PIPELINE EXECUTION FORWARD CONTROL (WITH ENHANCED LOADING SCREEN)
 # -----------------------------------------------------------------------------
+
+# Show loading screen while scanning (ADDED)
 if st.session_state.scan_active_loading:
+    # Display the loading overlay
+    st.markdown(show_loading_screen(), unsafe_allow_html=True)
+    
+    # Use a placeholder for status updates
+    status_placeholder = st.empty()
+    progress_placeholder = st.empty()
+    
+    # Step 1
+    st.session_state.loading_source = "detecting"
+    st.session_state.loading_step = 1
+    st.session_state.loading_progress = 10
+    status_placeholder.text("Locating province from coordinates...")
+    progress_placeholder.progress(10)
+    
     province_name = get_province_from_coords(lat_coord, lon_coord)
+    
+    # Step 2 - Set source based on region
+    luzon_provinces_list = ["metro_manila", "cavite", "laguna", "bulacan", "batangas", "rizal", 
+                            "pampanga", "nueva_ecija", "zambales", "tarlac", "pangasinan", 
+                            "la_union", "ilocos_norte", "ilocos_sur"]
+    is_luzon = province_name in luzon_provinces_list if province_name else False
+    
+    if is_luzon:
+        st.session_state.loading_source = "github_primary"
+        status_placeholder.text("Luzon detected - Loading from GitHub pre-processed data...")
+    else:
+        st.session_state.loading_source = "overpass_primary"
+        status_placeholder.text("Visayas/Mindanao detected - Loading from Overpass live API...")
+    
+    st.session_state.loading_step = 2
+    st.session_state.loading_progress = 25
+    progress_placeholder.progress(25)
+    
+    # Step 3 - Load data
+    if is_luzon:
+        st.session_state.loading_source = "github"
+    else:
+        st.session_state.loading_source = "overpass"
+    
+    st.session_state.loading_step = 3
+    st.session_state.loading_progress = 40
+    status_placeholder.text("Fetching POI data...")
+    progress_placeholder.progress(40)
+    
     records = load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, selected_tags)
+    
+    # Step 4 - Processing
+    st.session_state.loading_step = 4
+    st.session_state.loading_progress = 70
+    status_placeholder.text("Processing and filtering POIs...")
+    progress_placeholder.progress(70)
+    
+    # Step 5 - Finalizing
+    st.session_state.loading_step = 5
+    st.session_state.loading_progress = 85
+    status_placeholder.text("Preparing map visualization...")
+    progress_placeholder.progress(85)
     
     if records:
         st.session_state.scanned_records = records
         st.session_state.last_scan_lat = lat_coord
         st.session_state.last_scan_lon = lon_coord
+        st.session_state.loading_source = "complete"
+        st.session_state.loading_progress = 100
+        status_placeholder.text(f"Complete! Found {len(records)} POIs")
+        progress_placeholder.progress(100)
     else:
         st.session_state.scanned_records = []
-        
+        st.session_state.loading_source = "complete"
+        st.session_state.loading_progress = 100
+        status_placeholder.text("No POIs found in this area")
+        progress_placeholder.progress(100)
+    
+    time.sleep(0.5)
+    status_placeholder.empty()
+    progress_placeholder.empty()
+    
     st.session_state.scan_active_loading = False
     st.rerun()
 
 # --- CONTINUATION OF SIDEBAR CONTROLS ---
 with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("CLEAR ALL", type="primary", key="clear_btn"):
-        st.session_state.scanned_records = []
-        st.session_state.layer_meta = {}
-        st.session_state.layer_groups = {}
-        st.session_state.scan_active_loading = False
-        for key in list(st.session_state.keys()):
-            if key.startswith("chk_"): st.session_state[key] = False
-        st.rerun()
+    
+    # Two columns for CLEAR ALL and UNSELECT ALL buttons (ADDED)
+    col_clear1, col_clear2 = st.columns(2)
+    
+    with col_clear1:
+        if st.button("CLEAR ALL", type="primary", key="clear_btn", use_container_width=True):
+            st.session_state.scanned_records = []
+            st.session_state.layer_meta = {}
+            st.session_state.layer_groups = {}
+            st.session_state.scan_active_loading = False
+            unselect_all_pois()
+            st.rerun()
+    
+    with col_clear2:
+        if st.button("UNSELECT ALL POIs", type="secondary", key="unselect_btn", use_container_width=True):
+            unselect_all_pois()
+            st.rerun()
 
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
