@@ -16,6 +16,88 @@ if not os.path.exists(_config_file):
         f.write("[theme]\nbase=\"light\"\n")
 
 # -----------------------------------------------------------------------------
+# For Maintenance                                                              
+st.markdown("""
+<div id="maintenance-overlay" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 51, 102, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 9999999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Montserrat', sans-serif;
+">
+    <div style="
+        background: #ffffff;
+        padding: 35px 40px;
+        border-radius: 8px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        border-top: 5px solid #C9AB4C;
+        text-align: center;
+        max-width: 450px;
+        width: 90%;
+        position: relative;
+    ">
+        <button onclick="closeMaintenanceOverlay()" style="
+            position: absolute;
+            top: 12px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            font-weight: bold;
+            color: #888780;
+            cursor: pointer;
+            transition: color 0.2s;
+        " onmouseover="this.style.color='#003366'" onmouseout="this.style.color='#888780'">×</button>
+        
+        <div style="font-size: 40px; margin-bottom: 15px;">🛠️</div>
+        <h3 style="margin: 0 0 10px 0; color: #003366; font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
+            Under Maintenance
+        </h3>
+        <p style="margin: 0 0 20px 0; color: #555555; font-size: 12px; line-height: 1.6; font-weight: 500;">
+            Sorry for the inconvenience! We are currently optimizing and deploying updates to this system layer. You may dismiss this notice to continue testing.
+        </p>
+        
+        <button onclick="closeMaintenanceOverlay()" style="
+            background: #003366;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 20px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        " onmouseover="this.style.background='#C9AB4C'" onmouseout="this.style.background='#003366'">
+            Proceed to Application
+        </button>
+    </div>
+</div>
+
+<script>
+    // Self-contained session check to avoid showing it repeatedly on frame re-renders
+    if (sessionStorage.getItem('maintenance_dismissed') === 'true') {
+        document.getElementById('maintenance-overlay').style.display = 'none';
+    }
+
+    function closeMaintenanceOverlay() {
+        document.getElementById('maintenance-overlay').style.display = 'none';
+        sessionStorage.setItem('maintenance_dismissed', 'true');
+    }
+</script>
+""", unsafe_allow_html=True)
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 # 1. BRANDED THEME & STRUCTURAL FULL OVERRIDES
 # -----------------------------------------------------------------------------
 st.set_page_config(
