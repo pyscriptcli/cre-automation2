@@ -428,13 +428,13 @@ def show_loading_overlay():
     message = st.session_state.get('loading_message', 'Initializing...')
     
     source_display = {
-        "starting": ("🔄", "Initializing..."),
-        "detecting": ("📍", "Detecting region (Luzon/Visayas/Mindanao)..."),
-        "github_primary": ("📦", "Luzon detected - Using GitHub pre-processed data..."),
-        "overpass_primary": ("🌐", "Visayas/Mindanao detected - Using Overpass live API..."),
-        "github": ("📦", "Loading from GitHub pre-processed data..."),
-        "overpass": ("🌐", "Loading from Overpass live API..."),
-        "complete": ("✅", "Complete! Rendering map..."),
+        "starting": ("", "Initializing..."),
+        "detecting": ("", "Detecting region (Luzon/Visayas/Mindanao)..."),
+        "github_primary": ("", "Luzon detected - Using GitHub pre-processed data..."),
+        "overpass_primary": ("", "Visayas/Mindanao detected - Using Overpass live API..."),
+        "github": ("", "Loading from GitHub pre-processed data..."),
+        "overpass": ("", "Loading from Overpass live API..."),
+        "complete": ("", "Complete! Rendering map..."),
     }
     
     icon, source_message = source_display.get(source, ("⏳", "Loading..."))
@@ -558,17 +558,25 @@ def filter_pois_by_tags(pois, selected_tags):
     if not selected_tags:
         return pois
     filtered = []
+    
+    # Compile a flat set of valid individual sub-tags from pipe-delimited values
+    valid_targets = []
+    for tag in selected_tags:
+        valid_targets.extend(tag.replace('"', '').lower().split('|'))
+
     for poi in pois:
         poi_type = poi.get('type', '').lower()
-        for tag in selected_tags:
-            tag_clean = tag.replace('"', '').lower()
-            if '=' in tag_clean:
-                key, value = tag_clean.split('=', 1)
-                if key in poi_type or value in poi_type:
+        
+        for target in valid_targets:
+            if '=' in target:
+                # Splitting shop=mall into ['shop', 'mall']
+                tgt_key, tgt_val = target.split('=', 1)
+                # If the key or value perfectly matches the point type, pass it
+                if poi_type == tgt_val or poi_type == tgt_key:
                     filtered.append(poi)
                     break
             else:
-                if tag_clean in poi_type:
+                if target == poi_type:
                     filtered.append(poi)
                     break
     return filtered
@@ -718,8 +726,7 @@ def load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, sele
     st.session_state.loading_message = "Complete!"
     
     if len(records) < 20 and selected_tags:
-        add_api_log(f"Only {len(records)} POIs, retrying without tags", "WARNING")
-        return load_pois_smart_hybrid(province_name, lat_coord, lon_coord, radius_val, [])
+    add_api_log(f"Low POI count ({len(records)}) found for specific tags.", "INFO")
     
     return records
 
