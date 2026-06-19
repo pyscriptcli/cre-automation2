@@ -1,6 +1,3 @@
-# app.py - Open Node UI Overhaul
-# Migration: Dynamic collapsible sidebar, Fullscreen map mode, Compact label sizing, Removed administrative boundaries, Minimal session logs
-
 import streamlit as st
 import requests
 import re
