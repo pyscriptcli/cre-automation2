@@ -176,93 +176,9 @@ st.markdown("""
         .api-log-close { cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
         .api-log-close:hover { color: #ff8888; }
         
-        /* Full Screen Button - Minimal */
-        .fullscreen-btn {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 99999;
-            background: rgba(0, 51, 102, 0.85);
-            color: #ffffff;
-            border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 3px;
-            padding: 3px 10px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 7px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            cursor: pointer;
-            backdrop-filter: blur(4px);
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-        }
-        .fullscreen-btn:hover {
-            background: rgba(201, 171, 76, 0.9);
-            border-color: rgba(255,255,255,0.25);
-        }
+        /* Full Screen Button - Minimal - Positioned inside map */
         
-        /* Label Size Slider - Minimal */
-        .label-slider-container {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 99998;
-            background: rgba(0, 51, 102, 0.85);
-            border-radius: 3px;
-            padding: 3px 10px;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.12);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-            transition: opacity 0.3s ease, transform 0.3s ease;
-        }
-        .label-slider-container label {
-            color: #ffffff;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 7px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            margin: 0;
-        }
-        .label-slider-container input[type="range"] {
-            width: 60px;
-            height: 2px;
-            -webkit-appearance: none;
-            background: rgba(255,255,255,0.2);
-            border-radius: 1px;
-            outline: none;
-            margin: 0;
-        }
-        .label-slider-container input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #C9AB4C;
-            cursor: pointer;
-        }
-        .label-slider-container input[type="range"]::-moz-range-thumb {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #C9AB4C;
-            cursor: pointer;
-            border: none;
-        }
-        .label-slider-value {
-            color: #C9AB4C;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 7px;
-            font-weight: 700;
-            min-width: 14px;
-            text-align: center;
-        }
+        /* Label Size Slider - Minimal - Positioned inside map */
         
         /* Full screen mode - hide sidebar */
         .fullscreen-mode [data-testid="stSidebar"] {
@@ -992,13 +908,102 @@ leaflet_template = """
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 6px; font-size: 8px; padding: 3px 0; color: #003366; font-weight: 600; }
         
-        /* Full Screen Mode */
+        /* Full Screen Mode - Hide panels */
         .fullscreen-mode #scan-results-panel {
             display: none !important;
         }
         .fullscreen-mode #apiLogPanel {
             display: none !important;
         }
+        
+        /* Full Screen Button - Bottom Center */
+        .fullscreen-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            background: rgba(0, 51, 102, 0.85);
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 3px;
+            padding: 4px 14px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .fullscreen-btn:hover {
+            background: rgba(201, 171, 76, 0.9);
+            border-color: rgba(255,255,255,0.25);
+        }
+        
+        /* Label Size Slider - Bottom Center, next to fullscreen */
+        .label-slider-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(calc(-50% + 70px));
+            z-index: 9998;
+            background: rgba(0, 51, 102, 0.85);
+            border-radius: 3px;
+            padding: 4px 12px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.12);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .label-slider-container label {
+            color: #ffffff;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 7px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin: 0;
+        }
+        .label-slider-container input[type="range"] {
+            width: 80px;
+            height: 3px;
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            outline: none;
+            margin: 0;
+        }
+        .label-slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #C9AB4C;
+            cursor: pointer;
+        }
+        .label-slider-container input[type="range"]::-moz-range-thumb {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #C9AB4C;
+            cursor: pointer;
+            border: none;
+        }
+        .label-slider-value {
+            color: #C9AB4C;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 8px;
+            font-weight: 700;
+            min-width: 16px;
+            text-align: center;
+        }
+        
+        /* Hide slider and button in fullscreen mode */
         .fullscreen-mode .fullscreen-btn {
             bottom: 20px;
         }
@@ -1017,15 +1022,15 @@ leaflet_template = """
         </div>
         <div id="map"></div>
         
-        <!-- Full Screen Button -->
-        <button class="fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()">fullscreen</button>
-        
         <!-- Label Size Slider -->
         <div class="label-slider-container" id="labelSliderContainer">
             <label for="labelSizeSlider">label</label>
             <input type="range" id="labelSizeSlider" min="6" max="20" value="__LABEL_SIZE__" oninput="updateLabelSize(this.value)">
             <span class="label-slider-value" id="labelSizeValue">__LABEL_SIZE__</span>
         </div>
+        
+        <!-- Full Screen Button -->
+        <button class="fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()">fullscreen</button>
         
         <div id="scan-results-panel">
             <div class="results-header"><span>WORKSPACE</span><div style="display: flex; align-items: center; gap: 6px;"><span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 7px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP</span><span id="results-count" style="color:#C9AB4C;">0</span></div></div>
@@ -1233,7 +1238,7 @@ leaflet_template = """
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
         
-        // Fullscreen toggle
+        // Fullscreen toggle - Toggle class on map-container
         function toggleFullscreen() {
             const container = document.getElementById('map-container');
             container.classList.toggle('fullscreen-mode');
@@ -1243,7 +1248,8 @@ leaflet_template = """
             } else {
                 btn.textContent = 'fullscreen';
             }
-            setTimeout(() => {
+            // Resize map after transition
+            setTimeout(function() {
                 map.invalidateSize();
             }, 350);
         }
