@@ -281,13 +281,13 @@ st.markdown("""
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 6px; font-size: 8px; padding: 3px 0; color: #003366; font-weight: 600; }
         
-        /* Label size slider in basemap controller */
+        /* Label size slider in basemap controller - smaller */
         .label-size-row {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 2px 0 2px 18px;
-            font-size: 7px;
+            gap: 4px;
+            padding: 1px 0 1px 18px;
+            font-size: 6px;
             font-weight: 600;
             color: #888780;
             text-transform: uppercase;
@@ -301,18 +301,19 @@ st.markdown("""
             border-radius: 1px;
             outline: none;
             margin: 0;
+            max-width: 60px;
         }
         .label-size-row input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background: #003366;
             cursor: pointer;
         }
         .label-size-row input[type="range"]::-moz-range-thumb {
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background: #003366;
             cursor: pointer;
@@ -321,16 +322,52 @@ st.markdown("""
         .label-size-row .label-size-value {
             color: #003366;
             font-weight: 700;
-            min-width: 12px;
+            min-width: 10px;
             text-align: center;
+            font-size: 6px;
         }
         
-        /* Full screen mode - hide workspace panel and show only map */
+        /* Full screen mode - hide workspace panel and API log, show only map */
         .fullscreen-mode #scan-results-panel {
             display: none !important;
         }
         .fullscreen-mode #apiLogPanel {
             display: none !important;
+        }
+        .fullscreen-mode #mapFullscreenBtn {
+            background: rgba(0, 51, 102, 0.9) !important;
+            color: #ffffff !important;
+            border-color: rgba(255,255,255,0.3) !important;
+        }
+        
+        /* Fullscreen toggle button on map - top left */
+        .map-fullscreen-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 9999;
+            background: rgba(255,255,255,0.92);
+            color: #003366;
+            border: 1px solid rgba(0, 51, 102, 0.15);
+            border-radius: 3px;
+            padding: 0;
+            width: 28px;
+            height: 28px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .map-fullscreen-btn:hover {
+            background: #003366;
+            color: #ffffff;
+            border-color: #003366;
         }
         
         /* Minimal Session Logs */
@@ -510,8 +547,7 @@ def filter_pois_by_tags(pois, selected_tags):
 
 # -----------------------------------------------------------------------------
 # API LOGGING SYSTEM
-# -----------------------------------------------------------------------------
-if 'api_logs' not in st.session_state:
+# -----------------------------------------------------------------------------if 'api_logs' not in st.session_state:
     st.session_state.api_logs = []
 
 def add_api_log(message, level="INFO"):
@@ -1109,13 +1145,13 @@ leaflet_template = """
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 6px; font-size: 8px; padding: 3px 0; color: #003366; font-weight: 600; }
         
-        /* Label size slider in basemap controller */
+        /* Label size slider in basemap controller - smaller */
         .label-size-row {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 2px 0 2px 18px;
-            font-size: 7px;
+            gap: 4px;
+            padding: 1px 0 1px 18px;
+            font-size: 6px;
             font-weight: 600;
             color: #888780;
             text-transform: uppercase;
@@ -1129,18 +1165,19 @@ leaflet_template = """
             border-radius: 1px;
             outline: none;
             margin: 0;
+            max-width: 60px;
         }
         .label-size-row input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background: #003366;
             cursor: pointer;
         }
         .label-size-row input[type="range"]::-moz-range-thumb {
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
             background: #003366;
             cursor: pointer;
@@ -1149,57 +1186,52 @@ leaflet_template = """
         .label-size-row .label-size-value {
             color: #003366;
             font-weight: 700;
-            min-width: 12px;
+            min-width: 10px;
             text-align: center;
+            font-size: 6px;
         }
         
-        /* Full screen mode - hide workspace panel and show only map */
+        /* Full screen mode - hide workspace panel and API log, show only map */
         .fullscreen-mode #scan-results-panel {
             display: none !important;
         }
         .fullscreen-mode #apiLogPanel {
             display: none !important;
         }
+        .fullscreen-mode #mapFullscreenBtn {
+            background: rgba(0, 51, 102, 0.9) !important;
+            color: #ffffff !important;
+            border-color: rgba(255,255,255,0.3) !important;
+        }
         
-        /* Fullscreen toggle button on map - positioned near zoom controls */
+        /* Fullscreen toggle button on map - top left */
         .map-fullscreen-btn {
             position: absolute;
-            bottom: 100px;
-            right: 10px;
-            z-index: 1000;
-            background: rgba(255,255,255,0.9);
+            top: 12px;
+            left: 12px;
+            z-index: 9999;
+            background: rgba(255,255,255,0.92);
             color: #003366;
             border: 1px solid rgba(0, 51, 102, 0.15);
             border-radius: 3px;
-            padding: 6px 10px;
+            padding: 0;
+            width: 28px;
+            height: 28px;
             font-family: 'Montserrat', sans-serif;
-            font-size: 7px;
+            font-size: 11px;
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
             transition: all 0.2s ease;
-            width: 34px;
-            height: 34px;
             display: flex;
             align-items: center;
             justify-content: center;
-            text-align: center;
-            line-height: 1.2;
+            line-height: 1;
         }
         .map-fullscreen-btn:hover {
             background: #003366;
             color: #ffffff;
             border-color: #003366;
-        }
-        .fullscreen-mode .map-fullscreen-btn {
-            background: #003366;
-            color: #ffffff;
-            border-color: #003366;
-        }
-        .fullscreen-mode .map-fullscreen-btn:hover {
-            background: rgba(0, 51, 102, 0.8);
         }
     </style>
 </head>
@@ -1213,7 +1245,7 @@ leaflet_template = """
         </div>
         <div id="map"></div>
         
-        <!-- Fullscreen toggle button on map near zoom controls -->
+        <!-- Fullscreen toggle button on map - top left -->
         <button class="map-fullscreen-btn" id="mapFullscreenBtn" onclick="toggleFullscreen()">⛶</button>
         
         <div id="scan-results-panel">
@@ -1246,7 +1278,7 @@ leaflet_template = """
                         <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
                     </label>
                 </div>
-                <!-- Label size slider under the checkbox -->
+                <!-- Label size slider under the checkbox - smaller -->
                 <div class="label-size-row">
                     <span>size</span>
                     <input type="range" id="labelSizeSlider" min="6" max="20" value="__LABEL_SIZE__" oninput="updateLabelSize(this.value)">
@@ -1461,12 +1493,14 @@ leaflet_template = """
             const btn = document.getElementById('mapFullscreenBtn');
             if (container.classList.contains('fullscreen-mode')) {
                 btn.textContent = '⛶';
-                btn.style.background = '#003366';
+                btn.style.background = 'rgba(0, 51, 102, 0.9)';
                 btn.style.color = '#ffffff';
+                btn.style.borderColor = 'rgba(255,255,255,0.3)';
             } else {
                 btn.textContent = '⛶';
-                btn.style.background = 'rgba(255,255,255,0.9)';
+                btn.style.background = 'rgba(255,255,255,0.92)';
                 btn.style.color = '#003366';
+                btn.style.borderColor = 'rgba(0, 51, 102, 0.15)';
             }
             setTimeout(function() {
                 map.invalidateSize();
