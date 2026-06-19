@@ -87,7 +87,55 @@ st.markdown("""
             visibility: visible !important;
             overflow: hidden !important;
             box-shadow: 2px 0 15px rgba(0,0,0,0.03) !important;
-            transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, transform 0.3s ease !important;
+            transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, transform 0.3s ease, margin-left 0.3s ease !important;
+            position: relative !important;
+            z-index: 100 !important;
+        }
+        
+        /* Sidebar collapsed state */
+        .sidebar-collapsed [data-testid="stSidebar"] {
+            width: 0px !important;
+            min-width: 0px !important;
+            max-width: 0px !important;
+            margin-left: -280px !important;
+            border-right: none !important;
+            overflow: hidden !important;
+            padding: 0 !important;
+        }
+        .sidebar-collapsed [data-testid="stMain"] {
+            width: 100vw !important;
+        }
+        
+        /* Sidebar toggle button - positioned on the left edge */
+        .sidebar-toggle-btn {
+            position: fixed;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 99999;
+            background: rgba(0, 51, 102, 0.85);
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 3px;
+            padding: 6px 8px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+        }
+        .sidebar-toggle-btn:hover {
+            background: rgba(201, 171, 76, 0.9);
+            border-color: rgba(255,255,255,0.25);
+        }
+        .sidebar-toggle-btn.sidebar-hidden {
+            left: 10px;
         }
         
         [data-testid="stSidebarCollapseButton"], [data-testid="collapsedControl"] { display: none !important; }
@@ -176,7 +224,7 @@ st.markdown("""
         .api-log-close { cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
         .api-log-close:hover { color: #ff8888; }
         
-        /* Workspace header with controls */
+        /* Workspace header */
         .workspace-header {
             background: #003366;
             color: #ffffff;
@@ -189,74 +237,89 @@ st.markdown("""
             text-transform: uppercase;
             border-bottom: 2px solid #C9AB4C;
             letter-spacing: 1px;
+            flex-shrink: 0;
         }
-        .workspace-controls {
+        .workspace-header .workspace-title {
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        .workspace-controls .fullscreen-toggle {
-            background: rgba(255,255,255,0.15);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 2px;
-            color: #ffffff;
-            padding: 2px 8px;
-            font-size: 7px;
-            font-weight: 600;
-            font-family: 'Montserrat', sans-serif;
-            text-transform: uppercase;
-            cursor: pointer;
-            letter-spacing: 0.5px;
-            transition: all 0.2s ease;
-        }
-        .workspace-controls .fullscreen-toggle:hover {
+        .workspace-header .workspace-title .count-badge {
             background: rgba(201, 171, 76, 0.3);
-            border-color: #C9AB4C;
+            padding: 1px 6px;
+            border-radius: 2px;
+            font-size: 8px;
+            color: #C9AB4C;
         }
-        .workspace-controls .label-slider-wrap {
+        
+        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; max-height: calc(100vh - 280px); }
+        .layer-category-block { border-bottom: 1px solid #f0f0f0; }
+        .layer-category-header { background: #ffffff; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+        .layer-header-left { display: flex; align-items: center; gap: 4px; font-size: 8px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
+        .layer-category-items { padding: 0; background: #f8fafc; }
+        .layer-category-items.collapsed { display: none !important; }
+        .results-item { padding: 3px 6px 3px 12px; font-size: 8px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
+        .results-item:hover { background: #ffffff; color: #003366; }
+        .action-icon-trigger { cursor: pointer; padding: 1px; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 2px; transition: all 0.15s; }
+        .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
+        .action-icon-trigger svg { fill: #888780; width: 10px; height: 10px; }
+        .action-icon-trigger:hover svg { fill: #003366; }
+        .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
+        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 1px 3px; border-radius: 2px; font-size: __LABEL_SIZE__px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .hide-labels .poi-text-label { display: none !important; }
+        .color-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
+        .config-block-wrapper { padding: 4px 8px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.05); display: flex; flex-direction: column; gap: 3px; }
+        .config-headline { font-size: 7px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
+        .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 8px; font-weight: 600; color: #003366; gap: 4px; }
+        .config-flex-row select, .config-flex-row input { font-size: 8px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 2px; outline: none; }
+        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 3px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
+        .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 8px; border-radius: 50%; background: #003366; cursor: pointer; }
+        .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 3px; border-bottom: 1px solid rgba(0,51,102,0.08); }
+        .group-cluster-header { background: #e2e8f0; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .group-cluster-title { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 4px; }
+        .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
+        .cluster-popover-modal.active { display: block; }
+        .cluster-selection-row { display: flex; align-items: center; gap: 6px; font-size: 8px; padding: 3px 0; color: #003366; font-weight: 600; }
+        
+        /* Label size slider in basemap controller */
+        .label-size-row {
             display: flex;
             align-items: center;
-            gap: 4px;
-            background: rgba(255,255,255,0.1);
-            padding: 2px 6px;
-            border-radius: 2px;
-        }
-        .workspace-controls .label-slider-wrap label {
-            color: rgba(255,255,255,0.7);
+            gap: 6px;
+            padding: 2px 0 2px 18px;
             font-size: 7px;
             font-weight: 600;
+            color: #888780;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 0;
+            letter-spacing: 0.3px;
         }
-        .workspace-controls .label-slider-wrap input[type="range"] {
-            width: 50px;
+        .label-size-row input[type="range"] {
+            flex-grow: 1;
             height: 2px;
             -webkit-appearance: none;
-            background: rgba(255,255,255,0.2);
+            background: rgba(0,51,102,0.15);
             border-radius: 1px;
             outline: none;
             margin: 0;
         }
-        .workspace-controls .label-slider-wrap input[type="range"]::-webkit-slider-thumb {
+        .label-size-row input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: #C9AB4C;
+            background: #003366;
             cursor: pointer;
         }
-        .workspace-controls .label-slider-wrap input[type="range"]::-moz-range-thumb {
+        .label-size-row input[type="range"]::-moz-range-thumb {
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: #C9AB4C;
+            background: #003366;
             cursor: pointer;
             border: none;
         }
-        .workspace-controls .label-slider-value {
-            color: #C9AB4C;
-            font-size: 7px;
+        .label-size-row .label-size-value {
+            color: #003366;
             font-weight: 700;
             min-width: 12px;
             text-align: center;
@@ -305,6 +368,10 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
+# Sidebar toggle state
+if 'sidebar_collapsed' not in st.session_state:
+    st.session_state.sidebar_collapsed = False
 
 # -----------------------------------------------------------------------------
 # GLOBAL HELPER DEFINITIONS
@@ -606,6 +673,7 @@ if 'global_marker_size' not in st.session_state: st.session_state.global_marker_
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 if 'label_size' not in st.session_state: st.session_state.label_size = 9
 if 'fullscreen_active' not in st.session_state: st.session_state.fullscreen_active = False
+if 'sidebar_collapsed' not in st.session_state: st.session_state.sidebar_collapsed = False
 
 POI_CONFIG = {
     "COMMERCIAL & OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
@@ -620,9 +688,39 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
+# Sidebar toggle function
+def toggle_sidebar():
+    st.session_state.sidebar_collapsed = not st.session_state.sidebar_collapsed
+
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
+# Sidebar toggle button - positioned on the left edge
+sidebar_btn_label = "▶" if st.session_state.sidebar_collapsed else "◀"
+st.markdown(f"""
+    <button class="sidebar-toggle-btn" onclick="toggleSidebar()" id="sidebarToggleBtn">{sidebar_btn_label}</button>
+    <script>
+        function toggleSidebar() {{
+            const container = document.querySelector('[data-testid="stAppViewContainer"]');
+            container.classList.toggle('sidebar-collapsed');
+            const btn = document.getElementById('sidebarToggleBtn');
+            if (container.classList.contains('sidebar-collapsed')) {{
+                btn.textContent = '▶';
+            }} else {{
+                btn.textContent = '◀';
+            }}
+        }}
+    </script>
+""", unsafe_allow_html=True)
+
+# Apply sidebar collapsed class if state is set
+if st.session_state.sidebar_collapsed:
+    st.markdown("""
+        <script>
+            document.querySelector('[data-testid="stAppViewContainer"]').classList.add('sidebar-collapsed');
+        </script>
+    """, unsafe_allow_html=True)
+
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
@@ -776,6 +874,7 @@ poi_count: {len(st.session_state.get('scanned_records', []))}
 scan_active: {st.session_state.get('scan_active_loading', False)}
 label_size: {st.session_state.get('label_size', 9)}
 fullscreen: {st.session_state.get('fullscreen_active', False)}
+sidebar: {'collapsed' if st.session_state.get('sidebar_collapsed', False) else 'expanded'}
         """, language="text", line_numbers=False)
 
 # -----------------------------------------------------------------------------
@@ -953,7 +1052,7 @@ leaflet_template = """
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
         }
         
-        /* Workspace header with controls inside the panel */
+        /* Workspace header */
         .workspace-header {
             background: #003366;
             color: #ffffff;
@@ -968,76 +1067,17 @@ leaflet_template = """
             letter-spacing: 1px;
             flex-shrink: 0;
         }
-        .workspace-controls {
+        .workspace-header .workspace-title {
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        .workspace-controls .fullscreen-toggle {
-            background: rgba(255,255,255,0.15);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 2px;
-            color: #ffffff;
-            padding: 2px 8px;
-            font-size: 7px;
-            font-weight: 600;
-            font-family: 'Montserrat', sans-serif;
-            text-transform: uppercase;
-            cursor: pointer;
-            letter-spacing: 0.5px;
-            transition: all 0.2s ease;
-        }
-        .workspace-controls .fullscreen-toggle:hover {
+        .workspace-header .workspace-title .count-badge {
             background: rgba(201, 171, 76, 0.3);
-            border-color: #C9AB4C;
-        }
-        .workspace-controls .label-slider-wrap {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            background: rgba(255,255,255,0.1);
-            padding: 2px 6px;
+            padding: 1px 6px;
             border-radius: 2px;
-        }
-        .workspace-controls .label-slider-wrap label {
-            color: rgba(255,255,255,0.7);
-            font-size: 7px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 0;
-        }
-        .workspace-controls .label-slider-wrap input[type="range"] {
-            width: 50px;
-            height: 2px;
-            -webkit-appearance: none;
-            background: rgba(255,255,255,0.2);
-            border-radius: 1px;
-            outline: none;
-            margin: 0;
-        }
-        .workspace-controls .label-slider-wrap input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #C9AB4C;
-            cursor: pointer;
-        }
-        .workspace-controls .label-slider-wrap input[type="range"]::-moz-range-thumb {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #C9AB4C;
-            cursor: pointer;
-            border: none;
-        }
-        .workspace-controls .label-slider-value {
+            font-size: 8px;
             color: #C9AB4C;
-            font-size: 7px;
-            font-weight: 700;
-            min-width: 12px;
-            text-align: center;
         }
         
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; max-height: calc(100vh - 280px); }
@@ -1069,12 +1109,97 @@ leaflet_template = """
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 6px; font-size: 8px; padding: 3px 0; color: #003366; font-weight: 600; }
         
+        /* Label size slider in basemap controller */
+        .label-size-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 0 2px 18px;
+            font-size: 7px;
+            font-weight: 600;
+            color: #888780;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .label-size-row input[type="range"] {
+            flex-grow: 1;
+            height: 2px;
+            -webkit-appearance: none;
+            background: rgba(0,51,102,0.15);
+            border-radius: 1px;
+            outline: none;
+            margin: 0;
+        }
+        .label-size-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #003366;
+            cursor: pointer;
+        }
+        .label-size-row input[type="range"]::-moz-range-thumb {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #003366;
+            cursor: pointer;
+            border: none;
+        }
+        .label-size-row .label-size-value {
+            color: #003366;
+            font-weight: 700;
+            min-width: 12px;
+            text-align: center;
+        }
+        
         /* Full screen mode - hide workspace panel and show only map */
         .fullscreen-mode #scan-results-panel {
             display: none !important;
         }
         .fullscreen-mode #apiLogPanel {
             display: none !important;
+        }
+        
+        /* Fullscreen toggle button on map - positioned near zoom controls */
+        .map-fullscreen-btn {
+            position: absolute;
+            bottom: 100px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.9);
+            color: #003366;
+            border: 1px solid rgba(0, 51, 102, 0.15);
+            border-radius: 3px;
+            padding: 6px 10px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 7px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .map-fullscreen-btn:hover {
+            background: #003366;
+            color: #ffffff;
+            border-color: #003366;
+        }
+        .fullscreen-mode .map-fullscreen-btn {
+            background: #003366;
+            color: #ffffff;
+            border-color: #003366;
+        }
+        .fullscreen-mode .map-fullscreen-btn:hover {
+            background: rgba(0, 51, 102, 0.8);
         }
     </style>
 </head>
@@ -1088,17 +1213,18 @@ leaflet_template = """
         </div>
         <div id="map"></div>
         
+        <!-- Fullscreen toggle button on map near zoom controls -->
+        <button class="map-fullscreen-btn" id="mapFullscreenBtn" onclick="toggleFullscreen()">⛶</button>
+        
         <div id="scan-results-panel">
-            <!-- Workspace Header with controls -->
+            <!-- Workspace Header -->
             <div class="workspace-header">
-                <span>WORKSPACE</span>
-                <div class="workspace-controls">
-                    <div class="label-slider-wrap">
-                        <label for="labelSizeSlider">label</label>
-                        <input type="range" id="labelSizeSlider" min="6" max="20" value="__LABEL_SIZE__" oninput="updateLabelSize(this.value)">
-                        <span class="label-slider-value" id="labelSizeValue">__LABEL_SIZE__</span>
-                    </div>
-                    <button class="fullscreen-toggle" id="fullscreenBtn" onclick="toggleFullscreen()">fullscreen</button>
+                <div class="workspace-title">
+                    <span>WORKSPACE</span>
+                    <span class="count-badge" id="results-count">0</span>
+                </div>
+                <div>
+                    <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 7px; font-weight: 700; border: 1px solid rgba(255,255,255,0.3); padding: 2px 6px; border-radius: 2px; cursor: pointer;">GROUP</span>
                 </div>
             </div>
             <div id="cluster-modal-overlay" class="cluster-popover-modal">
@@ -1107,7 +1233,26 @@ leaflet_template = """
                 <div id="cluster-checkbox-target-mount" style="max-height: 120px; overflow-y: auto; margin-bottom: 6px;"></div>
                 <div style="display: flex; gap: 3px;"><button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 3px; font-size:8px; font-weight:700; cursor:pointer;">BUILD</button><button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 3px; font-size:8px; font-weight:700; cursor:pointer;">CANCEL</button></div>
             </div>
-            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);"><div class="config-headline">Basemap Controller</div><div class="config-flex-row"><span>Tile:</span><select id="basemap-select" onchange="switchActiveBasemap(this.value)"><option value="osm">OSM</option><option value="satellite">Satellite</option><option value="carto">Carto</option></select><label style="font-size:8px; font-weight:700; color:#003366; display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels</label></div></div>
+            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
+                <div class="config-headline">Basemap Controller</div>
+                <div class="config-flex-row">
+                    <span>Tile:</span>
+                    <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
+                        <option value="osm">OSM</option>
+                        <option value="satellite">Satellite</option>
+                        <option value="carto">Carto</option>
+                    </select>
+                    <label style="font-size:8px; font-weight:700; color:#003366; display:flex; align-items:center; gap:2px; cursor:pointer;">
+                        <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
+                    </label>
+                </div>
+                <!-- Label size slider under the checkbox -->
+                <div class="label-size-row">
+                    <span>size</span>
+                    <input type="range" id="labelSizeSlider" min="6" max="20" value="__LABEL_SIZE__" oninput="updateLabelSize(this.value)">
+                    <span class="label-size-value" id="labelSizeValue">__LABEL_SIZE__</span>
+                </div>
+            </div>
             <div class="config-block-wrapper"><div class="config-headline">Global Markers</div><div class="config-flex-row"><span>Style:</span><select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)"><option value="dots">Dots</option><option value="pin">Pin</option><option value="modern-pin">Modern</option></select><input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)"></div><div class="config-flex-row"><span>Color:</span><input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)"><select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:60px;"><option value="">Preset</option><option value="#003366">Midnight</option><option value="#C9AB4C">Gold</option><option value="#AA2E20">Crimson</option></select></div></div>
             <div class="config-block-wrapper"><div class="config-headline">Target & Radius</div><div class="config-flex-row"><span>Target:</span><select onchange="patchTargetCenterConfig('style', this.value)"><option value="star">Star</option><option value="circle">Dot</option></select><input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)"><input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)"></div><div class="config-flex-row"><span>Radius:</span><input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)"><span>Opacity:</span><input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)"></div><div class="config-flex-row"><span>Thick:</span><input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)"></div></div>
             <div class="results-list" id="results-list-box"></div>
@@ -1120,6 +1265,9 @@ leaflet_template = """
         let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
         let scanStartTime = null;
         let labelSize = __LABEL_SIZE__;
+        
+        // Custom zoom controls positioned on right
+        L.control.zoom({ position: 'topright' }).addTo(map);
         
         if (__SHOW_LOADING__) {
             const overlay = document.getElementById('map-loading-overlay');
@@ -1263,10 +1411,7 @@ leaflet_template = """
 
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box'); 
-            const countEl = document.querySelector('.workspace-header .workspace-controls');
-            if (countEl) {
-                // Update count in header if needed
-            }
+            document.getElementById('results-count').innerText = pts.length;
             if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:8px; padding:8px; color:#888780;'>No items mapped.</div>"; return; }
             let htmlPayload = '';
             const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
@@ -1313,11 +1458,15 @@ leaflet_template = """
         function toggleFullscreen() {
             const container = document.getElementById('map-container');
             container.classList.toggle('fullscreen-mode');
-            const btn = document.getElementById('fullscreenBtn');
+            const btn = document.getElementById('mapFullscreenBtn');
             if (container.classList.contains('fullscreen-mode')) {
-                btn.textContent = 'exit';
+                btn.textContent = '⛶';
+                btn.style.background = '#003366';
+                btn.style.color = '#ffffff';
             } else {
-                btn.textContent = 'fullscreen';
+                btn.textContent = '⛶';
+                btn.style.background = 'rgba(255,255,255,0.9)';
+                btn.style.color = '#003366';
             }
             setTimeout(function() {
                 map.invalidateSize();
