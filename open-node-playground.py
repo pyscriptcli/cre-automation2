@@ -76,43 +76,38 @@ st.markdown("""
             font-family: 'Montserrat', sans-serif !important;
         }
         
+        /* Floating sidebar - overlay style */
         [data-testid="stSidebar"] {
-            background-color: var(--bg-offwhite) !important;
-            color: var(--brand-midnight) !important;
-            border-right: 1px solid rgba(0, 51, 102, 0.08) !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            height: 100vh !important;
             width: 280px !important;
             min-width: 280px !important;
             max-width: 280px !important;
-            transform: none !important;
-            visibility: visible !important;
-            overflow: hidden !important;
-            box-shadow: 2px 0 15px rgba(0,0,0,0.03) !important;
-            transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, transform 0.3s ease, margin-left 0.3s ease !important;
-            position: relative !important;
-            z-index: 100 !important;
+            background-color: var(--bg-offwhite) !important;
+            color: var(--brand-midnight) !important;
+            border-right: 1px solid rgba(0, 51, 102, 0.08) !important;
+            box-shadow: 2px 0 20px rgba(0,0,0,0.08) !important;
+            transform: translateX(0) !important;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            z-index: 9999 !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
         }
         
-        /* Sidebar collapsed state */
-        .sidebar-collapsed [data-testid="stSidebar"] {
-            width: 0px !important;
-            min-width: 0px !important;
-            max-width: 0px !important;
-            margin-left: -280px !important;
-            border-right: none !important;
-            overflow: hidden !important;
-            padding: 0 !important;
-        }
-        .sidebar-collapsed [data-testid="stMain"] {
-            width: 100vw !important;
+        /* Sidebar hidden state */
+        .sidebar-hidden [data-testid="stSidebar"] {
+            transform: translateX(-100%) !important;
         }
         
-        /* Sidebar toggle button - positioned on the left edge */
+        /* Sidebar toggle button - positioned on the left edge when hidden */
         .sidebar-toggle-btn {
             position: fixed;
             left: 10px;
             top: 50%;
             transform: translateY(-50%);
-            z-index: 99999;
+            z-index: 10000;
             background: rgba(0, 51, 102, 0.85);
             color: #ffffff;
             border: 1px solid rgba(255,255,255,0.12);
@@ -142,16 +137,22 @@ st.markdown("""
         ::-webkit-scrollbar { width: 0px !important; background: transparent !important; }
         * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
         
-        p, label, h1, h2, h3, h4, h5, h6, .stMarkdown, [data-testid="stExpander"] summary p {
-            color: var(--brand-midnight) !important;
-            font-family: 'Montserrat', sans-serif !important;
+        /* Main content fills entire viewport */
+        [data-testid="stMain"] {
+            width: 100vw !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+            margin: 0px !important;
+            padding: 0px !important;
+            transition: none !important;
         }
         
-        [data-testid="stHeader"], header, #stDecoration { display: none !important; }
-        
-        [data-testid="stAppViewContainer"] { display: flex !important; flex-direction: row !important; width: 100vw !important; height: 100vh !important; overflow: hidden !important; }
-        [data-testid="stMain"] { flex-grow: 1 !important; width: calc(100vw - 280px) !important; height: 100vh !important; overflow: hidden !important; margin: 0px !important; padding: 0px !important; transition: width 0.3s ease !important; }
-        .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer { padding: 0px !important; margin: 0px !important; max-width: 100% !important; gap: 0rem !important; }
+        .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer { 
+            padding: 0px !important; 
+            margin: 0px !important; 
+            max-width: 100% !important; 
+            gap: 0rem !important; 
+        }
         iframe { height: 100vh !important; width: 100% !important; border: none !important; display: block !important; }
         
         div[data-baseweb="input"], div[data-baseweb="select"] { background-color: transparent !important; border: none !important; border-bottom: 1px solid rgba(201, 171, 76, 0.5) !important; border-radius: 0px !important; box-shadow: none !important; }
@@ -370,6 +371,15 @@ st.markdown("""
             border-color: #003366;
         }
         
+        /* Fullscreen also hides sidebar */
+        .fullscreen-mode [data-testid="stSidebar"] {
+            transform: translateX(-100%) !important;
+        }
+        .fullscreen-mode .sidebar-toggle-btn {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+        
         /* Minimal Session Logs */
         .session-log-container {
             font-size: 8px;
@@ -409,6 +419,8 @@ st.markdown("""
 # Sidebar toggle state
 if 'sidebar_collapsed' not in st.session_state:
     st.session_state.sidebar_collapsed = False
+if 'fullscreen_active' not in st.session_state:
+    st.session_state.fullscreen_active = False
 
 # -----------------------------------------------------------------------------
 # GLOBAL HELPER DEFINITIONS
@@ -547,7 +559,8 @@ def filter_pois_by_tags(pois, selected_tags):
 
 # -----------------------------------------------------------------------------
 # API LOGGING SYSTEM
-# -----------------------------------------------------------------------------if 'api_logs' not in st.session_state:
+# -----------------------------------------------------------------------------
+if 'api_logs' not in st.session_state:
     st.session_state.api_logs = []
 
 def add_api_log(message, level="INFO"):
@@ -724,36 +737,48 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
-# Sidebar toggle function
-def toggle_sidebar():
-    st.session_state.sidebar_collapsed = not st.session_state.sidebar_collapsed
-
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 # Sidebar toggle button - positioned on the left edge
-sidebar_btn_label = "▶" if st.session_state.sidebar_collapsed else "◀"
+sidebar_btn_label = "◀" if st.session_state.sidebar_collapsed else "▶"
 st.markdown(f"""
-    <button class="sidebar-toggle-btn" onclick="toggleSidebar()" id="sidebarToggleBtn">{sidebar_btn_label}</button>
+    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebar()">{sidebar_btn_label}</button>
     <script>
         function toggleSidebar() {{
+            const sidebar = document.querySelector('[data-testid="stSidebar"]');
             const container = document.querySelector('[data-testid="stAppViewContainer"]');
-            container.classList.toggle('sidebar-collapsed');
             const btn = document.getElementById('sidebarToggleBtn');
-            if (container.classList.contains('sidebar-collapsed')) {{
+            container.classList.toggle('sidebar-hidden');
+            if (container.classList.contains('sidebar-hidden')) {{
                 btn.textContent = '▶';
             }} else {{
                 btn.textContent = '◀';
             }}
         }}
+        
+        // Listen for fullscreen changes from the map
+        window.addEventListener('message', function(event) {{
+            if (event.data && event.data.type === 'fullscreenToggle') {{
+                const container = document.querySelector('[data-testid="stAppViewContainer"]');
+                const btn = document.getElementById('sidebarToggleBtn');
+                if (event.data.active) {{
+                    container.classList.add('sidebar-hidden');
+                    if (btn) btn.textContent = '▶';
+                }} else {{
+                    container.classList.remove('sidebar-hidden');
+                    if (btn) btn.textContent = '◀';
+                }}
+            }}
+        }});
     </script>
 """, unsafe_allow_html=True)
 
-# Apply sidebar collapsed class if state is set
+# Apply sidebar hidden class if state is set
 if st.session_state.sidebar_collapsed:
     st.markdown("""
         <script>
-            document.querySelector('[data-testid="stAppViewContainer"]').classList.add('sidebar-collapsed');
+            document.querySelector('[data-testid="stAppViewContainer"]').classList.add('sidebar-hidden');
         </script>
     """, unsafe_allow_html=True)
 
@@ -1233,6 +1258,15 @@ leaflet_template = """
             color: #ffffff;
             border-color: #003366;
         }
+        
+        /* Fullscreen also hides sidebar via postMessage */
+        .fullscreen-mode [data-testid="stSidebar"] {
+            transform: translateX(-100%) !important;
+        }
+        .fullscreen-mode .sidebar-toggle-btn {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
     </style>
 </head>
 <body>
@@ -1297,6 +1331,7 @@ leaflet_template = """
         let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
         let scanStartTime = null;
         let labelSize = __LABEL_SIZE__;
+        let fullscreenActive = false;
         
         // Custom zoom controls positioned on right
         L.control.zoom({ position: 'topright' }).addTo(map);
@@ -1486,12 +1521,13 @@ leaflet_template = """
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
         
-        // Fullscreen toggle - Toggle class on map-container
+        // Fullscreen toggle - Toggle class on map-container and notify parent
         function toggleFullscreen() {
             const container = document.getElementById('map-container');
             container.classList.toggle('fullscreen-mode');
+            fullscreenActive = container.classList.contains('fullscreen-mode');
             const btn = document.getElementById('mapFullscreenBtn');
-            if (container.classList.contains('fullscreen-mode')) {
+            if (fullscreenActive) {
                 btn.textContent = '⛶';
                 btn.style.background = 'rgba(0, 51, 102, 0.9)';
                 btn.style.color = '#ffffff';
@@ -1502,6 +1538,13 @@ leaflet_template = """
                 btn.style.color = '#003366';
                 btn.style.borderColor = 'rgba(0, 51, 102, 0.15)';
             }
+            
+            // Notify parent window to toggle sidebar
+            window.parent.postMessage({
+                type: 'fullscreenToggle',
+                active: fullscreenActive
+            }, '*');
+            
             setTimeout(function() {
                 map.invalidateSize();
             }, 350);
