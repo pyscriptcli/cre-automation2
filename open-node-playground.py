@@ -24,10 +24,6 @@ if 'event_logs' not in st.session_state:
     st.session_state.event_logs = []
 
 def log_event(event_type, event_name, event_data=None, level="INFO"):
-    """
-    Log events with detailed information for debugging.
-    event_type: 'USER_ACTION', 'STATE_CHANGE', 'API_CALL', 'ERROR', 'BOUNDARY', 'POI'
-    """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
     
     log_entry = {
@@ -36,10 +32,6 @@ def log_event(event_type, event_name, event_data=None, level="INFO"):
         "event_name": event_name,
         "level": level,
         "session_state": {
-            "show_boundaries": st.session_state.get('show_boundaries', False),
-            "boundary_levels": st.session_state.get('boundary_levels', []),
-            "has_location": st.session_state.get('current_location_info') is not None,
-            "has_boundary_data": len(st.session_state.get('boundary_geojson_data', {})) > 0,
             "scanned_records_count": len(st.session_state.get('scanned_records', [])),
             "scan_active": st.session_state.get('scan_active_loading', False)
         }
@@ -49,11 +41,8 @@ def log_event(event_type, event_name, event_data=None, level="INFO"):
         log_entry["event_data"] = event_data
     
     st.session_state.event_logs.append(log_entry)
-    
-    # Also add to existing api_logs for display
     add_api_log(f"[{event_type}] {event_name}", level)
     
-    # Keep only last 200 events
     if len(st.session_state.event_logs) > 200:
         st.session_state.event_logs = st.session_state.event_logs[-200:]
     
@@ -71,7 +60,6 @@ st.set_page_config(
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
 
         :root {
             --brand-midnight: #003366 !important;
@@ -143,14 +131,6 @@ st.markdown("""
         .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
         .stTextInput label p, .stNumberInput label p { font-size: 9px !important; font-weight: 500 !important; color: var(--text-muted) !important; }
 
-        /* ABSOLUTE STYLING PROTOCOL: Hard-Lock Color Picker to UpperCase HEX primitives only */
-        [data-testid="stColorPicker"] div[data-baseweb="select"] { text-transform: uppercase !important; }
-        div[data-baseweb="color-picker-popover"] div[data-baseweb="select"] { display: none !important; }
-        div[data-baseweb="color-picker-popover"] div:has(> input) + div { display: none !important; }
-        div[data-baseweb="color-picker-popover"] label, div[data-baseweb="color-picker-popover"] span { display: none !important; }
-        div[data-baseweb="color-picker-popover"] input[type="number"] { display: none !important; }
-        div[data-baseweb="color-picker-popover"] input[type="text"] { width: 100% !important; text-transform: uppercase !important; font-family: 'Montserrat', sans-serif !important; font-weight: 700 !important; font-size: 11px !important; text-align: center !important; color: var(--brand-midnight) !important; }
-        
         /* Python Engine Core Centered Progress Stopwatch HUD Panel Overlay */
         .py-loading-container {
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
@@ -167,36 +147,36 @@ st.markdown("""
         .py-loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* API LOG PANEL */
+        /* API LOG PANEL - Minimal */
         .api-log-container {
-            position: absolute; bottom: 12px; right: 12px; width: 380px; max-height: 280px;
-            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); border-radius: 8px;
-            border-left: 3px solid #C9AB4C; z-index: 10000; font-family: 'Monaco', monospace;
-            font-size: 10px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            position: absolute; bottom: 12px; right: 12px; width: 340px; max-height: 220px;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); border-radius: 4px;
+            border-left: 2px solid #C9AB4C; z-index: 10000; font-family: 'Monaco', monospace;
+            font-size: 9px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             transition: all 0.2s ease; color: #e0e0e0;
         }
         .api-log-header {
-            padding: 6px 10px; background: rgba(0,0,0,0.6); border-radius: 8px 8px 0 0;
-            font-weight: 700; font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+            padding: 4px 8px; background: rgba(0,0,0,0.6); border-radius: 4px 4px 0 0;
+            font-weight: 600; font-size: 8px; letter-spacing: 0.5px; text-transform: uppercase;
             display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-            color: #C9AB4C; border-bottom: 1px solid rgba(201, 171, 76, 0.3);
+            color: #C9AB4C; border-bottom: 1px solid rgba(201, 171, 76, 0.2);
         }
         .api-log-content {
-            overflow-y: auto; padding: 6px; flex-grow: 1; max-height: 220px;
+            overflow-y: auto; padding: 4px; flex-grow: 1; max-height: 170px;
             scrollbar-width: thin;
         }
         .api-log-entry {
-            border-bottom: 1px solid rgba(255,255,255,0.1); padding: 6px 4px;
-            font-family: monospace; font-size: 9px; word-break: break-word;
+            border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 4px;
+            font-family: monospace; font-size: 8px; word-break: break-word;
         }
-        .api-log-time { color: #C9AB4C; font-weight: 600; margin-right: 8px; }
+        .api-log-time { color: #C9AB4C; font-weight: 600; margin-right: 6px; }
         .api-log-info { color: #88ffaa; }
         .api-log-error { color: #ff8888; }
         .api-log-warning { color: #ffaa66; }
-        .api-log-close { cursor: pointer; padding: 0 6px; font-size: 14px; line-height: 1; }
+        .api-log-close { cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
         .api-log-close:hover { color: #ff8888; }
         
-        /* Full Screen Button - Minimal Style */
+        /* Full Screen Button - Minimal */
         .fullscreen-btn {
             position: fixed;
             bottom: 20px;
@@ -205,22 +185,22 @@ st.markdown("""
             z-index: 99999;
             background: rgba(0, 51, 102, 0.85);
             color: #ffffff;
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 4px;
-            padding: 4px 12px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 3px;
+            padding: 3px 10px;
             font-family: 'Montserrat', sans-serif;
-            font-size: 8px;
+            font-size: 7px;
             font-weight: 600;
             letter-spacing: 0.5px;
             text-transform: uppercase;
             cursor: pointer;
             backdrop-filter: blur(4px);
             transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
         }
         .fullscreen-btn:hover {
             background: rgba(201, 171, 76, 0.9);
-            border-color: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.25);
         }
         
         /* Label Size Slider - Minimal */
@@ -231,14 +211,14 @@ st.markdown("""
             transform: translateX(-50%);
             z-index: 99998;
             background: rgba(0, 51, 102, 0.85);
-            border-radius: 4px;
-            padding: 4px 12px;
+            border-radius: 3px;
+            padding: 3px 10px;
             backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.12);
             display: flex;
             align-items: center;
-            gap: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            gap: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
             transition: opacity 0.3s ease, transform 0.3s ease;
         }
         .label-slider-container label {
@@ -251,25 +231,25 @@ st.markdown("""
             margin: 0;
         }
         .label-slider-container input[type="range"] {
-            width: 80px;
-            height: 3px;
+            width: 60px;
+            height: 2px;
             -webkit-appearance: none;
             background: rgba(255,255,255,0.2);
-            border-radius: 2px;
+            border-radius: 1px;
             outline: none;
             margin: 0;
         }
         .label-slider-container input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             background: #C9AB4C;
             cursor: pointer;
         }
         .label-slider-container input[type="range"]::-moz-range-thumb {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             background: #C9AB4C;
             cursor: pointer;
@@ -278,9 +258,9 @@ st.markdown("""
         .label-slider-value {
             color: #C9AB4C;
             font-family: 'Montserrat', sans-serif;
-            font-size: 8px;
+            font-size: 7px;
             font-weight: 700;
-            min-width: 16px;
+            min-width: 14px;
             text-align: center;
         }
         
@@ -299,6 +279,40 @@ st.markdown("""
         }
         .fullscreen-mode .block-container {
             padding: 0px !important;
+        }
+
+        /* Minimal Session Logs */
+        .session-log-container {
+            font-size: 8px;
+        }
+        .session-log-container .stButton button {
+            font-size: 7px !important;
+            padding: 2px 6px !important;
+            min-height: 20px !important;
+            height: 20px !important;
+            line-height: 1 !important;
+        }
+        .session-log-container .stButton button p {
+            font-size: 7px !important;
+        }
+        .session-log-container .stExpander {
+            border: 1px solid rgba(0, 51, 102, 0.05) !important;
+        }
+        .session-log-container .stExpander summary {
+            font-size: 8px !important;
+        }
+        .session-log-container .stExpander summary p {
+            font-size: 8px !important;
+        }
+        .session-log-container code {
+            font-size: 7px !important;
+        }
+        .session-log-container .stInfo {
+            font-size: 8px !important;
+            padding: 4px 8px !important;
+        }
+        .session-log-container .stInfo p {
+            font-size: 8px !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -320,9 +334,7 @@ def compile_features_kml(features):
 # -----------------------------------------------------------------------------
 GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
 
-# Province bounding boxes for reverse geocoding (COMPLETE - Luzon, Visayas, Mindanao)
 PROVINCE_BOUNDS = {
-    # === LUZON ===
     "metro_manila": [120.90, 14.40, 121.10, 14.80],
     "cavite": [120.60, 14.10, 121.00, 14.50],
     "laguna": [121.00, 14.00, 121.60, 14.50],
@@ -337,7 +349,6 @@ PROVINCE_BOUNDS = {
     "la_union": [120.20, 16.40, 120.80, 17.00],
     "ilocos_norte": [120.30, 17.80, 121.00, 18.70],
     "ilocos_sur": [120.20, 16.90, 120.80, 17.80],
-    # === VISAYAS ===
     "cebu": [123.00, 9.40, 124.20, 11.20],
     "leyte": [124.30, 9.80, 125.60, 11.50],
     "bohol": [123.70, 9.50, 124.60, 10.10],
@@ -346,7 +357,6 @@ PROVINCE_BOUNDS = {
     "samar": [124.80, 11.00, 125.80, 12.50],
     "biliran": [124.30, 11.40, 124.60, 11.70],
     "siquijor": [123.40, 9.10, 123.70, 9.30],
-    # === MINDANAO ===
     "davao_city": [125.40, 6.90, 125.70, 7.40],
     "davao_del_sur": [125.00, 6.00, 125.80, 7.00],
     "davao_oriental": [126.00, 6.50, 126.80, 7.80],
@@ -373,7 +383,6 @@ PROVINCE_BOUNDS = {
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_province_list():
-    """Get list of all available provinces from index.json"""
     url = f"{GITHUB_POI_BASE}/index.json"
     try:
         response = requests.get(url, timeout=10)
@@ -386,7 +395,6 @@ def get_province_list():
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_province_pois(province_name):
-    """Load POI data for a specific province from GitHub"""
     url = f"{GITHUB_POI_BASE}/{province_name}.json"
     try:
         response = requests.get(url, timeout=15)
@@ -400,14 +408,12 @@ def load_province_pois(province_name):
         return None
 
 def get_province_from_coords(lat, lon):
-    """Determine which province contains the given coordinates"""
     for province, bbox in PROVINCE_BOUNDS.items():
         if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
             return province
     return None
 
 def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
-    """Filter POIs within a radius using Haversine formula"""
     def haversine(lat1, lon1, lat2, lon2):
         R = 6371000
         lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
@@ -427,7 +433,6 @@ def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
     return filtered
 
 def filter_pois_by_tags(pois, selected_tags):
-    """Filter POIs by selected tag categories"""
     if not selected_tags:
         return pois
     
@@ -534,10 +539,8 @@ def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
     return all_results
 
 def load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags):
-    """Primary: Load from GitHub. Fallback: Overpass API."""
     records = []
     
-    # Try GitHub first
     all_province_pois = load_province_pois(province_name)
     
     if all_province_pois:
@@ -563,7 +566,6 @@ def load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, sel
             })
         return records
     
-    # Fallback to Overpass API
     add_api_log(f"No GitHub data for {province_name}, falling back to Overpass API", "WARNING")
     elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
     add_api_log(f"Overpass returned {len(elements)} raw elements", "INFO")
@@ -674,8 +676,7 @@ with st.sidebar:
         log_event("USER_ACTION", "SCAN_BUTTON_CLICKED", {
             "coordinates": f"{lat_coord}, {lon_coord}",
             "radius": radius_val,
-            "selected_tags_count": len(selected_tags),
-            "selected_tags": selected_tags[:10]
+            "selected_tags_count": len(selected_tags)
         })
         if not selected_tags:
             st.error("Select ≥ 1 layer.")
@@ -722,19 +723,19 @@ with st.sidebar:
                     add_api_log(f"Import failed: {str(e)[:100]}", "ERROR")
 
     # -------------------------------------------------------------------------
-    # SESSION LOGS (Debug Panel)
+    # SESSION LOGS (Minimal - No Emojis)
     # -------------------------------------------------------------------------
-    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin: 8px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
-    with st.expander("📋 SESSION LOGS", expanded=False):
-        st.markdown("<div style='font-size: 10px; font-weight: 600; margin-bottom: 8px;'>Real-time Debug Information</div>", unsafe_allow_html=True)
+    with st.expander("SESSION LOGS", expanded=False):
+        st.markdown("<div style='font-size: 8px; font-weight: 600; margin-bottom: 4px; color: #888780;'>debug information</div>", unsafe_allow_html=True)
         
-        col_log1, col_log2, col_log3, col_log4 = st.columns(4)
+        col_log1, col_log2, col_log3 = st.columns(3)
         with col_log1:
-            if st.button("🔄 REFRESH", key="refresh_logs", use_container_width=True):
+            if st.button("REFRESH", key="refresh_logs", use_container_width=True):
                 st.rerun()
         with col_log2:
-            if st.button("🗑️ CLEAR", key="clear_logs_btn", use_container_width=True):
+            if st.button("CLEAR", key="clear_logs_btn", use_container_width=True):
                 st.session_state.api_logs = []
                 st.session_state.event_logs = []
                 st.rerun()
@@ -745,68 +746,43 @@ with st.sidebar:
                     "events": st.session_state.event_logs,
                     "api_logs": st.session_state.api_logs,
                     "final_state": {
-                        "show_boundaries": st.session_state.get('show_boundaries', False),
-                        "boundary_levels": st.session_state.get('boundary_levels', []),
-                        "has_location": st.session_state.get('current_location_info') is not None,
-                        "boundary_data_keys": list(st.session_state.get('boundary_geojson_data', {}).keys()),
                         "poi_count": len(st.session_state.get('scanned_records', []))
                     }
                 }
                 logs_json = json.dumps(all_logs, indent=2)
                 st.download_button(
-                    "📥 DOWNLOAD",
+                    "EXPORT",
                     logs_json,
                     file_name=f"opennode_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json",
                     use_container_width=True
                 )
-        with col_log4:
-            st.caption(f"Events: {len(st.session_state.get('event_logs', []))}")
         
         st.markdown("---")
-        st.markdown("### 📋 Event Timeline")
+        st.markdown("### event timeline")
         
         if st.session_state.get('event_logs', []):
             log_text = ""
-            for log in st.session_state.event_logs[-50:]:
+            for log in st.session_state.event_logs[-30:]:
                 time_str = log.get('timestamp', '')[-12:-3] if log.get('timestamp') else ''
                 event_type = log.get('event_type', '')
                 event_name = log.get('event_name', '')
                 level = log.get('level', 'INFO')
                 
-                if level == 'ERROR':
-                    icon = "🔴"
-                elif level == 'WARNING':
-                    icon = "🟡"
-                elif event_type == 'USER_ACTION':
-                    icon = "👆"
-                elif event_type == 'API_CALL':
-                    icon = "🌐"
-                elif event_type == 'BOUNDARY':
-                    icon = "🗺️"
-                elif event_type == 'SUCCESS':
-                    icon = "✅"
-                else:
-                    icon = "🟢"
-                
-                log_text += f"{icon} [{time_str}] {event_type}: {event_name}\n"
+                prefix = "[ERR]" if level == 'ERROR' else "[WRN]" if level == 'WARNING' else "[INF]"
+                log_text += f"{prefix} [{time_str}] {event_type}: {event_name}\n"
                 
                 if log.get('event_data'):
-                    data_str = str(log.get('event_data'))[:100]
-                    log_text += f"     📎 {data_str}\n"
+                    data_str = str(log.get('event_data'))[:80]
+                    log_text += f"     {data_str}\n"
             
             st.code(log_text, language="text", line_numbers=False)
         else:
-            st.info("No events logged yet. Click SCAN AREA to generate logs.")
+            st.info("No events logged. Click SCAN AREA to generate logs.")
         
         st.markdown("---")
-        st.markdown("### 🔍 Current Application State")
+        st.markdown("### current state")
         st.code(f"""
-show_boundaries: {st.session_state.get('show_boundaries', False)}
-boundary_levels: {st.session_state.get('boundary_levels', [])}
-has_location: {st.session_state.get('current_location_info') is not None}
-location: {st.session_state.get('current_location_info', {})}
-boundary_data_keys: {list(st.session_state.get('boundary_geojson_data', {}).keys())}
 poi_count: {len(st.session_state.get('scanned_records', []))}
 scan_active: {st.session_state.get('scan_active_loading', False)}
 label_size: {st.session_state.get('label_size', 9)}
@@ -814,7 +790,7 @@ fullscreen: {st.session_state.get('fullscreen_active', False)}
         """, language="text", line_numbers=False)
 
 # -----------------------------------------------------------------------------
-# PIPELINE STAGE PIPING CONTROLLER (USING GITHUB POI DATA WITH FALLBACK)
+# PIPELINE STAGE PIPING CONTROLLER
 # -----------------------------------------------------------------------------
 main_canvas = st.empty()
 
@@ -828,7 +804,6 @@ if st.session_state.scan_active_loading:
     records = []
     success = False
     
-    # Loading overlay
     main_canvas.markdown(f'''
         <div class="py-loading-container">
             <div class="py-spinner"></div>
@@ -857,9 +832,8 @@ if st.session_state.scan_active_loading:
     
     add_api_log("Starting POI data load (GitHub primary, Overpass fallback)", "INFO")
     
-    # Step 1: Determine province from coordinates (for POI loading)
     province_name = get_province_from_coords(lat_coord, lon_coord)
-    log_event("PROCESS", "PROVINCE_DETECTION", {"province": province_name, "coordinates": f"{lat_coord}, {lon_coord}"})
+    log_event("PROCESS", "PROVINCE_DETECTION", {"province": province_name})
     
     if province_name:
         add_api_log(f"Coordinates map to province: {province_name}", "INFO")
@@ -869,8 +843,7 @@ if st.session_state.scan_active_loading:
         
         log_event("PROCESS", "POI_LOAD_COMPLETE", {
             "province": province_name,
-            "records_count": len(records),
-            "source": "github" if len(records) > 0 else "overpass"
+            "records_count": len(records)
         })
         
         if records:
@@ -923,18 +896,18 @@ is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord !
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 
 api_logs_html = ""
-for log in st.session_state.api_logs[-30:]:
+for log in st.session_state.api_logs[-20:]:
     level_class = f"api-log-{log['level'].lower()}"
     api_logs_html += f'<div class="api-log-entry"><span class="api-log-time">[{log["time"]}]</span> <span class="{level_class}">{log["message"]}</span></div>'
 
 api_log_panel = f'''
 <div class="api-log-container" id="apiLogPanel">
     <div class="api-log-header" onclick="toggleApiLog()">
-        <span>API ACTIVITY LOG</span>
-        <span class="api-log-close" onclick="event.stopPropagation(); clearApiLogsFromUI();">✕</span>
+        <span>API LOG</span>
+        <span class="api-log-close" onclick="event.stopPropagation(); clearApiLogsFromUI();">×</span>
     </div>
     <div class="api-log-content" id="apiLogContent">
-        {api_logs_html if api_logs_html else '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>No logs yet. Click SCAN to start.</span></div>'}
+        {api_logs_html if api_logs_html else '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>No logs. Click SCAN.</span></div>'}
     </div>
 </div>
 <script>
@@ -959,9 +932,8 @@ api_log_panel = f'''
 
 if st.session_state.network_stats:
     s = st.session_state.network_stats
-    st.markdown(f"""<div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>📈 STREET GRAPH DESCRIPTOR METRICS — Intersection Count: <b>{s.get('n', 0)}</b> | Edge Count: <b>{s.get('m', 0)}</b> | Total Street Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Clean Intersections Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style='background:#f1f5f9; padding:6px 12px; border-left:3px solid #C9AB4C; margin-bottom:2px; font-size:9px; font-weight:600; color:#003366;'>STREET GRAPH — Intersections: <b>{s.get('n', 0)}</b> | Edges: <b>{s.get('m', 0)}</b> | Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
 
-# Full screen mode class
 fullscreen_class = "fullscreen-mode" if st.session_state.get('fullscreen_active', False) else ""
 
 leaflet_template = """
@@ -990,35 +962,49 @@ leaflet_template = """
         #scan-results-panel {
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
         }
-        .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
+        .results-header { background: #003366; color: #ffffff; padding: 8px 10px; font-size: 9px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; max-height: calc(100vh - 280px); }
         .layer-category-block { border-bottom: 1px solid #f0f0f0; }
-        .layer-category-header { background: #ffffff; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
-        .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
+        .layer-category-header { background: #ffffff; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+        .layer-header-left { display: flex; align-items: center; gap: 4px; font-size: 8px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
         .layer-category-items { padding: 0; background: #f8fafc; }
         .layer-category-items.collapsed { display: none !important; }
-        .results-item { padding: 4px 8px 4px 16px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
+        .results-item { padding: 3px 6px 3px 12px; font-size: 8px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
         .results-item:hover { background: #ffffff; color: #003366; }
-        .action-icon-trigger { cursor: pointer; padding: 2px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 2px; transition: all 0.15s; }
+        .action-icon-trigger { cursor: pointer; padding: 1px; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 2px; transition: all 0.15s; }
         .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
-        .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
+        .action-icon-trigger svg { fill: #888780; width: 10px; height: 10px; }
         .action-icon-trigger:hover svg { fill: #003366; }
         .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
-        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: __LABEL_SIZE__px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 1px 3px; border-radius: 2px; font-size: __LABEL_SIZE__px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .hide-labels .poi-text-label { display: none !important; }
-        .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
-        .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
-        .config-headline { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
-        .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 600; color: #003366; gap: 6px; }
-        .config-flex-row select, .config-flex-row input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
-        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
-        .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
-        .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 4px; border-bottom: 1px solid rgba(0,51,102,0.08); }
-        .group-cluster-header { background: #e2e8f0; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-        .group-cluster-title { font-size: 9px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+        .color-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
+        .config-block-wrapper { padding: 4px 8px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.05); display: flex; flex-direction: column; gap: 3px; }
+        .config-headline { font-size: 7px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
+        .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 8px; font-weight: 600; color: #003366; gap: 4px; }
+        .config-flex-row select, .config-flex-row input { font-size: 8px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 2px; outline: none; }
+        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 3px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
+        .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 8px; border-radius: 50%; background: #003366; cursor: pointer; }
+        .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 3px; border-bottom: 1px solid rgba(0,51,102,0.08); }
+        .group-cluster-header { background: #e2e8f0; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .group-cluster-title { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 4px; }
         .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
-        .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
+        .cluster-selection-row { display: flex; align-items: center; gap: 6px; font-size: 8px; padding: 3px 0; color: #003366; font-weight: 600; }
+        
+        /* Full Screen Mode */
+        .fullscreen-mode #scan-results-panel {
+            display: none !important;
+        }
+        .fullscreen-mode #apiLogPanel {
+            display: none !important;
+        }
+        .fullscreen-mode .fullscreen-btn {
+            bottom: 20px;
+        }
+        .fullscreen-mode .label-slider-container {
+            bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -1042,16 +1028,16 @@ leaflet_template = """
         </div>
         
         <div id="scan-results-panel">
-            <div class="results-header"><span>WORKSPACE</span><div style="display: flex; align-items: center; gap: 8px;"><span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span><span id="results-count" style="color:#C9AB4C;">0</span></div></div>
+            <div class="results-header"><span>WORKSPACE</span><div style="display: flex; align-items: center; gap: 6px;"><span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 7px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP</span><span id="results-count" style="color:#C9AB4C;">0</span></div></div>
             <div id="cluster-modal-overlay" class="cluster-popover-modal">
-                <div style="font-size: 9px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 8px;">CREATE LAYER CLUSTER GROUP</div>
-                <div style="margin-bottom: 8px;"><input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);"></div>
-                <div id="cluster-checkbox-target-mount" style="max-height: 140px; overflow-y: auto; margin-bottom: 8px;"></div>
-                <div style="display: flex; gap: 4px;"><button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button><button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button></div>
+                <div style="font-size: 8px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px;">CREATE LAYER CLUSTER</div>
+                <div style="margin-bottom: 6px;"><input type="text" id="new-cluster-name-input" placeholder="Enter cluster name..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 8px; padding: 3px; border: 1px solid rgba(0,51,102,0.2);"></div>
+                <div id="cluster-checkbox-target-mount" style="max-height: 120px; overflow-y: auto; margin-bottom: 6px;"></div>
+                <div style="display: flex; gap: 3px;"><button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 3px; font-size:8px; font-weight:700; cursor:pointer;">BUILD</button><button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 3px; font-size:8px; font-weight:700; cursor:pointer;">CANCEL</button></div>
             </div>
-            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);"><div class="config-headline">Basemap Controller</div><div class="config-flex-row"><span>Tile Style:</span><select id="basemap-select" onchange="switchActiveBasemap(this.value)"><option value="osm">OpenStreetMap</option><option value="satellite">Satellite View</option><option value="carto">Carto Light</option></select><label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;"><input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels</label></div></div>
-            <div class="config-block-wrapper"><div class="config-headline">Global Markers</div><div class="config-flex-row"><span>Style:</span><select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)"><option value="dots">Dots</option><option value="pin">Pin Location</option><option value="modern-pin">Modern Drop-Pin</option></select><input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)"></div><div class="config-flex-row"><span>Color:</span><input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)"><select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;"><option value="">Preset</option><option value="#003366">Midnight</option><option value="#C9AB4C">Gold</option><option value="#AA2E20">Crimson</option></select></div></div>
-            <div class="config-block-wrapper"><div class="config-headline">Target Coordinates & Radius Layer</div><div class="config-flex-row"><span>Target:</span><select onchange="patchTargetCenterConfig('style', this.value)"><option value="star">Star</option><option value="circle">Dot</option></select><input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)"><input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)"></div><div class="config-flex-row"><span>Radius Fill:</span><input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)"><span>Opacity:</span><input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)"></div><div class="config-flex-row"><span>Thickness:</span><input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)"></div></div>
+            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);"><div class="config-headline">Basemap Controller</div><div class="config-flex-row"><span>Tile:</span><select id="basemap-select" onchange="switchActiveBasemap(this.value)"><option value="osm">OSM</option><option value="satellite">Satellite</option><option value="carto">Carto</option></select><label style="font-size:8px; font-weight:700; color:#003366; display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels</label></div></div>
+            <div class="config-block-wrapper"><div class="config-headline">Global Markers</div><div class="config-flex-row"><span>Style:</span><select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)"><option value="dots">Dots</option><option value="pin">Pin</option><option value="modern-pin">Modern</option></select><input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)"></div><div class="config-flex-row"><span>Color:</span><input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)"><select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:60px;"><option value="">Preset</option><option value="#003366">Midnight</option><option value="#C9AB4C">Gold</option><option value="#AA2E20">Crimson</option></select></div></div>
+            <div class="config-block-wrapper"><div class="config-headline">Target & Radius</div><div class="config-flex-row"><span>Target:</span><select onchange="patchTargetCenterConfig('style', this.value)"><option value="star">Star</option><option value="circle">Dot</option></select><input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)"><input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)"></div><div class="config-flex-row"><span>Radius:</span><input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)"><span>Opacity:</span><input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)"></div><div class="config-flex-row"><span>Thick:</span><input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)"></div></div>
             <div class="results-list" id="results-list-box"></div>
         </div>
         __API_LOG_PANEL__
@@ -1153,7 +1139,7 @@ leaflet_template = """
                     if (p.has_footprint && p.footprint_geojson) {
                         L.geoJSON(p.footprint_geojson, { style: { color: meta.color, weight: 1.5, fillColor: meta.color, fillOpacity: 0.35 } }).addTo(layerGroupsRef[key]);
                     }
-                    const marker = L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).bindPopup(`<b>${p.name}</b><br><span style="color:#888780;font-size:9px;">${p.type}</span>`);
+                    const marker = L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).bindPopup(`<b>${p.name}</b><br><span style="color:#888780;font-size:8px;">${p.type}</span>`);
                     if (p.name && p.name !== 'Unknown') marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -10], className: 'poi-text-label' });
                     marker.addTo(layerGroupsRef[key]);
                 });
@@ -1163,7 +1149,7 @@ leaflet_template = """
         window.openClusterModalWindow = function() {
             const container = document.getElementById('cluster-checkbox-target-mount'); container.innerHTML = '';
             const layers = Object.keys(categoryMap);
-            if(layers.length === 0) container.innerHTML = '<div style="font-size:9px; padding:4px; color:#888780;">No active layers to compile.</div>';
+            if(layers.length === 0) container.innerHTML = '<div style="font-size:8px; padding:3px; color:#888780;">No active layers.</div>';
             else { layers.forEach(lyr => { container.innerHTML += `<div class="cluster-selection-row"><input type="checkbox" class="cluster-matrix-select-target" value="${lyr}" style="accent-color:#003366;"><span>${lyr} (${categoryMap[lyr].length})</span></div>`; }); }
             document.getElementById('cluster-modal-overlay').classList.add('active');
         };
@@ -1205,7 +1191,7 @@ leaflet_template = """
 
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box'); document.getElementById('results-count').innerText = pts.length;
-            if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:9px; padding:12px; color:#888780;'>No items mapped.</div>"; return; }
+            if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:8px; padding:8px; color:#888780;'>No items mapped.</div>"; return; }
             let htmlPayload = '';
             const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
             const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
@@ -1214,7 +1200,7 @@ leaflet_template = """
             Object.keys(clusters).forEach(clusterName => {
                 const assignedLayers = clusters[clusterName] || []; let aggregatedCount = 0; let groupIsVisible = false;
                 assignedLayers.forEach(lKey => { if (categoryMap[lKey]) { aggregatedCount += categoryMap[lKey].length; if (categoryMap[lKey].some(p => p.visible !== false)) groupIsVisible = true; } });
-                htmlPayload += `<div class="group-cluster-block" id="cluster-block-${clusterName}"><div class="group-cluster-header"><div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')"><span style="color:#C9AB4C;">⚡</span><span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span></div><div style="display:flex; align-items:center; gap:2px;"><a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a><span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span></div></div><div class="config-block-wrapper" style="background: #e2e8f0; border-bottom: 1px solid rgba(0,51,102,0.15);"><div class="config-headline" style="font-size:7.5px; opacity:0.8;">Batch Group Style Controller</div><div class="config-flex-row"><select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)"><option value="dots">Dots</option><option value="pin">Pin</option><option value="modern-pin">Modern Pin</option></select><input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)"><input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)"></div></div><div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 8px; background: rgba(0,0,0,0.02);">`;
+                htmlPayload += `<div class="group-cluster-block" id="cluster-block-${clusterName}"><div class="group-cluster-header"><div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')"><span style="color:#C9AB4C;">⚡</span><span>${clusterName} <span style="font-weight:500; font-size:7px; opacity:0.75;">(${aggregatedCount})</span></span></div><div style="display:flex; align-items:center; gap:1px;"><a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a><span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 7px; color:#003366; margin-left:3px; cursor:pointer;">▼</span></div></div><div class="config-block-wrapper" style="background: #e2e8f0; border-bottom: 1px solid rgba(0,51,102,0.15);"><div class="config-headline" style="font-size:6.5px; opacity:0.8;">Batch Style</div><div class="config-flex-row"><select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)"><option value="dots">Dots</option><option value="pin">Pin</option><option value="modern-pin">Modern</option></select><input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)"><input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)"></div></div><div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 6px; background: rgba(0,0,0,0.02);">`;
                 assignedLayers.forEach(catName => { if(!categoryMap[catName]) return; const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 }; const layerPts = categoryMap[catName] || []; const isLayerVisible = layerPts.some(p => p.visible !== false); htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg); });
                 htmlPayload += '</div></div>';
             });
@@ -1228,26 +1214,26 @@ leaflet_template = """
         }
 
         function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg) {
-            let chunk = `<div class="layer-category-header"><div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')"><span class="color-dot" style="background-color: ${meta.color};"></span><span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:8px;">(${layerPts.length})</span></span></div><div style="display:flex; align-items:center; gap:1px;"><a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a><a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a><span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">▼</span></div></div><div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);"><div class="config-flex-row"><select onchange="triggerLayerUpdate('${catName}', 'style', this.value)"><option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option><option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option><option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern Drop-Pin</option></select><input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)"><input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();"></div></div><div class="layer-category-items collapsed" id="items-${catName}">`;
+            let chunk = `<div class="layer-category-header"><div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')"><span class="color-dot" style="background-color: ${meta.color};"></span><span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:7px;">(${layerPts.length})</span></span></div><div style="display:flex; align-items:center; gap:1px;"><a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a><a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a><span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 7px; color:#C9AB4C; margin-left:3px; cursor:pointer;">▼</span></div></div><div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);"><div class="config-flex-row"><select onchange="triggerLayerUpdate('${catName}', 'style', this.value)"><option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option><option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option><option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern</option></select><input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)"><input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();"></div></div><div class="layer-category-items collapsed" id="items-${catName}">`;
             layerPts.forEach(p => { const itemVisible = p.visible !== false; chunk += `<div class="results-item" id="res-item-${p.uid}" style="${itemVisible ? '' : 'opacity:0.4;'}"><div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">${p.name || 'Unknown'}</div><div style="display:flex; align-items:center; gap:1px;"><a class="action-icon-trigger" onclick="promptRenamePoi(${p.uid}, '${p.name}')">${editSvg}</a><a class="action-icon-trigger" onclick="togglePoiVisibility(${p.uid})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" onclick="removePoiInstance(${p.uid}, '${catName}')">${trashSvg}</a></div></div>`; });
             chunk += '</div>'; return chunk;
         }
 
         window.toggleAccordionCollapse = function(catKey) { const panel = document.getElementById('items-' + catKey); const chev = document.getElementById('chevron-' + catKey); if(panel) { panel.classList.toggle('collapsed'); chev.innerText = panel.classList.contains('collapsed') ? '▼' : '▲'; } };
         window.togglePoiVisibility = function(uid) { const p = pts.find(item => item.uid === uid); if (p) { p.visible = (p.visible === false); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
-        window.promptRenamePoi = function(uid, oldName) { const newName = prompt("Rename asset description Name:", oldName); if (newName && newName.trim() !== "") { const p = pts.find(item => item.uid === uid); if (p) { p.name = newName; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } } };
+        window.promptRenamePoi = function(uid, oldName) { const newName = prompt("Rename asset:", oldName); if (newName && newName.trim() !== "") { const p = pts.find(item => item.uid === uid); if (p) { p.name = newName; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } } };
         window.removePoiInstance = function(uid, catKey) { pts = pts.filter(item => item.uid !== uid); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
         window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) { pts.forEach(p => { if (p.type === catKey) p.visible = !currentlyVisible; }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
-        window.promptRenameLayer = function(oldKey) { const newKey = prompt("Rename layer designation path description:", oldKey); if (newKey && newKey.trim() !== "" && newKey !== oldKey) { pts.forEach(p => { if (p.type === oldKey) p.type = newKey; }); if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; } Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].map(item => item === oldKey ? newKey : item); }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
-        window.triggerLayerDeletion = function(catKey) { if (confirm(`Remove entire layer cluster: "${catKey}"?`)) { pts = pts.filter(p => p.type !== catKey); delete layerMeta[catKey]; Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].filter(item => item !== catKey); }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
+        window.promptRenameLayer = function(oldKey) { const newKey = prompt("Rename layer:", oldKey); if (newKey && newKey.trim() !== "" && newKey !== oldKey) { pts.forEach(p => { if (p.type === oldKey) p.type = newKey; }); if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; } Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].map(item => item === oldKey ? newKey : item); }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
+        window.triggerLayerDeletion = function(catKey) { if (confirm(`Remove layer: "${catKey}"?`)) { pts = pts.filter(p => p.type !== catKey); delete layerMeta[catKey]; Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].filter(item => item !== catKey); }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
 
         map.on('contextmenu', function(e) {
             const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const menuHtml = `<div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;"><div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div></div>`;
+            const menuHtml = `<div style="font-family: Montserrat, sans-serif; font-size: 9px; color: #003366; min-width: 120px; background:#fff; padding:4px;"><div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 3px; margin-bottom: 4px; letter-spacing: 0.5px;">MAP</div><div style="padding: 4px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coords</div><div style="padding: 4px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Google Maps</div><div style="padding: 4px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Streetview</div></div>`;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
         
-        // Fullscreen toggle function
+        // Fullscreen toggle
         function toggleFullscreen() {
             const container = document.getElementById('map-container');
             container.classList.toggle('fullscreen-mode');
@@ -1257,7 +1243,6 @@ leaflet_template = """
             } else {
                 btn.textContent = 'fullscreen';
             }
-            // Resize map after transition
             setTimeout(() => {
                 map.invalidateSize();
             }, 350);
