@@ -99,6 +99,7 @@ st.markdown("""
             visibility: visible !important;
             overflow: hidden !important;
             box-shadow: 2px 0 15px rgba(0,0,0,0.03) !important;
+            transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, transform 0.3s ease !important;
         }
         
         [data-testid="stSidebarCollapseButton"], [data-testid="collapsedControl"] { display: none !important; }
@@ -113,7 +114,7 @@ st.markdown("""
         [data-testid="stHeader"], header, #stDecoration { display: none !important; }
         
         [data-testid="stAppViewContainer"] { display: flex !important; flex-direction: row !important; width: 100vw !important; height: 100vh !important; overflow: hidden !important; }
-        [data-testid="stMain"] { flex-grow: 1 !important; width: calc(100vw - 280px) !important; height: 100vh !important; overflow: hidden !important; margin: 0px !important; padding: 0px !important; }
+        [data-testid="stMain"] { flex-grow: 1 !important; width: calc(100vw - 280px) !important; height: 100vh !important; overflow: hidden !important; margin: 0px !important; padding: 0px !important; transition: width 0.3s ease !important; }
         .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer { padding: 0px !important; margin: 0px !important; max-width: 100% !important; gap: 0rem !important; }
         iframe { height: 100vh !important; width: 100% !important; border: none !important; display: block !important; }
         
@@ -195,27 +196,109 @@ st.markdown("""
         .api-log-close { cursor: pointer; padding: 0 6px; font-size: 14px; line-height: 1; }
         .api-log-close:hover { color: #ff8888; }
         
-        /* Boundary styles */
-        .boundary-tooltip {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 9px;
-            font-weight: 600;
-            background: rgba(0, 51, 102, 0.9);
-            color: white;
-            padding: 2px 6px;
-            border-radius: 2px;
-            border-left: 2px solid #C9AB4C;
-        }
-        .boundary-legend {
-            background: rgba(255,255,255,0.95);
-            padding: 6px 10px;
+        /* Full Screen Button - Minimal Style */
+        .fullscreen-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999;
+            background: rgba(0, 51, 102, 0.85);
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.15);
             border-radius: 4px;
-            font-size: 9px;
+            padding: 4px 12px;
             font-family: 'Montserrat', sans-serif;
+            font-size: 8px;
             font-weight: 600;
-            color: #003366;
-            border: 1px solid rgba(0,51,102,0.1);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .fullscreen-btn:hover {
+            background: rgba(201, 171, 76, 0.9);
+            border-color: rgba(255,255,255,0.3);
+        }
+        
+        /* Label Size Slider - Minimal */
+        .label-slider-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99998;
+            background: rgba(0, 51, 102, 0.85);
+            border-radius: 4px;
+            padding: 4px 12px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.15);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .label-slider-container label {
+            color: #ffffff;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 7px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin: 0;
+        }
+        .label-slider-container input[type="range"] {
+            width: 80px;
+            height: 3px;
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            outline: none;
+            margin: 0;
+        }
+        .label-slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #C9AB4C;
+            cursor: pointer;
+        }
+        .label-slider-container input[type="range"]::-moz-range-thumb {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #C9AB4C;
+            cursor: pointer;
+            border: none;
+        }
+        .label-slider-value {
+            color: #C9AB4C;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 8px;
+            font-weight: 700;
+            min-width: 16px;
+            text-align: center;
+        }
+        
+        /* Full screen mode - hide sidebar */
+        .fullscreen-mode [data-testid="stSidebar"] {
+            width: 0px !important;
+            min-width: 0px !important;
+            max-width: 0px !important;
+            transform: translateX(-100%) !important;
+            opacity: 0 !important;
+            overflow: hidden !important;
+            border-right: none !important;
+        }
+        .fullscreen-mode [data-testid="stMain"] {
+            width: 100vw !important;
+        }
+        .fullscreen-mode .block-container {
+            padding: 0px !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -227,8 +310,8 @@ def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
         if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&").replace("<", "<").replace(">", ">")
-        class_type = f.get('type', 'Node').replace("&", "&").replace("<", "<").replace(">", ">")
+        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
@@ -236,7 +319,6 @@ def compile_features_kml(features):
 # GITHUB POI DATA LOADER & FALLBACK
 # -----------------------------------------------------------------------------
 GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
-GITHUB_BOUNDARY_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/boundaries"
 
 # Province bounding boxes for reverse geocoding (COMPLETE - Luzon, Visayas, Mindanao)
 PROVINCE_BOUNDS = {
@@ -324,37 +406,6 @@ def get_province_from_coords(lat, lon):
             return province
     return None
 
-# ===== FALLBACK FUNCTION FOR BOUNDARIES =====
-def get_location_from_province_bounds(lat, lon):
-    """
-    Fallback: Get location info from PROVINCE_BOUNDS dictionary.
-    This provides at least province-level info for boundaries.
-    """
-    province_name = get_province_from_coords(lat, lon)
-    
-    if province_name:
-        # Convert province name to readable format
-        display_name = province_name.replace('_', ' ').title()
-        
-        # Create a basic location info dict
-        location_info = {
-            "region": "Philippines",
-            "province": display_name,
-            "city": "Unknown",
-            "barangay": "Unknown",
-            "lat": lat,
-            "lon": lon,
-            "full_display_name": f"{display_name}, Philippines",
-            "source": "province_bounds_fallback"
-        }
-        
-        log_event("SUCCESS", "PROVINCE_BOUNDS_FALLBACK", {"province": province_name})
-        add_api_log(f"📍 Using fallback location from province bounds: {display_name}", "INFO")
-        
-        return location_info
-    
-    return None
-
 def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
     """Filter POIs within a radius using Haversine formula"""
     def haversine(lat1, lon1, lat2, lon2):
@@ -397,233 +448,23 @@ def filter_pois_by_tags(pois, selected_tags):
     return filtered
 
 # -----------------------------------------------------------------------------
-# BOUNDARY FUNCTIONS (Primary: GitHub, Fallback: Overpass API)
+# API LOGGING SYSTEM
 # -----------------------------------------------------------------------------
-def load_github_boundary(area_name, boundary_type):
-    """
-    Load boundary GeoJSON from GitHub repository.
-    boundary_type: 'regions', 'provinces', 'cities'
-    """
-    filename_map = {
-        "region": "regions.geojson",
-        "province": "provinces.geojson",
-        "city": "cities.geojson"
-    }
-    
-    filename = filename_map.get(boundary_type)
-    if not filename:
-        return None
-    
-    url = f"{GITHUB_BOUNDARY_BASE}/{filename}"
-    try:
-        response = requests.get(url, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            if area_name:
-                filtered_features = []
-                for feature in data.get('features', []):
-                    props = feature.get('properties', {})
-                    feature_name = props.get('name', '')
-                    if feature_name.lower() == area_name.lower():
-                        filtered_features.append(feature)
-                
-                if filtered_features:
-                    return {"type": "FeatureCollection", "features": filtered_features}
-            return data
-        return None
-    except Exception as e:
-        add_api_log(f"GitHub boundary error for {area_name}: {str(e)[:100]}", "WARNING")
-        return None
+if 'api_logs' not in st.session_state:
+    st.session_state.api_logs = []
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def reverse_geocode_location(lat, lon):
-    """
-    Get administrative hierarchy from coordinates using Nominatim API.
-    Returns dict with region, province, city, barangay.
-    """
-    log_event("API_CALL", "REVERSE_GEOCODING_START", {"lat": lat, "lon": lon})
-    
-    try:
-        # Use a more reliable URL with better parameters
-        url = "https://nominatim.openstreetmap.org/reverse"
-        params = {
-            "lat": lat,
-            "lon": lon,
-            "format": "json",
-            "addressdetails": 1,
-            "zoom": 18,
-            "accept-language": "en"
-        }
-        headers = {"User-Agent": "OpenNode/2.0 (https://opennode.app; contact@opennode.app)"}
-        
-        add_api_log(f"Calling Nominatim API: {url}?lat={lat}&lon={lon}", "INFO")
-        
-        response = requests.get(url, params=params, headers=headers, timeout=15)
-        
-        add_api_log(f"Nominatim response status: {response.status_code}", "INFO")
-        
-        if response.status_code == 200:
-            data = response.json()
-            add_api_log(f"Nominatim returned data: {list(data.keys()) if data else 'None'}", "INFO")
-            
-            address = data.get('address', {})
-            
-            # Extract Philippine administrative hierarchy
-            # Common field names in Nominatim for Philippines
-            location_info = {
-                "region": address.get('state', '') or address.get('region', ''),
-                "province": address.get('province', '') or address.get('state_district', ''),
-                "city": address.get('city', '') or address.get('municipality', '') or address.get('town', ''),
-                "barangay": address.get('suburb', '') or address.get('neighbourhood', '') or address.get('village', ''),
-                "lat": lat,
-                "lon": lon,
-                "full_display_name": data.get('display_name', '')
-            }
-            
-            # If province is still empty, try to get from OSM data
-            if not location_info["province"]:
-                # Try to extract from displayed name or other fields
-                osm_type = data.get('osm_type')
-                if osm_type == 'node':
-                    location_info["province"] = address.get('county', '')
-            
-            # Clean up empty values
-            for key in location_info:
-                if location_info[key] == '' or location_info[key] is None:
-                    location_info[key] = 'Unknown'
-            
-            log_event("SUCCESS", "REVERSE_GEOCODING_SUCCESS", {
-                "region": location_info["region"],
-                "province": location_info["province"],
-                "city": location_info["city"],
-                "barangay": location_info["barangay"]
-            })
-            
-            add_api_log(f"📍 Location detected: Barangay: {location_info['barangay']}, City: {location_info['city']}, Province: {location_info['province']}, Region: {location_info['region']}", "INFO")
-            
-            return location_info
-        else:
-            add_api_log(f"Nominatim API error: HTTP {response.status_code}", "ERROR")
-            log_event("ERROR", "REVERSE_GEOCODING_HTTP_ERROR", {"status_code": response.status_code})
-            
-            # FALLBACK: Use PROVINCE_BOUNDS if Nominatim fails
-            add_api_log("Nominatim failed, trying fallback from province bounds", "WARNING")
-            return get_location_from_province_bounds(lat, lon)
-            
-    except requests.exceptions.Timeout:
-        add_api_log("Nominatim API timeout after 15 seconds", "ERROR")
-        log_event("ERROR", "REVERSE_GEOCODING_TIMEOUT", {"lat": lat, "lon": lon})
-        
-        # FALLBACK: Use PROVINCE_BOUNDS on timeout
-        add_api_log("Nominatim timeout, trying fallback from province bounds", "WARNING")
-        return get_location_from_province_bounds(lat, lon)
-        
-    except Exception as e:
-        add_api_log(f"Reverse geocoding error: {str(e)[:200]}", "ERROR")
-        log_event("ERROR", "REVERSE_GEOCODING_EXCEPTION", {"error": str(e)[:200]})
-        
-        # FALLBACK: Use PROVINCE_BOUNDS on exception
-        add_api_log("Nominatim exception, trying fallback from province bounds", "WARNING")
-        return get_location_from_province_bounds(lat, lon)
+def add_api_log(message, level="INFO"):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    st.session_state.api_logs.append({
+        "time": timestamp,
+        "message": message,
+        "level": level
+    })
+    if len(st.session_state.api_logs) > 100:
+        st.session_state.api_logs = st.session_state.api_logs[-100:]
 
-@st.cache_data(ttl=86400, show_spinner=False)
-def get_boundary_geojson(area_name, admin_level):
-    """
-    Fetch boundary GeoJSON directly from Overpass API.
-    """
-    add_api_log(f"DEBUG: get_boundary_geojson called with area_name='{area_name}', admin_level='{admin_level}'", "INFO")
-    
-    if not area_name or area_name == '':
-        add_api_log(f"DEBUG: area_name is empty, returning None", "WARNING")
-        return None
-    
-    # Build Overpass query
-    query = f"""
-    [out:json][timeout:30];
-    (
-      relation["admin_level"="{admin_level}"]["name"="{area_name}"];
-      relation["admin_level"="{admin_level}"]["name:en"="{area_name}"];
-    );
-    (._;>;);
-    out geom;
-    """
-    add_api_log(f"DEBUG: Overpass query for {area_name}: {query[:200]}...", "INFO")
-    
-    try:
-        response = requests.post(
-            "https://overpass-api.de/api/interpreter",
-            data={"data": query},
-            timeout=30
-        )
-        add_api_log(f"DEBUG: Overpass response status: {response.status_code}", "INFO")
-        
-        if response.status_code == 200:
-            data = response.json()
-            add_api_log(f"DEBUG: Overpass returned {len(data.get('elements', []))} elements", "INFO")
-            features = []
-            for element in data.get('elements', []):
-                if element.get('type') == 'relation':
-                    coords = []
-                    members = element.get('members', [])
-                    add_api_log(f"DEBUG: Found relation with {len(members)} members", "INFO")
-                    
-                    for node in members:
-                        if node.get('type') == 'node' and 'lat' in node and 'lon' in node:
-                            coords.append([node['lon'], node['lat']])
-                        elif node.get('type') == 'way':
-                            # For ways, we need to fetch the nodes - simplified approach
-                            # Just use the way's center or skip for now
-                            if 'center' in node:
-                                coords.append([node['center']['lon'], node['center']['lat']])
-                    
-                    if coords and len(coords) >= 3:
-                        features.append({
-                            "type": "Feature",
-                            "geometry": {
-                                "type": "Polygon",
-                                "coordinates": [coords]
-                            },
-                            "properties": {
-                                "name": element.get('tags', {}).get('name', area_name),
-                                "admin_level": admin_level
-                            }
-                        })
-                        add_api_log(f"✅ Added feature for {area_name} with {len(coords)} coordinates", "INFO")
-                    else:
-                        add_api_log(f"DEBUG: Not enough coordinates for {area_name} (got {len(coords)})", "WARNING")
-            
-            if features:
-                add_api_log(f"✅ Loaded {area_name} boundary from Overpass API ({len(features)} features)", "INFO")
-                return {"type": "FeatureCollection", "features": features}
-            else:
-                add_api_log(f"DEBUG: No valid features found for {area_name}", "WARNING")
-                
-                # Try alternative: search for the area with a more flexible query
-                alt_query = f"""
-                [out:json][timeout:30];
-                (
-                  area["name"="{area_name}"];
-                  relation["name"="{area_name}"];
-                );
-                out geom;
-                """
-                add_api_log(f"DEBUG: Trying alternative query for {area_name}", "INFO")
-                
-                alt_response = requests.post(
-                    "https://overpass-api.de/api/interpreter",
-                    data={"data": alt_query},
-                    timeout=30
-                )
-                
-                if alt_response.status_code == 200:
-                    alt_data = alt_response.json()
-                    add_api_log(f"DEBUG: Alternative query returned {len(alt_data.get('elements', []))} elements", "INFO")
-        else:
-            add_api_log(f"DEBUG: Overpass API error: {response.status_code}", "ERROR")
-        return None
-    except Exception as e:
-        add_api_log(f"❌ Boundary fetch error for {area_name}: {str(e)[:200]}", "ERROR")
-        return None
+def clear_api_logs():
+    st.session_state.api_logs = []
 
 # -----------------------------------------------------------------------------
 # OVERPASS API FALLBACK FOR POIS
@@ -751,25 +592,6 @@ def load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, sel
     return records
 
 # -----------------------------------------------------------------------------
-# API LOGGING SYSTEM
-# -----------------------------------------------------------------------------
-if 'api_logs' not in st.session_state:
-    st.session_state.api_logs = []
-
-def add_api_log(message, level="INFO"):
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    st.session_state.api_logs.append({
-        "time": timestamp,
-        "message": message,
-        "level": level
-    })
-    if len(st.session_state.api_logs) > 100:
-        st.session_state.api_logs = st.session_state.api_logs[-100:]
-
-def clear_api_logs():
-    st.session_state.api_logs = []
-
-# -----------------------------------------------------------------------------
 # 2. STATE PERSISTENCE & DATA CONFIGURATIONS
 # -----------------------------------------------------------------------------
 DEFAULT_COORDS = "14.5995, 120.9842"
@@ -791,16 +613,8 @@ if 'radius_config' not in st.session_state: st.session_state.radius_config = {"c
 if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "modern-pin"
 if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 16
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
-
-# Boundary state
-if 'show_boundaries' not in st.session_state:
-    st.session_state.show_boundaries = False
-if 'boundary_levels' not in st.session_state:
-    st.session_state.boundary_levels = []
-if 'current_location_info' not in st.session_state:
-    st.session_state.current_location_info = None
-if 'boundary_geojson_data' not in st.session_state:
-    st.session_state.boundary_geojson_data = {}
+if 'label_size' not in st.session_state: st.session_state.label_size = 9
+if 'fullscreen_active' not in st.session_state: st.session_state.fullscreen_active = False
 
 POI_CONFIG = {
     "COMMERCIAL & OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
@@ -856,100 +670,6 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
-    # -------------------------------------------------------------------------
-    # BOUNDARY CONTROLS (Dropdown first, then Show button)
-    # -------------------------------------------------------------------------
-    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
-    st.markdown("<div style='font-weight: 700; font-size: 11px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>🗺️ ADMINISTRATIVE BOUNDARIES</div>", unsafe_allow_html=True)
-    
-    # Dropdown first (always visible)
-    boundary_options = st.multiselect(
-        "Select boundary levels:",
-        options=["Region", "Province", "City/Municipality"],
-        default=st.session_state.boundary_levels,
-        key="boundary_selector"
-    )
-    st.session_state.boundary_levels = boundary_options
-    
-    # Show and Hide buttons
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        show_boundaries_trigger = st.button("SHOW BOUNDARIES", type="secondary", use_container_width=True, key="show_boundaries_btn")
-    with col_btn2:
-        hide_boundaries_trigger = st.button("HIDE BOUNDARIES", type="primary", use_container_width=True, key="hide_boundaries_btn")
-    
-    if show_boundaries_trigger:
-        add_api_log("🔍 DEBUG: SHOW_BOUNDARIES button was clicked!", "INFO")
-        add_api_log(f"🔍 DEBUG: boundary_levels = {st.session_state.boundary_levels}", "INFO")
-        add_api_log(f"🔍 DEBUG: current_location_info = {st.session_state.current_location_info}", "INFO")
-        
-        log_event("USER_ACTION", "SHOW_BOUNDARIES_CLICKED", {
-            "boundary_levels": st.session_state.boundary_levels,
-            "has_location": st.session_state.current_location_info is not None,
-            "location": st.session_state.current_location_info
-        })
-        st.session_state.show_boundaries = True
-        
-        # Fetch boundaries immediately if location is available
-        if st.session_state.current_location_info:
-            add_api_log("🔍 DEBUG: Location available, starting boundary fetch...", "INFO")
-            log_event("BOUNDARY", "BOUNDARY_FETCH_STARTED", {
-                "boundary_levels": st.session_state.boundary_levels,
-                "location": st.session_state.current_location_info
-            })
-            
-            loc = st.session_state.current_location_info
-            boundary_geojson_data = {}
-            
-            level_mapping = {
-                "Region": ("region", "4", loc.get('region', '')),
-                "Province": ("province", "5", loc.get('province', '')),
-                "City/Municipality": ("city", "7", loc.get('city', ''))
-            }
-            
-            add_api_log(f"🔍 DEBUG: level_mapping created with region='{loc.get('region', '')}', province='{loc.get('province', '')}', city='{loc.get('city', '')}'", "INFO")
-            
-            for level_name in st.session_state.boundary_levels:
-                add_api_log(f"🔍 DEBUG: Processing level: {level_name}", "INFO")
-                if level_name in level_mapping:
-                    key, admin_level, area_name = level_mapping[level_name]
-                    add_api_log(f"🔍 DEBUG: level_name={level_name}, key={key}, admin_level={admin_level}, area_name='{area_name}'", "INFO")
-                    
-                    if area_name and area_name != 'Unknown':
-                        add_api_log(f"🔍 DEBUG: Fetching {level_name} boundary for: {area_name} at admin_level {admin_level}", "INFO")
-                        geojson = get_boundary_geojson(area_name, admin_level)
-                        add_api_log(f"🔍 DEBUG: get_boundary_geojson returned: {geojson is not None}", "INFO")
-                        if geojson:
-                            boundary_geojson_data[key] = geojson
-                            feature_count = len(geojson.get('features', []))
-                            add_api_log(f"✅ Loaded {level_name} boundary with {feature_count} features", "INFO")
-                        else:
-                            add_api_log(f"❌ Failed to load {level_name} boundary for {area_name}", "ERROR")
-                    else:
-                        add_api_log(f"⚠️ Skipping {level_name} - area_name is '{area_name}'", "WARNING")
-                else:
-                    add_api_log(f"⚠️ Level {level_name} not found in level_mapping", "WARNING")
-            
-            st.session_state.boundary_geojson_data = boundary_geojson_data
-            add_api_log(f"🔍 DEBUG: Final boundary_geojson_data keys: {list(boundary_geojson_data.keys())}", "INFO")
-            log_event("STATE_CHANGE", "BOUNDARY_DATA_UPDATED", {"keys": list(boundary_geojson_data.keys())})
-        else:
-            add_api_log("🔍 DEBUG: No location info available, cannot fetch boundaries", "WARNING")
-        
-        st.rerun()
-    
-    if hide_boundaries_trigger:
-        log_event("USER_ACTION", "HIDE_BOUNDARIES_CLICKED", {})
-        st.session_state.show_boundaries = False
-        st.session_state.boundary_geojson_data = {}
-        st.rerun()
-    
-    # Show current location info if boundaries are active
-    if st.session_state.current_location_info and st.session_state.show_boundaries:
-        loc_info = st.session_state.current_location_info
-        st.info(f"📍 {loc_info.get('barangay', '?')}, {loc_info.get('city', '?')}, {loc_info.get('province', '?')}")
-    # -------------------------------------------------------------------------
-
     if scan_triggered:
         log_event("USER_ACTION", "SCAN_BUTTON_CLICKED", {
             "coordinates": f"{lat_coord}, {lon_coord}",
@@ -973,10 +693,6 @@ with st.sidebar:
         st.session_state.layer_groups = {}
         st.session_state.network_stats = None
         st.session_state.scan_active_loading = False
-        st.session_state.show_boundaries = False
-        st.session_state.boundary_levels = []
-        st.session_state.current_location_info = None
-        st.session_state.boundary_geojson_data = {}
         clear_api_logs()
         for key in list(st.session_state.keys()):
             if key.startswith("chk_"): st.session_state[key] = False
@@ -1013,7 +729,6 @@ with st.sidebar:
     with st.expander("📋 SESSION LOGS", expanded=False):
         st.markdown("<div style='font-size: 10px; font-weight: 600; margin-bottom: 8px;'>Real-time Debug Information</div>", unsafe_allow_html=True)
         
-        # Create columns for log controls
         col_log1, col_log2, col_log3, col_log4 = st.columns(4)
         with col_log1:
             if st.button("🔄 REFRESH", key="refresh_logs", use_container_width=True):
@@ -1024,7 +739,6 @@ with st.sidebar:
                 st.session_state.event_logs = []
                 st.rerun()
         with col_log3:
-            # Download all logs as JSON
             if st.session_state.get('event_logs', []):
                 all_logs = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -1049,7 +763,6 @@ with st.sidebar:
         with col_log4:
             st.caption(f"Events: {len(st.session_state.get('event_logs', []))}")
         
-        # Display event logs in a scrollable container
         st.markdown("---")
         st.markdown("### 📋 Event Timeline")
         
@@ -1084,9 +797,8 @@ with st.sidebar:
             
             st.code(log_text, language="text", line_numbers=False)
         else:
-            st.info("No events logged yet. Click SCAN AREA or SHOW BOUNDARIES to generate logs.")
+            st.info("No events logged yet. Click SCAN AREA to generate logs.")
         
-        # Show current state
         st.markdown("---")
         st.markdown("### 🔍 Current Application State")
         st.code(f"""
@@ -1097,6 +809,8 @@ location: {st.session_state.get('current_location_info', {})}
 boundary_data_keys: {list(st.session_state.get('boundary_geojson_data', {}).keys())}
 poi_count: {len(st.session_state.get('scanned_records', []))}
 scan_active: {st.session_state.get('scan_active_loading', False)}
+label_size: {st.session_state.get('label_size', 9)}
+fullscreen: {st.session_state.get('fullscreen_active', False)}
         """, language="text", line_numbers=False)
 
 # -----------------------------------------------------------------------------
@@ -1147,19 +861,6 @@ if st.session_state.scan_active_loading:
     province_name = get_province_from_coords(lat_coord, lon_coord)
     log_event("PROCESS", "PROVINCE_DETECTION", {"province": province_name, "coordinates": f"{lat_coord}, {lon_coord}"})
     
-    # Step 2: Get location hierarchy for boundaries (reverse geocoding)
-    log_event("API_CALL", "REVERSE_GEOCODING_START", {"lat": lat_coord, "lon": lon_coord})
-    location_info = reverse_geocode_location(lat_coord, lon_coord)
-    
-    if location_info:
-        st.session_state.current_location_info = location_info
-        log_event("SUCCESS", "REVERSE_GEOCODING_SUCCESS", location_info)
-        add_api_log(f"📍 Location detected: {location_info.get('barangay', 'N/A')}, {location_info.get('city', 'N/A')}, {location_info.get('province', 'N/A')}, {location_info.get('region', 'N/A')}", "INFO")
-    else:
-        st.session_state.current_location_info = None
-        log_event("ERROR", "REVERSE_GEOCODING_FAILED", {"lat": lat_coord, "lon": lon_coord})
-        add_api_log("⚠️ Could not determine location hierarchy for boundaries", "WARNING")
-    
     if province_name:
         add_api_log(f"Coordinates map to province: {province_name}", "INFO")
         log_event("PROCESS", "GITHUB_POI_LOAD_START", {"province": province_name})
@@ -1186,65 +887,6 @@ if st.session_state.scan_active_loading:
     else:
         add_api_log(f"Coordinates ({lat_coord}, {lon_coord}) not within any loaded province boundary", "ERROR")
         log_event("ERROR", "PROVINCE_NOT_FOUND", {"coordinates": f"{lat_coord}, {lon_coord}"})
-    
-    # -------------------------------------------------------------------------
-    # FETCH BOUNDARIES IF SHOW BOUNDARIES IS ACTIVE
-    # -------------------------------------------------------------------------
-    if st.session_state.show_boundaries and st.session_state.current_location_info:
-        log_event("BOUNDARY", "BOUNDARY_FETCH_STARTED", {
-            "boundary_levels": st.session_state.boundary_levels,
-            "location": st.session_state.current_location_info
-        })
-        
-        add_api_log("DEBUG: Starting boundary fetch process", "INFO")
-        add_api_log(f"DEBUG: boundary_levels selected: {st.session_state.boundary_levels}", "INFO")
-        add_api_log(f"DEBUG: location_info: {st.session_state.current_location_info}", "INFO")
-        
-        loc = st.session_state.current_location_info
-        boundary_geojson_data = {}
-        
-        level_mapping = {
-            "Region": ("region", "4", loc.get('region', '')),
-            "Province": ("province", "5", loc.get('province', '')),
-            "City/Municipality": ("city", "7", loc.get('city', ''))
-        }
-        
-        for level_name in st.session_state.boundary_levels:
-            add_api_log(f"DEBUG: Processing level: {level_name}", "INFO")
-            log_event("BOUNDARY", "BOUNDARY_LEVEL_PROCESSING", {"level": level_name})
-            
-            if level_name in level_mapping:
-                key, admin_level, area_name = level_mapping[level_name]
-                add_api_log(f"DEBUG: level={level_name}, key={key}, admin_level={admin_level}, area_name='{area_name}'", "INFO")
-                
-                if area_name and area_name != '':
-                    add_api_log(f"DEBUG: Fetching boundary for '{area_name}' at admin_level {admin_level}", "INFO")
-                    log_event("API_CALL", "BOUNDARY_FETCH", {"area": area_name, "admin_level": admin_level})
-                    
-                    geojson = get_boundary_geojson(area_name, admin_level)
-                    
-                    if geojson:
-                        boundary_geojson_data[key] = geojson
-                        feature_count = len(geojson.get('features', []))
-                        add_api_log(f"✅ Successfully fetched {level_name} boundary for: {area_name} ({feature_count} features)", "INFO")
-                        log_event("SUCCESS", "BOUNDARY_FETCH_SUCCESS", {"level": level_name, "area": area_name, "features": feature_count})
-                    else:
-                        add_api_log(f"❌ Failed to fetch {level_name} boundary for: {area_name}", "ERROR")
-                        log_event("ERROR", "BOUNDARY_FETCH_FAILED", {"level": level_name, "area": area_name})
-                else:
-                    add_api_log(f"DEBUG: Skipping {level_name} - area_name is empty", "WARNING")
-                    log_event("WARNING", "BOUNDARY_SKIPPED_EMPTY", {"level": level_name})
-        
-        st.session_state.boundary_geojson_data = boundary_geojson_data
-        add_api_log(f"DEBUG: Final boundary_geojson_data keys: {list(boundary_geojson_data.keys())}", "INFO")
-        log_event("STATE_CHANGE", "BOUNDARY_DATA_UPDATED", {"keys": list(boundary_geojson_data.keys())})
-    else:
-        add_api_log(f"DEBUG: NOT fetching boundaries - show_boundaries={st.session_state.show_boundaries}, location_info={st.session_state.current_location_info is not None}", "INFO")
-        log_event("SKIP", "BOUNDARY_FETCH_SKIPPED", {
-            "show_boundaries": st.session_state.show_boundaries,
-            "has_location": st.session_state.current_location_info is not None
-        })
-    # -------------------------------------------------------------------------
     
     if not success:
         add_api_log("Scan failed - no data retrieved", "ERROR")
@@ -1280,9 +922,6 @@ render_lat, render_lon = lat_coord, lon_coord
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 show_loading = "true" if st.session_state.scan_active_loading else "false"
 
-boundary_geojson_data = st.session_state.get('boundary_geojson_data', {})
-boundary_data_json = json.dumps(boundary_geojson_data)
-
 api_logs_html = ""
 for log in st.session_state.api_logs[-30:]:
     level_class = f"api-log-{log['level'].lower()}"
@@ -1291,7 +930,7 @@ for log in st.session_state.api_logs[-30:]:
 api_log_panel = f'''
 <div class="api-log-container" id="apiLogPanel">
     <div class="api-log-header" onclick="toggleApiLog()">
-        <span>📡 API ACTIVITY LOG</span>
+        <span>API ACTIVITY LOG</span>
         <span class="api-log-close" onclick="event.stopPropagation(); clearApiLogsFromUI();">✕</span>
     </div>
     <div class="api-log-content" id="apiLogContent">
@@ -1321,6 +960,9 @@ api_log_panel = f'''
 if st.session_state.network_stats:
     s = st.session_state.network_stats
     st.markdown(f"""<div style='background:#f1f5f9; padding:8px 16px; border-left:4px solid #C9AB4C; margin-bottom:4px; font-size:11px; font-weight:600; color:#003366;'>📈 STREET GRAPH DESCRIPTOR METRICS — Intersection Count: <b>{s.get('n', 0)}</b> | Edge Count: <b>{s.get('m', 0)}</b> | Total Street Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Clean Intersections Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
+
+# Full screen mode class
+fullscreen_class = "fullscreen-mode" if st.session_state.get('fullscreen_active', False) else ""
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -1362,7 +1004,7 @@ leaflet_template = """
         .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
         .action-icon-trigger:hover svg { fill: #003366; }
         .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
-        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: __LABEL_SIZE__px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .hide-labels .poi-text-label { display: none !important; }
         .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
         .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
@@ -1377,32 +1019,10 @@ leaflet_template = """
         .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
-        
-        .boundary-tooltip {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 9px;
-            font-weight: 600;
-            background: rgba(0, 51, 102, 0.9);
-            color: white;
-            padding: 2px 6px;
-            border-radius: 2px;
-            border-left: 2px solid #C9AB4C;
-        }
-        .boundary-legend {
-            background: rgba(255,255,255,0.95);
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-size: 9px;
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            color: #003366;
-            border: 1px solid rgba(0,51,102,0.1);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        }
     </style>
 </head>
 <body>
-    <div id="map-container">
+    <div id="map-container" class="__FULLSCREEN_CLASS__">
         <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
             <div class="loading-spinner"></div>
             <div class="loading-text">Scanning Spatial Engine</div>
@@ -1410,6 +1030,17 @@ leaflet_template = """
             <div class="elapsed-timer" id="timer-output">Elapsed: 0.0s</div>
         </div>
         <div id="map"></div>
+        
+        <!-- Full Screen Button -->
+        <button class="fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()">fullscreen</button>
+        
+        <!-- Label Size Slider -->
+        <div class="label-slider-container" id="labelSliderContainer">
+            <label for="labelSizeSlider">label</label>
+            <input type="range" id="labelSizeSlider" min="6" max="20" value="__LABEL_SIZE__" oninput="updateLabelSize(this.value)">
+            <span class="label-slider-value" id="labelSizeValue">__LABEL_SIZE__</span>
+        </div>
+        
         <div id="scan-results-panel">
             <div class="results-header"><span>WORKSPACE</span><div style="display: flex; align-items: center; gap: 8px;"><span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span><span id="results-count" style="color:#C9AB4C;">0</span></div></div>
             <div id="cluster-modal-overlay" class="cluster-popover-modal">
@@ -1430,13 +1061,7 @@ leaflet_template = """
         const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
         let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
         let scanStartTime = null;
-        
-        let boundaryLayers = {
-            region: null,
-            province: null,
-            city: null,
-            barangay: null
-        };
+        let labelSize = __LABEL_SIZE__;
         
         if (__SHOW_LOADING__) {
             const overlay = document.getElementById('map-loading-overlay');
@@ -1534,65 +1159,6 @@ leaflet_template = """
                 });
             });
         }
-        
-        function renderBoundaries(boundaryData) {
-            clearBoundaries();
-            
-            const styles = {
-                region: { color: "#FF6B6B", weight: 2, fillOpacity: 0.08, opacity: 0.8, dashArray: "2, 4" },
-                province: { color: "#4ECDC4", weight: 1.5, fillOpacity: 0.06, opacity: 0.7, dashArray: "3, 4" },
-                city: { color: "#45B7D1", weight: 1, fillOpacity: 0.04, opacity: 0.6 },
-                barangay: { color: "#96CEB4", weight: 0.8, fillOpacity: 0.03, opacity: 0.5 }
-            };
-            
-            const levelNames = { region: "Region", province: "Province", city: "City", barangay: "Barangay" };
-            let addedCount = 0;
-            
-            for (const [key, data] of Object.entries(boundaryData)) {
-                if (data && data.features && data.features.length > 0 && styles[key]) {
-                    try {
-                        const layer = L.geoJSON(data, {
-                            style: styles[key],
-                            onEachFeature: function(feature, layer) {
-                                const name = feature.properties?.name || levelNames[key];
-                                layer.bindTooltip(name, { sticky: true, className: 'boundary-tooltip' });
-                            }
-                        }).addTo(map);
-                        boundaryLayers[key] = layer;
-                        addedCount++;
-                    } catch(e) { console.error("Error rendering boundary:", e); }
-                }
-            }
-            
-            if (addedCount > 0) addBoundaryLegend(Object.keys(boundaryData));
-        }
-        
-        function clearBoundaries() {
-            Object.keys(boundaryLayers).forEach(key => {
-                if (boundaryLayers[key]) { map.removeLayer(boundaryLayers[key]); boundaryLayers[key] = null; }
-            });
-            const legend = document.getElementById('boundary-legend');
-            if (legend) legend.remove();
-        }
-        
-        function addBoundaryLegend(activeKeys) {
-            const existingLegend = document.getElementById('boundary-legend');
-            if (existingLegend) existingLegend.remove();
-            const colorMap = { region: "#FF6B6B", province: "#4ECDC4", city: "#45B7D1", barangay: "#96CEB4" };
-            const nameMap = { region: "Region", province: "Province", city: "City/Municipality", barangay: "Barangay" };
-            const legend = L.control({position: 'bottomleft'});
-            legend.onAdd = function() {
-                const div = L.DomUtil.create('div', 'boundary-legend');
-                div.innerHTML = '<div style="font-weight:800; margin-bottom:4px;">🗺️ BOUNDARY LEGEND</div>';
-                activeKeys.forEach(key => {
-                    if (colorMap[key]) {
-                        div.innerHTML += `<div style="display:flex; align-items:center; gap:6px; margin-top:3px;"><div style="width:12px; height:12px; background:${colorMap[key]}; border-radius:1px;"></div><span>${nameMap[key]}</span></div>`;
-                    }
-                });
-                return div;
-            };
-            legend.addTo(map);
-        }
 
         window.openClusterModalWindow = function() {
             const container = document.getElementById('cluster-checkbox-target-mount'); container.innerHTML = '';
@@ -1629,6 +1195,13 @@ leaflet_template = """
         window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
         window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderRadiusCircleBounds(); };
         window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
+        window.updateLabelSize = function(val) {
+            labelSize = val;
+            document.getElementById('labelSizeValue').textContent = val;
+            document.querySelectorAll('.poi-text-label').forEach(el => {
+                el.style.fontSize = val + 'px';
+            });
+        };
 
         function rebuildSidebarControlLayout() {
             const listBox = document.getElementById('results-list-box'); document.getElementById('results-count').innerText = pts.length;
@@ -1673,15 +1246,26 @@ leaflet_template = """
             const menuHtml = `<div style="font-family: Montserrat, sans-serif; font-size: 10px; color: #003366; min-width: 140px; background:#fff; padding:4px;"><div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px;">MAP OPTIONS</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coordinates</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Open in Google Maps</div><div style="padding: 5px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Open in Streetview</div></div>`;
             L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
         });
+        
+        // Fullscreen toggle function
+        function toggleFullscreen() {
+            const container = document.getElementById('map-container');
+            container.classList.toggle('fullscreen-mode');
+            const btn = document.getElementById('fullscreenBtn');
+            if (container.classList.contains('fullscreen-mode')) {
+                btn.textContent = 'exit';
+            } else {
+                btn.textContent = 'fullscreen';
+            }
+            // Resize map after transition
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 350);
+        }
 
         renderTargetCenterIcon(); renderRadiusCircleBounds(); compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
         if (pts.length > 0 && !__IS_STALE__) {
             const validPts = pts.filter(p => p.visible !== false); if (validPts.length > 0) map.fitBounds(L.featureGroup([L.marker([__LAT__, __LON__]), ...validPts.map(p => L.marker([p.lat, p.lon]))]).getBounds().pad(0.05));
-        }
-        
-        const boundaryData = __BOUNDARY_DATA__;
-        if (boundaryData && Object.keys(boundaryData).length > 0) {
-            renderBoundaries(boundaryData);
         }
     </script>
 </body>
@@ -1692,6 +1276,7 @@ fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", 
 render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
 
 show_loading_display = "flex" if st.session_state.scan_active_loading else "none"
+label_size = st.session_state.get('label_size', 9)
 
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
@@ -1707,6 +1292,7 @@ leaflet_html = (leaflet_template
                 .replace("__LAYER_META_JSON__", layer_meta_json)
                 .replace("__GEOJSON__", geojson_str)
                 .replace("__API_LOG_PANEL__", api_log_panel)
-                .replace("__BOUNDARY_DATA__", boundary_data_json))
+                .replace("__LABEL_SIZE__", str(label_size))
+                .replace("__FULLSCREEN_CLASS__", fullscreen_class))
 
 st.components.v1.html(leaflet_html, height=850, scrolling=False)
