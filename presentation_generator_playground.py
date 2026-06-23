@@ -557,7 +557,7 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
         st.markdown("Patterns with numbered suffixes (_1, _2, _3) were detected:")
         
         for base_name, config in detected_groups.items():
-            st.markdown(f'<div class="group-card">', unsafe_allow_html=True)
+            st.markdown('<div class="group-card">', unsafe_allow_html=True)
             
             cols = st.columns([1, 2, 1])
             with cols[0]:
