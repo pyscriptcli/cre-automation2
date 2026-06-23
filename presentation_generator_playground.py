@@ -366,13 +366,41 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     return pptx_stream.getvalue()
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=None):
+    """Generate DOCX with text, image, and table replacements"""
     doc = Document(io.BytesIO(template_bytes))
     
     # Process regular paragraphs
-    for paragraph in doc.paragraphs:
-        replace_text_in_paragraph(paragraph, text_inputs)
+    paragraphs_to_process = list(doc.paragraphs)
     
-    # Process tables - handle dynamic rows
+    for paragraph in paragraphs_to_process:
+        # Check for image placeholders first
+        has_image = False
+        for img_token, img_file in image_inputs.items():
+            if img_token in paragraph.text and img_file is not None:
+                has_image = True
+                # Remove the placeholder text from all runs
+                for run in paragraph.runs:
+                    if img_token in run.text:
+                        run.text = run.text.replace(img_token, '')
+                
+                # Add the image after the text
+                try:
+                    # Reset file pointer
+                    img_file.seek(0)
+                    # Add image with default size
+                    run = paragraph.add_run()
+                    # Add image with reasonable size
+                    run.add_picture(img_file, width=Inches(1.5))
+                except Exception as e:
+                    # If image fails, add error text instead
+                    run = paragraph.add_run()
+                    run.text = f"[Image could not be loaded: {str(e)}]"
+        
+        # Replace text placeholders (skip if image was already processed)
+        if not has_image:
+            replace_text_in_paragraph(paragraph, text_inputs)
+    
+    # Process tables
     for table in doc.tables:
         # Check if this is a placeholder table with dynamic rows
         if table_data and len(table.rows) > 0:
@@ -397,9 +425,9 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
                     new_row = table.add_row()
                     # Assuming the table has 3 columns: Company, Representative, Designation
                     if len(new_row.cells) >= 3:
-                        new_row.cells[0].text = data_item.get('company', '')
-                        new_row.cells[1].text = data_item.get('rep', '')
-                        new_row.cells[2].text = data_item.get('designation', '')
+                        new_row.cells[0].text = str(data_item.get('company', ''))
+                        new_row.cells[1].text = str(data_item.get('rep', ''))
+                        new_row.cells[2].text = str(data_item.get('designation', ''))
             else:
                 # Regular table with fixed rows - just replace text
                 for row in table.rows:
@@ -680,12 +708,11 @@ if u_template is not None and st.session_state.tokens:
                             st.rerun()
                     
                     with col_a:
-                        if data_type == "Image" and template_type == 'pptx':
+                        if data_type == "Image":
                             image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                             field_types[token] = "Image"
+                            st.caption("Upload image (PNG, JPG)")
                         else:
-                            if data_type == "Image" and template_type != 'pptx':
-                                st.warning("Image replacement only supported in PPTX templates")
                             st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                             text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
                             field_types[token] = "Text"
@@ -713,12 +740,11 @@ if u_template is not None and st.session_state.tokens:
                             st.rerun()
                     
                     with col_a:
-                        if data_type == "Image" and template_type == 'pptx':
+                        if data_type == "Image":
                             image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                             field_types[token] = "Image"
+                            st.caption("Upload image (PNG, JPG)")
                         else:
-                            if data_type == "Image" and template_type != 'pptx':
-                                st.warning("Image replacement only supported in PPTX templates")
                             st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                             text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
                             field_types[token] = "Text"
@@ -840,11 +866,22 @@ if u_template is not None:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
             def generate_docx():
-                # Pass table data for dynamic row generation
-                if st.session_state.use_dynamic_table and st.session_state.table_data:
-                    return generate_docx_bytes(template_bytes, text_data, image_data, st.session_state.table_data)
-                else:
-                    return generate_docx_bytes(template_bytes, text_data, image_data)
+                try:
+                    # Pass table data for dynamic row generation
+                    if st.session_state.use_dynamic_table and st.session_state.table_data:
+                        result = generate_docx_bytes(template_bytes, text_data, image_data, st.session_state.table_data)
+                    else:
+                        result = generate_docx_bytes(template_bytes, text_data, image_data)
+                    
+                    # Validate the result
+                    if not result or len(result) < 100:
+                        st.error("Generated document is too small - there might be an error")
+                        return None
+                    
+                    return result
+                except Exception as e:
+                    st.error(f"Error generating document: {str(e)}")
+                    return None
             
             st.download_button(
                 label="Download DOCX",
