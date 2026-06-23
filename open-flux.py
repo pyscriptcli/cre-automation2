@@ -26,46 +26,50 @@ MINIMAL_CRE_SYSTEM = """
 <style>
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
-    .block-container { padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; max-width: 1000px !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; padding-left: 1rem !important; padding-right: 1rem !important; }
     
     /* Hide Streamlit branding */
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
     .stDeployButton { display: none; }
     
+    /* Title */
+    .app-title { font-size: 24px; font-weight: 700; color: #1A1A1A; margin-bottom: 4px; letter-spacing: -0.5px; }
+    .app-subtitle { font-size: 13px; color: #666; margin-bottom: 8px; }
+    
     /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
-        background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 3px !important;
+        background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important;
         color: #1A1A1A !important;
-        min-height: 24px !important;
+        min-height: 28px !important;
     }
     div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, textarea:focus { border-color: #666666 !important; box-shadow: none !important; }
-    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 12px !important; padding: 1px 6px !important; }
+    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 13px !important; padding: 2px 8px !important; }
     
     /* Make select boxes and dropdown icons smaller */
-    div[data-baseweb="select"] { min-height: 24px !important; }
-    div[data-baseweb="select"] > div { min-height: 24px !important; padding: 0 4px !important; }
-    div[data-baseweb="select"] select { font-size: 12px !important; padding: 1px 4px !important; }
-    svg[data-testid="stSelectbox"] { width: 14px !important; height: 14px !important; }
-    div[data-baseweb="select"] svg { width: 14px !important; height: 14px !important; }
+    div[data-baseweb="select"] { min-height: 28px !important; }
+    div[data-baseweb="select"] > div { min-height: 28px !important; padding: 0 6px !important; }
+    div[data-baseweb="select"] select { font-size: 13px !important; padding: 2px 6px !important; }
+    svg[data-testid="stSelectbox"] { width: 16px !important; height: 16px !important; }
+    div[data-baseweb="select"] svg { width: 16px !important; height: 16px !important; }
     
     /* File Uploader */
-    section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 3px !important; padding: 2px 6px !important; }
-    section[data-testid="stFileUploader"] button { padding: 2px 8px !important; font-size: 11px !important; }
+    section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important; padding: 2px 8px !important; }
+    section[data-testid="stFileUploader"] button { padding: 2px 10px !important; font-size: 12px !important; }
     
     /* Cards */
-    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 3px; padding: 8px 10px; margin-bottom: 4px; }
-    .config-card { background-color: #F8F8F8; border: 1px solid #E0E0E0; border-radius: 3px; padding: 8px 10px; margin-bottom: 4px; }
+    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 10px 12px; margin-bottom: 6px; }
+    .config-card { background-color: #F8F8F8; border: 1px solid #E0E0E0; border-radius: 4px; padding: 10px 12px; margin-bottom: 6px; }
     
     /* Buttons */
-    div.stButton > button { background-color: #1A1A1A !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 11px !important; border: none !important; border-radius: 3px !important; padding: 3px 8px !important; width: 100% !important; transition: background-color 0.15s ease; min-height: 24px !important; }
+    div.stButton > button { background-color: #1A1A1A !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 13px !important; border: none !important; border-radius: 4px !important; padding: 6px 14px !important; width: 100% !important; transition: background-color 0.15s ease; min-height: 32px !important; }
     div.stButton > button:hover { background-color: #333333 !important; color: #FFFFFF !important; }
     
-    div[data-testid="stDownloadButton"] > button { background-color: #1A1A1A !important; border-radius: 3px !important; color: #FFFFFF !important; font-weight: 600 !important; padding: 3px 8px !important; width: 100% !important; font-size: 11px !important; min-height: 24px !important; }
+    div[data-testid="stDownloadButton"] > button { background-color: #1A1A1A !important; border-radius: 4px !important; color: #FFFFFF !important; font-weight: 600 !important; padding: 6px 14px !important; width: 100% !important; font-size: 13px !important; min-height: 32px !important; }
     div[data-testid="stDownloadButton"] > button:hover { background-color: #333333 !important; }
     
     /* Delete button */
-    div[data-testid="column"] button { background-color: #DC3545 !important; color: white !important; border: none !important; border-radius: 3px !important; padding: 3px 10px !important; font-size: 11px !important; min-height: 24px !important; width: auto !important; }
+    div[data-testid="column"] button { background-color: #DC3545 !important; color: white !important; border: none !important; border-radius: 4px !important; padding: 4px 12px !important; font-size: 12px !important; min-height: 28px !important; width: auto !important; }
     div[data-testid="column"] button:hover { background-color: #C82333 !important; color: white !important; }
     
     /* Confirmation buttons */
@@ -73,34 +77,35 @@ MINIMAL_CRE_SYSTEM = """
     .confirm-no button { background-color: #6C757D !important; color: white !important; }
     
     /* Labels */
-    .field-label { font-size: 11px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 2px !important; margin-bottom: 1px !important; }
-    .section-header { font-size: 12px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 4px !important; }
-    .saved-indicator { background-color: #E8F5E9; padding: 2px 8px; border-radius: 3px; font-size: 11px; color: #2E7D32; border-left: 2px solid #2E7D32; margin-top: 2px; }
-    .config-label { font-size: 11px !important; font-weight: 500 !important; color: #1A1A1A !important; padding-top: 2px !important; }
+    .field-label { font-size: 12px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 4px !important; margin-bottom: 2px !important; }
+    .section-header { font-size: 13px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 6px !important; }
+    .saved-indicator { background-color: #E8F5E9; padding: 3px 10px; border-radius: 4px; font-size: 12px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 4px; }
+    .config-label { font-size: 12px !important; font-weight: 500 !important; color: #1A1A1A !important; padding-top: 4px !important; }
     
-    hr { margin: 4px 0 !important; border-color: #E0E0E0 !important; }
+    hr { margin: 6px 0 !important; border-color: #E0E0E0 !important; }
     
     /* Compact spacing */
-    .stSelectbox { margin-bottom: 1px !important; }
-    .stSelectbox > div { min-height: 22px !important; }
-    .stTextInput { margin-bottom: 1px !important; }
-    .stTextArea { margin-bottom: 1px !important; }
-    .stFileUploader { margin-bottom: 1px !important; }
-    .stCheckbox { margin-bottom: 1px !important; }
+    .stSelectbox { margin-bottom: 2px !important; }
+    .stSelectbox > div { min-height: 28px !important; }
+    .stTextInput { margin-bottom: 2px !important; }
+    .stTextArea { margin-bottom: 2px !important; }
+    .stFileUploader { margin-bottom: 2px !important; }
+    .stCheckbox { margin-bottom: 2px !important; }
     
     /* Compact columns */
-    .row-widget.stColumns { gap: 2px !important; }
-    div[data-testid="column"] { padding: 0 1px !important; }
+    .row-widget.stColumns { gap: 8px !important; }
+    div[data-testid="column"] { padding: 0 4px !important; }
     
     /* Expander */
-    .streamlit-expanderHeader { font-size: 12px !important; font-weight: 600 !important; padding: 4px !important; }
-    .streamlit-expanderContent { padding: 4px !important; }
+    .streamlit-expanderHeader { font-size: 13px !important; font-weight: 600 !important; padding: 6px !important; }
+    .streamlit-expanderContent { padding: 6px !important; }
     
-    /* Title container */
-    .title-container { height: 12px; margin-bottom: 2px; border-bottom: 1px solid #E0E0E0; }
+    /* Loading spinner */
+    .loading-container { display: flex; justify-content: center; align-items: center; padding: 20px; }
+    .loading-text { font-size: 14px; color: #666; margin-left: 10px; }
     
     /* Info message */
-    .stAlert { padding: 4px 8px !important; font-size: 11px !important; margin-bottom: 2px !important; }
+    .stAlert { padding: 6px 12px !important; font-size: 12px !important; margin-bottom: 4px !important; }
 </style>
 """
 
@@ -311,9 +316,6 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs, config_settin
                             # Apply font settings if configured
                             if config_settings.get('font_size'):
                                 run.font.size = Pt(config_settings['font_size'])
-                            if config_settings.get('font_style'):
-                                # Apply font style if needed
-                                pass
                     
                     # Apply alignment if configured
                     if config_settings.get('text_alignment'):
@@ -422,31 +424,32 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, config_settin
     return doc_stream.getvalue()
 
 # --- UI HELPERS ---
-def simple_form_row_with_type(label_text, key, placeholder="", value=""):
+def field_with_type(label_text, token):
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-        result = st.text_input("", key=f"val_{key}", label_visibility="collapsed", placeholder=placeholder, value=value)
+        val = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
     with col2:
-        st.markdown('<div style="padding-top: 2px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="padding-top: 4px;"></div>', unsafe_allow_html=True)
         data_type = st.selectbox(
             "Type",
             ["Text", "Image"],
-            key=f"type_{key}",
+            key=f"type_{token}",
             label_visibility="collapsed"
         )
-    return result, data_type
+    return val, data_type
 
-def simple_uploader_row(label_text, allowed_types, key):
+def upload_row(label_text, token):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
+    return st.file_uploader("", type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
 
 # --- INIT APP ---
-st.set_page_config(page_title="Document Generator", layout="wide")
+st.set_page_config(page_title="OpenFlux", layout="wide")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
-# Title container
-st.markdown('<div class="title-container"></div>', unsafe_allow_html=True)
+# Title
+st.markdown('<div class="app-title">OpenFlux</div>', unsafe_allow_html=True)
+st.markdown('<div class="app-subtitle">Document Automation Platform</div>', unsafe_allow_html=True)
 
 # Initialize session state
 if "final_pptx" not in st.session_state:
@@ -469,6 +472,8 @@ if "template_type" not in st.session_state:
     st.session_state.template_type = None
 if "generated" not in st.session_state:
     st.session_state.generated = False
+if "generating" not in st.session_state:
+    st.session_state.generating = False
 if "config_settings" not in st.session_state:
     st.session_state.config_settings = {
         'font_size': 12,
@@ -510,6 +515,7 @@ with col1:
             st.session_state.template_loaded = True
             st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
             st.session_state.generated = False
+            st.session_state.generating = False
             
             config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
             config_data = load_config_from_file(config_name)
@@ -538,6 +544,7 @@ with col2:
         st.session_state.template_loaded = True
         st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
         st.session_state.generated = False
+        st.session_state.generating = False
         
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
@@ -565,10 +572,10 @@ with col3:
 
 # Show delete confirmation
 if st.session_state.show_delete_confirm and st.session_state.template_to_delete:
-    st.markdown('<div style="padding: 4px 8px; background-color: #FFF3CD; border: 1px solid #FFE69C; border-radius: 3px; margin: 4px 0;">', unsafe_allow_html=True)
-    st.markdown(f'<small>Delete "{st.session_state.template_to_delete}"?</small>', unsafe_allow_html=True)
-    col_yes, col_no = st.columns(2)
-    with col_yes:
+    col_confirm1, col_confirm2, col_confirm3 = st.columns([1, 0.5, 0.5])
+    with col_confirm1:
+        st.markdown(f'<small>Delete "{st.session_state.template_to_delete}"?</small>', unsafe_allow_html=True)
+    with col_confirm2:
         if st.button("Yes", key="confirm_delete_yes"):
             if delete_template_file(st.session_state.template_to_delete):
                 st.session_state.template_bytes = None
@@ -576,16 +583,16 @@ if st.session_state.show_delete_confirm and st.session_state.template_to_delete:
                 st.session_state.template_loaded = False
                 st.session_state.tokens = []
                 st.session_state.generated = False
+                st.session_state.generating = False
                 st.session_state.custom_mapping = {}
                 st.session_state.show_delete_confirm = False
                 st.session_state.template_to_delete = None
                 st.rerun()
-    with col_no:
+    with col_confirm3:
         if st.button("No", key="confirm_delete_no"):
             st.session_state.show_delete_confirm = False
             st.session_state.template_to_delete = None
             st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved"
@@ -625,24 +632,12 @@ if u_template is not None and st.session_state.tokens:
                 stored_type = st.session_state.custom_mapping.get(token, "Text")
                 
                 if stored_type == "Image" and template_type == 'pptx':
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                    image_data[token] = upload_row(clean_label, token)
                     st.session_state.custom_mapping[token] = "Image"
                 else:
-                    col_a, col_b = st.columns([3, 0.8])
-                    with col_a:
-                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        val = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                        text_data[token] = val
-                    with col_b:
-                        st.markdown('<div style="padding-top: 2px;"></div>', unsafe_allow_html=True)
-                        data_type = st.selectbox(
-                            "Type",
-                            ["Text", "Image"],
-                            index=0 if stored_type == "Text" else 1,
-                            key=f"type_{token}",
-                            label_visibility="collapsed"
-                        )
-                        st.session_state.custom_mapping[token] = data_type
+                    val, data_type = field_with_type(clean_label, token)
+                    text_data[token] = val
+                    st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
@@ -653,24 +648,12 @@ if u_template is not None and st.session_state.tokens:
                 stored_type = st.session_state.custom_mapping.get(token, "Text")
                 
                 if stored_type == "Image" and template_type == 'pptx':
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                    image_data[token] = upload_row(clean_label, token)
                     st.session_state.custom_mapping[token] = "Image"
                 else:
-                    col_a, col_b = st.columns([3, 0.8])
-                    with col_a:
-                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        val = st.text_input("", key=f"val_{token}_2", label_visibility="collapsed")
-                        text_data[token] = val
-                    with col_b:
-                        st.markdown('<div style="padding-top: 2px;"></div>', unsafe_allow_html=True)
-                        data_type = st.selectbox(
-                            "Type",
-                            ["Text", "Image"],
-                            index=0 if stored_type == "Text" else 1,
-                            key=f"type_{token}_2",
-                            label_visibility="collapsed"
-                        )
-                        st.session_state.custom_mapping[token] = data_type
+                    val, data_type = field_with_type(clean_label, token + "_2")
+                    text_data[token] = val
+                    st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
 
 # --- CONFIGURATION SETTINGS ---
@@ -775,8 +758,15 @@ if u_template is not None:
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     
+    # Generate button
     if st.button("Generate", use_container_width=True):
-        with st.spinner("Generating..."):
+        st.session_state.generating = True
+        st.session_state.generated = False
+        st.rerun()
+    
+    # Show loading screen while generating
+    if st.session_state.generating:
+        with st.spinner("Generating document..."):
             try:
                 if template_type == 'pptx':
                     raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data, st.session_state.config_settings)
@@ -789,51 +779,60 @@ if u_template is not None:
                     st.session_state.final_pdf = convert_docx_to_pdf(raw_docx)
                     st.session_state.final_pptx = None
                 st.session_state.generated = True
-                st.success("Done!")
+                st.session_state.generating = False
+                st.success("Document generated successfully!")
                 st.rerun()
             except Exception as e:
+                st.session_state.generating = False
                 st.error(f"Error: {e}")
     
+    # Show export buttons after generation
     if st.session_state.generated:
-        st.markdown("<hr style='margin: 2px 0;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 6px 0;'>", unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Export</div>', unsafe_allow_html=True)
         dl_col1, dl_col2, dl_col3 = st.columns(3)
         
         with dl_col1:
             if st.session_state.final_pptx:
                 st.download_button(
-                    "PPTX",
+                    "📊 PPTX",
                     data=st.session_state.final_pptx,
                     file_name="Generated.pptx",
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True
                 )
             else:
-                st.button("PPTX", disabled=True, use_container_width=True)
+                st.button("📊 PPTX", disabled=True, use_container_width=True)
         
         with dl_col2:
             if st.session_state.final_pdf:
                 st.download_button(
-                    "PDF",
+                    "📄 PDF",
                     data=st.session_state.final_pdf,
                     file_name="Generated.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 )
             else:
-                st.button("PDF", disabled=True, use_container_width=True)
+                st.button("📄 PDF", disabled=True, use_container_width=True)
         
         with dl_col3:
             if st.session_state.final_docx:
                 st.download_button(
-                    "DOCX",
+                    "📝 DOCX",
                     data=st.session_state.final_docx,
                     file_name="Generated.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True
                 )
             else:
-                st.button("DOCX", disabled=True, use_container_width=True)
+                st.button("📝 DOCX", disabled=True, use_container_width=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("Select or upload a template")
+    st.info("Select or upload a template to begin")
+
+# Clear generating state on template change
+if st.session_state.template_bytes is None:
+    st.session_state.generating = False
+    st.session_state.generated = False
