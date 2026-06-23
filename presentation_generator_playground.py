@@ -130,7 +130,6 @@ MINIMAL_CRE_SYSTEM = """
         font-size: 13px;
     }
     
-    /* Dialog/Modal styles */
     .detection-dialog {
         background-color: #F8F9FA;
         border: 2px solid #003366;
@@ -330,14 +329,8 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                         run.text = run.text.replace(token, replacement)
 
 def detect_table_placeholders(tokens):
-    """
-    Automatically detect table placeholders.
-    Looks for patterns like {{NAME_1}}, {{NAME_2}}, {{NAME_3}} where NAME is consistent.
-    Returns: dict with structure {base_name: {'rows': max_row_number, 'tokens': list_of_tokens}}
-    """
     table_groups = {}
     
-    # Pattern to match placeholders with numbers: {{SOMETHING_1}}, {{SOMETHING_2}}, etc.
     pattern = r'\{\{([A-Z_]+)_(\d+)\}\}'
     
     for token in tokens:
@@ -354,20 +347,15 @@ def detect_table_placeholders(tokens):
             table_groups[base_name]['rows'].add(row_num)
             table_groups[base_name]['tokens'].append(token)
     
-    # Validate and process each group
     validated_groups = {}
     for base_name, data in table_groups.items():
         row_numbers = sorted(data['rows'])
         max_row = max(row_numbers)
         
-        # Check if rows are sequential (1, 2, 3, ...)
         expected_rows = set(range(1, max_row + 1))
         current_rows = set(row_numbers)
-        
-        # Find missing rows using set difference
         missing_rows = expected_rows - current_rows
         
-        # Only include if we have at least 2 rows
         if len(row_numbers) >= 2:
             validated_groups[base_name] = {
                 'max_row': max_row,
@@ -425,10 +413,8 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     return pptx_stream.getvalue()
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=None, table_config=None):
-    """Generate DOCX with text, image, and table replacements"""
     doc = Document(io.BytesIO(template_bytes))
     
-    # Process regular paragraphs
     for paragraph in doc.paragraphs:
         has_image = False
         for img_token in image_inputs.keys():
@@ -439,13 +425,10 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
         if not has_image:
             replace_text_in_paragraph(paragraph, text_inputs)
     
-    # Process tables with dynamic data
     if table_data and table_config:
-        # Get the base names for this table
         base_names = list(table_config.keys())
         
         for table in doc.tables:
-            # Check if this table has placeholders
             has_placeholders = False
             for row in table.rows:
                 for cell in row.cells:
@@ -456,20 +439,15 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
                     break
             
             if has_placeholders:
-                # Remove all rows after the first (header)
                 while len(table.rows) > 1:
                     table._element.remove(table.rows[-1]._element)
                 
-                # Add data rows
                 for row_idx, row_data in enumerate(table_data):
                     new_row = table.add_row()
-                    # For each cell, try to find matching placeholder
                     for col_idx, cell in enumerate(new_row.cells):
-                        # Check each base name
                         for base_name in base_names:
                             placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
                             if placeholder in cell.text:
-                                # Replace with the value from row_data
                                 value = row_data.get(base_name, '')
                                 cell.text = str(value) if value else ''
                                 break
@@ -489,6 +467,46 @@ def get_download_filename(template_name, file_type):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"Generated_Document_{timestamp}.{file_type}"
 
+def load_template_with_config(template_bytes, template_name, template_type, tokens, confirmed_groups):
+    """Load template with confirmed configuration"""
+    st.session_state.table_config = confirmed_groups
+    st.session_state.tokens = tokens
+    st.session_state.template_bytes = template_bytes
+    st.session_state.template_type = template_type
+    st.session_state.template_loaded = True
+    st.session_state.saved_template_name = template_name
+    
+    if confirmed_groups and template_type == 'docx':
+        st.session_state.use_dynamic_table = True
+        st.session_state.table_headers = list(confirmed_groups.keys())
+        
+        max_rows = 0
+        for base_name, config in confirmed_groups.items():
+            max_rows = max(max_rows, config['max_row'])
+        
+        st.session_state.table_data = []
+        for i in range(max_rows):
+            row_data = {}
+            for base_name in confirmed_groups.keys():
+                row_data[base_name] = ""
+            st.session_state.table_data.append(row_data)
+    else:
+        st.session_state.use_dynamic_table = False
+        st.session_state.table_data = []
+    
+    # Save config if template has a name
+    if template_name:
+        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+        save_config_to_file(st.session_state.custom_mapping, config_name)
+    
+    # Reset pending state
+    st.session_state.show_detection_dialog = False
+    st.session_state.pending_tokens = []
+    st.session_state.pending_template_bytes = None
+    st.session_state.pending_template_type = None
+    st.session_state.pending_template_name = None
+    st.session_state.confirmed_groups = {}
+
 # --- UI HELPERS ---
 def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
@@ -498,10 +516,9 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
     """Show detected placeholders and ask for confirmation"""
     
     st.markdown('<div class="detection-dialog">', unsafe_allow_html=True)
-    st.markdown("### 📋 Placeholder Detection Results")
+    st.markdown("### Placeholder Detection Results")
     st.markdown(f"**Total placeholders found:** {len(tokens)}")
     
-    # Show all placeholders in a compact view
     with st.expander("View All Placeholders", expanded=False):
         cols = st.columns(4)
         for idx, token in enumerate(sorted(tokens)):
@@ -509,12 +526,11 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
     
     st.markdown("---")
     
-    # Show detected table groups
     confirmed_groups = {}
     
     if detected_groups:
-        st.markdown("### 🔍 Detected Table Groups")
-        st.markdown("The following patterns with numbered suffixes (_1, _2, _3) were detected:")
+        st.markdown("### Detected Table Groups")
+        st.markdown("Patterns with numbered suffixes (_1, _2, _3) were detected:")
         
         for base_name, config in detected_groups.items():
             st.markdown(f'<div class="group-card">', unsafe_allow_html=True)
@@ -543,10 +559,9 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
     
     st.markdown("---")
     
-    # Manual grouping option
-    with st.expander("✏️ Manual Grouping (Optional)"):
+    with st.expander("Manual Grouping (Optional)"):
         st.markdown("Create a custom table group by specifying the base name and number of rows.")
-        st.caption("Example: If you have {{CUSTOM_1}}, {{CUSTOM_2}}, {{CUSTOM_3}}, enter base name as 'CUSTOM'")
+        st.caption("Example: If you have CUSTOM_1, CUSTOM_2, CUSTOM_3, enter base name as 'CUSTOM'")
         
         col1, col2, col3 = st.columns([2, 1, 1])
         with col1:
@@ -555,14 +570,12 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
             manual_rows = st.number_input("Number of Rows", min_value=1, value=1, key="manual_rows", step=1)
         with col3:
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("➕ Add Group", key="add_manual_group"):
+            if st.button("Add Group", key="add_manual_group"):
                 if manual_base:
-                    # Create manual group
                     manual_tokens = []
                     for i in range(1, manual_rows + 1):
                         manual_tokens.append(f"{{{{{manual_base}_{i}}}}}")
                     
-                    # Check if these tokens exist
                     existing_tokens = [t for t in manual_tokens if t in tokens]
                     if existing_tokens:
                         confirmed_groups[manual_base] = {
@@ -570,24 +583,35 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
                             'tokens': existing_tokens,
                             'missing_rows': []
                         }
-                        st.success(f"✅ Added manual group: {manual_base}")
+                        st.success(f"Added manual group: {manual_base}")
                         st.rerun()
                     else:
-                        st.warning(f"⚠️ No tokens found matching pattern {manual_base}_1, {manual_base}_2, ...")
+                        st.warning(f"No tokens found matching pattern {manual_base}_1, {manual_base}_2, ...")
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Confirmation button
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
-        if st.button("✅ Confirm & Continue", use_container_width=True, type="primary"):
+        if st.button("Confirm", use_container_width=True, type="primary"):
             st.session_state.confirmed_groups = confirmed_groups
             st.session_state.show_detection_dialog = False
+            # Load the template with the confirmed configuration
+            load_template_with_config(
+                st.session_state.pending_template_bytes,
+                st.session_state.pending_template_name,
+                st.session_state.pending_template_type,
+                st.session_state.pending_tokens,
+                confirmed_groups
+            )
             st.rerun()
     with col2:
-        if st.button("❌ Cancel", use_container_width=True):
+        if st.button("Cancel", use_container_width=True):
             st.session_state.confirmed_groups = {}
             st.session_state.show_detection_dialog = False
+            st.session_state.pending_tokens = []
+            st.session_state.pending_template_bytes = None
+            st.session_state.pending_template_type = None
+            st.session_state.pending_template_name = None
             st.rerun()
     
     return confirmed_groups
@@ -715,17 +739,15 @@ with col_template1:
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
             
-            # Auto-detect table placeholders
             detected_groups = detect_table_placeholders(tokens)
             
             if detected_groups and st.session_state.template_type == 'docx':
-                # Show detection dialog
                 st.session_state.show_detection_dialog = True
                 st.session_state.pending_tokens = tokens
                 st.session_state.pending_template_bytes = template_bytes
                 st.session_state.pending_template_type = st.session_state.template_type
                 st.session_state.pending_template_name = template_name
-                st.session_state.template_loaded = False  # Don't load until confirmed
+                st.session_state.template_loaded = False
             else:
                 st.session_state.use_dynamic_table = False
                 st.session_state.table_config = {}
@@ -751,21 +773,17 @@ with col_template2:
         template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
         
         tokens = extract_placeholders(template_bytes, template_type)
-        
-        # Auto-detect table placeholders
         detected_groups = detect_table_placeholders(tokens)
         
         if detected_groups and template_type == 'docx':
-            # Show detection dialog
             st.session_state.show_detection_dialog = True
             st.session_state.pending_tokens = tokens
             st.session_state.pending_template_bytes = template_bytes
             st.session_state.pending_template_type = template_type
             st.session_state.pending_template_name = template_name
-            st.session_state.template_bytes = None  # Don't load until confirmed
+            st.session_state.template_bytes = None
             st.session_state.template_loaded = False
         else:
-            # No detection needed, load directly
             st.session_state.template_bytes = template_bytes
             st.session_state.saved_template_name = None
             st.session_state.template_loaded = True
@@ -793,43 +811,7 @@ with col_template2:
 if st.session_state.show_detection_dialog and st.session_state.pending_tokens:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     detected_groups = detect_table_placeholders(st.session_state.pending_tokens)
-    confirmed_groups = show_placeholder_detection_dialog(st.session_state.pending_tokens, detected_groups)
-    
-    # If confirmed, load the template with the confirmed groups
-    if not st.session_state.show_detection_dialog and st.session_state.confirmed_groups:
-        st.session_state.table_config = st.session_state.confirmed_groups
-        st.session_state.tokens = st.session_state.pending_tokens
-        st.session_state.template_bytes = st.session_state.pending_template_bytes
-        st.session_state.template_type = st.session_state.pending_template_type
-        st.session_state.template_loaded = True
-        st.session_state.use_dynamic_table = True
-        st.session_state.table_headers = list(st.session_state.confirmed_groups.keys())
-        
-        # Initialize table data
-        max_rows = 0
-        for base_name, config in st.session_state.confirmed_groups.items():
-            max_rows = max(max_rows, config['max_row'])
-        
-        st.session_state.table_data = []
-        for i in range(max_rows):
-            row_data = {}
-            for base_name in st.session_state.confirmed_groups.keys():
-                row_data[base_name] = ""
-            st.session_state.table_data.append(row_data)
-        
-        # Save the template if it was uploaded
-        if st.session_state.pending_template_name and not st.session_state.saved_template_name:
-            saved_path = save_template_to_file(st.session_state.pending_template_bytes, st.session_state.pending_template_name)
-            st.session_state.saved_template_name = st.session_state.pending_template_name
-            st.session_state.save_success = True
-            st.session_state.saved_file_name = st.session_state.pending_template_name
-        
-        st.session_state.pending_tokens = []
-        st.session_state.pending_template_bytes = None
-        st.session_state.pending_template_type = None
-        st.session_state.pending_template_name = None
-        st.rerun()
-    
+    show_placeholder_detection_dialog(st.session_state.pending_tokens, detected_groups)
     st.markdown('</div>', unsafe_allow_html=True)
 
 if st.session_state.save_success:
@@ -862,7 +844,6 @@ if u_template is not None and st.session_state.tokens:
     if not tokens:
         st.info("No placeholders found in the template.")
     else:
-        # Identify which tokens belong to tables
         table_tokens = set()
         for base_name, config in table_config.items():
             for token in config['tokens']:
@@ -959,17 +940,14 @@ if u_template is not None and st.session_state.tokens:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Table Data</div>', unsafe_allow_html=True)
             
-            # Get table headers from the config
             table_headers = list(table_config.keys())
             
-            # Display current max rows
             max_rows = 0
             for base_name, config in table_config.items():
                 max_rows = max(max_rows, config['max_row'])
             
             st.markdown(f'<div style="font-size:12px;color:#666;margin-bottom:10px;">{len(table_headers)} columns, {max_rows} base rows</div>', unsafe_allow_html=True)
             
-            # Table controls
             col_controls1, col_controls2, col_controls3 = st.columns([1, 1, 6])
             with col_controls1:
                 if st.button("Add Row", use_container_width=True, key="add_table_row"):
@@ -984,20 +962,17 @@ if u_template is not None and st.session_state.tokens:
                         st.session_state.table_data.pop()
                         st.rerun()
             
-            # Table header
             col_count = len(table_headers)
             col_widths = [2] * col_count + [0.5]
             col_headers = st.columns(col_widths)
             
             for idx, header in enumerate(table_headers):
-                # Clean up header for display
                 display_header = header.replace('_', ' ').title()
                 with col_headers[idx]:
                     st.markdown(f'<strong>{display_header}</strong>', unsafe_allow_html=True)
             with col_headers[-1]:
                 st.markdown('', unsafe_allow_html=True)
             
-            # Display each row
             rows_to_delete = []
             for idx, row_data in enumerate(st.session_state.table_data):
                 col_widths = [2] * col_count + [0.5]
@@ -1026,8 +1001,6 @@ if u_template is not None and st.session_state.tokens:
             st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Update text_data with table data
-            # Clear existing table entries
             for key in list(text_data.keys()):
                 if '{{' in key and '_' in key:
                     for base_name in table_config.keys():
@@ -1035,7 +1008,6 @@ if u_template is not None and st.session_state.tokens:
                             del text_data[key]
                             break
             
-            # Add all rows
             for idx, row_data in enumerate(st.session_state.table_data):
                 for base_name in table_config.keys():
                     placeholder = f"{{{{{base_name}_{idx+1}}}}}"
@@ -1101,7 +1073,6 @@ if u_template is not None and st.session_state.template_loaded:
                     st.error("Failed to generate document. Please check the template and try again.")
             except Exception as e:
                 st.error(f"Error generating document: {str(e)}")
-                import traceback
                 st.error(traceback.format_exc())
     
     st.markdown('</div>', unsafe_allow_html=True)
