@@ -14,7 +14,6 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
-import time
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -141,79 +140,6 @@ MINIMAL_CRE_SYSTEM = """
         color: #003366;
         padding-right: 10px;
         font-size: 13px;
-    }
-    
-    /* Fullscreen progress overlay */
-    .progress-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.75);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-        backdrop-filter: blur(4px);
-        transition: opacity 0.3s ease;
-    }
-    .progress-overlay.hidden {
-        opacity: 0;
-        pointer-events: none;
-    }
-    .progress-container {
-        background: white;
-        border-radius: 12px;
-        padding: 40px 60px;
-        text-align: center;
-        max-width: 400px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    }
-    .spinner {
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #003366;
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 20px auto;
-    }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    .progress-text {
-        color: #1A1A1A;
-        font-size: 18px;
-        font-weight: 600;
-        margin: 0;
-    }
-    .progress-subtext {
-        color: #666;
-        font-size: 14px;
-        margin-top: 8px;
-    }
-    .progress-bar-track {
-        width: 100%;
-        height: 4px;
-        background: #E0E0E0;
-        border-radius: 2px;
-        margin-top: 16px;
-        overflow: hidden;
-    }
-    .progress-bar-fill {
-        height: 100%;
-        background: #003366;
-        border-radius: 2px;
-        animation: progressAnimation 2s ease-in-out infinite;
-        width: 0%;
-    }
-    @keyframes progressAnimation {
-        0% { width: 0%; }
-        50% { width: 70%; }
-        100% { width: 100%; }
     }
 </style>
 """
@@ -494,43 +420,6 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
-# --- FULLSCREEN PROGRESS INDICATOR ---
-def show_progress_overlay():
-    """Display fullscreen progress overlay with HTML/JS"""
-    progress_html = """
-    <div id="progressOverlay" class="progress-overlay">
-        <div class="progress-container">
-            <div class="spinner"></div>
-            <p class="progress-text">Generating Document...</p>
-            <p class="progress-subtext">Please wait while your document is being prepared</p>
-            <div class="progress-bar-track">
-                <div class="progress-bar-fill"></div>
-            </div>
-        </div>
-    </div>
-    <script>
-        // Auto-hide after 3 seconds (enough time for download to trigger)
-        setTimeout(function() {
-            var overlay = document.getElementById('progressOverlay');
-            if (overlay) {
-                overlay.classList.add('hidden');
-                setTimeout(function() {
-                    overlay.style.display = 'none';
-                }, 300);
-            }
-        }, 3000);
-    </script>
-    """
-    st.markdown(progress_html, unsafe_allow_html=True)
-
-def trigger_progress_indicator():
-    """Set session state to show progress indicator"""
-    st.session_state.show_progress = True
-
-def hide_progress_indicator():
-    """Hide progress indicator"""
-    st.session_state.show_progress = False
-
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -560,18 +449,6 @@ if "saved_file_name" not in st.session_state:
     st.session_state.saved_file_name = None
 if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
-if "show_progress" not in st.session_state:
-    st.session_state.show_progress = False
-if "download_triggered" not in st.session_state:
-    st.session_state.download_triggered = False
-
-# Show progress overlay if triggered
-if st.session_state.show_progress:
-    show_progress_overlay()
-    # Auto-hide after 3.5 seconds (to ensure download starts)
-    time.sleep(0.1)  # Small delay to ensure overlay renders
-    st.session_state.show_progress = False
-    st.rerun()
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -814,19 +691,15 @@ if u_template is not None:
             st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
             try:
-                # Generate the document data
                 pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
                 pptx_filename = get_download_filename(base_template_name, "pptx")
-                
-                # Use a download button with custom onclick to show progress
                 st.download_button(
                     label="Download PPTX",
                     data=pptx_data,
                     file_name=pptx_filename,
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True,
-                    key="download_pptx",
-                    on_click=trigger_progress_indicator
+                    key="download_pptx"
                 )
             except Exception as e:
                 st.error(f"Error generating PPTX: {str(e)}")
@@ -848,8 +721,7 @@ if u_template is not None:
                         file_name=docx_filename,
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True,
-                        key="download_docx",
-                        on_click=trigger_progress_indicator
+                        key="download_docx"
                     )
                 else:
                     st.error("Failed to generate document. Please check the template and try again.")
