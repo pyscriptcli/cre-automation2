@@ -1,3 +1,4 @@
+
 import os
 import io
 import subprocess
@@ -13,16 +14,6 @@ from docx import Document
 from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-import xml.etree.ElementTree as ET
-from zipfile import ZipFile
-import io as io_module
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -63,18 +54,6 @@ MINIMAL_CRE_SYSTEM = """
     
     /* File Uploader */
     section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important; padding: 4px 12px !important; }
-    
-    /* Image upload indicator */
-    .image-upload-indicator {
-        background-color: #E3F2FD;
-        border-left: 3px solid #003366;
-        padding: 4px 8px;
-        border-radius: 3px;
-        font-size: 12px;
-        color: #003366;
-        margin-bottom: 4px;
-        font-weight: 500;
-    }
     
     /* Cards */
     .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
@@ -249,254 +228,6 @@ def load_config_from_file(config_name="template_config.json"):
             return json.load(f)
     return None
 
-# --- PDF GENERATION FUNCTIONS (Pure Python) ---
-def extract_text_from_pptx(pptx_bytes):
-    """Extract text and images from PPTX for PDF generation"""
-    prs = Presentation(io.BytesIO(pptx_bytes))
-    slides_content = []
-    
-    for slide_num, slide in enumerate(prs.slides, 1):
-        slide_data = {'number': slide_num, 'texts': [], 'images': []}
-        
-        for shape in slide.shapes:
-            # Extract text
-            if shape.has_text_frame:
-                text = shape.text.strip()
-                if text:
-                    slide_data['texts'].append(text)
-            
-            # Extract images
-            if hasattr(shape, 'image'):
-                try:
-                    image_bytes = shape.image.blob
-                    slide_data['images'].append(image_bytes)
-                except:
-                    pass
-        
-        slides_content.append(slide_data)
-    
-    return slides_content
-
-def extract_text_from_docx(docx_bytes):
-    """Extract text and images from DOCX for PDF generation"""
-    doc = Document(io.BytesIO(docx_bytes))
-    content = {'texts': [], 'images': []}
-    
-    for paragraph in doc.paragraphs:
-        text = paragraph.text.strip()
-        if text:
-            content['texts'].append(text)
-    
-    # Extract images from docx (simplified - just get inline shapes)
-    for rel in doc.part.rels.values():
-        if "image" in rel.target_ref:
-            try:
-                image_bytes = rel.target_part.blob
-                content['images'].append(image_bytes)
-            except:
-                pass
-    
-    return content
-
-def create_pdf_from_pptx(pptx_bytes, text_inputs, image_inputs):
-    """Create PDF from PPTX data using ReportLab"""
-    # First, replace placeholders in the PPTX content
-    prs = Presentation(io.BytesIO(pptx_bytes))
-    
-    # Replace text placeholders
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                for paragraph in shape.text_frame.paragraphs:
-                    for run in paragraph.runs:
-                        for token, value in text_inputs.items():
-                            if token in run.text:
-                                run.text = run.text.replace(token, str(value) if value else '')
-    
-    # Extract content after replacement
-    slides_content = []
-    for slide_num, slide in enumerate(prs.slides, 1):
-        slide_data = {'number': slide_num, 'texts': [], 'images': []}
-        
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                text = shape.text.strip()
-                if text:
-                    slide_data['texts'].append(text)
-            
-            # Check if this shape should be replaced with an image
-            if shape.has_text_frame:
-                for img_token, img_file in image_inputs.items():
-                    if img_token in shape.text and img_file is not None:
-                        try:
-                            # Add the uploaded image
-                            slide_data['images'].append(img_file)
-                        except:
-                            pass
-        
-        slides_content.append(slide_data)
-    
-    # Generate PDF using ReportLab
-    pdf_buffer = io.BytesIO()
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    # Add a title style
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.HexColor('#003366'),
-        alignment=TA_CENTER,
-        spaceAfter=12
-    )
-    
-    body_style = ParagraphStyle(
-        'CustomBody',
-        parent=styles['Normal'],
-        fontSize=11,
-        alignment=TA_LEFT,
-        spaceAfter=6
-    )
-    
-    for slide in slides_content:
-        # Add slide header
-        story.append(Paragraph(f"Slide {slide['number']}", title_style))
-        story.append(Spacer(1, 12))
-        
-        # Add text content
-        for text in slide['texts']:
-            # Clean text and wrap in paragraphs
-            cleaned_text = text.replace('{{', '').replace('}}', '').strip()
-            if cleaned_text:
-                story.append(Paragraph(cleaned_text, body_style))
-                story.append(Spacer(1, 6))
-        
-        # Add images
-        for img_data in slide['images']:
-            try:
-                # If img_data is a file-like object, read it
-                if hasattr(img_data, 'read'):
-                    img_data.seek(0)
-                    img_bytes = img_data.read()
-                else:
-                    img_bytes = img_data
-                
-                # Create a temporary image file
-                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_img:
-                    tmp_img.write(img_bytes)
-                    tmp_img_path = tmp_img.name
-                
-                # Add image to PDF
-                img = RLImage(tmp_img_path, width=5*inch, height=3*inch)
-                story.append(img)
-                story.append(Spacer(1, 6))
-                
-                # Clean up
-                os.unlink(tmp_img_path)
-            except Exception as e:
-                st.warning(f"Could not add image to PDF: {str(e)}")
-        
-        story.append(Spacer(1, 12))
-        # Add a horizontal line between slides
-        story.append(Paragraph("─" * 80, styles['Normal']))
-        story.append(Spacer(1, 12))
-    
-    # Build PDF
-    doc.build(story)
-    pdf_buffer.seek(0)
-    return pdf_buffer.getvalue()
-
-def create_pdf_from_docx(docx_bytes, text_inputs, image_inputs):
-    """Create PDF from DOCX data using ReportLab"""
-    # First, replace placeholders in the DOCX content
-    doc = Document(io.BytesIO(docx_bytes))
-    
-    # Replace text placeholders
-    for paragraph in doc.paragraphs:
-        for run in paragraph.runs:
-            for token, value in text_inputs.items():
-                if token in run.text:
-                    run.text = run.text.replace(token, str(value) if value else '')
-    
-    # Extract content after replacement
-    content = {'texts': [], 'images': []}
-    
-    for paragraph in doc.paragraphs:
-        text = paragraph.text.strip()
-        if text:
-            content['texts'].append(text)
-    
-    # Add uploaded images to the content
-    for img_token, img_file in image_inputs.items():
-        if img_file is not None:
-            content['images'].append(img_file)
-    
-    # Generate PDF using ReportLab
-    pdf_buffer = io.BytesIO()
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    # Custom styles
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=14,
-        textColor=colors.HexColor('#003366'),
-        alignment=TA_LEFT,
-        spaceAfter=12
-    )
-    
-    body_style = ParagraphStyle(
-        'CustomBody',
-        parent=styles['Normal'],
-        fontSize=11,
-        alignment=TA_LEFT,
-        spaceAfter=6
-    )
-    
-    # Add document content
-    for text in content['texts']:
-        if text:
-            # Check if it looks like a heading (all caps or short)
-            if len(text) < 50 and text.isupper():
-                story.append(Paragraph(text, title_style))
-            else:
-                story.append(Paragraph(text, body_style))
-            story.append(Spacer(1, 6))
-    
-    # Add images
-    for img_data in content['images']:
-        try:
-            # If img_data is a file-like object, read it
-            if hasattr(img_data, 'read'):
-                img_data.seek(0)
-                img_bytes = img_data.read()
-            else:
-                img_bytes = img_data
-            
-            # Create a temporary image file
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_img:
-                tmp_img.write(img_bytes)
-                tmp_img_path = tmp_img.name
-            
-            # Add image to PDF
-            img = RLImage(tmp_img_path, width=5*inch, height=3*inch)
-            story.append(img)
-            story.append(Spacer(1, 6))
-            
-            # Clean up
-            os.unlink(tmp_img_path)
-        except Exception as e:
-            st.warning(f"Could not add image to PDF: {str(e)}")
-    
-    # Build PDF
-    doc.build(story)
-    pdf_buffer.seek(0)
-    return pdf_buffer.getvalue()
-
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     try:
@@ -655,44 +386,9 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 # --- UI HELPERS ---
-def render_field(token, template_type, col):
-    """Render a field with dynamic type switching between text and image"""
-    clean_label = token.replace("{", "").replace("}", "")
-    stored_type = st.session_state.custom_mapping.get(token, "Text")
-    
-    with col:
-        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-        
-        # Type selector
-        data_type = st.selectbox(
-            "Type",
-            ["Text", "Image"],
-            index=0 if stored_type == "Text" else 1,
-            key=f"type_{token}",
-            label_visibility="collapsed"
-        )
-        
-        st.session_state.custom_mapping[token] = data_type
-        
-        if data_type == "Image" and template_type == 'pptx':
-            st.markdown('<div class="image-upload-indicator">📷 Upload Image</div>', unsafe_allow_html=True)
-            uploaded_file = st.file_uploader(
-                f"Upload image for {clean_label}",
-                type=["png", "jpg", "jpeg"],
-                key=f"img_{token}",
-                label_visibility="collapsed"
-            )
-            st.session_state[f"image_{token}"] = uploaded_file
-            return None, uploaded_file
-        else:
-            text_value = st.text_input(
-                "",
-                key=f"val_{token}",
-                label_visibility="collapsed",
-                value=st.session_state.get(f"text_{token}", "")
-            )
-            st.session_state[f"text_{token}"] = text_value
-            return text_value, None
+def simple_uploader_row(label_text, allowed_types, key):
+    st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
+    return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -719,10 +415,6 @@ if "show_delete_confirm" not in st.session_state:
     st.session_state.show_delete_confirm = False
 if "template_to_delete" not in st.session_state:
     st.session_state.template_to_delete = None
-if "pdf_ready" not in st.session_state:
-    st.session_state.pdf_ready = False
-if "pdf_data" not in st.session_state:
-    st.session_state.pdf_data = None
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -858,26 +550,56 @@ if u_template is not None and st.session_state.tokens:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col1_tokens:
-                text_val, img_val = render_field(token, template_type, st)
-                if img_val is not None:
-                    image_data[token] = img_val
+                clean_label = token.replace("{", "").replace("}", "")
+                stored_type = st.session_state.custom_mapping.get(token, "Text")
+                
+                if stored_type == "Image" and template_type == 'pptx':
+                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                     field_types[token] = "Image"
                 else:
-                    text_data[token] = text_val
-                    field_types[token] = "Text"
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                    with col_b:
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                        data_type = st.selectbox(
+                            "Type",
+                            ["Text", "Image"],
+                            index=0 if stored_type == "Text" else 1,
+                            key=f"type_{token}",
+                            label_visibility="collapsed"
+                        )
+                        field_types[token] = data_type
+                        st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col2_tokens:
-                text_val, img_val = render_field(token, template_type, st)
-                if img_val is not None:
-                    image_data[token] = img_val
+                clean_label = token.replace("{", "").replace("}", "")
+                stored_type = st.session_state.custom_mapping.get(token, "Text")
+                
+                if stored_type == "Image" and template_type == 'pptx':
+                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                     field_types[token] = "Image"
                 else:
-                    text_data[token] = text_val
-                    field_types[token] = "Text"
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                    with col_b:
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                        data_type = st.selectbox(
+                            "Type",
+                            ["Text", "Image"],
+                            index=0 if stored_type == "Text" else 1,
+                            key=f"type_{token}_2",
+                            label_visibility="collapsed"
+                        )
+                        field_types[token] = data_type
+                        st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
 
 if u_template is not None and st.session_state.tokens:
@@ -926,15 +648,16 @@ if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
     
-    # Three columns for download buttons (PPTX, DOCX, PDF)
-    col1, col2, col3 = st.columns(3)
+    # Two columns for download buttons (PPTX and DOCX only)
+    col1, col2 = st.columns(2)
     
     with col1:
-        # PPTX Download Button
+        # PPTX Download Button - generates and downloads in one click
         pptx_disabled = template_type != 'pptx'
         if pptx_disabled:
             st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
+            # Create a function that generates the file when download is clicked
             def generate_pptx():
                 return generate_pptx_bytes(template_bytes, text_data, image_data)
             
@@ -948,11 +671,12 @@ if u_template is not None:
             )
     
     with col2:
-        # DOCX Download Button
+        # DOCX Download Button - generates and downloads in one click
         docx_disabled = template_type != 'docx'
         if docx_disabled:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
+            # Create a function that generates the file when download is clicked
             def generate_docx():
                 return generate_docx_bytes(template_bytes, text_data, image_data)
             
@@ -963,32 +687,6 @@ if u_template is not None:
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True,
                 key="download_docx"
-            )
-    
-    with col3:
-        # PDF Download Button - works for both PPTX and DOCX
-        if st.button("Download PDF", use_container_width=True, key="generate_pdf"):
-            with st.spinner("Generating PDF..."):
-                if template_type == 'pptx':
-                    pdf_data = create_pdf_from_pptx(template_bytes, text_data, image_data)
-                else:  # docx
-                    pdf_data = create_pdf_from_docx(template_bytes, text_data, image_data)
-                
-                if pdf_data:
-                    st.session_state.pdf_data = pdf_data
-                    st.session_state.pdf_ready = True
-                    st.success("PDF generated successfully!")
-                    st.rerun()
-        
-        # Show PDF download button if PDF is ready
-        if st.session_state.get("pdf_ready", False) and st.session_state.get("pdf_data"):
-            st.download_button(
-                label="⬇️ Download PDF",
-                data=st.session_state.pdf_data,
-                file_name="Generated_Document.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-                key="download_pdf"
             )
     
     st.markdown('</div>', unsafe_allow_html=True)
