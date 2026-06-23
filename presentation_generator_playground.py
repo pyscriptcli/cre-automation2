@@ -467,14 +467,24 @@ def get_download_filename(template_name, file_type):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"Generated_Document_{timestamp}.{file_type}"
 
-def load_template_with_config(template_bytes, template_name, template_type, tokens, confirmed_groups):
-    """Load template with confirmed configuration"""
+def save_and_load_template(template_bytes, template_name, template_type, tokens, confirmed_groups):
+    """Save template to file and load with confirmed configuration"""
+    # Save the template file
+    saved_path = save_template_to_file(template_bytes, template_name)
+    
+    # Save config
+    config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+    save_config_to_file(st.session_state.custom_mapping, config_name)
+    
+    # Load into session state
     st.session_state.table_config = confirmed_groups
     st.session_state.tokens = tokens
     st.session_state.template_bytes = template_bytes
     st.session_state.template_type = template_type
     st.session_state.template_loaded = True
     st.session_state.saved_template_name = template_name
+    st.session_state.saved_file_name = template_name
+    st.session_state.save_success = True
     
     if confirmed_groups and template_type == 'docx':
         st.session_state.use_dynamic_table = True
@@ -493,11 +503,6 @@ def load_template_with_config(template_bytes, template_name, template_type, toke
     else:
         st.session_state.use_dynamic_table = False
         st.session_state.table_data = []
-    
-    # Save config if template has a name
-    if template_name:
-        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-        save_config_to_file(st.session_state.custom_mapping, config_name)
     
     # Reset pending state
     st.session_state.show_detection_dialog = False
@@ -590,13 +595,10 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        if st.button("Confirm", use_container_width=True, type="primary"):
-            st.session_state.confirmed_groups = confirmed_groups
-            st.session_state.show_detection_dialog = False
-            # Load the template with the confirmed configuration
-            load_template_with_config(
+    # Use a single Save Template button
+    if st.button("Save Template", use_container_width=True, type="primary"):
+        if st.session_state.pending_template_name:
+            save_and_load_template(
                 st.session_state.pending_template_bytes,
                 st.session_state.pending_template_name,
                 st.session_state.pending_template_type,
@@ -604,15 +606,8 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
                 confirmed_groups
             )
             st.rerun()
-    with col2:
-        if st.button("Cancel", use_container_width=True):
-            st.session_state.confirmed_groups = {}
-            st.session_state.show_detection_dialog = False
-            st.session_state.pending_tokens = []
-            st.session_state.pending_template_bytes = None
-            st.session_state.pending_template_type = None
-            st.session_state.pending_template_name = None
-            st.rerun()
+        else:
+            st.error("Template name not found. Please try uploading again.")
     
     return confirmed_groups
 
