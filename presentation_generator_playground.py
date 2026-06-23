@@ -406,10 +406,9 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
                             except:
                                 pass
                     except Exception as e:
-                        # If image fails, add error text instead
-                        run = paragraph.add_run()
-                        run.text = f"[Image could not be loaded]"
+                        # If image fails, skip it and continue
                         print(f"Error adding image: {str(e)}")
+                        continue
         
         # Then process text replacements (skip paragraphs that had images)
         for paragraph in doc.paragraphs:
@@ -473,7 +472,14 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
     except Exception as e:
         print(f"Error in generate_docx_bytes: {str(e)}")
         print(traceback.format_exc())
-        raise
+        # Return a simple error document instead of raising
+        error_doc = Document()
+        error_doc.add_heading("Error Generating Document", 1)
+        error_doc.add_paragraph(f"An error occurred: {str(e)}")
+        error_stream = io.BytesIO()
+        error_doc.save(error_stream)
+        error_stream.seek(0)
+        return error_stream.getvalue()
 
 # --- UI HELPERS ---
 def simple_uploader_row(label_text, allowed_types, key):
@@ -742,8 +748,13 @@ if u_template is not None and st.session_state.tokens:
                             field_types[token] = "Image"
                             st.caption("Upload image (PNG, JPG)")
                         else:
+                            # Fixed: Use a non-empty label with label_visibility="collapsed"
                             st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                            text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                            text_data[token] = st.text_input(
+                                clean_label, 
+                                key=f"val_{token}", 
+                                label_visibility="collapsed"
+                            )
                             field_types[token] = "Text"
             
             with col2:
@@ -774,8 +785,13 @@ if u_template is not None and st.session_state.tokens:
                             field_types[token] = "Image"
                             st.caption("Upload image (PNG, JPG)")
                         else:
+                            # Fixed: Use a non-empty label with label_visibility="collapsed"
                             st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                            text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                            text_data[token] = st.text_input(
+                                clean_label, 
+                                key=f"val_{token}", 
+                                label_visibility="collapsed"
+                            )
                             field_types[token] = "Text"
             
             st.markdown('</div>', unsafe_allow_html=True)
@@ -813,8 +829,9 @@ if u_template is not None and st.session_state.tokens:
             for idx, row_data in enumerate(st.session_state.table_data):
                 cols = st.columns([2, 2, 2, 0.5])
                 with cols[0]:
+                    # Fixed: Use non-empty labels with label_visibility="collapsed"
                     row_data["company"] = st.text_input(
-                        "", 
+                        f"Company {idx+1}", 
                         value=row_data["company"], 
                         key=f"table_company_{idx}",
                         label_visibility="collapsed",
@@ -822,7 +839,7 @@ if u_template is not None and st.session_state.tokens:
                     )
                 with cols[1]:
                     row_data["rep"] = st.text_input(
-                        "", 
+                        f"Rep {idx+1}", 
                         value=row_data["rep"], 
                         key=f"table_rep_{idx}",
                         label_visibility="collapsed",
@@ -830,7 +847,7 @@ if u_template is not None and st.session_state.tokens:
                     )
                 with cols[2]:
                     row_data["designation"] = st.text_input(
-                        "", 
+                        f"Designation {idx+1}", 
                         value=row_data["designation"], 
                         key=f"table_designation_{idx}",
                         label_visibility="collapsed",
