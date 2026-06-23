@@ -467,14 +467,27 @@ def get_download_filename(template_name, file_type):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"Generated_Document_{timestamp}.{file_type}"
 
+def load_saved_template_config(template_name):
+    """Load saved configuration for a template if it exists"""
+    config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+    config_data = load_config_from_file(config_name)
+    
+    if config_data and 'table_config' in config_data:
+        return config_data['table_config']
+    return None
+
 def save_and_load_template(template_bytes, template_name, template_type, tokens, confirmed_groups):
     """Save template to file and load with confirmed configuration"""
     # Save the template file
     saved_path = save_template_to_file(template_bytes, template_name)
     
-    # Save config
+    # Save config with table_config
+    config_data = {
+        'table_config': confirmed_groups,
+        'custom_mapping': st.session_state.custom_mapping
+    }
     config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-    save_config_to_file(st.session_state.custom_mapping, config_name)
+    save_config_to_file(config_data, config_name)
     
     # Load into session state
     st.session_state.table_config = confirmed_groups
@@ -485,11 +498,10 @@ def save_and_load_template(template_bytes, template_name, template_type, tokens,
     st.session_state.saved_template_name = template_name
     st.session_state.saved_file_name = template_name
     st.session_state.save_success = True
+    st.session_state.use_dynamic_table = True if confirmed_groups else False
+    st.session_state.table_headers = list(confirmed_groups.keys()) if confirmed_groups else []
     
     if confirmed_groups and template_type == 'docx':
-        st.session_state.use_dynamic_table = True
-        st.session_state.table_headers = list(confirmed_groups.keys())
-        
         max_rows = 0
         for base_name, config in confirmed_groups.items():
             max_rows = max(max_rows, config['max_row'])
@@ -501,7 +513,6 @@ def save_and_load_template(template_bytes, template_name, template_type, tokens,
                 row_data[base_name] = ""
             st.session_state.table_data.append(row_data)
     else:
-        st.session_state.use_dynamic_table = False
         st.session_state.table_data = []
     
     # Reset pending state
@@ -595,7 +606,7 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Use a single Save Template button
+    # Save Template button
     if st.button("Save Template", use_container_width=True, type="primary"):
         if st.session_state.pending_template_name:
             save_and_load_template(
@@ -721,33 +732,60 @@ with col_template1:
         template_name = selected_template.split(' (')[0]
         template_bytes = load_template_from_file(template_name)
         if template_bytes:
-            st.session_state.template_bytes = template_bytes
-            st.session_state.saved_template_name = template_name
-            st.session_state.template_loaded = True
-            st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+            # Check if this template has a saved configuration
+            saved_table_config = load_saved_template_config(template_name)
             
-            config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-            config_data = load_config_from_file(config_name)
-            if config_data:
-                st.session_state.custom_mapping = config_data
-            
-            tokens = extract_placeholders(template_bytes, st.session_state.template_type)
-            st.session_state.tokens = tokens
-            
-            detected_groups = detect_table_placeholders(tokens)
-            
-            if detected_groups and st.session_state.template_type == 'docx':
-                st.session_state.show_detection_dialog = True
-                st.session_state.pending_tokens = tokens
-                st.session_state.pending_template_bytes = template_bytes
-                st.session_state.pending_template_type = st.session_state.template_type
-                st.session_state.pending_template_name = template_name
-                st.session_state.template_loaded = False
-            else:
-                st.session_state.use_dynamic_table = False
-                st.session_state.table_config = {}
+            if saved_table_config:
+                # Load directly from saved config
+                st.session_state.template_bytes = template_bytes
+                st.session_state.saved_template_name = template_name
+                st.session_state.template_loaded = True
+                st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+                
+                tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+                st.session_state.tokens = tokens
+                
+                # Load saved config
+                st.session_state.table_config = saved_table_config
+                st.session_state.use_dynamic_table = True
+                st.session_state.table_headers = list(saved_table_config.keys())
+                
+                # Initialize table data
+                max_rows = 0
+                for base_name, config in saved_table_config.items():
+                    max_rows = max(max_rows, config['max_row'])
+                
                 st.session_state.table_data = []
-                st.session_state.table_headers = []
+                for i in range(max_rows):
+                    row_data = {}
+                    for base_name in saved_table_config.keys():
+                        row_data[base_name] = ""
+                    st.session_state.table_data.append(row_data)
+                
+                # Load custom mapping
+                config_data = load_config_from_file(template_name.replace('.pptx', '').replace('.docx', '') + '_config.json')
+                if config_data and 'custom_mapping' in config_data:
+                    st.session_state.custom_mapping = config_data['custom_mapping']
+            else:
+                # No saved config, check for detection
+                tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+                st.session_state.tokens = tokens
+                
+                detected_groups = detect_table_placeholders(tokens)
+                
+                if detected_groups and st.session_state.template_type == 'docx':
+                    st.session_state.show_detection_dialog = True
+                    st.session_state.pending_tokens = tokens
+                    st.session_state.pending_template_bytes = template_bytes
+                    st.session_state.pending_template_type = st.session_state.template_type
+                    st.session_state.pending_template_name = template_name
+                    st.session_state.template_loaded = False
+                else:
+                    st.session_state.template_loaded = True
+                    st.session_state.use_dynamic_table = False
+                    st.session_state.table_config = {}
+                    st.session_state.table_data = []
+                    st.session_state.table_headers = []
 
 with col_template2:
     uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
