@@ -13,6 +13,7 @@ from docx import Document
 from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
+import traceback
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -367,84 +368,112 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=None):
     """Generate DOCX with text, image, and table replacements"""
-    doc = Document(io.BytesIO(template_bytes))
-    
-    # Process regular paragraphs
-    paragraphs_to_process = list(doc.paragraphs)
-    
-    for paragraph in paragraphs_to_process:
-        # Check for image placeholders first
-        has_image = False
-        for img_token, img_file in image_inputs.items():
-            if img_token in paragraph.text and img_file is not None:
-                has_image = True
-                # Remove the placeholder text from all runs
-                for run in paragraph.runs:
-                    if img_token in run.text:
-                        run.text = run.text.replace(img_token, '')
-                
-                # Add the image after the text
-                try:
-                    # Reset file pointer
-                    img_file.seek(0)
-                    # Add image with default size
-                    run = paragraph.add_run()
-                    # Add image with reasonable size
-                    run.add_picture(img_file, width=Inches(1.5))
-                except Exception as e:
-                    # If image fails, add error text instead
-                    run = paragraph.add_run()
-                    run.text = f"[Image could not be loaded: {str(e)}]"
+    try:
+        doc = Document(io.BytesIO(template_bytes))
         
-        # Replace text placeholders (skip if image was already processed)
-        if not has_image:
-            replace_text_in_paragraph(paragraph, text_inputs)
-    
-    # Process tables
-    for table in doc.tables:
-        # Check if this is a placeholder table with dynamic rows
-        if table_data and len(table.rows) > 0:
-            # Check if first row (header) has placeholders or actual headers
-            header_row = table.rows[0]
-            has_placeholders = False
-            
-            # Check if header row has any placeholders
-            for cell in header_row.cells:
-                if '{{' in cell.text and '}}' in cell.text:
-                    has_placeholders = True
+        # First, process images in paragraphs
+        paragraphs_to_process = list(doc.paragraphs)
+        
+        for paragraph in paragraphs_to_process:
+            # Check for image placeholders
+            for img_token, img_file in image_inputs.items():
+                if img_token in paragraph.text and img_file is not None:
+                    try:
+                        # Read image bytes once
+                        img_file.seek(0)
+                        img_bytes = img_file.read()
+                        
+                        # Remove the placeholder text from all runs
+                        for run in paragraph.runs:
+                            if img_token in run.text:
+                                run.text = run.text.replace(img_token, '')
+                        
+                        # Add the image after the text
+                        if img_bytes:
+                            # Create a temporary file for the image
+                            import tempfile
+                            with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                                tmp_file.write(img_bytes)
+                                tmp_path = tmp_file.name
+                            
+                            # Add the image to the paragraph
+                            run = paragraph.add_run()
+                            run.add_picture(tmp_path, width=Inches(1.5))
+                            
+                            # Clean up temp file
+                            try:
+                                os.unlink(tmp_path)
+                            except:
+                                pass
+                    except Exception as e:
+                        # If image fails, add error text instead
+                        run = paragraph.add_run()
+                        run.text = f"[Image could not be loaded]"
+                        print(f"Error adding image: {str(e)}")
+        
+        # Then process text replacements (skip paragraphs that had images)
+        for paragraph in doc.paragraphs:
+            # Check if this paragraph has an image token that was processed
+            has_image = False
+            for img_token in image_inputs.keys():
+                if img_token in paragraph.text:
+                    has_image = True
                     break
             
-            if has_placeholders:
-                # This is a placeholder table - replace with dynamic data
-                # Keep the header row
-                while len(table.rows) > 1:
-                    table._element.remove(table.rows[-1]._element)
+            # Only replace text if no image token is present
+            if not has_image:
+                replace_text_in_paragraph(paragraph, text_inputs)
+        
+        # Process tables
+        for table in doc.tables:
+            # Check if this is a placeholder table with dynamic rows
+            if table_data and len(table.rows) > 0:
+                # Check if first row (header) has placeholders or actual headers
+                header_row = table.rows[0]
+                has_placeholders = False
                 
-                # Add data rows from table_data
-                for data_item in table_data:
-                    new_row = table.add_row()
-                    # Assuming the table has 3 columns: Company, Representative, Designation
-                    if len(new_row.cells) >= 3:
-                        new_row.cells[0].text = str(data_item.get('company', ''))
-                        new_row.cells[1].text = str(data_item.get('rep', ''))
-                        new_row.cells[2].text = str(data_item.get('designation', ''))
+                # Check if header row has any placeholders
+                for cell in header_row.cells:
+                    if '{{' in cell.text and '}}' in cell.text:
+                        has_placeholders = True
+                        break
+                
+                if has_placeholders:
+                    # This is a placeholder table - replace with dynamic data
+                    # Keep the header row
+                    while len(table.rows) > 1:
+                        table._element.remove(table.rows[-1]._element)
+                    
+                    # Add data rows from table_data
+                    for data_item in table_data:
+                        new_row = table.add_row()
+                        # Assuming the table has 3 columns: Company, Representative, Designation
+                        if len(new_row.cells) >= 3:
+                            new_row.cells[0].text = str(data_item.get('company', ''))
+                            new_row.cells[1].text = str(data_item.get('rep', ''))
+                            new_row.cells[2].text = str(data_item.get('designation', ''))
+                else:
+                    # Regular table with fixed rows - just replace text
+                    for row in table.rows:
+                        for cell in row.cells:
+                            for paragraph in cell.paragraphs:
+                                replace_text_in_paragraph(paragraph, text_inputs)
             else:
-                # Regular table with fixed rows - just replace text
+                # No dynamic data, just replace text
                 for row in table.rows:
                     for cell in row.cells:
                         for paragraph in cell.paragraphs:
                             replace_text_in_paragraph(paragraph, text_inputs)
-        else:
-            # No dynamic data, just replace text
-            for row in table.rows:
-                for cell in row.cells:
-                    for paragraph in cell.paragraphs:
-                        replace_text_in_paragraph(paragraph, text_inputs)
+        
+        doc_stream = io.BytesIO()
+        doc.save(doc_stream)
+        doc_stream.seek(0)
+        return doc_stream.getvalue()
     
-    doc_stream = io.BytesIO()
-    doc.save(doc_stream)
-    doc_stream.seek(0)
-    return doc_stream.getvalue()
+    except Exception as e:
+        print(f"Error in generate_docx_bytes: {str(e)}")
+        print(traceback.format_exc())
+        raise
 
 # --- UI HELPERS ---
 def simple_uploader_row(label_text, allowed_types, key):
@@ -849,7 +878,11 @@ if u_template is not None:
             st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
             def generate_pptx():
-                return generate_pptx_bytes(template_bytes, text_data, image_data)
+                try:
+                    return generate_pptx_bytes(template_bytes, text_data, image_data)
+                except Exception as e:
+                    st.error(f"Error generating PPTX: {str(e)}")
+                    return None
             
             st.download_button(
                 label="Download PPTX",
@@ -880,7 +913,10 @@ if u_template is not None:
                     
                     return result
                 except Exception as e:
-                    st.error(f"Error generating document: {str(e)}")
+                    error_msg = f"Error generating document: {str(e)}"
+                    st.error(error_msg)
+                    print(error_msg)
+                    print(traceback.format_exc())
                     return None
             
             st.download_button(
