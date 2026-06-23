@@ -35,20 +35,6 @@ MINIMAL_CRE_SYSTEM = """
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
     
-    /* Title Header */
-    .app-title {
-        font-size: 28px !important;
-        font-weight: 700 !important;
-        color: #1A1A1A !important;
-        padding: 20px 0 10px 0 !important;
-        border-bottom: 2px solid #E0E0E0 !important;
-        margin-bottom: 20px !important;
-        letter-spacing: -0.5px !important;
-    }
-    .app-title span {
-        color: #0078D4 !important;
-    }
-    
     /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
         background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important;
@@ -153,7 +139,7 @@ MINIMAL_CRE_SYSTEM = """
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(255, 255, 255, 0.9);
+        background: rgba(255, 255, 255, 0.92);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -164,8 +150,8 @@ MINIMAL_CRE_SYSTEM = """
         border: 4px solid #f3f3f3;
         border-top: 4px solid #1A1A1A;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 50px;
+        height: 50px;
         animation: spin 1s linear infinite;
     }
     @keyframes spin {
@@ -174,9 +160,14 @@ MINIMAL_CRE_SYSTEM = """
     }
     .loading-text {
         margin-top: 20px;
-        font-size: 16px;
+        font-size: 18px;
         color: #1A1A1A;
         font-weight: 600;
+    }
+    .loading-subtext {
+        margin-top: 8px;
+        font-size: 14px;
+        color: #666;
     }
     
     /* Export buttons container */
@@ -187,6 +178,12 @@ MINIMAL_CRE_SYSTEM = """
     }
     .export-button {
         flex: 1;
+    }
+    
+    /* Loading button state */
+    .loading-btn {
+        opacity: 0.7;
+        pointer-events: none;
     }
 </style>
 """
@@ -494,11 +491,8 @@ def simple_uploader_row(label_text, allowed_types, key):
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
 # --- INIT APP ---
-st.set_page_config(page_title="", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Document Generator", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
-
-# --- APP TITLE ---
-st.markdown('<div class="app-title">Open<span>Flux</span></div>', unsafe_allow_html=True)
 
 # Initialize all session state variables
 if "final_pptx" not in st.session_state:
@@ -527,6 +521,8 @@ if "generated" not in st.session_state:
     st.session_state.generated = False
 if "is_loading" not in st.session_state:
     st.session_state.is_loading = False
+if "loading_message" not in st.session_state:
+    st.session_state.loading_message = "Generating document..."
 if "generated_files" not in st.session_state:
     st.session_state.generated_files = {}
 
@@ -774,12 +770,13 @@ if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Export Document</div>', unsafe_allow_html=True)
     
-    # Loading state
+    # Loading overlay
     if st.session_state.is_loading:
-        st.markdown("""
+        st.markdown(f"""
         <div class="loading-overlay">
             <div class="loading-spinner"></div>
-            <div class="loading-text">Generating document...</div>
+            <div class="loading-text">{st.session_state.loading_message}</div>
+            <div class="loading-subtext">Please wait...</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -788,58 +785,9 @@ if u_template is not None:
     
     # Function to generate document and store in session state
     def generate_and_store(format_type):
-        with st.spinner(f"Generating {format_type}..."):
-            try:
-                if format_type == 'PPTX':
-                    if template_type == 'pptx':
-                        raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
-                        st.session_state.final_pptx = raw_pptx
-                        st.session_state.final_pdf = None
-                        st.session_state.final_docx = None
-                    else:
-                        # For DOCX templates, we can't generate PPTX directly
-                        st.warning("PPTX export is only available for PPTX templates")
-                        return
-                        
-                elif format_type == 'PDF':
-                    if template_type == 'pptx':
-                        raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
-                        st.session_state.final_pptx = raw_pptx
-                        pdf_bytes = convert_pptx_to_pdf(raw_pptx)
-                        if pdf_bytes:
-                            st.session_state.final_pdf = pdf_bytes
-                            st.session_state.final_docx = None
-                        else:
-                            st.error("PDF conversion failed. Please ensure LibreOffice is installed.")
-                            return
-                    else:  # docx
-                        raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
-                        st.session_state.final_docx = raw_docx
-                        pdf_bytes = convert_docx_to_pdf(raw_docx)
-                        if pdf_bytes:
-                            st.session_state.final_pdf = pdf_bytes
-                            st.session_state.final_pptx = None
-                        else:
-                            st.error("PDF conversion failed. Please ensure LibreOffice is installed.")
-                            return
-                            
-                elif format_type == 'DOCX':
-                    if template_type == 'docx':
-                        raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
-                        st.session_state.final_docx = raw_docx
-                        st.session_state.final_pptx = None
-                        st.session_state.final_pdf = None
-                    else:
-                        # For PPTX templates, we can't generate DOCX directly
-                        st.warning("DOCX export is only available for DOCX templates")
-                        return
-                
-                st.session_state.generated = True
-                st.success(f"{format_type} generated successfully!")
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"Error generating {format_type}: {str(e)}")
+        st.session_state.is_loading = True
+        st.session_state.loading_message = f"Generating {format_type} file..."
+        st.rerun()
     
     with col1:
         # PPTX Button
@@ -863,6 +811,74 @@ if u_template is not None:
         else:
             if st.button("Export as DOCX", use_container_width=True, key="export_docx"):
                 generate_and_store('DOCX')
+    
+    # Actual generation happens here (after loading state is set)
+    if st.session_state.is_loading and not st.session_state.generated:
+        try:
+            # Determine which format to generate
+            loading_msg = st.session_state.loading_message
+            if "PPTX" in loading_msg:
+                format_type = 'PPTX'
+            elif "PDF" in loading_msg:
+                format_type = 'PDF'
+            elif "DOCX" in loading_msg:
+                format_type = 'DOCX'
+            else:
+                format_type = 'PDF'  # Default
+            
+            if format_type == 'PPTX':
+                if template_type == 'pptx':
+                    raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
+                    st.session_state.final_pptx = raw_pptx
+                    st.session_state.final_pdf = None
+                    st.session_state.final_docx = None
+                    st.session_state.generated = True
+                    st.success("PPTX generated successfully!")
+                else:
+                    st.warning("PPTX export is only available for PPTX templates")
+                    
+            elif format_type == 'PDF':
+                if template_type == 'pptx':
+                    raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
+                    st.session_state.final_pptx = raw_pptx
+                    pdf_bytes = convert_pptx_to_pdf(raw_pptx)
+                    if pdf_bytes:
+                        st.session_state.final_pdf = pdf_bytes
+                        st.session_state.final_docx = None
+                        st.session_state.generated = True
+                        st.success("PDF generated successfully!")
+                    else:
+                        st.error("PDF conversion failed. Please ensure LibreOffice is installed.")
+                else:  # docx
+                    raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
+                    st.session_state.final_docx = raw_docx
+                    pdf_bytes = convert_docx_to_pdf(raw_docx)
+                    if pdf_bytes:
+                        st.session_state.final_pdf = pdf_bytes
+                        st.session_state.final_pptx = None
+                        st.session_state.generated = True
+                        st.success("PDF generated successfully!")
+                    else:
+                        st.error("PDF conversion failed. Please ensure LibreOffice is installed.")
+                        
+            elif format_type == 'DOCX':
+                if template_type == 'docx':
+                    raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
+                    st.session_state.final_docx = raw_docx
+                    st.session_state.final_pptx = None
+                    st.session_state.final_pdf = None
+                    st.session_state.generated = True
+                    st.success("DOCX generated successfully!")
+                else:
+                    st.warning("DOCX export is only available for DOCX templates")
+            
+            st.session_state.is_loading = False
+            st.rerun()
+            
+        except Exception as e:
+            st.session_state.is_loading = False
+            st.error(f"Error generating {format_type}: {str(e)}")
+            st.rerun()
     
     # Show download buttons if generated
     if st.session_state.generated:
