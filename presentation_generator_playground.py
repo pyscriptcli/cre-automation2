@@ -14,6 +14,7 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
+import time
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -99,6 +100,39 @@ MINIMAL_CRE_SYSTEM = """
         background-color: #002244 !important;
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
+    }
+    
+    /* Progress Bar */
+    .progress-container {
+        width: 100%;
+        background-color: #E8E8E8;
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 10px 0;
+        height: 20px;
+        position: relative;
+    }
+    .progress-bar {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #003366, #004488);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .progress-text {
+        position: absolute;
+        width: 100%;
+        text-align: center;
+        color: #1A1A1A;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 20px;
     }
     
     /* Delete button - made smaller */
@@ -420,6 +454,20 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
+# --- PROGRESS BAR HELPER ---
+def show_progress_bar(progress, status_text):
+    """Display a progress bar with percentage"""
+    progress_percent = int(progress * 100)
+    bar_style = f"""
+    <div class="progress-container">
+        <div class="progress-bar" style="width: {progress_percent}%;">
+            {progress_percent}%
+        </div>
+        <div class="progress-text">{status_text}</div>
+    </div>
+    """
+    st.markdown(bar_style, unsafe_allow_html=True)
+
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -449,6 +497,16 @@ if "saved_file_name" not in st.session_state:
     st.session_state.saved_file_name = None
 if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
+if "download_in_progress" not in st.session_state:
+    st.session_state.download_in_progress = False
+if "download_status" not in st.session_state:
+    st.session_state.download_status = ""
+if "download_progress" not in st.session_state:
+    st.session_state.download_progress = 0
+if "download_data" not in st.session_state:
+    st.session_state.download_data = None
+if "download_filename" not in st.session_state:
+    st.session_state.download_filename = None
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -690,43 +748,166 @@ if u_template is not None:
         if pptx_disabled:
             st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
-            try:
-                pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
-                pptx_filename = get_download_filename(base_template_name, "pptx")
+            # Check if download was triggered
+            if st.button("Generate & Download PPTX", key="generate_pptx", use_container_width=True):
+                st.session_state.download_in_progress = True
+                st.session_state.download_progress = 0
+                st.session_state.download_status = "Initializing..."
+                
+                # Start progress simulation
+                progress_placeholder = st.empty()
+                
+                try:
+                    # Simulate progress
+                    for i in range(1, 101, 10):
+                        st.session_state.download_progress = i / 100
+                        st.session_state.download_status = f"Processing... {i}%"
+                        with progress_placeholder.container():
+                            show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
+                        time.sleep(0.1)
+                    
+                    # Actually generate the file
+                    st.session_state.download_status = "Generating document..."
+                    st.session_state.download_progress = 0.9
+                    with progress_placeholder.container():
+                        show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
+                    
+                    pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
+                    
+                    # Complete
+                    st.session_state.download_progress = 1.0
+                    st.session_state.download_status = "Complete!"
+                    with progress_placeholder.container():
+                        show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
+                    
+                    # Store data for download
+                    st.session_state.download_data = pptx_data
+                    st.session_state.download_filename = get_download_filename(base_template_name, "pptx")
+                    
+                    # Short delay to show completion
+                    time.sleep(0.5)
+                    
+                    # Clear progress and trigger download
+                    st.session_state.download_in_progress = False
+                    st.session_state.download_progress = 0
+                    progress_placeholder.empty()
+                    
+                    # Auto-download
+                    st.download_button(
+                        label="Download PPTX",
+                        data=pptx_data,
+                        file_name=st.session_state.download_filename,
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        use_container_width=True,
+                        key="download_pptx_auto"
+                    )
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.session_state.download_in_progress = False
+                    st.session_state.download_progress = 0
+                    progress_placeholder.empty()
+                    st.error(f"Error generating PPTX: {str(e)}")
+            
+            # Show download button if data is ready
+            if st.session_state.download_data and not st.session_state.download_in_progress:
                 st.download_button(
                     label="Download PPTX",
-                    data=pptx_data,
-                    file_name=pptx_filename,
+                    data=st.session_state.download_data,
+                    file_name=st.session_state.download_filename,
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True,
-                    key="download_pptx"
+                    key="download_pptx_ready"
                 )
-            except Exception as e:
-                st.error(f"Error generating PPTX: {str(e)}")
+                # Clear data after showing button
+                st.session_state.download_data = None
+                st.session_state.download_filename = None
+            
+            # Show progress if in progress
+            if st.session_state.download_in_progress:
+                show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
     
     with col2:
         docx_disabled = template_type != 'docx'
         if docx_disabled:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
-            # Generate the document data
-            try:
-                docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
+            if st.button("Generate & Download DOCX", key="generate_docx", use_container_width=True):
+                st.session_state.download_in_progress = True
+                st.session_state.download_progress = 0
+                st.session_state.download_status = "Initializing..."
                 
-                if docx_data:
-                    docx_filename = get_download_filename(base_template_name, "docx")
+                progress_placeholder = st.empty()
+                
+                try:
+                    # Simulate progress
+                    for i in range(1, 101, 10):
+                        st.session_state.download_progress = i / 100
+                        st.session_state.download_status = f"Processing... {i}%"
+                        with progress_placeholder.container():
+                            show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
+                        time.sleep(0.1)
+                    
+                    # Actually generate the file
+                    st.session_state.download_status = "Generating document..."
+                    st.session_state.download_progress = 0.9
+                    with progress_placeholder.container():
+                        show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
+                    
+                    docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
+                    
+                    # Complete
+                    st.session_state.download_progress = 1.0
+                    st.session_state.download_status = "Complete!"
+                    with progress_placeholder.container():
+                        show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
+                    
+                    # Store data for download
+                    st.session_state.download_data = docx_data
+                    st.session_state.download_filename = get_download_filename(base_template_name, "docx")
+                    
+                    # Short delay to show completion
+                    time.sleep(0.5)
+                    
+                    # Clear progress and trigger download
+                    st.session_state.download_in_progress = False
+                    st.session_state.download_progress = 0
+                    progress_placeholder.empty()
+                    
+                    # Auto-download
                     st.download_button(
                         label="Download DOCX",
                         data=docx_data,
-                        file_name=docx_filename,
+                        file_name=st.session_state.download_filename,
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True,
-                        key="download_docx"
+                        key="download_docx_auto"
                     )
-                else:
-                    st.error("Failed to generate document. Please check the template and try again.")
-            except Exception as e:
-                st.error(f"Error generating document: {str(e)}")
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.session_state.download_in_progress = False
+                    st.session_state.download_progress = 0
+                    progress_placeholder.empty()
+                    st.error(f"Error generating document: {str(e)}")
+            
+            # Show download button if data is ready
+            if st.session_state.download_data and not st.session_state.download_in_progress:
+                st.download_button(
+                    label="Download DOCX",
+                    data=st.session_state.download_data,
+                    file_name=st.session_state.download_filename,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                    key="download_docx_ready"
+                )
+                # Clear data after showing button
+                st.session_state.download_data = None
+                st.session_state.download_filename = None
+            
+            # Show progress if in progress
+            if st.session_state.download_in_progress:
+                show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
