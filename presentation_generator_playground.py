@@ -314,8 +314,8 @@ def detect_table_placeholders(tokens):
     for token in tokens:
         match = re.match(pattern, token)
         if match:
-            base_name = match.group(1)  # e.g., COMPANY_NAME, LESSOR_REPRESENTATIVE_NAME
-            row_num = int(match.group(2))  # e.g., 1, 2, 3
+            base_name = match.group(1)
+            row_num = int(match.group(2))
             
             if base_name not in table_groups:
                 table_groups[base_name] = {
@@ -410,6 +410,9 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
     
     # Process tables with dynamic data
     if table_data and table_config:
+        # Get the base names for this table
+        base_names = list(table_config.keys())
+        
         for table in doc.tables:
             # Check if this table has placeholders
             has_placeholders = False
@@ -422,35 +425,23 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
                     break
             
             if has_placeholders:
-                # Get the base names for this table
-                base_names = list(table_config.keys())
-                
                 # Remove all rows after the first (header)
                 while len(table.rows) > 1:
                     table._element.remove(table.rows[-1]._element)
                 
                 # Add data rows
                 for row_idx, row_data in enumerate(table_data):
-                    if row_idx < len(table_data):
-                        new_row = table.add_row()
-                        # For each cell, check if it needs replacement
-                        for col_idx, cell in enumerate(new_row.cells):
-                            # Try to match based on the column pattern
-                            for base_name in base_names:
-                                placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
-                                if placeholder in cell.text:
-                                    # Find the matching column value
-                                    value = row_data.get(base_name, '')
-                                    cell.text = str(value) if value else ''
-                                    break
-                            # If no match found, leave as is
-                            if '{{' in cell.text and '}}' in cell.text:
-                                # Try to replace with standard placeholders
-                                for base_name in base_names:
-                                    placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
-                                    if placeholder in cell.text:
-                                        cell.text = str(row_data.get(base_name, ''))
-                                        break
+                    new_row = table.add_row()
+                    # For each cell, try to find matching placeholder
+                    for col_idx, cell in enumerate(new_row.cells):
+                        # Check each base name
+                        for base_name in base_names:
+                            placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
+                            if placeholder in cell.text:
+                                # Replace with the value from row_data
+                                value = row_data.get(base_name, '')
+                                cell.text = str(value) if value else ''
+                                break
     
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
@@ -697,7 +688,7 @@ if u_template is not None and st.session_state.tokens:
     if not tokens:
         st.info("No placeholders found in the template.")
     else:
-        # Identify which tokens belong to tables
+        # Identify which tokens belong to tables - use the raw tokens from table_config
         table_tokens = set()
         for base_name, config in table_config.items():
             for token in config['tokens']:
@@ -861,20 +852,20 @@ if u_template is not None and st.session_state.tokens:
             st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Update text_data with table data
-            # Clear existing table entries
+            # --- FIX: Update text_data with table data for ALL rows ---
+            # Clear existing table entries from text_data
             for key in list(text_data.keys()):
                 if '{{' in key and '_' in key:
-                    # Check if it matches any table token pattern
                     for base_name in table_config.keys():
                         if f'{{{{{base_name}_' in key:
                             del text_data[key]
                             break
             
-            # Add all rows
+            # Add all rows to text_data
             for idx, row_data in enumerate(st.session_state.table_data):
                 for base_name in table_config.keys():
                     placeholder = f"{{{{{base_name}_{idx+1}}}}}"
+                    # Store the value - empty strings will be replaced with empty strings
                     text_data[placeholder] = row_data.get(base_name, "")
 
 # --- DOWNLOAD SECTION ---
@@ -912,7 +903,12 @@ if u_template is not None:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
             try:
+                # Debug: Print table data
                 if st.session_state.use_dynamic_table and st.session_state.table_data and st.session_state.table_config:
+                    print("Table Config:", st.session_state.table_config)
+                    print("Table Data:", st.session_state.table_data)
+                    print("Text Data:", text_data)
+                    
                     docx_data = generate_docx_bytes(
                         template_bytes, 
                         text_data, 
@@ -937,6 +933,8 @@ if u_template is not None:
                     st.error("Failed to generate document. Please check the template and try again.")
             except Exception as e:
                 st.error(f"Error generating document: {str(e)}")
+                import traceback
+                st.error(traceback.format_exc())
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
