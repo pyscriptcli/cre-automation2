@@ -32,7 +32,7 @@ MINIMAL_CRE_SYSTEM = """
     .stDeployButton {display: none;}
     .stStatusWidget {display: none;}
     
-    /* Hide footer - "Created by" and "Hosted with" */
+    /* Hide footer with overlay */
     footer {
         visibility: hidden !important;
         display: none !important;
@@ -42,33 +42,28 @@ MINIMAL_CRE_SYSTEM = """
         bottom: -100px !important;
     }
     
-    /* Hide the entire footer container */
     .stFooter {
         display: none !important;
         visibility: hidden !important;
         height: 0 !important;
     }
     
-    /* Hide any view footer or bottom bar */
     [data-testid="stFooter"] {
         display: none !important;
         visibility: hidden !important;
         height: 0 !important;
     }
     
-    /* Hide the app footer completely */
-    .appview-container .st-emotion-cache-1r6slb0 {
-        display: none !important;
-    }
-    
-    /* Additional footer hiding */
-    .st-emotion-cache-1r6slb0 {
-        display: none !important;
-    }
-    
-    /* Hide any bottom text */
-    .st-emotion-cache-16txtl3 {
-        display: none !important;
+    /* White overlay to cover footer area */
+    .footer-overlay {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        width: 300px;
+        height: 60px;
+        background-color: #FFFFFF;
+        z-index: 999999;
+        pointer-events: none;
     }
     
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
@@ -432,6 +427,9 @@ def simple_uploader_row(label_text, allowed_types, key):
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
+# Add white overlay to hide footer
+st.markdown('<div class="footer-overlay"></div>', unsafe_allow_html=True)
+
 # Initialize all session state variables
 if "custom_mapping" not in st.session_state:
     st.session_state.custom_mapping = {}
@@ -591,25 +589,35 @@ if u_template is not None and st.session_state.tokens:
                 clean_label = token.replace("{", "").replace("}", "")
                 stored_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                if stored_type == "Image" and template_type == 'pptx':
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
-                    field_types[token] = "Image"
-                else:
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
-                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                    with col_b:
-                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                        data_type = st.selectbox(
-                            "Type",
-                            ["Text", "Image"],
-                            index=0 if stored_type == "Text" else 1,
-                            key=f"type_{token}",
+                # Always show both text input and type selector
+                col_a, col_b = st.columns([3, 1])
+                with col_a:
+                    st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                    if stored_type == "Image" and template_type == 'pptx':
+                        # Show file uploader for image
+                        image_data[token] = st.file_uploader(
+                            "Upload Image", 
+                            type=["png", "jpg", "jpeg"], 
+                            key=f"val_{token}", 
                             label_visibility="collapsed"
                         )
-                        field_types[token] = data_type
-                        st.session_state.custom_mapping[token] = data_type
+                        text_data[token] = ""  # No text value
+                    else:
+                        # Show text input
+                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                        image_data[token] = None
+                
+                with col_b:
+                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                    data_type = st.selectbox(
+                        "Type",
+                        ["Text", "Image"],
+                        index=0 if stored_type == "Text" else 1,
+                        key=f"type_{token}",
+                        label_visibility="collapsed"
+                    )
+                    field_types[token] = data_type
+                    st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
@@ -619,25 +627,35 @@ if u_template is not None and st.session_state.tokens:
                 clean_label = token.replace("{", "").replace("}", "")
                 stored_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                if stored_type == "Image" and template_type == 'pptx':
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
-                    field_types[token] = "Image"
-                else:
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
-                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                    with col_b:
-                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                        data_type = st.selectbox(
-                            "Type",
-                            ["Text", "Image"],
-                            index=0 if stored_type == "Text" else 1,
-                            key=f"type_{token}_2",
+                # Always show both text input and type selector
+                col_a, col_b = st.columns([3, 1])
+                with col_a:
+                    st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                    if stored_type == "Image" and template_type == 'pptx':
+                        # Show file uploader for image
+                        image_data[token] = st.file_uploader(
+                            "Upload Image", 
+                            type=["png", "jpg", "jpeg"], 
+                            key=f"val_{token}_2", 
                             label_visibility="collapsed"
                         )
-                        field_types[token] = data_type
-                        st.session_state.custom_mapping[token] = data_type
+                        text_data[token] = ""  # No text value
+                    else:
+                        # Show text input
+                        text_data[token] = st.text_input("", key=f"val_{token}_2", label_visibility="collapsed")
+                        image_data[token] = None
+                
+                with col_b:
+                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                    data_type = st.selectbox(
+                        "Type",
+                        ["Text", "Image"],
+                        index=0 if stored_type == "Text" else 1,
+                        key=f"type_{token}_2",
+                        label_visibility="collapsed"
+                    )
+                    field_types[token] = data_type
+                    st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
 
 if u_template is not None and st.session_state.tokens:
