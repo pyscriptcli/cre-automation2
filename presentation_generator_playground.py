@@ -32,6 +32,45 @@ MINIMAL_CRE_SYSTEM = """
     .stDeployButton {display: none;}
     .stStatusWidget {display: none;}
     
+    /* Hide footer - "Created by" and "Hosted with" */
+    footer {
+        visibility: hidden !important;
+        display: none !important;
+        height: 0 !important;
+        opacity: 0 !important;
+        position: fixed !important;
+        bottom: -100px !important;
+    }
+    
+    /* Hide the entire footer container */
+    .stFooter {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+    }
+    
+    /* Hide any view footer or bottom bar */
+    [data-testid="stFooter"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+    }
+    
+    /* Hide the app footer completely */
+    .appview-container .st-emotion-cache-1r6slb0 {
+        display: none !important;
+    }
+    
+    /* Additional footer hiding */
+    .st-emotion-cache-1r6slb0 {
+        display: none !important;
+    }
+    
+    /* Hide any bottom text */
+    .st-emotion-cache-16txtl3 {
+        display: none !important;
+    }
+    
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
@@ -389,13 +428,6 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
-# --- CALLBACK FUNCTIONS FOR TYPE CHANGE ---
-def update_field_type(token, new_type):
-    """Callback function to update field type in session state"""
-    st.session_state.custom_mapping[token] = new_type
-    # Force a rerun to update the UI
-    st.rerun()
-
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -574,13 +606,10 @@ if u_template is not None and st.session_state.tokens:
                             ["Text", "Image"],
                             index=0 if stored_type == "Text" else 1,
                             key=f"type_{token}",
-                            label_visibility="collapsed",
-                            on_change=update_field_type,
-                            args=(token,)
+                            label_visibility="collapsed"
                         )
-                        # Update the mapping immediately
-                        st.session_state.custom_mapping[token] = data_type
                         field_types[token] = data_type
+                        st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
@@ -605,13 +634,10 @@ if u_template is not None and st.session_state.tokens:
                             ["Text", "Image"],
                             index=0 if stored_type == "Text" else 1,
                             key=f"type_{token}_2",
-                            label_visibility="collapsed",
-                            on_change=update_field_type,
-                            args=(token,)
+                            label_visibility="collapsed"
                         )
-                        # Update the mapping immediately
-                        st.session_state.custom_mapping[token] = data_type
                         field_types[token] = data_type
+                        st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
 
 if u_template is not None and st.session_state.tokens:
