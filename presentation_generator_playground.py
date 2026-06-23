@@ -143,34 +143,77 @@ MINIMAL_CRE_SYSTEM = """
         font-size: 13px;
     }
     
-    /* Progress bar styling */
-    .progress-container {
-        margin: 16px 0;
-        padding: 12px;
-        background-color: #F8F9FA;
-        border-radius: 4px;
-        border: 1px solid #E0E0E0;
-    }
-    .progress-bar {
+    /* Fullscreen progress overlay */
+    .progress-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
         width: 100%;
-        height: 20px;
-        background-color: #E9ECEF;
-        border-radius: 10px;
-        overflow: hidden;
-        position: relative;
-    }
-    .progress-fill {
         height: 100%;
-        background: linear-gradient(90deg, #003366, #0055A0);
-        border-radius: 10px;
-        transition: width 0.3s ease;
-        width: 0%;
+        background: rgba(0, 0, 0, 0.75);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        backdrop-filter: blur(4px);
+        transition: opacity 0.3s ease;
+    }
+    .progress-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+    .progress-container {
+        background: white;
+        border-radius: 12px;
+        padding: 40px 60px;
+        text-align: center;
+        max-width: 400px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #003366;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
     .progress-text {
-        text-align: center;
-        font-size: 13px;
         color: #1A1A1A;
-        margin-top: 6px;
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+    }
+    .progress-subtext {
+        color: #666;
+        font-size: 14px;
+        margin-top: 8px;
+    }
+    .progress-bar-track {
+        width: 100%;
+        height: 4px;
+        background: #E0E0E0;
+        border-radius: 2px;
+        margin-top: 16px;
+        overflow: hidden;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        background: #003366;
+        border-radius: 2px;
+        animation: progressAnimation 2s ease-in-out infinite;
+        width: 0%;
+    }
+    @keyframes progressAnimation {
+        0% { width: 0%; }
+        50% { width: 70%; }
+        100% { width: 100%; }
     }
 </style>
 """
@@ -451,18 +494,42 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
-# --- PROGRESS BAR COMPONENT ---
-def show_progress_bar(progress_value, progress_text="Processing..."):
-    """Display a custom progress bar"""
-    progress_html = f"""
-    <div class="progress-container">
-        <div class="progress-bar">
-            <div class="progress-fill" style="width: {progress_value}%;"></div>
+# --- FULLSCREEN PROGRESS INDICATOR ---
+def show_progress_overlay():
+    """Display fullscreen progress overlay with HTML/JS"""
+    progress_html = """
+    <div id="progressOverlay" class="progress-overlay">
+        <div class="progress-container">
+            <div class="spinner"></div>
+            <p class="progress-text">Generating Document...</p>
+            <p class="progress-subtext">Please wait while your document is being prepared</p>
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill"></div>
+            </div>
         </div>
-        <div class="progress-text">{progress_text} ({progress_value}%)</div>
     </div>
+    <script>
+        // Auto-hide after 3 seconds (enough time for download to trigger)
+        setTimeout(function() {
+            var overlay = document.getElementById('progressOverlay');
+            if (overlay) {
+                overlay.classList.add('hidden');
+                setTimeout(function() {
+                    overlay.style.display = 'none';
+                }, 300);
+            }
+        }, 3000);
+    </script>
     """
     st.markdown(progress_html, unsafe_allow_html=True)
+
+def trigger_progress_indicator():
+    """Set session state to show progress indicator"""
+    st.session_state.show_progress = True
+
+def hide_progress_indicator():
+    """Hide progress indicator"""
+    st.session_state.show_progress = False
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -495,12 +562,16 @@ if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
 if "show_progress" not in st.session_state:
     st.session_state.show_progress = False
-if "progress_value" not in st.session_state:
-    st.session_state.progress_value = 0
-if "progress_text" not in st.session_state:
-    st.session_state.progress_text = "Preparing download..."
 if "download_triggered" not in st.session_state:
     st.session_state.download_triggered = False
+
+# Show progress overlay if triggered
+if st.session_state.show_progress:
+    show_progress_overlay()
+    # Auto-hide after 3.5 seconds (to ensure download starts)
+    time.sleep(0.1)  # Small delay to ensure overlay renders
+    st.session_state.show_progress = False
+    st.rerun()
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -747,56 +818,18 @@ if u_template is not None:
                 pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
                 pptx_filename = get_download_filename(base_template_name, "pptx")
                 
-                # Show progress bar if download is triggered
-                if st.session_state.show_progress and st.session_state.download_triggered:
-                    show_progress_bar(st.session_state.progress_value, st.session_state.progress_text)
-                
-                download_clicked = st.download_button(
+                # Use a download button with custom onclick to show progress
+                st.download_button(
                     label="Download PPTX",
                     data=pptx_data,
                     file_name=pptx_filename,
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True,
-                    key="download_pptx"
+                    key="download_pptx",
+                    on_click=trigger_progress_indicator
                 )
-                
-                # If download button is clicked, show progress
-                if download_clicked:
-                    st.session_state.show_progress = True
-                    st.session_state.download_triggered = True
-                    
-                    # Simulate progress steps
-                    for i in range(1, 101):
-                        if i <= 30:
-                            st.session_state.progress_value = i
-                            st.session_state.progress_text = "Preparing document..."
-                        elif i <= 60:
-                            st.session_state.progress_value = i
-                            st.session_state.progress_text = "Processing content..."
-                        elif i <= 85:
-                            st.session_state.progress_value = i
-                            st.session_state.progress_text = "Formatting document..."
-                        else:
-                            st.session_state.progress_value = i
-                            st.session_state.progress_text = "Finalizing..."
-                        
-                        # Update progress in real-time
-                        # Note: In a real app, you'd want to use actual progress from the generation process
-                        # This is a simulation for demonstration
-                        if i == 100:
-                            st.session_state.progress_text = "Complete! Download starting..."
-                            time.sleep(0.5)
-                            st.session_state.show_progress = False
-                            st.session_state.download_triggered = False
-                            st.session_state.progress_value = 0
-                            st.rerun()
-                        
-                        time.sleep(0.02)  # Simulate processing time
-                    
             except Exception as e:
                 st.error(f"Error generating PPTX: {str(e)}")
-                st.session_state.show_progress = False
-                st.session_state.download_triggered = False
     
     with col2:
         docx_disabled = template_type != 'docx'
@@ -809,58 +842,19 @@ if u_template is not None:
                 
                 if docx_data:
                     docx_filename = get_download_filename(base_template_name, "docx")
-                    
-                    # Show progress bar if download is triggered
-                    if st.session_state.show_progress and st.session_state.download_triggered:
-                        show_progress_bar(st.session_state.progress_value, st.session_state.progress_text)
-                    
-                    download_clicked = st.download_button(
+                    st.download_button(
                         label="Download DOCX",
                         data=docx_data,
                         file_name=docx_filename,
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True,
-                        key="download_docx"
+                        key="download_docx",
+                        on_click=trigger_progress_indicator
                     )
-                    
-                    # If download button is clicked, show progress
-                    if download_clicked:
-                        st.session_state.show_progress = True
-                        st.session_state.download_triggered = True
-                        
-                        # Simulate progress steps
-                        for i in range(1, 101):
-                            if i <= 30:
-                                st.session_state.progress_value = i
-                                st.session_state.progress_text = "Preparing document..."
-                            elif i <= 60:
-                                st.session_state.progress_value = i
-                                st.session_state.progress_text = "Processing content..."
-                            elif i <= 85:
-                                st.session_state.progress_value = i
-                                st.session_state.progress_text = "Formatting document..."
-                            else:
-                                st.session_state.progress_value = i
-                                st.session_state.progress_text = "Finalizing..."
-                            
-                            # Update progress in real-time
-                            if i == 100:
-                                st.session_state.progress_text = "Complete! Download starting..."
-                                time.sleep(0.5)
-                                st.session_state.show_progress = False
-                                st.session_state.download_triggered = False
-                                st.session_state.progress_value = 0
-                                st.rerun()
-                            
-                            time.sleep(0.02)  # Simulate processing time
                 else:
                     st.error("Failed to generate document. Please check the template and try again.")
-                    st.session_state.show_progress = False
-                    st.session_state.download_triggered = False
             except Exception as e:
                 st.error(f"Error generating document: {str(e)}")
-                st.session_state.show_progress = False
-                st.session_state.download_triggered = False
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
