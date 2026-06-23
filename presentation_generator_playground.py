@@ -32,40 +32,6 @@ MINIMAL_CRE_SYSTEM = """
     .stDeployButton {display: none;}
     .stStatusWidget {display: none;}
     
-    /* Hide footer with overlay */
-    footer {
-        visibility: hidden !important;
-        display: none !important;
-        height: 0 !important;
-        opacity: 0 !important;
-        position: fixed !important;
-        bottom: -100px !important;
-    }
-    
-    .stFooter {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-    
-    [data-testid="stFooter"] {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-    }
-    
-    /* White overlay to cover footer area */
-    .footer-overlay {
-        position: fixed;
-        bottom: 0;
-        right: 0;
-        width: 300px;
-        height: 60px;
-        background-color: #FFFFFF;
-        z-index: 999999;
-        pointer-events: none;
-    }
-    
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
@@ -427,9 +393,6 @@ def simple_uploader_row(label_text, allowed_types, key):
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
-# Add white overlay to hide footer
-st.markdown('<div class="footer-overlay"></div>', unsafe_allow_html=True)
-
 # Initialize all session state variables
 if "custom_mapping" not in st.session_state:
     st.session_state.custom_mapping = {}
@@ -582,80 +545,84 @@ if u_template is not None and st.session_state.tokens:
         
         col1, col2 = st.columns(2)
         
+        # --- COLUMN 1 ---
         with col1:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col1_tokens:
                 clean_label = token.replace("{", "").replace("}", "")
-                stored_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                # Always show both text input and type selector
-                col_a, col_b = st.columns([3, 1])
-                with col_a:
-                    st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                    if stored_type == "Image" and template_type == 'pptx':
-                        # Show file uploader for image
-                        image_data[token] = st.file_uploader(
-                            "Upload Image", 
-                            type=["png", "jpg", "jpeg"], 
-                            key=f"val_{token}", 
+                # Get the current type from session state, default to "Text"
+                current_type = st.session_state.custom_mapping.get(token, "Text")
+                
+                # Determine if we should show image upload or text input
+                # Images are only supported in PPTX templates
+                should_show_image = current_type == "Image" and template_type == 'pptx'
+                
+                if should_show_image:
+                    # Show image upload
+                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                    field_types[token] = "Image"
+                else:
+                    # Show text input
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                    with col_b:
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                        # Use a unique key for the selectbox
+                        type_key = f"type_{token}"
+                        data_type = st.selectbox(
+                            "Type",
+                            ["Text", "Image"],
+                            index=0 if current_type == "Text" else 1,
+                            key=type_key,
                             label_visibility="collapsed"
                         )
-                        text_data[token] = ""  # No text value
-                    else:
-                        # Show text input
-                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                        image_data[token] = None
-                
-                with col_b:
-                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                    data_type = st.selectbox(
-                        "Type",
-                        ["Text", "Image"],
-                        index=0 if stored_type == "Text" else 1,
-                        key=f"type_{token}",
-                        label_visibility="collapsed"
-                    )
-                    field_types[token] = data_type
-                    st.session_state.custom_mapping[token] = data_type
+                        field_types[token] = data_type
+                        # Update session state immediately
+                        st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
-            
+        
+        # --- COLUMN 2 ---
         with col2:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col2_tokens:
                 clean_label = token.replace("{", "").replace("}", "")
-                stored_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                # Always show both text input and type selector
-                col_a, col_b = st.columns([3, 1])
-                with col_a:
-                    st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                    if stored_type == "Image" and template_type == 'pptx':
-                        # Show file uploader for image
-                        image_data[token] = st.file_uploader(
-                            "Upload Image", 
-                            type=["png", "jpg", "jpeg"], 
-                            key=f"val_{token}_2", 
+                # Get the current type from session state, default to "Text"
+                current_type = st.session_state.custom_mapping.get(token, "Text")
+                
+                # Determine if we should show image upload or text input
+                # Images are only supported in PPTX templates
+                should_show_image = current_type == "Image" and template_type == 'pptx'
+                
+                if should_show_image:
+                    # Show image upload
+                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                    field_types[token] = "Image"
+                else:
+                    # Show text input
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                    with col_b:
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                        # Use a unique key for the selectbox
+                        type_key = f"type_{token}_2"
+                        data_type = st.selectbox(
+                            "Type",
+                            ["Text", "Image"],
+                            index=0 if current_type == "Text" else 1,
+                            key=type_key,
                             label_visibility="collapsed"
                         )
-                        text_data[token] = ""  # No text value
-                    else:
-                        # Show text input
-                        text_data[token] = st.text_input("", key=f"val_{token}_2", label_visibility="collapsed")
-                        image_data[token] = None
-                
-                with col_b:
-                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                    data_type = st.selectbox(
-                        "Type",
-                        ["Text", "Image"],
-                        index=0 if stored_type == "Text" else 1,
-                        key=f"type_{token}_2",
-                        label_visibility="collapsed"
-                    )
-                    field_types[token] = data_type
-                    st.session_state.custom_mapping[token] = data_type
+                        field_types[token] = data_type
+                        # Update session state immediately
+                        st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
 
 if u_template is not None and st.session_state.tokens:
