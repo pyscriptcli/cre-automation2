@@ -305,11 +305,15 @@ def extract_placeholders(template_bytes, template_type):
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """Replace text in a paragraph while preserving formatting"""
+    # First pass: replace in runs
     for run in paragraph.runs:
         for token, value in text_inputs.items():
             if token in run.text:
-                run.text = run.text.replace(token, str(value) if value else '')
+                # Replace with empty string if value is None or empty
+                replacement = str(value) if value else ''
+                run.text = run.text.replace(token, replacement)
     
+    # Second pass: handle text that might not be in runs
     if hasattr(paragraph, 'text') and paragraph.text:
         for token, value in text_inputs.items():
             if token in paragraph.text:
@@ -317,7 +321,8 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                     paragraph.add_run()
                 for run in paragraph.runs:
                     if token in run.text:
-                        run.text = run.text.replace(token, str(value) if value else '')
+                        replacement = str(value) if value else ''
+                        run.text = run.text.replace(token, replacement)
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
@@ -408,18 +413,18 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
                     new_row = table.add_row()
                     # Check if table has the expected number of columns
                     if len(new_row.cells) >= 3:
-                        new_row.cells[0].text = str(data_item.get('company', ''))
-                        new_row.cells[1].text = str(data_item.get('rep', ''))
-                        new_row.cells[2].text = str(data_item.get('designation', ''))
+                        new_row.cells[0].text = str(data_item.get('company', '')) if data_item.get('company') else ''
+                        new_row.cells[1].text = str(data_item.get('rep', '')) if data_item.get('rep') else ''
+                        new_row.cells[2].text = str(data_item.get('designation', '')) if data_item.get('designation') else ''
                     else:
                         # Handle tables with different column counts
                         for idx, cell in enumerate(new_row.cells):
                             if idx == 0:
-                                cell.text = str(data_item.get('company', ''))
+                                cell.text = str(data_item.get('company', '')) if data_item.get('company') else ''
                             elif idx == 1:
-                                cell.text = str(data_item.get('rep', ''))
+                                cell.text = str(data_item.get('rep', '')) if data_item.get('rep') else ''
                             elif idx == 2:
-                                cell.text = str(data_item.get('designation', ''))
+                                cell.text = str(data_item.get('designation', '')) if data_item.get('designation') else ''
             else:
                 # Regular table with fixed rows - just replace text
                 for row in table.rows:
@@ -437,6 +442,21 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
     doc.save(doc_stream)
     doc_stream.seek(0)
     return doc_stream.getvalue()
+
+def get_download_filename(template_name, file_type):
+    """Generate download filename based on template name"""
+    if template_name:
+        # Remove the extension if present
+        base_name = re.sub(r'\.(pptx|docx)$', '', template_name)
+        # Clean up the name
+        base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
+        # Add timestamp to avoid overwriting
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        return f"{base_name}_{timestamp}.{file_type}"
+    else:
+        # Default name if no template name
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        return f"Generated_Document_{timestamp}.{file_type}"
 
 # --- UI HELPERS ---
 def simple_uploader_row(label_text, allowed_types, key):
@@ -825,18 +845,18 @@ if u_template is not None and st.session_state.tokens:
             st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # --- FIX: Update text_data with table data for ALL rows ---
             # Clear existing table-related text_data entries first
             for key in list(text_data.keys()):
                 if any(x in key for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_']):
                     del text_data[key]
             
-            # Then add all rows
+            # Then add all rows with proper empty value handling
             for idx, row_data in enumerate(st.session_state.table_data):
                 company_placeholder = f"{{{{COMPANY_NAME_{idx+1}}}}}"
                 rep_placeholder = f"{{{{REPRESENTATIVE_{idx+1}}}}}"
                 designation_placeholder = f"{{{{DESIGNATION_{idx+1}}}}}"
                 
+                # Store values - empty strings will be replaced with empty strings
                 text_data[company_placeholder] = row_data.get("company", "")
                 text_data[rep_placeholder] = row_data.get("rep", "")
                 text_data[designation_placeholder] = row_data.get("designation", "")
@@ -846,6 +866,11 @@ if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
     
+    # Get template name for file naming
+    template_name = st.session_state.saved_template_name or "Generated_Document"
+    # Remove extension for clean name
+    base_template_name = re.sub(r'\.(pptx|docx)$', '', template_name)
+    
     col1, col2 = st.columns(2)
     
     with col1:
@@ -853,14 +878,19 @@ if u_template is not None:
         if pptx_disabled:
             st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
-            st.download_button(
-                label="Download PPTX",
-                data=generate_pptx_bytes(template_bytes, text_data, image_data),
-                file_name="Generated_Document.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                use_container_width=True,
-                key="download_pptx"
-            )
+            try:
+                pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
+                pptx_filename = get_download_filename(base_template_name, "pptx")
+                st.download_button(
+                    label="Download PPTX",
+                    data=pptx_data,
+                    file_name=pptx_filename,
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True,
+                    key="download_pptx"
+                )
+            except Exception as e:
+                st.error(f"Error generating PPTX: {str(e)}")
     
     with col2:
         docx_disabled = template_type != 'docx'
@@ -873,21 +903,21 @@ if u_template is not None:
                     docx_data = generate_docx_bytes(template_bytes, text_data, image_data, st.session_state.table_data)
                 else:
                     docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
+                
+                if docx_data:
+                    docx_filename = get_download_filename(base_template_name, "docx")
+                    st.download_button(
+                        label="Download DOCX",
+                        data=docx_data,
+                        file_name=docx_filename,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key="download_docx"
+                    )
+                else:
+                    st.error("Failed to generate document. Please check the template and try again.")
             except Exception as e:
                 st.error(f"Error generating document: {str(e)}")
-                docx_data = None
-            
-            if docx_data:
-                st.download_button(
-                    label="Download DOCX",
-                    data=docx_data,
-                    file_name="Generated_Document.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True,
-                    key="download_docx"
-                )
-            else:
-                st.error("Failed to generate document. Please check the template and try again.")
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
