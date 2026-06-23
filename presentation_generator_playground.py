@@ -56,7 +56,6 @@ MINIMAL_CRE_SYSTEM = """
     
     /* Cards */
     .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
-    .config-card { background-color: #F8F8F8; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
     
     /* Buttons - #003366 color */
     div.stButton > button { 
@@ -111,44 +110,6 @@ MINIMAL_CRE_SYSTEM = """
     
     /* Expander */
     .streamlit-expanderHeader { font-size: 14px !important; font-weight: 600 !important; }
-    
-    /* Loading overlay */
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.92);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-        flex-direction: column;
-    }
-    .loading-spinner {
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #003366;
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    .loading-text {
-        margin-top: 20px;
-        font-size: 18px;
-        color: #1A1A1A;
-        font-weight: 600;
-    }
-    .loading-subtext {
-        margin-top: 8px;
-        font-size: 14px;
-        color: #666;
-    }
 </style>
 """
 
@@ -226,6 +187,12 @@ def load_config_from_file(config_name="template_config.json"):
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
     return None
+
+def auto_save_config():
+    """Automatically save the current configuration"""
+    if st.session_state.saved_template_name and st.session_state.custom_mapping:
+        config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+        save_config_to_file(st.session_state.custom_mapping, config_name)
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -389,6 +356,14 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
+def update_field_type(token):
+    """Callback function to update field type and trigger rerun"""
+    # The session state is already updated by the selectbox
+    # Auto-save the config if template is saved
+    auto_save_config()
+    # Trigger a rerun to update the UI
+    st.rerun()
+
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -408,8 +383,6 @@ if "template_type" not in st.session_state:
     st.session_state.template_type = None
 if "delete_trigger" not in st.session_state:
     st.session_state.delete_trigger = False
-if "config_expanded" not in st.session_state:
-    st.session_state.config_expanded = False
 if "show_delete_confirm" not in st.session_state:
     st.session_state.show_delete_confirm = False
 if "template_to_delete" not in st.session_state:
@@ -509,6 +482,7 @@ with col_template2:
         
         if save_as_template:
             saved_path = save_template_to_file(template_bytes, uploaded_template.name)
+            st.session_state.saved_template_name = uploaded_template.name
             st.success(f"Template saved: {uploaded_template.name}")
             
             if st.session_state.custom_mapping:
@@ -578,9 +552,10 @@ if u_template is not None and st.session_state.tokens:
                             ["Text", "Image"],
                             index=0 if current_type == "Text" else 1,
                             key=type_key,
-                            label_visibility="collapsed"
+                            label_visibility="collapsed",
+                            on_change=update_field_type,
+                            args=(token,)
                         )
-                        field_types[token] = data_type
                         # Update session state immediately
                         st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
@@ -618,53 +593,13 @@ if u_template is not None and st.session_state.tokens:
                             ["Text", "Image"],
                             index=0 if current_type == "Text" else 1,
                             key=type_key,
-                            label_visibility="collapsed"
+                            label_visibility="collapsed",
+                            on_change=update_field_type,
+                            args=(token,)
                         )
-                        field_types[token] = data_type
                         # Update session state immediately
                         st.session_state.custom_mapping[token] = data_type
             st.markdown('</div>', unsafe_allow_html=True)
-
-if u_template is not None and st.session_state.tokens:
-    with st.expander("Configuration Settings", expanded=st.session_state.config_expanded):
-        st.markdown('<div class="config-card">', unsafe_allow_html=True)
-        
-        config_json_str = json.dumps(st.session_state.custom_mapping, indent=4)
-        col_json1, col_json2 = st.columns([1, 1])
-        with col_json1:
-            config_filename = "template_config.json"
-            if st.session_state.saved_template_name:
-                config_filename = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-            
-            st.download_button(
-                label="Download Configuration",
-                data=config_json_str,
-                file_name=config_filename,
-                mime="application/json",
-                use_container_width=True
-            )
-        
-        with col_json2:
-            if st.session_state.saved_template_name:
-                if st.button("Save Config with Template", use_container_width=True):
-                    config_filename = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-                    save_config_to_file(st.session_state.custom_mapping, config_filename)
-                    st.success(f"Config saved: {config_filename}")
-            else:
-                st.info("Save template first to persist config")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        u_json = st.file_uploader("Load Configuration", type=["json"], label_visibility="collapsed")
-        if u_json is not None:
-            try:
-                loaded_config = json.load(u_json)
-                st.session_state.custom_mapping.update(loaded_config)
-                st.success("Configuration loaded")
-                st.rerun()
-            except Exception:
-                st.error("Invalid JSON file")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- DOWNLOAD SECTION ---
 if u_template is not None:
