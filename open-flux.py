@@ -12,6 +12,7 @@ from datetime import datetime
 from docx import Document
 from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+import traceback
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -184,6 +185,39 @@ MINIMAL_CRE_SYSTEM = """
     .loading-btn {
         opacity: 0.7;
         pointer-events: none;
+    }
+    
+    /* Log styling */
+    .log-container {
+        background-color: #F8F8F8;
+        border: 1px solid #E0E0E0;
+        border-radius: 4px;
+        padding: 12px;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        margin-top: 10px;
+    }
+    .log-entry {
+        padding: 4px 0;
+        border-bottom: 1px solid #EEEEEE;
+    }
+    .log-success {
+        color: #28A745;
+    }
+    .log-warning {
+        color: #FFC107;
+    }
+    .log-error {
+        color: #DC3545;
+    }
+    .log-info {
+        color: #0078D4;
+    }
+    .log-timestamp {
+        color: #999;
+        margin-right: 10px;
     }
 </style>
 """
@@ -373,10 +407,17 @@ def extract_placeholders(template_bytes, template_type):
         return extract_placeholders_from_docx(template_bytes)
     return []
 
-def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
+def generate_pptx_bytes(template_bytes, text_inputs, image_inputs, log_callback=None):
     prs = Presentation(io.BytesIO(template_bytes))
     
-    for slide in prs.slides:
+    if log_callback:
+        log_callback("INFO", "Starting PPTX generation...")
+        log_callback("INFO", f"Found {len(text_inputs)} text fields and {len(image_inputs)} image fields to inject")
+    
+    for slide_idx, slide in enumerate(prs.slides):
+        if log_callback:
+            log_callback("INFO", f"Processing slide {slide_idx + 1}")
+        
         shapes_to_delete = []
         images_to_add = []
 
@@ -386,6 +427,8 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                 text_content = shape.text
                 for img_token, img_file in image_inputs.items():
                     if img_token in text_content and img_file is not None:
+                        if log_callback:
+                            log_callback("SUCCESS", f"Image placeholder '{img_token}' found and will be replaced with image")
                         images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
                         shapes_to_delete.append(shape)
                         break
@@ -398,6 +441,8 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                         for run in paragraph.runs:
                             for token, value in text_inputs.items():
                                 if token in run.text:
+                                    if log_callback:
+                                        log_callback("SUCCESS", f"Replaced '{token}' with '{str(value) if value else '[EMPTY]'}'")
                                     run.text = run.text.replace(token, str(value) if value else '')
                 
                 if hasattr(shape, 'table') and shape.table:
@@ -408,6 +453,8 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                                     for run in paragraph.runs:
                                         for token, value in text_inputs.items():
                                             if token in run.text:
+                                                if log_callback:
+                                                    log_callback("SUCCESS", f"Replaced '{token}' with '{str(value) if value else '[EMPTY]'}' in table")
                                                 run.text = run.text.replace(token, str(value) if value else '')
 
         # Add images
@@ -415,44 +462,62 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
             try:
                 processed_img = smart_crop_to_fit(img_file, width, height)
                 slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
-            except Exception:
-                pass
+                if log_callback:
+                    log_callback("SUCCESS", "Image added successfully")
+            except Exception as e:
+                if log_callback:
+                    log_callback("ERROR", f"Failed to add image: {str(e)}")
 
         # Delete placeholder shapes after adding images
         for old_shape in shapes_to_delete:
             try:
                 sp = old_shape._element
                 sp.getparent().remove(sp)
-            except Exception:
-                pass
+                if log_callback:
+                    log_callback("INFO", "Removed image placeholder shape")
+            except Exception as e:
+                if log_callback:
+                    log_callback("ERROR", f"Failed to remove placeholder shape: {str(e)}")
 
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
+    if log_callback:
+        log_callback("SUCCESS", "PPTX generation completed successfully")
     return pptx_stream.getvalue()
 
-def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
+def generate_docx_bytes(template_bytes, text_inputs, image_inputs, log_callback=None):
     doc = Document(io.BytesIO(template_bytes))
     
+    if log_callback:
+        log_callback("INFO", "Starting DOCX generation...")
+        log_callback("INFO", f"Found {len(text_inputs)} text fields to inject")
+    
     # Replace text in paragraphs while preserving formatting
-    for paragraph in doc.paragraphs:
+    for para_idx, paragraph in enumerate(doc.paragraphs):
         for run in paragraph.runs:
             for token, value in text_inputs.items():
                 if token in run.text:
+                    if log_callback:
+                        log_callback("SUCCESS", f"Replaced '{token}' with '{str(value) if value else '[EMPTY]'}' in paragraph {para_idx + 1}")
                     run.text = run.text.replace(token, str(value) if value else '')
     
     # Replace text in tables
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
+    for table_idx, table in enumerate(doc.tables):
+        for row_idx, row in enumerate(table.rows):
+            for cell_idx, cell in enumerate(row.cells):
                 for paragraph in cell.paragraphs:
                     for run in paragraph.runs:
                         for token, value in text_inputs.items():
                             if token in run.text:
+                                if log_callback:
+                                    log_callback("SUCCESS", f"Replaced '{token}' with '{str(value) if value else '[EMPTY]'}' in table {table_idx + 1}, row {row_idx + 1}, cell {cell_idx + 1}")
                                 run.text = run.text.replace(token, str(value) if value else '')
     
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
     doc_stream.seek(0)
+    if log_callback:
+        log_callback("SUCCESS", "DOCX generation completed successfully")
     return doc_stream.getvalue()
 
 # --- UI HELPERS ---
@@ -523,8 +588,10 @@ if "is_loading" not in st.session_state:
     st.session_state.is_loading = False
 if "loading_message" not in st.session_state:
     st.session_state.loading_message = "Generating document..."
-if "generated_files" not in st.session_state:
-    st.session_state.generated_files = {}
+if "generation_log" not in st.session_state:
+    st.session_state.generation_log = []
+if "show_log" not in st.session_state:
+    st.session_state.show_log = False
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -787,6 +854,8 @@ if u_template is not None:
     def generate_and_store(format_type):
         st.session_state.is_loading = True
         st.session_state.loading_message = f"Generating {format_type} file..."
+        st.session_state.generation_log = []  # Clear previous log
+        st.session_state.show_log = True
         st.rerun()
     
     with col1:
@@ -812,6 +881,15 @@ if u_template is not None:
             if st.button("Export as DOCX", use_container_width=True, key="export_docx"):
                 generate_and_store('DOCX')
     
+    # Log callback function
+    def add_log_entry(level, message):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        st.session_state.generation_log.append({
+            'timestamp': timestamp,
+            'level': level,
+            'message': message
+        })
+    
     # Actual generation happens here (after loading state is set)
     if st.session_state.is_loading and not st.session_state.generated:
         try:
@@ -826,50 +904,78 @@ if u_template is not None:
             else:
                 format_type = 'PDF'  # Default
             
+            # Add initial log entries
+            add_log_entry("INFO", f"Starting {format_type} generation...")
+            add_log_entry("INFO", f"Template type: {template_type.upper()}")
+            add_log_entry("INFO", f"Found {len(text_data)} text fields and {len(image_data)} image fields")
+            
+            # Log all text data being injected
+            if text_data:
+                add_log_entry("INFO", "Text data to be injected:")
+                for token, value in text_data.items():
+                    add_log_entry("INFO", f"  {token} -> '{str(value) if value else '[EMPTY]'}'")
+            
+            # Log all image data being injected
+            if image_data:
+                add_log_entry("INFO", "Image data to be injected:")
+                for token, img_file in image_data.items():
+                    if img_file:
+                        add_log_entry("INFO", f"  {token} -> Image file: {img_file.name if hasattr(img_file, 'name') else 'Uploaded'}")
+                    else:
+                        add_log_entry("WARNING", f"  {token} -> No image uploaded")
+            
             if format_type == 'PPTX':
                 if template_type == 'pptx':
-                    raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
+                    raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data, add_log_entry)
                     st.session_state.final_pptx = raw_pptx
                     st.session_state.final_pdf = None
                     st.session_state.final_docx = None
                     st.session_state.generated = True
-                    st.success("PPTX generated successfully!")
+                    add_log_entry("SUCCESS", "PPTX generation completed successfully!")
                 else:
+                    add_log_entry("ERROR", "PPTX export is only available for PPTX templates")
                     st.warning("PPTX export is only available for PPTX templates")
                     
             elif format_type == 'PDF':
                 if template_type == 'pptx':
-                    raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
+                    add_log_entry("INFO", "Generating PPTX first...")
+                    raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data, add_log_entry)
                     st.session_state.final_pptx = raw_pptx
+                    add_log_entry("INFO", "Converting PPTX to PDF...")
                     pdf_bytes = convert_pptx_to_pdf(raw_pptx)
                     if pdf_bytes:
                         st.session_state.final_pdf = pdf_bytes
                         st.session_state.final_docx = None
                         st.session_state.generated = True
-                        st.success("PDF generated successfully!")
+                        add_log_entry("SUCCESS", "PDF generation completed successfully!")
                     else:
+                        add_log_entry("ERROR", "PDF conversion failed. Please ensure LibreOffice is installed.")
                         st.error("PDF conversion failed. Please ensure LibreOffice is installed.")
                 else:  # docx
-                    raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
+                    add_log_entry("INFO", "Generating DOCX first...")
+                    raw_docx = generate_docx_bytes(template_bytes, text_data, image_data, add_log_entry)
                     st.session_state.final_docx = raw_docx
+                    add_log_entry("INFO", "Converting DOCX to PDF...")
                     pdf_bytes = convert_docx_to_pdf(raw_docx)
                     if pdf_bytes:
                         st.session_state.final_pdf = pdf_bytes
                         st.session_state.final_pptx = None
                         st.session_state.generated = True
-                        st.success("PDF generated successfully!")
+                        add_log_entry("SUCCESS", "PDF generation completed successfully!")
                     else:
+                        add_log_entry("ERROR", "PDF conversion failed. Please ensure LibreOffice is installed.")
                         st.error("PDF conversion failed. Please ensure LibreOffice is installed.")
                         
             elif format_type == 'DOCX':
                 if template_type == 'docx':
-                    raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
+                    raw_docx = generate_docx_bytes(template_bytes, text_data, image_data, add_log_entry)
                     st.session_state.final_docx = raw_docx
                     st.session_state.final_pptx = None
                     st.session_state.final_pdf = None
                     st.session_state.generated = True
-                    st.success("DOCX generated successfully!")
+                    add_log_entry("SUCCESS", "DOCX generation completed successfully!")
                 else:
+                    add_log_entry("ERROR", "DOCX export is only available for DOCX templates")
                     st.warning("DOCX export is only available for DOCX templates")
             
             st.session_state.is_loading = False
@@ -877,8 +983,44 @@ if u_template is not None:
             
         except Exception as e:
             st.session_state.is_loading = False
+            add_log_entry("ERROR", f"Error generating {format_type}: {str(e)}")
+            add_log_entry("ERROR", traceback.format_exc())
             st.error(f"Error generating {format_type}: {str(e)}")
             st.rerun()
+    
+    # Show generation log
+    if st.session_state.show_log and st.session_state.generation_log:
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("### Generation Log")
+        
+        # Add a button to clear log
+        col_log1, col_log2 = st.columns([3, 1])
+        with col_log1:
+            st.markdown(f"<small>{len(st.session_state.generation_log)} entries</small>", unsafe_allow_html=True)
+        with col_log2:
+            if st.button("Clear Log", use_container_width=True):
+                st.session_state.generation_log = []
+                st.rerun()
+        
+        # Display log
+        log_html = '<div class="log-container">'
+        for entry in st.session_state.generation_log:
+            level_class = {
+                'INFO': 'log-info',
+                'SUCCESS': 'log-success',
+                'WARNING': 'log-warning',
+                'ERROR': 'log-error'
+            }.get(entry['level'], 'log-info')
+            
+            log_html += f'''
+            <div class="log-entry">
+                <span class="log-timestamp">[{entry['timestamp']}]</span>
+                <span class="{level_class}">[{entry['level']}]</span>
+                <span>{entry['message']}</span>
+            </div>
+            '''
+        log_html += '</div>'
+        st.markdown(log_html, unsafe_allow_html=True)
     
     # Show download buttons if generated
     if st.session_state.generated:
@@ -930,6 +1072,8 @@ if u_template is not None:
                 st.session_state.final_pptx = None
                 st.session_state.final_pdf = None
                 st.session_state.final_docx = None
+                st.session_state.generation_log = []
+                st.session_state.show_log = False
                 st.rerun()
         else:
             st.info("No files generated yet. Click an export button above.")
