@@ -35,6 +35,20 @@ MINIMAL_CRE_SYSTEM = """
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
     
+    /* Title Header */
+    .app-title {
+        font-size: 28px !important;
+        font-weight: 700 !important;
+        color: #1A1A1A !important;
+        padding: 20px 0 10px 0 !important;
+        border-bottom: 2px solid #E0E0E0 !important;
+        margin-bottom: 20px !important;
+        letter-spacing: -0.5px !important;
+    }
+    .app-title span {
+        color: #0078D4 !important;
+    }
+    
     /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
         background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important;
@@ -480,8 +494,11 @@ def simple_uploader_row(label_text, allowed_types, key):
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
 # --- INIT APP ---
-st.set_page_config(page_title="Document Generator", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="OpenFlux - Document Generator", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
+
+# --- APP TITLE ---
+st.markdown('<div class="app-title">Open<span>Flux</span></div>', unsafe_allow_html=True)
 
 # Initialize all session state variables
 if "final_pptx" not in st.session_state:
@@ -518,7 +535,7 @@ st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
 
 # --- TEMPLATE MANAGEMENT SECTION ---
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-header">📄 Template</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">Template</div>', unsafe_allow_html=True)
 
 # Create row with dropdown and upload
 col_template1, col_template2 = st.columns(2)
@@ -545,7 +562,7 @@ with col_template1:
     with delete_col:
         if selected_template and selected_template != "Select saved template":
             template_name = selected_template.split(' (')[0]
-            if st.button("🗑️", key="delete_template", help="Delete this template"):
+            if st.button("Delete", key="delete_template", help="Delete this template"):
                 # Use a confirmation dialog
                 st.warning(f"Are you sure you want to delete '{template_name}'?")
                 col_confirm1, col_confirm2 = st.columns(2)
@@ -619,7 +636,7 @@ with col_template2:
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
     template_type = st.session_state.template_type or "Unknown"
-    st.markdown(f'<div class="saved-indicator">✅ Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -650,7 +667,7 @@ if u_template is not None and st.session_state.tokens:
         
         with col1:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">📝 Field Values</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col1_tokens:
                 clean_label = token.replace("{", "").replace("}", "")
                 # Get the stored type or default to Text
@@ -681,7 +698,7 @@ if u_template is not None and st.session_state.tokens:
             
         with col2:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">📝 Field Values</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col2_tokens:
                 clean_label = token.replace("{", "").replace("}", "")
                 stored_type = st.session_state.custom_mapping.get(token, "Text")
@@ -710,7 +727,7 @@ if u_template is not None and st.session_state.tokens:
 # --- DATA MAPPING SECTION (Collapsible) ---
 if u_template is not None and st.session_state.tokens:
     # Create expander for configuration
-    with st.expander("⚙️ Configuration Settings", expanded=st.session_state.config_expanded):
+    with st.expander("Configuration Settings", expanded=st.session_state.config_expanded):
         st.markdown('<div class="config-card">', unsafe_allow_html=True)
         
         # Save Configuration
@@ -755,7 +772,7 @@ if u_template is not None and st.session_state.tokens:
 # --- EXPORT SECTION ---
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">📤 Export Document</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Export Document</div>', unsafe_allow_html=True)
     
     # Loading state
     if st.session_state.is_loading:
@@ -828,32 +845,31 @@ if u_template is not None:
         # PPTX Button
         pptx_disabled = template_type != 'pptx'
         if pptx_disabled:
-            st.button("📊 PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
+            st.button("PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
-            if st.button("📊 Export as PPTX", use_container_width=True, key="export_pptx"):
+            if st.button("Export as PPTX", use_container_width=True, key="export_pptx"):
                 generate_and_store('PPTX')
     
     with col2:
         # PDF Button - Always available if LibreOffice is installed
-        if st.button("📄 Export as PDF", use_container_width=True, key="export_pdf"):
+        if st.button("Export as PDF", use_container_width=True, key="export_pdf"):
             generate_and_store('PDF')
     
     with col3:
         # DOCX Button
         docx_disabled = template_type != 'docx'
         if docx_disabled:
-            st.button("📝 DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
+            st.button("DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
-            if st.button("📝 Export as DOCX", use_container_width=True, key="export_docx"):
+            if st.button("Export as DOCX", use_container_width=True, key="export_docx"):
                 generate_and_store('DOCX')
     
     # Show download buttons if generated
     if st.session_state.generated:
         st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("### 📥 Download Generated Files")
+        st.markdown("### Download Generated Files")
         
         # Show available download buttons
-        download_cols = []
         available_formats = []
         
         if st.session_state.final_pptx:
@@ -869,7 +885,7 @@ if u_template is not None:
                 with cols[idx]:
                     if format_type == 'pptx':
                         st.download_button(
-                            "📊 Download PPTX",
+                            "Download PPTX",
                             data=st.session_state.final_pptx,
                             file_name="Generated_Document.pptx",
                             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -877,7 +893,7 @@ if u_template is not None:
                         )
                     elif format_type == 'pdf':
                         st.download_button(
-                            "📄 Download PDF",
+                            "Download PDF",
                             data=st.session_state.final_pdf,
                             file_name="Generated_Document.pdf",
                             mime="application/pdf",
@@ -885,7 +901,7 @@ if u_template is not None:
                         )
                     elif format_type == 'docx':
                         st.download_button(
-                            "📝 Download DOCX",
+                            "Download DOCX",
                             data=st.session_state.final_docx,
                             file_name="Generated_Document.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -893,7 +909,7 @@ if u_template is not None:
                         )
             
             # Reset button
-            if st.button("🔄 Generate New", use_container_width=True):
+            if st.button("Generate New", use_container_width=True):
                 st.session_state.generated = False
                 st.session_state.final_pptx = None
                 st.session_state.final_pdf = None
