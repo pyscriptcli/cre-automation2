@@ -317,7 +317,9 @@ if "saved_template_name" not in st.session_state:
 # --- MAIN LAYOUT ---
 st.markdown('<h2 style="font-weight: 700; color: #1A1A1A; margin-bottom: 4px;">Document Generator</h2>', unsafe_allow_html=True)
 
-app_mode = st.radio("Select Mode:", ["Standard PIS", "Custom Template"], horizontal=True, label_visibility="collapsed")
+# Commented out Standard PIS option - keeping only Custom Template
+# app_mode = st.radio("Select Mode:", ["Standard PIS", "Custom Template"], horizontal=True, label_visibility="collapsed")
+app_mode = "Custom Template"  # Force Custom Template mode
 st.markdown("<hr>", unsafe_allow_html=True)
 
 # --- TEMPLATE MANAGEMENT SECTION ---
@@ -397,6 +399,8 @@ if template_bytes:
 text_data = {}
 image_data = {}
 
+# --- STANDARD PIS SECTION - COMMENTED OUT ---
+"""
 if app_mode == "Standard PIS" and u_template:
     # Create two columns for fields
     col1, col2 = st.columns(2)
@@ -466,8 +470,10 @@ if app_mode == "Standard PIS" and u_template:
         "{{PROPERTY_LOCATION_MAP}}": u_map,
         "{{PROPERTY_LOTPLAN}}": u_lotplan
     }
+"""
 
-elif app_mode == "Custom Template" and u_template:
+# --- CUSTOM TEMPLATE SECTION ---
+if app_mode == "Custom Template" and u_template:
     if not st.session_state.tokens:
         st.session_state.tokens = extract_placeholders(template_bytes)
     
