@@ -57,17 +57,18 @@ MINIMAL_CRE_SYSTEM = """
     /* Cards */
     .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
     
-    /* Buttons - #003366 color */
+    /* Buttons - #003366 color - made smaller */
     div.stButton > button { 
         background-color: #003366 !important; 
         color: #FFFFFF !important; 
         font-weight: 600 !important; 
-        font-size: 14px !important; 
+        font-size: 11px !important; 
         border: none !important; 
-        border-radius: 4px !important; 
-        padding: 8px 16px !important; 
+        border-radius: 3px !important; 
+        padding: 5px 12px !important; 
         width: 100% !important; 
         transition: background-color 0.15s ease; 
+        min-height: 28px !important;
     }
     div.stButton > button:hover { 
         background-color: #002244 !important; 
@@ -81,15 +82,17 @@ MINIMAL_CRE_SYSTEM = """
         cursor: not-allowed !important; 
     }
     
-    /* Download Buttons - #003366 color */
+    /* Download Buttons - #003366 color - made smaller */
     div[data-testid="stDownloadButton"] > button { 
         background-color: #003366 !important;
         color: #FFFFFF !important;
-        border-radius: 4px !important; 
+        border-radius: 3px !important; 
         font-weight: 600 !important; 
-        padding: 8px 16px !important; 
+        padding: 5px 12px !important; 
         width: 100% !important; 
         transition: all 0.15s ease;
+        font-size: 11px !important;
+        min-height: 28px !important;
     }
     div[data-testid="stDownloadButton"] > button:hover {
         background-color: #002244 !important;
@@ -97,9 +100,21 @@ MINIMAL_CRE_SYSTEM = """
         box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
     }
     
-    /* Delete button */
-    div[data-testid="column"] button { background-color: transparent !important; color: #DC3545 !important; border: 1px solid #DC3545 !important; border-radius: 4px !important; padding: 4px 12px !important; font-size: 13px !important; min-height: 32px !important; width: auto !important; }
-    div[data-testid="column"] button:hover { background-color: #DC3545 !important; color: white !important; }
+    /* Delete button - made smaller */
+    div[data-testid="column"] button { 
+        background-color: transparent !important; 
+        color: #DC3545 !important; 
+        border: 1px solid #DC3545 !important; 
+        border-radius: 3px !important; 
+        padding: 3px 10px !important; 
+        font-size: 11px !important; 
+        min-height: 26px !important; 
+        width: auto !important; 
+    }
+    div[data-testid="column"] button:hover { 
+        background-color: #DC3545 !important; 
+        color: white !important; 
+    }
     
     /* Labels */
     .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 6px; }
@@ -636,7 +651,7 @@ if u_template is not None and st.session_state.tokens:
         # --- DISPLAY REGULAR FIELDS (Grouped) ---
         if regular_tokens:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">📋 General Information</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">General Information</div>', unsafe_allow_html=True)
             
             # Split regular tokens into two columns
             mid_point = len(regular_tokens) // 2
@@ -713,28 +728,28 @@ if u_template is not None and st.session_state.tokens:
         # --- DISPLAY DYNAMIC TABLE (Grouped) ---
         if table_tokens and st.session_state.use_dynamic_table and template_type == 'docx':
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">🏢 Company Information Table</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Company Information Table</div>', unsafe_allow_html=True)
             
             # Table controls
             col_controls1, col_controls2, col_controls3 = st.columns([1, 1, 6])
             with col_controls1:
-                if st.button("➕ Add Row", use_container_width=True, key="add_table_row"):
+                if st.button("Add Row", use_container_width=True, key="add_table_row"):
                     st.session_state.table_data.append({"company": "", "rep": "", "designation": ""})
                     st.rerun()
             with col_controls2:
                 if len(st.session_state.table_data) > 1:
-                    if st.button("➖ Remove Last", use_container_width=True, key="remove_last_row"):
+                    if st.button("Remove Last", use_container_width=True, key="remove_last_row"):
                         st.session_state.table_data.pop()
                         st.rerun()
             
             # Table header
             col_headers = st.columns([2, 2, 2, 0.5])
             with col_headers[0]:
-                st.markdown('<strong>🏢 Company Name</strong>', unsafe_allow_html=True)
+                st.markdown('<strong>Company Name</strong>', unsafe_allow_html=True)
             with col_headers[1]:
-                st.markdown('<strong>👤 Representative</strong>', unsafe_allow_html=True)
+                st.markdown('<strong>Representative</strong>', unsafe_allow_html=True)
             with col_headers[2]:
-                st.markdown('<strong>📋 Designation</strong>', unsafe_allow_html=True)
+                st.markdown('<strong>Designation</strong>', unsafe_allow_html=True)
             with col_headers[3]:
                 st.markdown('', unsafe_allow_html=True)
             
@@ -768,7 +783,7 @@ if u_template is not None and st.session_state.tokens:
                     )
                 with cols[3]:
                     if len(st.session_state.table_data) > 1:
-                        if st.button("🗑️", key=f"delete_row_{idx}"):
+                        if st.button("Delete", key=f"delete_row_{idx}"):
                             rows_to_delete.append(idx)
             
             # Delete rows after loop to avoid issues
