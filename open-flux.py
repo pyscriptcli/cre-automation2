@@ -16,6 +16,18 @@ import time
 import sys
 import platform
 
+# Try to import for PDF conversion (optional)
+try:
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
 _config_file = os.path.join(_config_dir, "config.toml")
@@ -251,6 +263,105 @@ def load_config_from_file(config_name="template_config.json"):
             return json.load(f)
     return None
 
+# --- PDF CONVERSION FUNCTIONS (No LibreOffice needed) ---
+def convert_pptx_to_pdf(pptx_bytes):
+    """Convert PPTX to PDF using python-pptx and reportlab"""
+    try:
+        # First generate the PPTX
+        prs = Presentation(io.BytesIO(pptx_bytes))
+        
+        # Create a PDF using reportlab
+        pdf_buffer = io.BytesIO()
+        
+        # Simple PDF creation - extract text from slides
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Add title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30
+        )
+        
+        for slide_num, slide in enumerate(prs.slides, 1):
+            # Add slide number as heading
+            story.append(Paragraph(f"Slide {slide_num}", title_style))
+            
+            # Extract text from slide
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for paragraph in shape.text_frame.paragraphs:
+                        text = paragraph.text
+                        if text.strip():
+                            story.append(Paragraph(text, styles['Normal']))
+                            story.append(Spacer(1, 0.2*inch))
+            
+            story.append(Spacer(1, 0.5*inch))
+        
+        # Build PDF
+        doc.build(story)
+        pdf_buffer.seek(0)
+        return pdf_buffer.getvalue()
+    except Exception as e:
+        st.error(f"PDF conversion error: {str(e)}")
+        return None
+
+def convert_docx_to_pdf(docx_bytes):
+    """Convert DOCX to PDF using python-docx and reportlab"""
+    try:
+        # Read the DOCX
+        doc = Document(io.BytesIO(docx_bytes))
+        
+        # Create PDF using reportlab
+        pdf_buffer = io.BytesIO()
+        doc_pdf = SimpleDocTemplate(pdf_buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Process each paragraph
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():
+                story.append(Paragraph(paragraph.text, styles['Normal']))
+                story.append(Spacer(1, 0.1*inch))
+        
+        # Process tables
+        for table in doc.tables:
+            data = []
+            for row in table.rows:
+                row_data = []
+                for cell in row.cells:
+                    row_data.append(cell.text)
+                data.append(row_data)
+            
+            if data:
+                table_style = TableStyle([
+                    ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                    ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+                    ('FONTSIZE', (0,0), (-1,-1), 10),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                    ('TOPPADDING', (0,0), (-1,-1), 6),
+                    ('GRID', (0,0), (-1,-1), 1, colors.black),
+                ])
+                pdf_table = Table(data)
+                pdf_table.setStyle(table_style)
+                story.append(pdf_table)
+                story.append(Spacer(1, 0.2*inch))
+        
+        # Build PDF
+        doc_pdf.build(story)
+        pdf_buffer.seek(0)
+        return pdf_buffer.getvalue()
+    except Exception as e:
+        st.error(f"PDF conversion error: {str(e)}")
+        return None
+
+def check_pdf_support():
+    """Check if PDF conversion is available"""
+    return REPORTLAB_AVAILABLE
+
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     try:
@@ -274,141 +385,6 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
         return img_byte_arr
     except Exception:
         return img_file
-
-def check_libreoffice():
-    """Check if LibreOffice is installed"""
-    try:
-        if platform.system() == "Windows":
-            # Check common Windows paths
-            possible_paths = [
-                "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
-                "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
-            ]
-            for path in possible_paths:
-                if os.path.exists(path):
-                    return True
-            # Try using where command
-            result = subprocess.run(["where", "soffice"], capture_output=True, text=True)
-            return result.returncode == 0
-        else:
-            # Linux/Mac
-            result = subprocess.run(["which", "soffice"], capture_output=True, text=True)
-            return result.returncode == 0
-    except:
-        return False
-
-def convert_pptx_to_pdf(pptx_bytes):
-    """Convert PPTX to PDF using LibreOffice"""
-    if not check_libreoffice():
-        st.error("LibreOffice is not installed. Please install LibreOffice to enable PDF export.")
-        return None
-    
-    with tempfile.TemporaryDirectory() as temp_dir:
-        input_pptx_path = os.path.join(temp_dir, "document.pptx")
-        with open(input_pptx_path, "wb") as f:
-            f.write(pptx_bytes)
-        try:
-            # Try different LibreOffice commands based on OS
-            if platform.system() == "Windows":
-                # Try to find LibreOffice executable
-                possible_paths = [
-                    "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
-                    "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
-                ]
-                libreoffice_cmd = None
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        libreoffice_cmd = path
-                        break
-                if not libreoffice_cmd:
-                    libreoffice_cmd = "soffice"
-            else:
-                libreoffice_cmd = "soffice"
-            
-            command = [
-                libreoffice_cmd,
-                "--headless",
-                "--convert-to", "pdf",
-                "--outdir", temp_dir,
-                input_pptx_path
-            ]
-            
-            result = subprocess.run(
-                command, 
-                capture_output=True, 
-                text=True,
-                timeout=60
-            )
-            
-            output_pdf_path = os.path.join(temp_dir, "document.pdf")
-            if os.path.exists(output_pdf_path):
-                with open(output_pdf_path, "rb") as f:
-                    return f.read()
-            else:
-                st.error(f"PDF conversion failed. LibreOffice output: {result.stdout} {result.stderr}")
-                return None
-        except subprocess.TimeoutExpired:
-            st.error("PDF conversion timed out. The file might be too large.")
-            return None
-        except Exception as e:
-            st.error(f"PDF conversion error: {str(e)}")
-            return None
-
-def convert_docx_to_pdf(docx_bytes):
-    """Convert DOCX to PDF using LibreOffice"""
-    if not check_libreoffice():
-        st.error("LibreOffice is not installed. Please install LibreOffice to enable PDF export.")
-        return None
-    
-    with tempfile.TemporaryDirectory() as temp_dir:
-        input_docx_path = os.path.join(temp_dir, "document.docx")
-        with open(input_docx_path, "wb") as f:
-            f.write(docx_bytes)
-        try:
-            # Try different LibreOffice commands based on OS
-            if platform.system() == "Windows":
-                possible_paths = [
-                    "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
-                    "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
-                ]
-                libreoffice_cmd = None
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        libreoffice_cmd = path
-                        break
-                if not libreoffice_cmd:
-                    libreoffice_cmd = "soffice"
-            else:
-                libreoffice_cmd = "soffice"
-            
-            command = [
-                libreoffice_cmd,
-                "--headless",
-                "--convert-to", "pdf",
-                "--outdir", temp_dir,
-                input_docx_path
-            ]
-            
-            result = subprocess.run(
-                command, 
-                capture_output=True, 
-                text=True,
-                timeout=60
-            )
-            
-            output_pdf_path = os.path.join(temp_dir, "document.pdf")
-            if os.path.exists(output_pdf_path):
-                with open(output_pdf_path, "rb") as f:
-                    return f.read()
-            else:
-                st.error(f"PDF conversion failed. LibreOffice output: {result.stdout} {result.stderr}")
-                return None
-        except subprocess.TimeoutExpired:
-            st.error("PDF conversion timed out. The file might be too large.")
-            return None
-        except Exception as e:
-            st.error(f"PDF conversion error: {str(e)}")
-            return None
 
 def extract_placeholders_from_pptx(pptx_bytes):
     prs = Presentation(io.BytesIO(pptx_bytes))
@@ -882,10 +858,10 @@ if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Export Document</div>', unsafe_allow_html=True)
     
-    # Check LibreOffice status for PDF
-    libreoffice_installed = check_libreoffice()
-    if not libreoffice_installed:
-        st.warning("⚠️ LibreOffice is not installed. PDF export will not work. Please install LibreOffice for PDF export.")
+    # Check PDF support
+    pdf_available = check_pdf_support()
+    if not pdf_available:
+        st.warning("⚠️ PDF export requires reportlab. Install with: pip install reportlab")
     
     # Three columns for export buttons
     col1, col2, col3 = st.columns(3)
@@ -903,9 +879,9 @@ if u_template is not None:
                 st.rerun()
     
     with col2:
-        # PDF Button - Disabled if LibreOffice not installed
-        if not libreoffice_installed:
-            st.button("PDF", disabled=True, use_container_width=True, help="LibreOffice is required for PDF export")
+        # PDF Button - Check if reportlab is available
+        if not pdf_available:
+            st.button("PDF", disabled=True, use_container_width=True, help="reportlab is required for PDF export")
         else:
             if st.button("Export as PDF", use_container_width=True, key="export_pdf"):
                 st.session_state.is_loading = True
@@ -959,36 +935,41 @@ if u_template is not None:
                 st.rerun()
                 
             elif format_type == 'PDF':
-                if template_type == 'pptx':
-                    raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
-                    st.session_state.final_pptx = raw_pptx
-                    pdf_bytes = convert_pptx_to_pdf(raw_pptx)
-                    if pdf_bytes:
-                        st.session_state.final_pdf = pdf_bytes
-                        st.session_state.final_docx = None
-                        st.session_state.generated = True
-                        st.session_state.is_loading = False
-                        st.success("PDF generated successfully!")
-                        st.rerun()
-                    else:
-                        st.session_state.is_loading = False
-                        st.error("PDF conversion failed. Please ensure LibreOffice is properly installed.")
-                        st.rerun()
-                else:  # docx
-                    raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
-                    st.session_state.final_docx = raw_docx
-                    pdf_bytes = convert_docx_to_pdf(raw_docx)
-                    if pdf_bytes:
-                        st.session_state.final_pdf = pdf_bytes
-                        st.session_state.final_pptx = None
-                        st.session_state.generated = True
-                        st.session_state.is_loading = False
-                        st.success("PDF generated successfully!")
-                        st.rerun()
-                    else:
-                        st.session_state.is_loading = False
-                        st.error("PDF conversion failed. Please ensure LibreOffice is properly installed.")
-                        st.rerun()
+                if not pdf_available:
+                    st.session_state.is_loading = False
+                    st.error("PDF export requires reportlab. Please install: pip install reportlab")
+                    st.rerun()
+                else:
+                    if template_type == 'pptx':
+                        raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
+                        st.session_state.final_pptx = raw_pptx
+                        pdf_bytes = convert_pptx_to_pdf(raw_pptx)
+                        if pdf_bytes:
+                            st.session_state.final_pdf = pdf_bytes
+                            st.session_state.final_docx = None
+                            st.session_state.generated = True
+                            st.session_state.is_loading = False
+                            st.success("PDF generated successfully!")
+                            st.rerun()
+                        else:
+                            st.session_state.is_loading = False
+                            st.error("PDF conversion failed. Please check the error messages above.")
+                            st.rerun()
+                    else:  # docx
+                        raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
+                        st.session_state.final_docx = raw_docx
+                        pdf_bytes = convert_docx_to_pdf(raw_docx)
+                        if pdf_bytes:
+                            st.session_state.final_pdf = pdf_bytes
+                            st.session_state.final_pptx = None
+                            st.session_state.generated = True
+                            st.session_state.is_loading = False
+                            st.success("PDF generated successfully!")
+                            st.rerun()
+                        else:
+                            st.session_state.is_loading = False
+                            st.error("PDF conversion failed. Please check the error messages above.")
+                            st.rerun()
                         
             elif format_type == 'DOCX' and template_type == 'docx':
                 raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
