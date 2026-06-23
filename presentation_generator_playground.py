@@ -6,10 +6,12 @@ import re
 import json
 import streamlit as st
 from pptx import Presentation
+from pptx.util import Pt
 from PIL import Image
 from datetime import datetime
 from docx import Document
-from docx.shared import Inches
+from docx.shared import Inches, Pt as DocxPt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -54,6 +56,11 @@ MINIMAL_CRE_SYSTEM = """
     .saved-indicator { background-color: #E8F5E9; padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 8px; }
     
     hr { margin: 16px 0 !important; border-color: #E0E0E0 !important; }
+    
+    /* Field with inline dropdown */
+    .field-row { display: flex; gap: 10px; align-items: center; }
+    .field-input { flex: 3; }
+    .field-type { flex: 1; }
 </style>
 """
 
@@ -69,7 +76,6 @@ def save_template_to_file(template_bytes, template_name):
     storage_dir = get_storage_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
     if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
-        # Default to .docx if no extension
         safe_name += '.docx'
     
     filepath = os.path.join(storage_dir, safe_name)
@@ -109,6 +115,11 @@ def delete_template_file(template_name):
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
         os.remove(filepath)
+        # Also delete associated config
+        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+        config_path = os.path.join(storage_dir, config_name)
+        if os.path.exists(config_path):
+            os.remove(config_path)
         return True
     return False
 
@@ -213,7 +224,6 @@ def extract_placeholders_from_docx(docx_bytes):
     tokens = []
     seen = set()
     
-    # Extract from paragraphs
     for paragraph in doc.paragraphs:
         found = re.findall(r'\{\{.*?\}\}', paragraph.text)
         for token in found:
@@ -221,7 +231,6 @@ def extract_placeholders_from_docx(docx_bytes):
                 tokens.append(token)
                 seen.add(token)
     
-    # Extract from tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
@@ -234,7 +243,6 @@ def extract_placeholders_from_docx(docx_bytes):
     return tokens
 
 def extract_placeholders(template_bytes, template_type):
-    """Extract placeholders based on template type"""
     if template_type == 'pptx':
         return extract_placeholders_from_pptx(template_bytes)
     elif template_type == 'docx':
@@ -258,37 +266,26 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                         shapes_to_delete.append(shape)
                         break
 
-        # Second pass: replace text
+        # Second pass: replace text preserving formatting
         for shape in slide.shapes:
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
-                        full_text = paragraph.text
-                        modified = False
-                        for token, value in text_inputs.items():
-                            if token in full_text:
-                                full_text = full_text.replace(token, str(value) if value else '')
-                                modified = True
-                        if modified:
-                            paragraph.clear()
-                            run = paragraph.add_run()
-                            run.text = full_text
+                        for run in paragraph.runs:
+                            for token, value in text_inputs.items():
+                                if token in run.text:
+                                    # Preserve formatting by replacing only the token
+                                    run.text = run.text.replace(token, str(value) if value else '')
                 
                 if hasattr(shape, 'table') and shape.table:
                     for row in shape.table.rows:
                         for cell in row.cells:
                             if cell.text_frame:
                                 for paragraph in cell.text_frame.paragraphs:
-                                    full_text = paragraph.text
-                                    modified = False
-                                    for token, value in text_inputs.items():
-                                        if token in full_text:
-                                            full_text = full_text.replace(token, str(value) if value else '')
-                                            modified = True
-                                    if modified:
-                                        paragraph.clear()
-                                        run = paragraph.add_run()
-                                        run.text = full_text
+                                    for run in paragraph.runs:
+                                        for token, value in text_inputs.items():
+                                            if token in run.text:
+                                                run.text = run.text.replace(token, str(value) if value else '')
 
         # Add images
         for img_file, left, top, width, height in images_to_add:
@@ -313,19 +310,22 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     doc = Document(io.BytesIO(template_bytes))
     
-    # Replace text in paragraphs
+    # Replace text in paragraphs preserving formatting
     for paragraph in doc.paragraphs:
-        for token, value in text_inputs.items():
-            if token in paragraph.text:
-                paragraph.text = paragraph.text.replace(token, str(value) if value else '')
+        for run in paragraph.runs:
+            for token, value in text_inputs.items():
+                if token in run.text:
+                    run.text = run.text.replace(token, str(value) if value else '')
     
     # Replace text in tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                for token, value in text_inputs.items():
-                    if token in cell.text:
-                        cell.text = cell.text.replace(token, str(value) if value else '')
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        for token, value in text_inputs.items():
+                            if token in run.text:
+                                run.text = run.text.replace(token, str(value) if value else '')
     
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
@@ -333,23 +333,43 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 # --- UI HELPERS ---
-def simple_form_row(label_text, key, placeholder="", value=""):
-    st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.text_input("", key=key, label_visibility="collapsed", placeholder=placeholder, value=value)
-
-def simple_textarea_row(label_text, key, placeholder="", value=""):
-    st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.text_area("", key=key, label_visibility="collapsed", placeholder=placeholder, height=100, value=value)
-
-def simple_uploader_row(label_text, allowed_types, key):
-    st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.file_uploader(label_text, type=allowed_types, key=key, label_visibility="collapsed")
+def field_with_type(token, key, default_type="text"):
+    """Create a field with inline type selector"""
+    # Get current type from session state
+    current_type = st.session_state.custom_mapping.get(token, default_type)
+    
+    # Create row with columns
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        clean_label = token.replace("{", "").replace("}", "")
+        value = st.text_input(
+            clean_label,
+            key=f"val_{key}",
+            label_visibility="collapsed",
+            placeholder=f"Enter value for {clean_label}"
+        )
+    
+    with col2:
+        # Type selector dropdown
+        type_options = ["text", "image"] if st.session_state.template_type == 'pptx' else ["text"]
+        type_idx = type_options.index(current_type) if current_type in type_options else 0
+        field_type = st.selectbox(
+            "Type",
+            type_options,
+            index=type_idx,
+            key=f"type_{key}",
+            label_visibility="collapsed"
+        )
+        st.session_state.custom_mapping[token] = field_type
+    
+    return value, field_type
 
 # --- INIT APP ---
 st.set_page_config(page_title="Document Generator", layout="wide")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
-# Initialize all session state variables at the start
+# Initialize all session state variables
 if "final_pptx" not in st.session_state:
     st.session_state.final_pptx = None
 if "final_docx" not in st.session_state:
@@ -368,6 +388,8 @@ if "template_loaded" not in st.session_state:
     st.session_state.template_loaded = False
 if "template_type" not in st.session_state:
     st.session_state.template_type = None
+if "delete_confirm" not in st.session_state:
+    st.session_state.delete_confirm = None
 
 # --- MAIN LAYOUT ---
 st.markdown('<h2 style="font-weight: 700; color: #1A1A1A; margin-bottom: 4px;">Document Generator</h2>', unsafe_allow_html=True)
@@ -377,16 +399,19 @@ st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-header">Template</div>', unsafe_allow_html=True)
 
-# Create two equal columns for dropdown and upload
+# Create two columns for dropdown and upload
 col_template1, col_template2 = st.columns(2)
 
 with col_template1:
     # Show saved templates dropdown
     saved_templates = get_saved_templates()
     template_options = ["Select saved template"]
+    template_dict = {}
     if saved_templates:
         for t in saved_templates:
-            template_options.append(f"{t['name']} ({t['type']})")
+            display_name = f"{t['name']} ({t['type']})"
+            template_options.append(display_name)
+            template_dict[display_name] = t['name']
     
     selected_template = st.selectbox(
         "Load Template",
@@ -396,8 +421,7 @@ with col_template1:
     )
     
     if selected_template and selected_template != "Select saved template":
-        # Extract the actual filename without the type indicator
-        template_name = selected_template.split(' (')[0]
+        template_name = template_dict.get(selected_template, selected_template.split(' (')[0])
         template_bytes = load_template_from_file(template_name)
         if template_bytes:
             st.session_state.template_bytes = template_bytes
@@ -416,9 +440,35 @@ with col_template1:
             st.session_state.tokens = tokens
             
             st.rerun()
+    
+    # Delete template section
+    if saved_templates:
+        st.markdown("<hr>", unsafe_allow_html=True)
+        delete_options = ["Select template to delete"] + [t['name'] for t in saved_templates]
+        template_to_delete = st.selectbox(
+            "Delete Template",
+            delete_options,
+            key="delete_template_select",
+            label_visibility="collapsed"
+        )
+        
+        if template_to_delete and template_to_delete != "Select template to delete":
+            if st.button("Delete Selected Template", use_container_width=True, key="delete_btn"):
+                if delete_template_file(template_to_delete):
+                    st.success(f"Deleted: {template_to_delete}")
+                    # Clear session state if the deleted template was active
+                    if st.session_state.saved_template_name == template_to_delete:
+                        st.session_state.template_bytes = None
+                        st.session_state.saved_template_name = None
+                        st.session_state.template_loaded = False
+                        st.session_state.tokens = []
+                        st.session_state.custom_mapping = {}
+                    st.rerun()
+                else:
+                    st.error("Failed to delete template")
 
 with col_template2:
-    # Upload new template - support both PPTX and DOCX
+    # Upload new template
     uploaded_template = st.file_uploader(
         "Upload New Template", 
         type=["pptx", "docx"], 
@@ -486,86 +536,50 @@ if u_template is not None and st.session_state.tokens:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col1_tokens:
-                t_type = st.session_state.custom_mapping.get(token, "Short Text")
-                clean_label = token.replace("{", "").replace("}", "")
+                key = token.replace("{", "").replace("}", "").replace(" ", "_")
+                value, field_type = field_with_type(token, key)
                 
-                if t_type == "Short Text":
-                    text_data[token] = simple_form_row(clean_label, f"val_{token}")
-                elif t_type == "Paragraph":
-                    text_data[token] = simple_textarea_row(clean_label, f"val_{token}")
-                elif t_type == "Image":
-                    if template_type == 'pptx':  # Only PPTX supports images
-                        image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], f"val_{token}")
-                    else:
-                        text_data[token] = simple_form_row(clean_label + " (Image not supported in DOCX)", f"val_{token}")
+                if field_type == "text":
+                    text_data[token] = value
+                elif field_type == "image":
+                    # Show image uploader
+                    st.markdown(f'<div class="field-label">{token.replace("{", "").replace("}", "")} (Image)</div>', unsafe_allow_html=True)
+                    img_file = st.file_uploader(
+                        f"Upload image for {token}",
+                        type=["png", "jpg", "jpeg"],
+                        key=f"img_{key}",
+                        label_visibility="collapsed"
+                    )
+                    if img_file:
+                        image_data[token] = img_file
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col2_tokens:
-                t_type = st.session_state.custom_mapping.get(token, "Short Text")
-                clean_label = token.replace("{", "").replace("}", "")
+                key = token.replace("{", "").replace("}", "").replace(" ", "_")
+                value, field_type = field_with_type(token, key)
                 
-                if t_type == "Short Text":
-                    text_data[token] = simple_form_row(clean_label, f"val_{token}")
-                elif t_type == "Paragraph":
-                    text_data[token] = simple_textarea_row(clean_label, f"val_{token}")
-                elif t_type == "Image":
-                    if template_type == 'pptx':  # Only PPTX supports images
-                        image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], f"val_{token}")
-                    else:
-                        text_data[token] = simple_form_row(clean_label + " (Image not supported in DOCX)", f"val_{token}")
+                if field_type == "text":
+                    text_data[token] = value
+                elif field_type == "image":
+                    # Show image uploader
+                    st.markdown(f'<div class="field-label">{token.replace("{", "").replace("}", "")} (Image)</div>', unsafe_allow_html=True)
+                    img_file = st.file_uploader(
+                        f"Upload image for {token}",
+                        type=["png", "jpg", "jpeg"],
+                        key=f"img_{key}",
+                        label_visibility="collapsed"
+                    )
+                    if img_file:
+                        image_data[token] = img_file
             st.markdown('</div>', unsafe_allow_html=True)
 
 # --- DATA MAPPING SECTION ---
 if u_template is not None and st.session_state.tokens:
     st.markdown('<div class="config-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Data Type Mapping</div>', unsafe_allow_html=True)
-    
-    # Create two columns for mapping
-    map_col1, map_col2 = st.columns(2)
-    
-    # Split tokens for mapping columns
-    mid_point = len(st.session_state.tokens) // 2
-    map_tokens_col1 = st.session_state.tokens[:mid_point]
-    map_tokens_col2 = st.session_state.tokens[mid_point:]
-    
-    # Only allow Image type for PPTX templates
-    if template_type == 'pptx':
-        valid_types = ["Short Text", "Paragraph", "Image"]
-    else:
-        valid_types = ["Short Text", "Paragraph"]
-    
-    with map_col1:
-        for token in map_tokens_col1:
-            raw_type = st.session_state.custom_mapping.get(token, "Short Text")
-            safe_type = raw_type if raw_type in valid_types else "Short Text"
-            
-            new_type = st.selectbox(
-                f"{token}",
-                valid_types,
-                index=valid_types.index(safe_type) if safe_type in valid_types else 0,
-                key=f"config_{token}_1",
-                label_visibility="collapsed"
-            )
-            st.session_state.custom_mapping[token] = new_type
-    
-    with map_col2:
-        for token in map_tokens_col2:
-            raw_type = st.session_state.custom_mapping.get(token, "Short Text")
-            safe_type = raw_type if raw_type in valid_types else "Short Text"
-            
-            new_type = st.selectbox(
-                f"{token}",
-                valid_types,
-                index=valid_types.index(safe_type) if safe_type in valid_types else 0,
-                key=f"config_{token}_2",
-                label_visibility="collapsed"
-            )
-            st.session_state.custom_mapping[token] = new_type
-    
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Configuration</div>', unsafe_allow_html=True)
     
     # Save Configuration
     config_json_str = json.dumps(st.session_state.custom_mapping, indent=4)
