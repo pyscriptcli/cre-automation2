@@ -379,10 +379,6 @@ if "show_delete_confirm" not in st.session_state:
     st.session_state.show_delete_confirm = False
 if "template_to_delete" not in st.session_state:
     st.session_state.template_to_delete = None
-if "save_template_trigger" not in st.session_state:
-    st.session_state.save_template_trigger = False
-if "refresh_browser" not in st.session_state:
-    st.session_state.refresh_browser = False
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -479,30 +475,19 @@ with col_template2:
             # Save the template first
             saved_path = save_template_to_file(template_bytes, uploaded_template.name)
             st.session_state.saved_template_name = uploaded_template.name
-            st.session_state.save_template_trigger = True
             
             if st.session_state.custom_mapping:
                 config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
                 save_config_to_file(st.session_state.custom_mapping, config_name)
             
-            # Set refresh flag
-            st.session_state.refresh_browser = True
-            
-            # Show success message
-            st.success(f"✅ Template saved successfully: {uploaded_template.name}")
-            
-            # Inject JavaScript to refresh the browser tab
+            # Inject JavaScript to immediately refresh the browser tab
             st.markdown("""
                 <script>
-                    // Show a brief message then refresh
-                    setTimeout(function() {
-                        window.location.reload(true);
-                    }, 1500);
+                    window.location.reload(true);
                 </script>
             """, unsafe_allow_html=True)
             
-            # Also trigger Streamlit rerun
-            st.rerun()
+            st.stop()  # Stop further execution
 
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
@@ -510,22 +495,6 @@ if st.session_state.template_bytes is not None:
     st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
-
-# If refresh was triggered, show a full-page refresh script
-if st.session_state.refresh_browser:
-    st.markdown("""
-        <script>
-            // Force full browser refresh
-            window.location.reload(true);
-        </script>
-        <div style="text-align: center; padding: 20px;">
-            <h3>🔄 Refreshing page...</h3>
-            <p>Template saved successfully. The page will refresh automatically.</p>
-        </div>
-    """, unsafe_allow_html=True)
-    # Reset the flag to prevent infinite refresh
-    st.session_state.refresh_browser = False
-    st.stop()  # Stop execution to show the refresh message
 
 template_bytes = st.session_state.template_bytes
 template_type = st.session_state.template_type
