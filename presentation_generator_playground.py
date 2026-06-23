@@ -26,7 +26,7 @@ MINIMAL_CRE_SYSTEM = """
 <style>
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; }
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; max-width: 1400px !important; }
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
     
     /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
@@ -36,34 +36,44 @@ MINIMAL_CRE_SYSTEM = """
     div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, textarea:focus { border-color: #666666 !important; box-shadow: none !important; }
     input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 14px !important; }
     
+    /* Make select boxes and dropdown icons smaller */
+    div[data-baseweb="select"] { min-height: 32px !important; }
+    div[data-baseweb="select"] > div { min-height: 32px !important; padding: 0 8px !important; }
+    div[data-baseweb="select"] select { font-size: 13px !important; padding: 2px 8px !important; }
+    svg[data-testid="stSelectbox"] { width: 16px !important; height: 16px !important; }
+    div[data-baseweb="select"] svg { width: 16px !important; height: 16px !important; }
+    
     /* File Uploader */
     section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important; padding: 4px 12px !important; }
     
     /* Cards */
-    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 20px; margin-bottom: 16px; }
-    .config-card { background-color: #F8F8F8; border: 1px solid #E0E0E0; border-radius: 4px; padding: 20px; margin-bottom: 16px; }
+    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
+    .config-card { background-color: #F8F8F8; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
     
     /* Buttons */
-    div.stButton > button { background-color: #1A1A1A !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 14px !important; border: none !important; border-radius: 4px !important; padding: 10px 20px !important; width: 100% !important; transition: background-color 0.15s ease; }
+    div.stButton > button { background-color: #1A1A1A !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 14px !important; border: none !important; border-radius: 4px !important; padding: 8px 16px !important; width: 100% !important; transition: background-color 0.15s ease; }
     div.stButton > button:hover { background-color: #333333 !important; color: #FFFFFF !important; }
     
-    div[data-testid="stDownloadButton"] > button { background-color: #1A1A1A !important; border-radius: 4px !important; color: #FFFFFF !important; font-weight: 600 !important; padding: 10px 20px !important; width: 100% !important; }
+    div[data-testid="stDownloadButton"] > button { background-color: #1A1A1A !important; border-radius: 4px !important; color: #FFFFFF !important; font-weight: 600 !important; padding: 8px 16px !important; width: 100% !important; }
     div[data-testid="stDownloadButton"] > button:hover { background-color: #333333 !important; }
     
     /* Delete button */
-    .delete-btn { background-color: #DC3545 !important; color: white !important; border: none !important; border-radius: 4px !important; padding: 4px 12px !important; font-size: 12px !important; cursor: pointer !important; }
-    .delete-btn:hover { background-color: #C82333 !important; }
+    div[data-testid="column"] button { background-color: transparent !important; color: #DC3545 !important; border: 1px solid #DC3545 !important; border-radius: 4px !important; padding: 4px 12px !important; font-size: 13px !important; min-height: 32px !important; width: auto !important; }
+    div[data-testid="column"] button:hover { background-color: #DC3545 !important; color: white !important; }
     
     /* Labels */
-    .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 8px; }
-    .section-header { font-size: 16px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 12px; }
-    .saved-indicator { background-color: #E8F5E9; padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 8px; }
+    .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 6px; }
+    .section-header { font-size: 15px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 10px; }
+    .saved-indicator { background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 6px; }
     
-    hr { margin: 16px 0 !important; border-color: #E0E0E0 !important; }
+    hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
     /* Template row with delete button */
     .template-row { display: flex; gap: 8px; align-items: center; }
     .template-select { flex: 1; }
+    
+    /* Expander */
+    .streamlit-expanderHeader { font-size: 14px !important; font-weight: 600 !important; }
 </style>
 """
 
@@ -341,7 +351,7 @@ def simple_form_row_with_type(label_text, key, placeholder="", value=""):
         st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
         result = st.text_input("", key=f"val_{key}", label_visibility="collapsed", placeholder=placeholder, value=value)
     with col2:
-        st.markdown('<div style="padding-top: 8px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
         data_type = st.selectbox(
             "Type",
             ["Text", "Image"],
@@ -356,7 +366,7 @@ def simple_textarea_row_with_type(label_text, key, placeholder="", value=""):
         st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
         result = st.text_area("", key=f"val_{key}", label_visibility="collapsed", placeholder=placeholder, height=100, value=value)
     with col2:
-        st.markdown('<div style="padding-top: 8px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
         data_type = st.selectbox(
             "Type",
             ["Text", "Image"],
@@ -396,10 +406,11 @@ if "delete_trigger" not in st.session_state:
     st.session_state.delete_trigger = False
 if "config_expanded" not in st.session_state:
     st.session_state.config_expanded = False
+if "generated" not in st.session_state:
+    st.session_state.generated = False
 
 # --- MAIN LAYOUT ---
-st.markdown('<h2 style="font-weight: 700; color: #1A1A1A; margin-bottom: 4px;">Document Generator</h2>', unsafe_allow_html=True)
-st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
 
 # --- TEMPLATE MANAGEMENT SECTION ---
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
@@ -430,15 +441,23 @@ with col_template1:
     with delete_col:
         if selected_template and selected_template != "Select saved template":
             template_name = selected_template.split(' (')[0]
-            if st.button("✕", key="delete_template", help="Delete this template"):
-                if delete_template_file(template_name):
-                    st.session_state.delete_trigger = True
-                    st.session_state.template_bytes = None
-                    st.session_state.saved_template_name = None
-                    st.session_state.template_loaded = False
-                    st.session_state.tokens = []
-                    st.success(f"Deleted: {template_name}")
-                    st.rerun()
+            if st.button("Delete Template", key="delete_template", help="Delete this template"):
+                # Use a confirmation dialog
+                st.warning(f"Are you sure you want to delete '{template_name}'?")
+                col_confirm1, col_confirm2 = st.columns(2)
+                with col_confirm1:
+                    if st.button("Yes, Delete", key="confirm_delete"):
+                        if delete_template_file(template_name):
+                            st.session_state.delete_trigger = True
+                            st.session_state.template_bytes = None
+                            st.session_state.saved_template_name = None
+                            st.session_state.template_loaded = False
+                            st.session_state.tokens = []
+                            st.success(f"Deleted: {template_name}")
+                            st.rerun()
+                with col_confirm2:
+                    if st.button("Cancel", key="cancel_delete"):
+                        st.rerun()
     
     if selected_template and selected_template != "Select saved template" and not st.session_state.delete_trigger:
         template_name = selected_template.split(' (')[0]
@@ -473,6 +492,7 @@ with col_template2:
         st.session_state.saved_template_name = None
         st.session_state.template_loaded = True
         st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
+        st.session_state.generated = False
         
         # Extract placeholders immediately
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
@@ -542,7 +562,7 @@ if u_template is not None and st.session_state.tokens:
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
                     with col_b:
-                        st.markdown('<div style="padding-top: 8px;"></div>', unsafe_allow_html=True)
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
                         data_type = st.selectbox(
                             "Type",
                             ["Text", "Image"],
@@ -571,7 +591,7 @@ if u_template is not None and st.session_state.tokens:
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
                     with col_b:
-                        st.markdown('<div style="padding-top: 8px;"></div>', unsafe_allow_html=True)
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
                         data_type = st.selectbox(
                             "Type",
                             ["Text", "Image"],
@@ -647,50 +667,54 @@ if u_template is not None:
                     st.session_state.final_pdf = convert_docx_to_pdf(raw_docx)
                     st.session_state.final_pptx = None
                 
+                st.session_state.generated = True
                 st.success("Document generated successfully")
+                st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
 
-    st.markdown("<hr>", unsafe_allow_html=True)
-    
-    # Downloads - Three columns for PPTX, PDF, DOCX
-    dl_col1, dl_col2, dl_col3 = st.columns(3)
-    
-    with dl_col1:
-        if st.session_state.final_pptx:
-            st.download_button(
-                "Download PPTX",
-                data=st.session_state.final_pptx,
-                file_name="Generated_Document.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                use_container_width=True
-            )
-        else:
-            st.button("Download PPTX", disabled=True, use_container_width=True)
-    
-    with dl_col2:
-        if st.session_state.final_pdf:
-            st.download_button(
-                "Download PDF",
-                data=st.session_state.final_pdf,
-                file_name="Generated_Document.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-        else:
-            st.button("Download PDF", disabled=True, use_container_width=True)
-    
-    with dl_col3:
-        if st.session_state.final_docx:
-            st.download_button(
-                "Download DOCX",
-                data=st.session_state.final_docx,
-                file_name="Generated_Document.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
-        else:
-            st.button("Download DOCX", disabled=True, use_container_width=True)
+    # Show export buttons only after generation
+    if st.session_state.generated:
+        st.markdown("<hr>", unsafe_allow_html=True)
+        
+        # Downloads - Three columns for PPTX, PDF, DOCX
+        dl_col1, dl_col2, dl_col3 = st.columns(3)
+        
+        with dl_col1:
+            if st.session_state.final_pptx:
+                st.download_button(
+                    "Download PPTX",
+                    data=st.session_state.final_pptx,
+                    file_name="Generated_Document.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True
+                )
+            else:
+                st.button("PPTX", disabled=True, use_container_width=True)
+        
+        with dl_col2:
+            if st.session_state.final_pdf:
+                st.download_button(
+                    "Download PDF",
+                    data=st.session_state.final_pdf,
+                    file_name="Generated_Document.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            else:
+                st.button("PDF", disabled=True, use_container_width=True)
+        
+        with dl_col3:
+            if st.session_state.final_docx:
+                st.download_button(
+                    "Download DOCX",
+                    data=st.session_state.final_docx,
+                    file_name="Generated_Document.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
+                )
+            else:
+                st.button("DOCX", disabled=True, use_container_width=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
