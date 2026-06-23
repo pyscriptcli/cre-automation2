@@ -12,6 +12,17 @@ from datetime import datetime
 from docx import Document
 from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+import base64
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+import xml.etree.ElementTree as ET
+from zipfile import ZipFile
+import io as io_module
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -24,8 +35,15 @@ if not os.path.exists(_config_file):
 # --- MINIMAL UI CSS ---
 MINIMAL_CRE_SYSTEM = """
 <style>
+    /* Hide Streamlit top bar */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    .stApp { margin-top: -50px; }
+    .stDeployButton {display: none;}
+    .stStatusWidget {display: none;}
+    
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
-    div[data-testid="stHeader"] { background-color: #FFFFFF !important; }
+    div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
     
     /* Inputs */
@@ -33,7 +51,7 @@ MINIMAL_CRE_SYSTEM = """
         background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important;
         color: #1A1A1A !important;
     }
-    div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, textarea:focus { border-color: #666666 !important; box-shadow: none !important; }
+    div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, textarea:focus { border-color: #003366 !important; box-shadow: none !important; }
     input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 14px !important; }
     
     /* Make select boxes and dropdown icons smaller */
@@ -46,16 +64,61 @@ MINIMAL_CRE_SYSTEM = """
     /* File Uploader */
     section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important; padding: 4px 12px !important; }
     
+    /* Image upload indicator */
+    .image-upload-indicator {
+        background-color: #E3F2FD;
+        border-left: 3px solid #003366;
+        padding: 4px 8px;
+        border-radius: 3px;
+        font-size: 12px;
+        color: #003366;
+        margin-bottom: 4px;
+        font-weight: 500;
+    }
+    
     /* Cards */
     .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
     .config-card { background-color: #F8F8F8; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
     
-    /* Buttons */
-    div.stButton > button { background-color: #1A1A1A !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 14px !important; border: none !important; border-radius: 4px !important; padding: 8px 16px !important; width: 100% !important; transition: background-color 0.15s ease; }
-    div.stButton > button:hover { background-color: #333333 !important; color: #FFFFFF !important; }
+    /* Buttons - #003366 color */
+    div.stButton > button { 
+        background-color: #003366 !important; 
+        color: #FFFFFF !important; 
+        font-weight: 600 !important; 
+        font-size: 14px !important; 
+        border: none !important; 
+        border-radius: 4px !important; 
+        padding: 8px 16px !important; 
+        width: 100% !important; 
+        transition: background-color 0.15s ease; 
+    }
+    div.stButton > button:hover { 
+        background-color: #002244 !important; 
+        color: #FFFFFF !important; 
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
+    }
+    div.stButton > button:disabled { 
+        background-color: #6688AA !important; 
+        color: #CCCCCC !important; 
+        cursor: not-allowed !important; 
+    }
     
-    div[data-testid="stDownloadButton"] > button { background-color: #1A1A1A !important; border-radius: 4px !important; color: #FFFFFF !important; font-weight: 600 !important; padding: 8px 16px !important; width: 100% !important; }
-    div[data-testid="stDownloadButton"] > button:hover { background-color: #333333 !important; }
+    /* Download Buttons - #003366 color */
+    div[data-testid="stDownloadButton"] > button { 
+        background-color: #003366 !important;
+        color: #FFFFFF !important;
+        border-radius: 4px !important; 
+        font-weight: 600 !important; 
+        padding: 8px 16px !important; 
+        width: 100% !important; 
+        transition: all 0.15s ease;
+    }
+    div[data-testid="stDownloadButton"] > button:hover {
+        background-color: #002244 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
+    }
     
     /* Delete button */
     div[data-testid="column"] button { background-color: transparent !important; color: #DC3545 !important; border: 1px solid #DC3545 !important; border-radius: 4px !important; padding: 4px 12px !important; font-size: 13px !important; min-height: 32px !important; width: auto !important; }
@@ -68,12 +131,46 @@ MINIMAL_CRE_SYSTEM = """
     
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
-    /* Template row with delete button */
-    .template-row { display: flex; gap: 8px; align-items: center; }
-    .template-select { flex: 1; }
-    
     /* Expander */
     .streamlit-expanderHeader { font-size: 14px !important; font-weight: 600 !important; }
+    
+    /* Loading overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.92);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        flex-direction: column;
+    }
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #003366;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .loading-text {
+        margin-top: 20px;
+        font-size: 18px;
+        color: #1A1A1A;
+        font-weight: 600;
+    }
+    .loading-subtext {
+        margin-top: 8px;
+        font-size: 14px;
+        color: #666;
+    }
 </style>
 """
 
@@ -128,7 +225,6 @@ def delete_template_file(template_name):
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
         os.remove(filepath)
-        # Also delete associated config
         config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         config_path = os.path.join(storage_dir, config_name)
         if os.path.exists(config_path):
@@ -153,6 +249,206 @@ def load_config_from_file(config_name="template_config.json"):
             return json.load(f)
     return None
 
+# --- PDF GENERATION FUNCTIONS (Pure Python) ---
+def create_pdf_from_pptx(pptx_bytes, text_inputs, image_inputs):
+    """Create PDF from PPTX data using ReportLab"""
+    # First, replace placeholders in the PPTX content
+    prs = Presentation(io.BytesIO(pptx_bytes))
+    
+    # Replace text placeholders
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        for token, value in text_inputs.items():
+                            if token in run.text:
+                                run.text = run.text.replace(token, str(value) if value else '')
+    
+    # Extract content after replacement
+    slides_content = []
+    for slide_num, slide in enumerate(prs.slides, 1):
+        slide_data = {'number': slide_num, 'texts': [], 'images': []}
+        
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                text = shape.text.strip()
+                if text:
+                    slide_data['texts'].append(text)
+            
+            # Check if this shape should be replaced with an image
+            if shape.has_text_frame:
+                for img_token, img_file in image_inputs.items():
+                    if img_token in shape.text and img_file is not None:
+                        try:
+                            # Add the uploaded image
+                            slide_data['images'].append(img_file)
+                        except:
+                            pass
+        
+        slides_content.append(slide_data)
+    
+    # Generate PDF using ReportLab
+    pdf_buffer = io.BytesIO()
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Add a title style
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#003366'),
+        alignment=TA_CENTER,
+        spaceAfter=12
+    )
+    
+    body_style = ParagraphStyle(
+        'CustomBody',
+        parent=styles['Normal'],
+        fontSize=11,
+        alignment=TA_LEFT,
+        spaceAfter=6
+    )
+    
+    for slide in slides_content:
+        # Add slide header
+        story.append(Paragraph(f"Slide {slide['number']}", title_style))
+        story.append(Spacer(1, 12))
+        
+        # Add text content
+        for text in slide['texts']:
+            # Clean text and wrap in paragraphs
+            cleaned_text = text.replace('{{', '').replace('}}', '').strip()
+            if cleaned_text:
+                story.append(Paragraph(cleaned_text, body_style))
+                story.append(Spacer(1, 6))
+        
+        # Add images
+        for img_data in slide['images']:
+            try:
+                # If img_data is a file-like object, read it
+                if hasattr(img_data, 'read'):
+                    img_data.seek(0)
+                    img_bytes = img_data.read()
+                else:
+                    img_bytes = img_data
+                
+                # Create a temporary image file
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_img:
+                    tmp_img.write(img_bytes)
+                    tmp_img_path = tmp_img.name
+                
+                # Add image to PDF
+                img = RLImage(tmp_img_path, width=5*inch, height=3*inch)
+                story.append(img)
+                story.append(Spacer(1, 6))
+                
+                # Clean up
+                os.unlink(tmp_img_path)
+            except Exception as e:
+                st.warning(f"Could not add image to PDF: {str(e)}")
+        
+        story.append(Spacer(1, 12))
+        # Add a horizontal line between slides
+        story.append(Paragraph("─" * 80, styles['Normal']))
+        story.append(Spacer(1, 12))
+    
+    # Build PDF
+    doc.build(story)
+    pdf_buffer.seek(0)
+    return pdf_buffer.getvalue()
+
+def create_pdf_from_docx(docx_bytes, text_inputs, image_inputs):
+    """Create PDF from DOCX data using ReportLab"""
+    # First, replace placeholders in the DOCX content
+    doc = Document(io.BytesIO(docx_bytes))
+    
+    # Replace text placeholders
+    for paragraph in doc.paragraphs:
+        for run in paragraph.runs:
+            for token, value in text_inputs.items():
+                if token in run.text:
+                    run.text = run.text.replace(token, str(value) if value else '')
+    
+    # Extract content after replacement
+    content = {'texts': [], 'images': []}
+    
+    for paragraph in doc.paragraphs:
+        text = paragraph.text.strip()
+        if text:
+            content['texts'].append(text)
+    
+    # Add uploaded images to the content
+    for img_token, img_file in image_inputs.items():
+        if img_file is not None:
+            content['images'].append(img_file)
+    
+    # Generate PDF using ReportLab
+    pdf_buffer = io.BytesIO()
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=14,
+        textColor=colors.HexColor('#003366'),
+        alignment=TA_LEFT,
+        spaceAfter=12
+    )
+    
+    body_style = ParagraphStyle(
+        'CustomBody',
+        parent=styles['Normal'],
+        fontSize=11,
+        alignment=TA_LEFT,
+        spaceAfter=6
+    )
+    
+    # Add document content
+    for text in content['texts']:
+        if text:
+            # Check if it looks like a heading (all caps or short)
+            if len(text) < 50 and text.isupper():
+                story.append(Paragraph(text, title_style))
+            else:
+                story.append(Paragraph(text, body_style))
+            story.append(Spacer(1, 6))
+    
+    # Add images
+    for img_data in content['images']:
+        try:
+            # If img_data is a file-like object, read it
+            if hasattr(img_data, 'read'):
+                img_data.seek(0)
+                img_bytes = img_data.read()
+            else:
+                img_bytes = img_data
+            
+            # Create a temporary image file
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_img:
+                tmp_img.write(img_bytes)
+                tmp_img_path = tmp_img.name
+            
+            # Add image to PDF
+            img = RLImage(tmp_img_path, width=5*inch, height=3*inch)
+            story.append(img)
+            story.append(Spacer(1, 6))
+            
+            # Clean up
+            os.unlink(tmp_img_path)
+        except Exception as e:
+            st.warning(f"Could not add image to PDF: {str(e)}")
+    
+    # Build PDF
+    doc.build(story)
+    pdf_buffer.seek(0)
+    return pdf_buffer.getvalue()
+
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     try:
@@ -176,38 +472,6 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
         return img_byte_arr
     except Exception:
         return img_file
-
-def convert_pptx_to_pdf(pptx_bytes):
-    with tempfile.TemporaryDirectory() as temp_dir:
-        input_pptx_path = os.path.join(temp_dir, "document.pptx")
-        with open(input_pptx_path, "wb") as f:
-            f.write(pptx_bytes)
-        try:
-            command = ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, input_pptx_path]
-            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output_pdf_path = os.path.join(temp_dir, "document.pdf")
-            if os.path.exists(output_pdf_path):
-                with open(output_pdf_path, "rb") as f:
-                    return f.read()
-        except Exception:
-            return None
-    return None
-
-def convert_docx_to_pdf(docx_bytes):
-    with tempfile.TemporaryDirectory() as temp_dir:
-        input_docx_path = os.path.join(temp_dir, "document.docx")
-        with open(input_docx_path, "wb") as f:
-            f.write(docx_bytes)
-        try:
-            command = ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, input_docx_path]
-            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            output_pdf_path = os.path.join(temp_dir, "document.pdf")
-            if os.path.exists(output_pdf_path):
-                with open(output_pdf_path, "rb") as f:
-                    return f.read()
-        except Exception:
-            return None
-    return None
 
 def extract_placeholders_from_pptx(pptx_bytes):
     prs = Presentation(io.BytesIO(pptx_bytes))
@@ -262,6 +526,22 @@ def extract_placeholders(template_bytes, template_type):
         return extract_placeholders_from_docx(template_bytes)
     return []
 
+def replace_text_in_paragraph(paragraph, text_inputs):
+    """Replace text in a paragraph while preserving formatting"""
+    for run in paragraph.runs:
+        for token, value in text_inputs.items():
+            if token in run.text:
+                run.text = run.text.replace(token, str(value) if value else '')
+    
+    if hasattr(paragraph, 'text') and paragraph.text:
+        for token, value in text_inputs.items():
+            if token in paragraph.text:
+                if not paragraph.runs:
+                    paragraph.add_run()
+                for run in paragraph.runs:
+                    if token in run.text:
+                        run.text = run.text.replace(token, str(value) if value else '')
+
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
     
@@ -269,7 +549,6 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
         shapes_to_delete = []
         images_to_add = []
 
-        # First pass: collect image placeholders
         for shape in slide.shapes:
             if shape.has_text_frame:
                 text_content = shape.text
@@ -279,27 +558,19 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                         shapes_to_delete.append(shape)
                         break
 
-        # Second pass: replace text while preserving formatting
         for shape in slide.shapes:
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
-                        for run in paragraph.runs:
-                            for token, value in text_inputs.items():
-                                if token in run.text:
-                                    run.text = run.text.replace(token, str(value) if value else '')
+                        replace_text_in_paragraph(paragraph, text_inputs)
                 
                 if hasattr(shape, 'table') and shape.table:
                     for row in shape.table.rows:
                         for cell in row.cells:
                             if cell.text_frame:
                                 for paragraph in cell.text_frame.paragraphs:
-                                    for run in paragraph.runs:
-                                        for token, value in text_inputs.items():
-                                            if token in run.text:
-                                                run.text = run.text.replace(token, str(value) if value else '')
+                                    replace_text_in_paragraph(paragraph, text_inputs)
 
-        # Add images
         for img_file, left, top, width, height in images_to_add:
             try:
                 processed_img = smart_crop_to_fit(img_file, width, height)
@@ -307,7 +578,6 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
             except Exception:
                 pass
 
-        # Delete placeholder shapes after adding images
         for old_shape in shapes_to_delete:
             try:
                 sp = old_shape._element
@@ -322,22 +592,14 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     doc = Document(io.BytesIO(template_bytes))
     
-    # Replace text in paragraphs while preserving formatting
     for paragraph in doc.paragraphs:
-        for run in paragraph.runs:
-            for token, value in text_inputs.items():
-                if token in run.text:
-                    run.text = run.text.replace(token, str(value) if value else '')
+        replace_text_in_paragraph(paragraph, text_inputs)
     
-    # Replace text in tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
-                    for run in paragraph.runs:
-                        for token, value in text_inputs.items():
-                            if token in run.text:
-                                run.text = run.text.replace(token, str(value) if value else '')
+                    replace_text_in_paragraph(paragraph, text_inputs)
     
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
@@ -345,51 +607,51 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 # --- UI HELPERS ---
-def simple_form_row_with_type(label_text, key, placeholder="", value=""):
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-        result = st.text_input("", key=f"val_{key}", label_visibility="collapsed", placeholder=placeholder, value=value)
-    with col2:
-        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+def render_field(token, template_type):
+    """Render a field with dynamic type switching between text and image"""
+    clean_label = token.replace("{", "").replace("}", "")
+    stored_type = st.session_state.custom_mapping.get(token, "Text")
+    
+    # Create a container for the field
+    with st.container():
+        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+        
+        # Type selector
         data_type = st.selectbox(
             "Type",
             ["Text", "Image"],
-            key=f"type_{key}",
+            index=0 if stored_type == "Text" else 1,
+            key=f"type_{token}",
             label_visibility="collapsed"
         )
-    return result, data_type
-
-def simple_textarea_row_with_type(label_text, key, placeholder="", value=""):
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-        result = st.text_area("", key=f"val_{key}", label_visibility="collapsed", placeholder=placeholder, height=100, value=value)
-    with col2:
-        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-        data_type = st.selectbox(
-            "Type",
-            ["Text", "Image"],
-            key=f"type_{key}",
-            label_visibility="collapsed"
-        )
-    return result, data_type
-
-def simple_uploader_row(label_text, allowed_types, key):
-    st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
+        
+        st.session_state.custom_mapping[token] = data_type
+        
+        if data_type == "Image" and template_type == 'pptx':
+            st.markdown('<div class="image-upload-indicator">📷 Upload Image</div>', unsafe_allow_html=True)
+            uploaded_file = st.file_uploader(
+                f"Upload image for {clean_label}",
+                type=["png", "jpg", "jpeg"],
+                key=f"img_{token}",
+                label_visibility="collapsed"
+            )
+            st.session_state[f"image_{token}"] = uploaded_file
+            return None, uploaded_file
+        else:
+            text_value = st.text_input(
+                "",
+                key=f"val_{token}",
+                label_visibility="collapsed",
+                value=st.session_state.get(f"text_{token}", "")
+            )
+            st.session_state[f"text_{token}"] = text_value
+            return text_value, None
 
 # --- INIT APP ---
-st.set_page_config(page_title="Document Generator", layout="wide")
+st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
 # Initialize all session state variables
-if "final_pptx" not in st.session_state:
-    st.session_state.final_pptx = None
-if "final_docx" not in st.session_state:
-    st.session_state.final_docx = None
-if "final_pdf" not in st.session_state:
-    st.session_state.final_pdf = None
 if "custom_mapping" not in st.session_state:
     st.session_state.custom_mapping = {}
 if "tokens" not in st.session_state:
@@ -406,8 +668,14 @@ if "delete_trigger" not in st.session_state:
     st.session_state.delete_trigger = False
 if "config_expanded" not in st.session_state:
     st.session_state.config_expanded = False
-if "generated" not in st.session_state:
-    st.session_state.generated = False
+if "show_delete_confirm" not in st.session_state:
+    st.session_state.show_delete_confirm = False
+if "template_to_delete" not in st.session_state:
+    st.session_state.template_to_delete = None
+if "pdf_ready" not in st.session_state:
+    st.session_state.pdf_ready = False
+if "pdf_data" not in st.session_state:
+    st.session_state.pdf_data = None
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -416,18 +684,15 @@ st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-header">Template</div>', unsafe_allow_html=True)
 
-# Create row with dropdown and upload
 col_template1, col_template2 = st.columns(2)
 
 with col_template1:
-    # Show saved templates dropdown with delete button
     saved_templates = get_saved_templates()
     template_options = ["Select saved template"]
     if saved_templates:
         for t in saved_templates:
             template_options.append(f"{t['name']} ({t['type']})")
     
-    # Use columns for dropdown and delete button
     dropdown_col, delete_col = st.columns([4, 1])
     
     with dropdown_col:
@@ -441,23 +706,31 @@ with col_template1:
     with delete_col:
         if selected_template and selected_template != "Select saved template":
             template_name = selected_template.split(' (')[0]
-            if st.button("Delete Template", key="delete_template", help="Delete this template"):
-                # Use a confirmation dialog
-                st.warning(f"Are you sure you want to delete '{template_name}'?")
-                col_confirm1, col_confirm2 = st.columns(2)
-                with col_confirm1:
-                    if st.button("Yes, Delete", key="confirm_delete"):
-                        if delete_template_file(template_name):
-                            st.session_state.delete_trigger = True
-                            st.session_state.template_bytes = None
-                            st.session_state.saved_template_name = None
-                            st.session_state.template_loaded = False
-                            st.session_state.tokens = []
-                            st.success(f"Deleted: {template_name}")
-                            st.rerun()
-                with col_confirm2:
-                    if st.button("Cancel", key="cancel_delete"):
-                        st.rerun()
+            if st.button("Delete", key="delete_template", help="Delete this template"):
+                st.session_state.show_delete_confirm = True
+                st.session_state.template_to_delete = template_name
+                st.rerun()
+    
+    if st.session_state.show_delete_confirm:
+        st.warning(f"Are you sure you want to delete '{st.session_state.template_to_delete}'?")
+        col_confirm1, col_confirm2 = st.columns([1, 1])
+        with col_confirm1:
+            if st.button("Yes, Delete", key="confirm_delete"):
+                if delete_template_file(st.session_state.template_to_delete):
+                    st.session_state.delete_trigger = True
+                    st.session_state.template_bytes = None
+                    st.session_state.saved_template_name = None
+                    st.session_state.template_loaded = False
+                    st.session_state.tokens = []
+                    st.session_state.show_delete_confirm = False
+                    st.session_state.template_to_delete = None
+                    st.success(f"Deleted: {st.session_state.template_to_delete}")
+                    st.rerun()
+        with col_confirm2:
+            if st.button("Cancel", key="cancel_delete"):
+                st.session_state.show_delete_confirm = False
+                st.session_state.template_to_delete = None
+                st.rerun()
     
     if selected_template and selected_template != "Select saved template" and not st.session_state.delete_trigger:
         template_name = selected_template.split(' (')[0]
@@ -468,13 +741,11 @@ with col_template1:
             st.session_state.template_loaded = True
             st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
             
-            # Load associated config
             config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
             config_data = load_config_from_file(config_name)
             if config_data:
                 st.session_state.custom_mapping = config_data
             
-            # Extract placeholders
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
 
@@ -492,26 +763,21 @@ with col_template2:
         st.session_state.saved_template_name = None
         st.session_state.template_loaded = True
         st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
-        st.session_state.generated = False
         
-        # Extract placeholders immediately
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
         
-        # Ask if user wants to save as template
         save_as_template = st.checkbox("Save as template for future use")
         
         if save_as_template:
             saved_path = save_template_to_file(template_bytes, uploaded_template.name)
             st.success(f"Template saved: {uploaded_template.name}")
             
-            # Save config if exists
             if st.session_state.custom_mapping:
                 config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
                 save_config_to_file(st.session_state.custom_mapping, config_name)
             st.rerun()
 
-# Show current template info
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
     template_type = st.session_state.template_type or "Unknown"
@@ -519,7 +785,6 @@ if st.session_state.template_bytes is not None:
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- Get current template bytes ---
 template_bytes = st.session_state.template_bytes
 template_type = st.session_state.template_type
 u_template = None
@@ -530,14 +795,12 @@ text_data = {}
 image_data = {}
 field_types = {}
 
-# --- DISPLAY FIELDS ---
 if u_template is not None and st.session_state.tokens:
     tokens = st.session_state.tokens
     
     if not tokens:
         st.info("No placeholders found in the template.")
     else:
-        # Distribute tokens evenly between two columns
         mid_point = len(tokens) // 2
         col1_tokens = tokens[:mid_point]
         col2_tokens = tokens[mid_point:]
@@ -548,68 +811,32 @@ if u_template is not None and st.session_state.tokens:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col1_tokens:
-                clean_label = token.replace("{", "").replace("}", "")
-                # Get the stored type or default to Text
-                stored_type = st.session_state.custom_mapping.get(token, "Text")
-                
-                if stored_type == "Image" and template_type == 'pptx':
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                text_val, img_val = render_field(token, template_type)
+                if img_val is not None:
+                    image_data[token] = img_val
                     field_types[token] = "Image"
                 else:
-                    # For text fields, show text input with type selector
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
-                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                    with col_b:
-                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                        data_type = st.selectbox(
-                            "Type",
-                            ["Text", "Image"],
-                            index=0 if stored_type == "Text" else 1,
-                            key=f"type_{token}",
-                            label_visibility="collapsed"
-                        )
-                        field_types[token] = data_type
-                        # Update mapping
-                        st.session_state.custom_mapping[token] = data_type
+                    text_data[token] = text_val
+                    field_types[token] = "Text"
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col2_tokens:
-                clean_label = token.replace("{", "").replace("}", "")
-                stored_type = st.session_state.custom_mapping.get(token, "Text")
-                
-                if stored_type == "Image" and template_type == 'pptx':
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                text_val, img_val = render_field(token, template_type)
+                if img_val is not None:
+                    image_data[token] = img_val
                     field_types[token] = "Image"
                 else:
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
-                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                    with col_b:
-                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                        data_type = st.selectbox(
-                            "Type",
-                            ["Text", "Image"],
-                            index=0 if stored_type == "Text" else 1,
-                            key=f"type_{token}_2",
-                            label_visibility="collapsed"
-                        )
-                        field_types[token] = data_type
-                        st.session_state.custom_mapping[token] = data_type
+                    text_data[token] = text_val
+                    field_types[token] = "Text"
             st.markdown('</div>', unsafe_allow_html=True)
 
-# --- DATA MAPPING SECTION (Collapsible) ---
 if u_template is not None and st.session_state.tokens:
-    # Create expander for configuration
-    with st.expander("⚙️ Configuration Settings", expanded=st.session_state.config_expanded):
+    with st.expander("Configuration Settings", expanded=st.session_state.config_expanded):
         st.markdown('<div class="config-card">', unsafe_allow_html=True)
         
-        # Save Configuration
         config_json_str = json.dumps(st.session_state.custom_mapping, indent=4)
         col_json1, col_json2 = st.columns([1, 1])
         with col_json1:
@@ -634,7 +861,6 @@ if u_template is not None and st.session_state.tokens:
             else:
                 st.info("Save template first to persist config")
         
-        # Load config
         st.markdown("<br>", unsafe_allow_html=True)
         u_json = st.file_uploader("Load Configuration", type=["json"], label_visibility="collapsed")
         if u_json is not None:
@@ -648,73 +874,75 @@ if u_template is not None and st.session_state.tokens:
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- GENERATION SECTION ---
+# --- DOWNLOAD SECTION ---
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Generate Document</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
     
-    if st.button("Generate", use_container_width=True):
-        with st.spinner("Generating document..."):
-            try:
+    # Three columns for download buttons (PPTX, DOCX, PDF)
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # PPTX Download Button
+        pptx_disabled = template_type != 'pptx'
+        if pptx_disabled:
+            st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
+        else:
+            def generate_pptx():
+                return generate_pptx_bytes(template_bytes, text_data, image_data)
+            
+            st.download_button(
+                label="Download PPTX",
+                data=generate_pptx,
+                file_name="Generated_Document.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True,
+                key="download_pptx"
+            )
+    
+    with col2:
+        # DOCX Download Button
+        docx_disabled = template_type != 'docx'
+        if docx_disabled:
+            st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
+        else:
+            def generate_docx():
+                return generate_docx_bytes(template_bytes, text_data, image_data)
+            
+            st.download_button(
+                label="Download DOCX",
+                data=generate_docx,
+                file_name="Generated_Document.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="download_docx"
+            )
+    
+    with col3:
+        # PDF Download Button - works for both PPTX and DOCX
+        if st.button("Download PDF", use_container_width=True, key="generate_pdf"):
+            with st.spinner("Generating PDF..."):
                 if template_type == 'pptx':
-                    raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
-                    st.session_state.final_pptx = raw_pptx
-                    st.session_state.final_pdf = convert_pptx_to_pdf(raw_pptx)
-                    st.session_state.final_docx = None
+                    pdf_data = create_pdf_from_pptx(template_bytes, text_data, image_data)
                 else:  # docx
-                    raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
-                    st.session_state.final_docx = raw_docx
-                    st.session_state.final_pdf = convert_docx_to_pdf(raw_docx)
-                    st.session_state.final_pptx = None
+                    pdf_data = create_pdf_from_docx(template_bytes, text_data, image_data)
                 
-                st.session_state.generated = True
-                st.success("Document generated successfully")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-    # Show export buttons only after generation
-    if st.session_state.generated:
-        st.markdown("<hr>", unsafe_allow_html=True)
+                if pdf_data:
+                    st.session_state.pdf_data = pdf_data
+                    st.session_state.pdf_ready = True
+                    st.success("PDF generated successfully!")
+                    st.rerun()
         
-        # Downloads - Three columns for PPTX, PDF, DOCX
-        dl_col1, dl_col2, dl_col3 = st.columns(3)
-        
-        with dl_col1:
-            if st.session_state.final_pptx:
-                st.download_button(
-                    "Download PPTX",
-                    data=st.session_state.final_pptx,
-                    file_name="Generated_Document.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True
-                )
-            else:
-                st.button("PPTX", disabled=True, use_container_width=True)
-        
-        with dl_col2:
-            if st.session_state.final_pdf:
-                st.download_button(
-                    "Download PDF",
-                    data=st.session_state.final_pdf,
-                    file_name="Generated_Document.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
-            else:
-                st.button("PDF", disabled=True, use_container_width=True)
-        
-        with dl_col3:
-            if st.session_state.final_docx:
-                st.download_button(
-                    "Download DOCX",
-                    data=st.session_state.final_docx,
-                    file_name="Generated_Document.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True
-                )
-            else:
-                st.button("DOCX", disabled=True, use_container_width=True)
+        # Show PDF download button if PDF is ready
+        if st.session_state.get("pdf_ready", False) and st.session_state.get("pdf_data"):
+            st.download_button(
+                label="⬇️ Download PDF",
+                data=st.session_state.pdf_data,
+                file_name="Generated_Document.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="download_pdf"
+            )
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
