@@ -13,6 +13,8 @@ from docx import Document
 from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import time
+import sys
+import platform
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -273,39 +275,140 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     except Exception:
         return img_file
 
+def check_libreoffice():
+    """Check if LibreOffice is installed"""
+    try:
+        if platform.system() == "Windows":
+            # Check common Windows paths
+            possible_paths = [
+                "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+                "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    return True
+            # Try using where command
+            result = subprocess.run(["where", "soffice"], capture_output=True, text=True)
+            return result.returncode == 0
+        else:
+            # Linux/Mac
+            result = subprocess.run(["which", "soffice"], capture_output=True, text=True)
+            return result.returncode == 0
+    except:
+        return False
+
 def convert_pptx_to_pdf(pptx_bytes):
+    """Convert PPTX to PDF using LibreOffice"""
+    if not check_libreoffice():
+        st.error("LibreOffice is not installed. Please install LibreOffice to enable PDF export.")
+        return None
+    
     with tempfile.TemporaryDirectory() as temp_dir:
         input_pptx_path = os.path.join(temp_dir, "document.pptx")
         with open(input_pptx_path, "wb") as f:
             f.write(pptx_bytes)
         try:
-            command = ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, input_pptx_path]
-            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # Try different LibreOffice commands based on OS
+            if platform.system() == "Windows":
+                # Try to find LibreOffice executable
+                possible_paths = [
+                    "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+                    "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
+                ]
+                libreoffice_cmd = None
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        libreoffice_cmd = path
+                        break
+                if not libreoffice_cmd:
+                    libreoffice_cmd = "soffice"
+            else:
+                libreoffice_cmd = "soffice"
+            
+            command = [
+                libreoffice_cmd,
+                "--headless",
+                "--convert-to", "pdf",
+                "--outdir", temp_dir,
+                input_pptx_path
+            ]
+            
+            result = subprocess.run(
+                command, 
+                capture_output=True, 
+                text=True,
+                timeout=60
+            )
+            
             output_pdf_path = os.path.join(temp_dir, "document.pdf")
             if os.path.exists(output_pdf_path):
                 with open(output_pdf_path, "rb") as f:
                     return f.read()
-        except Exception as e:
-            print(f"PDF conversion error: {e}")
+            else:
+                st.error(f"PDF conversion failed. LibreOffice output: {result.stdout} {result.stderr}")
+                return None
+        except subprocess.TimeoutExpired:
+            st.error("PDF conversion timed out. The file might be too large.")
             return None
-    return None
+        except Exception as e:
+            st.error(f"PDF conversion error: {str(e)}")
+            return None
 
 def convert_docx_to_pdf(docx_bytes):
+    """Convert DOCX to PDF using LibreOffice"""
+    if not check_libreoffice():
+        st.error("LibreOffice is not installed. Please install LibreOffice to enable PDF export.")
+        return None
+    
     with tempfile.TemporaryDirectory() as temp_dir:
         input_docx_path = os.path.join(temp_dir, "document.docx")
         with open(input_docx_path, "wb") as f:
             f.write(docx_bytes)
         try:
-            command = ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, input_docx_path]
-            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # Try different LibreOffice commands based on OS
+            if platform.system() == "Windows":
+                possible_paths = [
+                    "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+                    "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
+                ]
+                libreoffice_cmd = None
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        libreoffice_cmd = path
+                        break
+                if not libreoffice_cmd:
+                    libreoffice_cmd = "soffice"
+            else:
+                libreoffice_cmd = "soffice"
+            
+            command = [
+                libreoffice_cmd,
+                "--headless",
+                "--convert-to", "pdf",
+                "--outdir", temp_dir,
+                input_docx_path
+            ]
+            
+            result = subprocess.run(
+                command, 
+                capture_output=True, 
+                text=True,
+                timeout=60
+            )
+            
             output_pdf_path = os.path.join(temp_dir, "document.pdf")
             if os.path.exists(output_pdf_path):
                 with open(output_pdf_path, "rb") as f:
                     return f.read()
-        except Exception as e:
-            print(f"PDF conversion error: {e}")
+            else:
+                st.error(f"PDF conversion failed. LibreOffice output: {result.stdout} {result.stderr}")
+                return None
+        except subprocess.TimeoutExpired:
+            st.error("PDF conversion timed out. The file might be too large.")
             return None
-    return None
+        except Exception as e:
+            st.error(f"PDF conversion error: {str(e)}")
+            return None
 
 def extract_placeholders_from_pptx(pptx_bytes):
     prs = Presentation(io.BytesIO(pptx_bytes))
@@ -362,10 +465,12 @@ def extract_placeholders(template_bytes, template_type):
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """Replace text in a paragraph while preserving formatting"""
+    # Replace in runs
     for run in paragraph.runs:
         for token, value in text_inputs.items():
             if token in run.text:
                 run.text = run.text.replace(token, str(value) if value else '')
+    
     # Also check if there's text directly in the paragraph (not in runs)
     if hasattr(paragraph, 'text') and paragraph.text:
         for token, value in text_inputs.items():
@@ -485,7 +590,7 @@ def simple_uploader_row(label_text, allowed_types, key):
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
 # --- INIT APP ---
-st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Document Generator", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
 # Initialize all session state variables
@@ -519,6 +624,10 @@ if "loading_message" not in st.session_state:
     st.session_state.loading_message = ""
 if "download_trigger" not in st.session_state:
     st.session_state.download_trigger = False
+if "show_delete_confirm" not in st.session_state:
+    st.session_state.show_delete_confirm = False
+if "template_to_delete" not in st.session_state:
+    st.session_state.template_to_delete = None
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -553,22 +662,31 @@ with col_template1:
         if selected_template and selected_template != "Select saved template":
             template_name = selected_template.split(' (')[0]
             if st.button("Delete", key="delete_template", help="Delete this template"):
-                # Use a confirmation dialog
-                st.warning(f"Are you sure you want to delete '{template_name}'?")
-                col_confirm1, col_confirm2 = st.columns(2)
-                with col_confirm1:
-                    if st.button("Yes, Delete", key="confirm_delete"):
-                        if delete_template_file(template_name):
-                            st.session_state.delete_trigger = True
-                            st.session_state.template_bytes = None
-                            st.session_state.saved_template_name = None
-                            st.session_state.template_loaded = False
-                            st.session_state.tokens = []
-                            st.success(f"Deleted: {template_name}")
-                            st.rerun()
-                with col_confirm2:
-                    if st.button("Cancel", key="cancel_delete"):
-                        st.rerun()
+                st.session_state.show_delete_confirm = True
+                st.session_state.template_to_delete = template_name
+                st.rerun()
+    
+    # Show delete confirmation dialog
+    if st.session_state.show_delete_confirm:
+        st.warning(f"Are you sure you want to delete '{st.session_state.template_to_delete}'?")
+        col_confirm1, col_confirm2, col_confirm3 = st.columns([1, 1, 1])
+        with col_confirm1:
+            if st.button("Yes, Delete", key="confirm_delete"):
+                if delete_template_file(st.session_state.template_to_delete):
+                    st.session_state.delete_trigger = True
+                    st.session_state.template_bytes = None
+                    st.session_state.saved_template_name = None
+                    st.session_state.template_loaded = False
+                    st.session_state.tokens = []
+                    st.session_state.show_delete_confirm = False
+                    st.session_state.template_to_delete = None
+                    st.success(f"Deleted: {st.session_state.template_to_delete}")
+                    st.rerun()
+        with col_confirm2:
+            if st.button("Cancel", key="cancel_delete"):
+                st.session_state.show_delete_confirm = False
+                st.session_state.template_to_delete = None
+                st.rerun()
     
     if selected_template and selected_template != "Select saved template" and not st.session_state.delete_trigger:
         template_name = selected_template.split(' (')[0]
@@ -764,6 +882,11 @@ if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Export Document</div>', unsafe_allow_html=True)
     
+    # Check LibreOffice status for PDF
+    libreoffice_installed = check_libreoffice()
+    if not libreoffice_installed:
+        st.warning("⚠️ LibreOffice is not installed. PDF export will not work. Please install LibreOffice for PDF export.")
+    
     # Three columns for export buttons
     col1, col2, col3 = st.columns(3)
     
@@ -780,12 +903,15 @@ if u_template is not None:
                 st.rerun()
     
     with col2:
-        # PDF Button
-        if st.button("Export as PDF", use_container_width=True, key="export_pdf"):
-            st.session_state.is_loading = True
-            st.session_state.loading_message = "Generating PDF file..."
-            st.session_state.generated = False
-            st.rerun()
+        # PDF Button - Disabled if LibreOffice not installed
+        if not libreoffice_installed:
+            st.button("PDF", disabled=True, use_container_width=True, help="LibreOffice is required for PDF export")
+        else:
+            if st.button("Export as PDF", use_container_width=True, key="export_pdf"):
+                st.session_state.is_loading = True
+                st.session_state.loading_message = "Generating PDF file..."
+                st.session_state.generated = False
+                st.rerun()
     
     with col3:
         # DOCX Button
@@ -799,7 +925,7 @@ if u_template is not None:
                 st.session_state.generated = False
                 st.rerun()
     
-    # Loading overlay
+    # Loading overlay and generation
     if st.session_state.is_loading:
         st.markdown(f"""
         <div class="loading-overlay">
@@ -846,7 +972,7 @@ if u_template is not None:
                         st.rerun()
                     else:
                         st.session_state.is_loading = False
-                        st.error("PDF conversion failed. Please ensure LibreOffice is installed.")
+                        st.error("PDF conversion failed. Please ensure LibreOffice is properly installed.")
                         st.rerun()
                 else:  # docx
                     raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
@@ -861,7 +987,7 @@ if u_template is not None:
                         st.rerun()
                     else:
                         st.session_state.is_loading = False
-                        st.error("PDF conversion failed. Please ensure LibreOffice is installed.")
+                        st.error("PDF conversion failed. Please ensure LibreOffice is properly installed.")
                         st.rerun()
                         
             elif format_type == 'DOCX' and template_type == 'docx':
