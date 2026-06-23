@@ -303,17 +303,57 @@ def extract_placeholders(template_bytes, template_type):
         return extract_placeholders_from_docx(template_bytes)
     return []
 
+def detect_table_placeholders(tokens):
+    """Detect which placeholders belong to tables based on numbering pattern"""
+    table_tokens = []
+    regular_tokens = []
+    
+    # Group tokens by their base name (without the number suffix)
+    token_groups = {}
+    
+    for token in tokens:
+        # Check if token has a number at the end (like _1, _2, etc.)
+        # This pattern matches things like COMPANY_NAME_1, REPRESENTATIVE_2, LESSOR_REPRESENTATIVE_NAME_1, etc.
+        match = re.search(r'^(.*?)(?:_(\d+))$', token)
+        if match:
+            base_name = match.group(1)
+            number = int(match.group(2))
+            
+            # We need at least 2 occurrences with numbers to consider it a table
+            if base_name not in token_groups:
+                token_groups[base_name] = []
+            token_groups[base_name].append((token, number))
+    
+    # Check which groups should be treated as tables (at least 2 occurrences with same base)
+    table_bases = {}
+    for base_name, tokens_list in token_groups.items():
+        if len(tokens_list) >= 2:
+            # Sort by number
+            tokens_list.sort(key=lambda x: x[1])
+            table_bases[base_name] = tokens_list
+    
+    # Mark tokens as table tokens if they belong to a detected table group
+    for token in tokens:
+        is_table_token = False
+        for base_name, tokens_list in table_bases.items():
+            if token in [t[0] for t in tokens_list]:
+                is_table_token = True
+                break
+        if is_table_token:
+            table_tokens.append(token)
+        else:
+            regular_tokens.append(token)
+    
+    return table_tokens, regular_tokens
+
 def replace_text_in_paragraph(paragraph, text_inputs):
     """Replace text in a paragraph while preserving formatting"""
-    # First pass: replace in runs
     for run in paragraph.runs:
         for token, value in text_inputs.items():
             if token in run.text:
-                # Replace with empty string if value is None or empty
                 replacement = str(value) if value else ''
                 run.text = run.text.replace(token, replacement)
     
-    # Second pass: handle text that might not be in runs
     if hasattr(paragraph, 'text') and paragraph.text:
         for token, value in text_inputs.items():
             if token in paragraph.text:
@@ -377,62 +417,52 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
     
     # Process regular paragraphs
     for paragraph in doc.paragraphs:
-        # Check for image placeholders - skip them for text replacement
         has_image = False
         for img_token in image_inputs.keys():
             if img_token in paragraph.text:
                 has_image = True
                 break
         
-        # Only replace text if no image placeholder is present
         if not has_image:
             replace_text_in_paragraph(paragraph, text_inputs)
     
     # Process tables
     for table in doc.tables:
-        # Check if this is a placeholder table with dynamic rows
         if table_data and len(table.rows) > 0:
-            # Check if first row (header) has placeholders or actual headers
             header_row = table.rows[0]
             has_placeholders = False
             
-            # Check if header row has any placeholders
             for cell in header_row.cells:
                 if '{{' in cell.text and '}}' in cell.text:
                     has_placeholders = True
                     break
             
             if has_placeholders:
-                # This is a placeholder table - replace with dynamic data
-                # Remove all rows after header (they will be recreated)
+                # Remove all rows after header
                 while len(table.rows) > 1:
                     table._element.remove(table.rows[-1]._element)
                 
-                # Add data rows from table_data for ALL rows
+                # Add data rows from table_data
                 for data_item in table_data:
                     new_row = table.add_row()
-                    # Check if table has the expected number of columns
                     if len(new_row.cells) >= 3:
-                        new_row.cells[0].text = str(data_item.get('company', '')) if data_item.get('company') else ''
-                        new_row.cells[1].text = str(data_item.get('rep', '')) if data_item.get('rep') else ''
-                        new_row.cells[2].text = str(data_item.get('designation', '')) if data_item.get('designation') else ''
+                        new_row.cells[0].text = str(data_item.get('col1', '')) if data_item.get('col1') else ''
+                        new_row.cells[1].text = str(data_item.get('col2', '')) if data_item.get('col2') else ''
+                        new_row.cells[2].text = str(data_item.get('col3', '')) if data_item.get('col3') else ''
                     else:
-                        # Handle tables with different column counts
                         for idx, cell in enumerate(new_row.cells):
                             if idx == 0:
-                                cell.text = str(data_item.get('company', '')) if data_item.get('company') else ''
+                                cell.text = str(data_item.get('col1', '')) if data_item.get('col1') else ''
                             elif idx == 1:
-                                cell.text = str(data_item.get('rep', '')) if data_item.get('rep') else ''
+                                cell.text = str(data_item.get('col2', '')) if data_item.get('col2') else ''
                             elif idx == 2:
-                                cell.text = str(data_item.get('designation', '')) if data_item.get('designation') else ''
+                                cell.text = str(data_item.get('col3', '')) if data_item.get('col3') else ''
             else:
-                # Regular table with fixed rows - just replace text
                 for row in table.rows:
                     for cell in row.cells:
                         for paragraph in cell.paragraphs:
                             replace_text_in_paragraph(paragraph, text_inputs)
         else:
-            # No dynamic data, just replace text
             for row in table.rows:
                 for cell in row.cells:
                     for paragraph in cell.paragraphs:
@@ -446,47 +476,63 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
 def get_download_filename(template_name, file_type):
     """Generate download filename based on template name"""
     if template_name:
-        # Remove the extension if present
         base_name = re.sub(r'\.(pptx|docx)$', '', template_name)
-        # Clean up the name
         base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
-        # Add timestamp to avoid overwriting
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"{base_name}_{timestamp}.{file_type}"
     else:
-        # Default name if no template name
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"Generated_Document_{timestamp}.{file_type}"
+
+def detect_table_structure(tokens):
+    """Detect table structure from tokens with numbering"""
+    table_data = {}
+    
+    for token in tokens:
+        # Check for numbered tokens (ends with _1, _2, etc.)
+        match = re.search(r'^(.*?)(?:_(\d+))$', token)
+        if match:
+            base_name = match.group(1)
+            number = int(match.group(2))
+            
+            if base_name not in table_data:
+                table_data[base_name] = []
+            table_data[base_name].append((token, number))
+    
+    # Filter to only keep groups with at least 2 occurrences
+    return {k: v for k, v in table_data.items() if len(v) >= 2}
+
+def organize_table_rows_from_tokens(tokens):
+    """Organize table placeholders into rows based on detected structure"""
+    table_structure = detect_table_structure(tokens)
+    
+    if not table_structure:
+        return [], []
+    
+    # Find the maximum number of rows
+    max_rows = 0
+    columns = []
+    
+    for base_name, tokens_list in table_structure.items():
+        max_rows = max(max_rows, max([t[1] for t in tokens_list]))
+        columns.append(base_name)
+    
+    # Create row data structure
+    rows = []
+    for i in range(1, max_rows + 1):
+        row = {}
+        for col in columns:
+            token = f"{col}_{i}"
+            if token in tokens:
+                row[f"col{len(row)+1}"] = f"{{{{{token}}}}}"
+        rows.append(row)
+    
+    return rows, columns
 
 # --- UI HELPERS ---
 def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
-
-def organize_table_rows(tokens):
-    """Organize table placeholders into rows"""
-    rows = []
-    
-    # Find all company name placeholders to determine number of rows
-    company_placeholders = [t for t in tokens if 'COMPANY_NAME_' in t]
-    company_numbers = []
-    for p in company_placeholders:
-        match = re.search(r'COMPANY_NAME_(\d+)', p)
-        if match:
-            company_numbers.append(int(match.group(1)))
-    
-    # Sort numbers to get row count
-    max_rows = max(company_numbers) if company_numbers else 0
-    
-    for i in range(1, max_rows + 1):
-        row = {
-            'company': f'{{{{COMPANY_NAME_{i}}}}}',
-            'rep': f'{{{{REPRESENTATIVE_{i}}}}}',
-            'designation': f'{{{{DESIGNATION_{i}}}}}'
-        }
-        rows.append(row)
-    
-    return rows
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -521,7 +567,8 @@ if "clear_uploader" not in st.session_state:
 # Dynamic table data
 if "table_data" not in st.session_state:
     st.session_state.table_data = []
-
+if "table_columns" not in st.session_state:
+    st.session_state.table_columns = []
 if "use_dynamic_table" not in st.session_state:
     st.session_state.use_dynamic_table = False
 
@@ -571,6 +618,7 @@ with col_template1:
                     st.session_state.template_loaded = False
                     st.session_state.tokens = []
                     st.session_state.table_data = []
+                    st.session_state.table_columns = []
                     st.session_state.show_delete_confirm = False
                     st.session_state.template_to_delete = None
                     st.success(f"Deleted: {st.session_state.template_to_delete}")
@@ -598,16 +646,22 @@ with col_template1:
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
             
-            # Detect if this is a table template
-            table_tokens = [t for t in tokens if any(x in t for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_'])]
-            if table_tokens and st.session_state.template_type == 'docx':
+            # Detect table placeholders
+            table_structure = detect_table_structure(tokens)
+            if table_structure and st.session_state.template_type == 'docx':
                 st.session_state.use_dynamic_table = True
-                # Initialize table data with empty rows based on placeholders
+                rows, columns = organize_table_rows_from_tokens(tokens)
+                st.session_state.table_columns = columns
                 if not st.session_state.table_data:
-                    row_count = len([t for t in table_tokens if 'COMPANY_NAME_' in t])
-                    st.session_state.table_data = [
-                        {"company": "", "rep": "", "designation": ""} for _ in range(row_count)
-                    ]
+                    # Initialize with empty rows based on detected structure
+                    st.session_state.table_data = []
+                    for i in range(1, len(rows) + 1):
+                        row_data = {}
+                        for col in columns:
+                            row_data[col] = ""
+                        st.session_state.table_data.append(row_data)
+            else:
+                st.session_state.use_dynamic_table = False
 
 with col_template2:
     uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
@@ -632,14 +686,18 @@ with col_template2:
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
         
-        # Detect if this is a table template
-        table_tokens = [t for t in tokens if any(x in t for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_'])]
-        if table_tokens and st.session_state.template_type == 'docx':
+        # Detect table placeholders
+        table_structure = detect_table_structure(tokens)
+        if table_structure and st.session_state.template_type == 'docx':
             st.session_state.use_dynamic_table = True
-            row_count = len([t for t in table_tokens if 'COMPANY_NAME_' in t])
-            st.session_state.table_data = [
-                {"company": "", "rep": "", "designation": ""} for _ in range(row_count)
-            ]
+            rows, columns = organize_table_rows_from_tokens(tokens)
+            st.session_state.table_columns = columns
+            st.session_state.table_data = []
+            for i in range(1, len(rows) + 1):
+                row_data = {}
+                for col in columns:
+                    row_data[col] = ""
+                st.session_state.table_data.append(row_data)
         else:
             st.session_state.use_dynamic_table = False
         
@@ -684,9 +742,8 @@ if u_template is not None and st.session_state.tokens:
     if not tokens:
         st.info("No placeholders found in the template.")
     else:
-        # Separate table tokens from regular tokens
-        table_tokens = [t for t in tokens if any(x in t for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_'])]
-        regular_tokens = [t for t in tokens if t not in table_tokens]
+        # Detect table vs regular tokens
+        table_tokens, regular_tokens = detect_table_placeholders(tokens)
         
         # --- DISPLAY REGULAR FIELDS (Grouped) ---
         if regular_tokens:
@@ -778,13 +835,17 @@ if u_template is not None and st.session_state.tokens:
         # --- DISPLAY DYNAMIC TABLE (Grouped) ---
         if table_tokens and st.session_state.use_dynamic_table and template_type == 'docx':
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Company Information Table</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Dynamic Table</div>', unsafe_allow_html=True)
             
             # Table controls
             col_controls1, col_controls2, col_controls3 = st.columns([1, 1, 6])
             with col_controls1:
                 if st.button("Add Row", use_container_width=True, key="add_table_row"):
-                    st.session_state.table_data.append({"company": "", "rep": "", "designation": ""})
+                    # Add a new row with empty values
+                    new_row = {}
+                    for col in st.session_state.table_columns:
+                        new_row[col] = ""
+                    st.session_state.table_data.append(new_row)
                     st.rerun()
             with col_controls2:
                 if len(st.session_state.table_data) > 1:
@@ -792,46 +853,37 @@ if u_template is not None and st.session_state.tokens:
                         st.session_state.table_data.pop()
                         st.rerun()
             
+            # Get column names from the table structure
+            # Extract clean column names from the placeholders
+            col_names = st.session_state.table_columns if st.session_state.table_columns else ["Column 1", "Column 2", "Column 3"]
+            clean_col_names = []
+            for col in col_names:
+                # Try to get a clean name from the placeholder
+                clean_name = col.replace("_", " ").title()
+                clean_col_names.append(clean_name)
+            
             # Table header
             col_headers = st.columns([2, 2, 2, 0.5])
-            with col_headers[0]:
-                st.markdown('<strong>Company Name</strong>', unsafe_allow_html=True)
-            with col_headers[1]:
-                st.markdown('<strong>Representative</strong>', unsafe_allow_html=True)
-            with col_headers[2]:
-                st.markdown('<strong>Designation</strong>', unsafe_allow_html=True)
-            with col_headers[3]:
+            for idx, col_name in enumerate(clean_col_names):
+                with col_headers[idx]:
+                    st.markdown(f'<strong>{col_name}</strong>', unsafe_allow_html=True)
+            with col_headers[len(clean_col_names)]:
                 st.markdown('', unsafe_allow_html=True)
             
             # Display each row with delete button
             rows_to_delete = []
             for idx, row_data in enumerate(st.session_state.table_data):
                 cols = st.columns([2, 2, 2, 0.5])
-                with cols[0]:
-                    row_data["company"] = st.text_input(
-                        f"Company {idx+1}", 
-                        value=row_data["company"], 
-                        key=f"table_company_{idx}",
-                        label_visibility="collapsed",
-                        placeholder=f"Company {idx+1}"
-                    )
-                with cols[1]:
-                    row_data["rep"] = st.text_input(
-                        f"Rep {idx+1}", 
-                        value=row_data["rep"], 
-                        key=f"table_rep_{idx}",
-                        label_visibility="collapsed",
-                        placeholder=f"Rep {idx+1}"
-                    )
-                with cols[2]:
-                    row_data["designation"] = st.text_input(
-                        f"Designation {idx+1}", 
-                        value=row_data["designation"], 
-                        key=f"table_designation_{idx}",
-                        label_visibility="collapsed",
-                        placeholder=f"Designation {idx+1}"
-                    )
-                with cols[3]:
+                for col_idx, col_key in enumerate(col_names):
+                    with cols[col_idx]:
+                        row_data[col_key] = st.text_input(
+                            f"{col_key}_{idx+1}", 
+                            value=row_data.get(col_key, ""), 
+                            key=f"table_{col_key}_{idx}",
+                            label_visibility="collapsed",
+                            placeholder=f"{clean_col_names[col_idx]} {idx+1}"
+                        )
+                with cols[len(col_names)]:
                     if len(st.session_state.table_data) > 1:
                         if st.button("Delete", key=f"delete_row_{idx}"):
                             rows_to_delete.append(idx)
@@ -845,30 +897,27 @@ if u_template is not None and st.session_state.tokens:
             st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
+            # Update text_data with table data for ALL rows
             # Clear existing table-related text_data entries first
             for key in list(text_data.keys()):
-                if any(x in key for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_']):
-                    del text_data[key]
+                if any(key.startswith(c) for c in col_names):
+                    if key in text_data:
+                        del text_data[key]
             
             # Then add all rows with proper empty value handling
             for idx, row_data in enumerate(st.session_state.table_data):
-                company_placeholder = f"{{{{COMPANY_NAME_{idx+1}}}}}"
-                rep_placeholder = f"{{{{REPRESENTATIVE_{idx+1}}}}}"
-                designation_placeholder = f"{{{{DESIGNATION_{idx+1}}}}}"
-                
-                # Store values - empty strings will be replaced with empty strings
-                text_data[company_placeholder] = row_data.get("company", "")
-                text_data[rep_placeholder] = row_data.get("rep", "")
-                text_data[designation_placeholder] = row_data.get("designation", "")
+                row_num = idx + 1
+                for col_key in col_names:
+                    placeholder = f"{{{{{col_key}_{row_num}}}}}"
+                    # Store values - empty strings will be replaced with empty strings
+                    text_data[placeholder] = row_data.get(col_key, "")
 
 # --- DOWNLOAD SECTION ---
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
     
-    # Get template name for file naming
     template_name = st.session_state.saved_template_name or "Generated_Document"
-    # Remove extension for clean name
     base_template_name = re.sub(r'\.(pptx|docx)$', '', template_name)
     
     col1, col2 = st.columns(2)
@@ -897,10 +946,19 @@ if u_template is not None:
         if docx_disabled:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
-            # Generate the document data
             try:
-                if st.session_state.use_dynamic_table and st.session_state.table_data:
-                    docx_data = generate_docx_bytes(template_bytes, text_data, image_data, st.session_state.table_data)
+                # Convert table_data to the format expected by generate_docx_bytes
+                # The table_data should be a list of dicts with col1, col2, col3 keys
+                formatted_table_data = []
+                for row in st.session_state.table_data:
+                    formatted_row = {}
+                    # Map the column names to col1, col2, col3 format
+                    for idx, col_key in enumerate(st.session_state.table_columns):
+                        formatted_row[f"col{idx+1}"] = row.get(col_key, "")
+                    formatted_table_data.append(formatted_row)
+                
+                if st.session_state.use_dynamic_table and formatted_table_data:
+                    docx_data = generate_docx_bytes(template_bytes, text_data, image_data, formatted_table_data)
                 else:
                     docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
                 
