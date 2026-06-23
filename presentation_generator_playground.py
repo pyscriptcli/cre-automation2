@@ -110,6 +110,21 @@ MINIMAL_CRE_SYSTEM = """
     
     /* Expander */
     .streamlit-expanderHeader { font-size: 14px !important; font-weight: 600 !important; }
+    
+    /* Table row styling */
+    .table-row { 
+        background-color: #F8F9FA; 
+        padding: 8px; 
+        border-radius: 4px; 
+        margin-bottom: 8px; 
+        border: 1px solid #E0E0E0;
+    }
+    .row-number {
+        font-weight: 600;
+        color: #003366;
+        padding-right: 10px;
+        font-size: 13px;
+    }
 </style>
 """
 
@@ -335,17 +350,53 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs.save(pptx_stream)
     return pptx_stream.getvalue()
 
-def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
+def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=None):
     doc = Document(io.BytesIO(template_bytes))
     
+    # Process regular paragraphs
     for paragraph in doc.paragraphs:
         replace_text_in_paragraph(paragraph, text_inputs)
     
+    # Process tables - handle dynamic rows
     for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    replace_text_in_paragraph(paragraph, text_inputs)
+        # Check if this is a placeholder table with dynamic rows
+        if table_data and len(table.rows) > 0:
+            # Check if first row (header) has placeholders or actual headers
+            header_row = table.rows[0]
+            has_placeholders = False
+            
+            # Check if header row has any placeholders
+            for cell in header_row.cells:
+                if '{{' in cell.text and '}}' in cell.text:
+                    has_placeholders = True
+                    break
+            
+            if has_placeholders:
+                # This is a placeholder table - replace with dynamic data
+                # Keep the header row
+                while len(table.rows) > 1:
+                    table._element.remove(table.rows[-1]._element)
+                
+                # Add data rows from table_data
+                for data_item in table_data:
+                    new_row = table.add_row()
+                    # Assuming the table has 3 columns: Company, Representative, Designation
+                    if len(new_row.cells) >= 3:
+                        new_row.cells[0].text = data_item.get('company', '')
+                        new_row.cells[1].text = data_item.get('rep', '')
+                        new_row.cells[2].text = data_item.get('designation', '')
+            else:
+                # Regular table with fixed rows - just replace text
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            replace_text_in_paragraph(paragraph, text_inputs)
+        else:
+            # No dynamic data, just replace text
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        replace_text_in_paragraph(paragraph, text_inputs)
     
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
@@ -356,6 +407,31 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
 def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
+
+def organize_table_rows(tokens):
+    """Organize table placeholders into rows"""
+    rows = []
+    
+    # Find all company name placeholders to determine number of rows
+    company_placeholders = [t for t in tokens if 'COMPANY_NAME_' in t]
+    company_numbers = []
+    for p in company_placeholders:
+        match = re.search(r'COMPANY_NAME_(\d+)', p)
+        if match:
+            company_numbers.append(int(match.group(1)))
+    
+    # Sort numbers to get row count
+    max_rows = max(company_numbers) if company_numbers else 0
+    
+    for i in range(1, max_rows + 1):
+        row = {
+            'company': f'{{{{COMPANY_NAME_{i}}}}}',
+            'rep': f'{{{{REPRESENTATIVE_{i}}}}}',
+            'designation': f'{{{{DESIGNATION_{i}}}}}'
+        }
+        rows.append(row)
+    
+    return rows
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -386,6 +462,13 @@ if "saved_file_name" not in st.session_state:
     st.session_state.saved_file_name = None
 if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
+
+# Dynamic table data
+if "table_data" not in st.session_state:
+    st.session_state.table_data = []
+
+if "use_dynamic_table" not in st.session_state:
+    st.session_state.use_dynamic_table = False
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -432,6 +515,7 @@ with col_template1:
                     st.session_state.saved_template_name = None
                     st.session_state.template_loaded = False
                     st.session_state.tokens = []
+                    st.session_state.table_data = []
                     st.session_state.show_delete_confirm = False
                     st.session_state.template_to_delete = None
                     st.success(f"Deleted: {st.session_state.template_to_delete}")
@@ -458,9 +542,19 @@ with col_template1:
             
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
+            
+            # Detect if this is a table template
+            table_tokens = [t for t in tokens if any(x in t for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_'])]
+            if table_tokens and st.session_state.template_type == 'docx':
+                st.session_state.use_dynamic_table = True
+                # Initialize table data with empty rows based on placeholders
+                if not st.session_state.table_data:
+                    row_count = len([t for t in table_tokens if 'COMPANY_NAME_' in t])
+                    st.session_state.table_data = [
+                        {"company": "", "rep": "", "designation": ""} for _ in range(row_count)
+                    ]
 
 with col_template2:
-    # Use a different key if we need to clear the uploader
     uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
     
     uploaded_template = st.file_uploader(
@@ -470,7 +564,6 @@ with col_template2:
         key=uploader_key
     )
     
-    # Reset the clear flag after creating a new uploader
     if st.session_state.clear_uploader:
         st.session_state.clear_uploader = False
     
@@ -484,9 +577,18 @@ with col_template2:
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
         
-        # Save Template Button
+        # Detect if this is a table template
+        table_tokens = [t for t in tokens if any(x in t for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_'])]
+        if table_tokens and st.session_state.template_type == 'docx':
+            st.session_state.use_dynamic_table = True
+            row_count = len([t for t in table_tokens if 'COMPANY_NAME_' in t])
+            st.session_state.table_data = [
+                {"company": "", "rep": "", "designation": ""} for _ in range(row_count)
+            ]
+        else:
+            st.session_state.use_dynamic_table = False
+        
         if st.button("Save Template", key="save_template_btn", use_container_width=True):
-            # Save the template first
             saved_path = save_template_to_file(template_bytes, uploaded_template.name)
             st.session_state.saved_template_name = uploaded_template.name
             
@@ -494,13 +596,11 @@ with col_template2:
                 config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
                 save_config_to_file(st.session_state.custom_mapping, config_name)
             
-            # Set success state and clear uploader flag
             st.session_state.save_success = True
             st.session_state.saved_file_name = uploaded_template.name
             st.session_state.clear_uploader = True
             st.rerun()
 
-# Show success message if template was just saved
 if st.session_state.save_success:
     st.success(f"Template '{st.session_state.saved_file_name}' saved successfully! Refresh the page to see it in the dropdown.")
     st.session_state.save_success = False
@@ -529,111 +629,184 @@ if u_template is not None and st.session_state.tokens:
     if not tokens:
         st.info("No placeholders found in the template.")
     else:
-        mid_point = len(tokens) // 2
-        col1_tokens = tokens[:mid_point]
-        col2_tokens = tokens[mid_point:]
+        # Separate table tokens from regular tokens
+        table_tokens = [t for t in tokens if any(x in t for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_'])]
+        regular_tokens = [t for t in tokens if t not in table_tokens]
         
-        col1, col2 = st.columns(2)
-        
-        # --- COLUMN 1 ---
-        with col1:
+        # --- DISPLAY REGULAR FIELDS (Grouped) ---
+        if regular_tokens:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
-            for token in col1_tokens:
-                clean_label = token.replace("{", "").replace("}", "")
-                
-                # Get the current type from session state, default to "Text"
-                current_type = st.session_state.custom_mapping.get(token, "Text")
-                
-                # Always show both the type selector and the appropriate input
-                col_a, col_b = st.columns([3, 1])
-                
-                with col_b:
-                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                    type_key = f"type_{token}"
-                    data_type = st.selectbox(
-                        "Type",
-                        ["Text", "Image"],
-                        index=0 if current_type == "Text" else 1,
-                        key=type_key,
-                        label_visibility="collapsed"
-                    )
-                    # Update session state with the new type
-                    if data_type != current_type:
-                        st.session_state.custom_mapping[token] = data_type
-                        auto_save_config()
-                        st.rerun()
-                
-                with col_a:
-                    # Show appropriate input based on type
-                    if data_type == "Image" and template_type == 'pptx':
-                        image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
-                        field_types[token] = "Image"
-                    else:
-                        if data_type == "Image" and template_type != 'pptx':
-                            st.warning("Image replacement only supported in PPTX templates")
-                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                        field_types[token] = "Text"
+            st.markdown('<div class="section-header">📋 General Information</div>', unsafe_allow_html=True)
+            
+            # Split regular tokens into two columns
+            mid_point = len(regular_tokens) // 2
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                for token in regular_tokens[:mid_point]:
+                    clean_label = token.replace("{", "").replace("}", "")
+                    
+                    current_type = st.session_state.custom_mapping.get(token, "Text")
+                    col_a, col_b = st.columns([3, 1])
+                    
+                    with col_b:
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                        type_key = f"type_{token}"
+                        data_type = st.selectbox(
+                            "Type",
+                            ["Text", "Image"],
+                            index=0 if current_type == "Text" else 1,
+                            key=type_key,
+                            label_visibility="collapsed"
+                        )
+                        if data_type != current_type:
+                            st.session_state.custom_mapping[token] = data_type
+                            auto_save_config()
+                            st.rerun()
+                    
+                    with col_a:
+                        if data_type == "Image" and template_type == 'pptx':
+                            image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                            field_types[token] = "Image"
+                        else:
+                            if data_type == "Image" and template_type != 'pptx':
+                                st.warning("Image replacement only supported in PPTX templates")
+                            st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                            text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                            field_types[token] = "Text"
+            
+            with col2:
+                for token in regular_tokens[mid_point:]:
+                    clean_label = token.replace("{", "").replace("}", "")
+                    
+                    current_type = st.session_state.custom_mapping.get(token, "Text")
+                    col_a, col_b = st.columns([3, 1])
+                    
+                    with col_b:
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                        type_key = f"type_{token}_2"
+                        data_type = st.selectbox(
+                            "Type",
+                            ["Text", "Image"],
+                            index=0 if current_type == "Text" else 1,
+                            key=type_key,
+                            label_visibility="collapsed"
+                        )
+                        if data_type != current_type:
+                            st.session_state.custom_mapping[token] = data_type
+                            auto_save_config()
+                            st.rerun()
+                    
+                    with col_a:
+                        if data_type == "Image" and template_type == 'pptx':
+                            image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                            field_types[token] = "Image"
+                        else:
+                            if data_type == "Image" and template_type != 'pptx':
+                                st.warning("Image replacement only supported in PPTX templates")
+                            st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                            text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                            field_types[token] = "Text"
+            
             st.markdown('</div>', unsafe_allow_html=True)
         
-        # --- COLUMN 2 ---
-        with col2:
+        # --- DISPLAY DYNAMIC TABLE (Grouped) ---
+        if table_tokens and st.session_state.use_dynamic_table and template_type == 'docx':
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
-            for token in col2_tokens:
-                clean_label = token.replace("{", "").replace("}", "")
-                
-                # Get the current type from session state, default to "Text"
-                current_type = st.session_state.custom_mapping.get(token, "Text")
-                
-                # Always show both the type selector and the appropriate input
-                col_a, col_b = st.columns([3, 1])
-                
-                with col_b:
-                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                    type_key = f"type_{token}_2"
-                    data_type = st.selectbox(
-                        "Type",
-                        ["Text", "Image"],
-                        index=0 if current_type == "Text" else 1,
-                        key=type_key,
-                        label_visibility="collapsed"
-                    )
-                    # Update session state with the new type
-                    if data_type != current_type:
-                        st.session_state.custom_mapping[token] = data_type
-                        auto_save_config()
+            st.markdown('<div class="section-header">🏢 Company Information Table</div>', unsafe_allow_html=True)
+            
+            # Table controls
+            col_controls1, col_controls2, col_controls3 = st.columns([1, 1, 6])
+            with col_controls1:
+                if st.button("➕ Add Row", use_container_width=True, key="add_table_row"):
+                    st.session_state.table_data.append({"company": "", "rep": "", "designation": ""})
+                    st.rerun()
+            with col_controls2:
+                if len(st.session_state.table_data) > 1:
+                    if st.button("➖ Remove Last", use_container_width=True, key="remove_last_row"):
+                        st.session_state.table_data.pop()
                         st.rerun()
-                
-                with col_a:
-                    # Show appropriate input based on type
-                    if data_type == "Image" and template_type == 'pptx':
-                        image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
-                        field_types[token] = "Image"
-                    else:
-                        if data_type == "Image" and template_type != 'pptx':
-                            st.warning("Image replacement only supported in PPTX templates")
-                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                        field_types[token] = "Text"
+            
+            # Table header
+            col_headers = st.columns([2, 2, 2, 0.5])
+            with col_headers[0]:
+                st.markdown('<strong>🏢 Company Name</strong>', unsafe_allow_html=True)
+            with col_headers[1]:
+                st.markdown('<strong>👤 Representative</strong>', unsafe_allow_html=True)
+            with col_headers[2]:
+                st.markdown('<strong>📋 Designation</strong>', unsafe_allow_html=True)
+            with col_headers[3]:
+                st.markdown('', unsafe_allow_html=True)
+            
+            # Display each row with delete button
+            rows_to_delete = []
+            for idx, row_data in enumerate(st.session_state.table_data):
+                cols = st.columns([2, 2, 2, 0.5])
+                with cols[0]:
+                    row_data["company"] = st.text_input(
+                        "", 
+                        value=row_data["company"], 
+                        key=f"table_company_{idx}",
+                        label_visibility="collapsed",
+                        placeholder=f"Company {idx+1}"
+                    )
+                with cols[1]:
+                    row_data["rep"] = st.text_input(
+                        "", 
+                        value=row_data["rep"], 
+                        key=f"table_rep_{idx}",
+                        label_visibility="collapsed",
+                        placeholder=f"Rep {idx+1}"
+                    )
+                with cols[2]:
+                    row_data["designation"] = st.text_input(
+                        "", 
+                        value=row_data["designation"], 
+                        key=f"table_designation_{idx}",
+                        label_visibility="collapsed",
+                        placeholder=f"Designation {idx+1}"
+                    )
+                with cols[3]:
+                    if len(st.session_state.table_data) > 1:
+                        if st.button("🗑️", key=f"delete_row_{idx}"):
+                            rows_to_delete.append(idx)
+            
+            # Delete rows after loop to avoid issues
+            if rows_to_delete:
+                for idx in sorted(rows_to_delete, reverse=True):
+                    st.session_state.table_data.pop(idx)
+                st.rerun()
+            
+            st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Update text_data with table data for placeholder replacement
+            # For fixed placeholders (COMPANY_NAME_1, etc.), map the dynamic data
+            for idx, row_data in enumerate(st.session_state.table_data):
+                if idx < len(table_tokens) // 3:  # Make sure we don't exceed placeholder count
+                    company_placeholder = f"{{{{COMPANY_NAME_{idx+1}}}}}"
+                    rep_placeholder = f"{{{{REPRESENTATIVE_{idx+1}}}}}"
+                    designation_placeholder = f"{{{{DESIGNATION_{idx+1}}}}}"
+                    
+                    if company_placeholder in tokens:
+                        text_data[company_placeholder] = row_data.get("company", "")
+                    if rep_placeholder in tokens:
+                        text_data[rep_placeholder] = row_data.get("rep", "")
+                    if designation_placeholder in tokens:
+                        text_data[designation_placeholder] = row_data.get("designation", "")
 
 # --- DOWNLOAD SECTION ---
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
     
-    # Two columns for download buttons (PPTX and DOCX only)
     col1, col2 = st.columns(2)
     
     with col1:
-        # PPTX Download Button - generates and downloads in one click
         pptx_disabled = template_type != 'pptx'
         if pptx_disabled:
             st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
-            # Create a function that generates the file when download is clicked
             def generate_pptx():
                 return generate_pptx_bytes(template_bytes, text_data, image_data)
             
@@ -647,14 +820,16 @@ if u_template is not None:
             )
     
     with col2:
-        # DOCX Download Button - generates and downloads in one click
         docx_disabled = template_type != 'docx'
         if docx_disabled:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
-            # Create a function that generates the file when download is clicked
             def generate_docx():
-                return generate_docx_bytes(template_bytes, text_data, image_data)
+                # Pass table data for dynamic row generation
+                if st.session_state.use_dynamic_table and st.session_state.table_data:
+                    return generate_docx_bytes(template_bytes, text_data, image_data, st.session_state.table_data)
+                else:
+                    return generate_docx_bytes(template_bytes, text_data, image_data)
             
             st.download_button(
                 label="Download DOCX",
