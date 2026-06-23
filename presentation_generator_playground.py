@@ -816,20 +816,19 @@ if u_template is not None and st.session_state.tokens:
             st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Update text_data with table data for placeholder replacement
-            # For fixed placeholders (COMPANY_NAME_1, etc.), map the dynamic data
+            # --- FIX: Update text_data with table data for all rows ---
+            # Instead of limiting by table_tokens count, map all rows
             for idx, row_data in enumerate(st.session_state.table_data):
-                if idx < len(table_tokens) // 3:  # Make sure we don't exceed placeholder count
-                    company_placeholder = f"{{{{COMPANY_NAME_{idx+1}}}}}"
-                    rep_placeholder = f"{{{{REPRESENTATIVE_{idx+1}}}}}"
-                    designation_placeholder = f"{{{{DESIGNATION_{idx+1}}}}}"
-                    
-                    if company_placeholder in tokens:
-                        text_data[company_placeholder] = row_data.get("company", "")
-                    if rep_placeholder in tokens:
-                        text_data[rep_placeholder] = row_data.get("rep", "")
-                    if designation_placeholder in tokens:
-                        text_data[designation_placeholder] = row_data.get("designation", "")
+                # Generate placeholders for each row
+                company_placeholder = f"{{{{COMPANY_NAME_{idx+1}}}}}"
+                rep_placeholder = f"{{{{REPRESENTATIVE_{idx+1}}}}}"
+                designation_placeholder = f"{{{{DESIGNATION_{idx+1}}}}}"
+                
+                # Always add to text_data, even if placeholder doesn't exist
+                # This ensures the data is available for dynamic table generation
+                text_data[company_placeholder] = row_data.get("company", "")
+                text_data[rep_placeholder] = row_data.get("rep", "")
+                text_data[designation_placeholder] = row_data.get("designation", "")
 
 # --- DOWNLOAD SECTION ---
 if u_template is not None:
