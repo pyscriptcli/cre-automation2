@@ -24,8 +24,18 @@ if not os.path.exists(_config_file):
 # --- MINIMAL UI CSS ---
 MINIMAL_CRE_SYSTEM = """
 <style>
+    /* Hide Streamlit top bar */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display: none;}
+    .stApp > header {display: none !important;}
+    .stApp > header + div {padding-top: 0 !important;}
+    
+    /* Hide the "Manage app" button */
+    .stApp > div:last-child button {display: none !important;}
+    
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
-    div[data-testid="stHeader"] { background-color: #FFFFFF !important; }
+    div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
     
     /* Inputs */
@@ -121,14 +131,16 @@ MINIMAL_CRE_SYSTEM = """
         justify-content: center;
         align-items: center;
         z-index: 10000;
+        padding: 20px;
     }
     .modal-content {
         background: #FFFFFF;
         border-radius: 8px;
         padding: 30px;
         max-width: 500px;
-        width: 90%;
+        width: 100%;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        position: relative;
     }
     .modal-title {
         font-size: 20px;
@@ -141,14 +153,83 @@ MINIMAL_CRE_SYSTEM = """
         color: #666;
         margin-bottom: 20px;
     }
+    .modal-checkboxes {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 15px 0;
+    }
+    .modal-checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        border: 1px solid #E0E0E0;
+        border-radius: 4px;
+        background: #FAFAFA;
+    }
+    .modal-checkbox-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+    .modal-checkbox-item label {
+        font-size: 15px;
+        font-weight: 500;
+        color: #1A1A1A;
+        cursor: pointer;
+        flex: 1;
+    }
     .modal-buttons {
         display: flex;
         gap: 10px;
         margin-top: 20px;
-        flex-wrap: wrap;
     }
     .modal-buttons .stButton > button {
+        padding: 10px 20px !important;
+        min-width: 120px;
+    }
+    .modal-buttons .stButton {
+        flex: 1;
+    }
+    
+    /* Custom checkbox styling for Streamlit */
+    .stCheckbox {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .stCheckbox label {
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        color: #1A1A1A !important;
+    }
+    .stCheckbox > div {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 10px 15px !important;
+        border: 1px solid #E0E0E0 !important;
+        border-radius: 4px !important;
+        background: #FAFAFA !important;
+        margin: 5px 0 !important;
+    }
+    
+    /* Download buttons container */
+    .download-buttons-container {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+    .download-buttons-container .stButton {
+        flex: 1;
         min-width: 100px;
+    }
+    
+    /* Hide the default Streamlit checkbox label */
+    .stCheckbox label {
+        display: flex !important;
+        align-items: center !important;
     }
 </style>
 """
@@ -456,7 +537,7 @@ def simple_uploader_row(label_text, allowed_types, key):
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
 # --- INIT APP ---
-st.set_page_config(page_title="Document Generator", layout="wide")
+st.set_page_config(page_title="Document Generator", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
 # Initialize all session state variables
@@ -490,14 +571,10 @@ if "show_file_selector" not in st.session_state:
     st.session_state.show_file_selector = False
 if "generated_files" not in st.session_state:
     st.session_state.generated_files = {}
-if "temp_pptx" not in st.session_state:
-    st.session_state.temp_pptx = None
-if "temp_pdf" not in st.session_state:
-    st.session_state.temp_pdf = None
-if "temp_docx" not in st.session_state:
-    st.session_state.temp_docx = None
 if "generation_complete" not in st.session_state:
     st.session_state.generation_complete = False
+if "selected_formats" not in st.session_state:
+    st.session_state.selected_formats = {"pptx": True, "pdf": True, "docx": True}
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -531,7 +608,7 @@ with col_template1:
     with delete_col:
         if selected_template and selected_template != "Select saved template":
             template_name = selected_template.split(' (')[0]
-            if st.button("Delete Template", key="delete_template", help="Delete this template"):
+            if st.button("🗑️", key="delete_template", help="Delete this template"):
                 # Use a confirmation dialog
                 st.warning(f"Are you sure you want to delete '{template_name}'?")
                 col_confirm1, col_confirm2 = st.columns(2)
@@ -757,49 +834,68 @@ if u_template is not None:
         st.markdown("""
         <div class="modal-overlay">
             <div class="modal-content">
-                <div class="modal-title">Choose Output Format</div>
-                <div class="modal-subtitle">Select the file types you want to download:</div>
+                <div class="modal-title">📋 Choose Output Format</div>
+                <div class="modal-subtitle">Select the file types you want to generate:</div>
         """, unsafe_allow_html=True)
         
+        # Custom styled checkboxes
         col1, col2, col3 = st.columns(3)
         with col1:
-            download_pptx = st.checkbox("📊 PPTX", value=True, key="dl_pptx")
+            st.session_state.selected_formats["pptx"] = st.checkbox(
+                "📊 PPTX", 
+                value=st.session_state.selected_formats.get("pptx", True),
+                key="dl_pptx"
+            )
         with col2:
-            download_pdf = st.checkbox("📄 PDF", value=True, key="dl_pdf")
+            st.session_state.selected_formats["pdf"] = st.checkbox(
+                "📄 PDF", 
+                value=st.session_state.selected_formats.get("pdf", True),
+                key="dl_pdf"
+            )
         with col3:
-            download_docx = st.checkbox("📝 DOCX", value=True, key="dl_docx")
+            st.session_state.selected_formats["docx"] = st.checkbox(
+                "📝 DOCX", 
+                value=st.session_state.selected_formats.get("docx", True),
+                key="dl_docx"
+            )
         
+        # Buttons
         col_btns1, col_btns2 = st.columns(2)
         with col_btns1:
             if st.button("✅ Generate Selected", key="generate_selected", use_container_width=True):
-                st.session_state.show_file_selector = False
-                st.session_state.is_loading = True
-                st.rerun()
+                # Check if at least one format is selected
+                if any(st.session_state.selected_formats.values()):
+                    st.session_state.show_file_selector = False
+                    st.session_state.is_loading = True
+                    st.session_state.generation_complete = False
+                    st.rerun()
+                else:
+                    st.warning("Please select at least one format")
+        
         with col_btns2:
             if st.button("❌ Cancel", key="cancel_generation", use_container_width=True):
                 st.session_state.show_file_selector = False
-                st.session_state.is_loading = False
                 st.rerun()
         
         st.markdown("</div></div>", unsafe_allow_html=True)
     
     # Generate button (disabled while loading)
     generate_disabled = st.session_state.is_loading or st.session_state.show_file_selector
-    if st.button("Generate", use_container_width=True, disabled=generate_disabled):
+    if st.button("🚀 Generate", use_container_width=True, disabled=generate_disabled):
         # Show the file selector popup
         st.session_state.show_file_selector = True
         st.rerun()
     
     # Actual generation happens here (after user selects file types)
-    if st.session_state.is_loading and st.session_state.generation_complete == False:
+    if st.session_state.is_loading and not st.session_state.generation_complete:
         with st.spinner("Generating document..."):
             try:
                 generated_files = {}
                 
                 # Determine which files to generate based on user selection
-                generate_pptx = st.session_state.get('dl_pptx', True)
-                generate_pdf = st.session_state.get('dl_pdf', True)
-                generate_docx = st.session_state.get('dl_docx', True)
+                generate_pptx = st.session_state.selected_formats.get("pptx", False)
+                generate_pdf = st.session_state.selected_formats.get("pdf", False)
+                generate_docx = st.session_state.selected_formats.get("docx", False)
                 
                 # Generate based on template type
                 if template_type == 'pptx':
@@ -811,11 +907,12 @@ if u_template is not None:
                         pdf_bytes = convert_pptx_to_pdf(raw_pptx)
                         if pdf_bytes:
                             generated_files['pdf'] = pdf_bytes
+                        else:
+                            st.warning("PDF generation failed. LibreOffice might not be installed.")
                     
+                    # For DOCX from PPTX - we'll note it's not available
                     if generate_docx:
-                        # For PPTX, we can't directly convert to DOCX
-                        # We'll keep the PPTX format
-                        pass
+                        st.warning("DOCX export from PPTX is not supported. Only PPTX and PDF are available for this template type.")
                         
                 else:  # docx
                     # Always generate DOCX since it's the source
@@ -826,11 +923,12 @@ if u_template is not None:
                         pdf_bytes = convert_docx_to_pdf(raw_docx)
                         if pdf_bytes:
                             generated_files['pdf'] = pdf_bytes
+                        else:
+                            st.warning("PDF generation failed. LibreOffice might not be installed.")
                     
+                    # For PPTX from DOCX - we'll note it's not available
                     if generate_pptx:
-                        # For DOCX, we can't directly convert to PPTX
-                        # We'll keep the DOCX format
-                        pass
+                        st.warning("PPTX export from DOCX is not supported. Only DOCX and PDF are available for this template type.")
                 
                 # Store generated files
                 st.session_state.generated_files = generated_files
@@ -843,86 +941,68 @@ if u_template is not None:
                 st.session_state.generated = True
                 st.session_state.generation_complete = True
                 st.session_state.is_loading = False
-                st.success("Document generated successfully!")
+                
+                if generated_files:
+                    st.success("✅ Document generated successfully!")
+                else:
+                    st.error("No files were generated. Please check your selections.")
+                    
                 st.rerun()
                 
             except Exception as e:
                 st.session_state.is_loading = False
                 st.session_state.show_file_selector = False
-                st.error(f"Error: {e}")
+                st.error(f"❌ Error: {str(e)}")
                 st.rerun()
     
     # Show export buttons only after generation
     if st.session_state.generated and st.session_state.generation_complete:
         st.markdown("<hr>", unsafe_allow_html=True)
         
-        # Determine which buttons to show based on template type
-        if template_type == 'pptx':
-            # For PPTX templates: Show PPTX, PDF (if available)
-            col_count = 2 if st.session_state.final_pdf else 1
-            cols = st.columns(col_count)
-            col_idx = 0
-            
-            if st.session_state.final_pptx:
-                with cols[col_idx]:
-                    st.download_button(
-                        "📊 Download PPTX",
-                        data=st.session_state.final_pptx,
-                        file_name="Generated_Document.pptx",
-                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        use_container_width=True
-                    )
-                col_idx += 1
-            
-            if st.session_state.final_pdf:
-                with cols[col_idx]:
-                    st.download_button(
-                        "📄 Download PDF",
-                        data=st.session_state.final_pdf,
-                        file_name="Generated_Document.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-                col_idx += 1
-                
-        else:  # docx
-            # For DOCX templates: Show DOCX, PDF (if available)
-            col_count = 2 if st.session_state.final_pdf else 1
-            cols = st.columns(col_count)
-            col_idx = 0
-            
-            if st.session_state.final_docx:
-                with cols[col_idx]:
-                    st.download_button(
-                        "📝 Download DOCX",
-                        data=st.session_state.final_docx,
-                        file_name="Generated_Document.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True
-                    )
-                col_idx += 1
-            
-            if st.session_state.final_pdf:
-                with cols[col_idx]:
-                    st.download_button(
-                        "📄 Download PDF",
-                        data=st.session_state.final_pdf,
-                        file_name="Generated_Document.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-                col_idx += 1
+        # Determine which buttons to show based on what was generated
+        available_formats = []
+        if st.session_state.final_pptx:
+            available_formats.append(('pptx', '📊 Download PPTX', 'Generated_Document.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'))
+        if st.session_state.final_pdf:
+            available_formats.append(('pdf', '📄 Download PDF', 'Generated_Document.pdf', 'application/pdf'))
+        if st.session_state.final_docx:
+            available_formats.append(('docx', '📝 Download DOCX', 'Generated_Document.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'))
+        
+        if available_formats:
+            # Create columns for available formats
+            cols = st.columns(len(available_formats))
+            for idx, (format_key, label, filename, mime_type) in enumerate(available_formats):
+                with cols[idx]:
+                    data = None
+                    if format_key == 'pptx':
+                        data = st.session_state.final_pptx
+                    elif format_key == 'pdf':
+                        data = st.session_state.final_pdf
+                    elif format_key == 'docx':
+                        data = st.session_state.final_docx
+                    
+                    if data:
+                        st.download_button(
+                            label=label,
+                            data=data,
+                            file_name=filename,
+                            mime=mime_type,
+                            use_container_width=True
+                        )
         
         # Reset button
         if st.button("🔄 Generate New", use_container_width=True):
+            # Reset all generation-related states
             st.session_state.generated = False
             st.session_state.generation_complete = False
             st.session_state.generated_files = {}
             st.session_state.final_pptx = None
             st.session_state.final_pdf = None
             st.session_state.final_docx = None
+            st.session_state.is_loading = False
+            st.session_state.show_file_selector = False
             st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("Please upload or select a template to begin")
+    st.info("📄 Please upload or select a template to begin")
