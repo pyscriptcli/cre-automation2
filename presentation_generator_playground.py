@@ -230,7 +230,7 @@ def load_config_from_file(config_name="template_config.json"):
     return None
 
 def auto_save_config():
-    if st.session_state.saved_template_name and st.session_state.custom_mapping:
+    if hasattr(st.session_state, 'saved_template_name') and st.session_state.saved_template_name and hasattr(st.session_state, 'custom_mapping') and st.session_state.custom_mapping:
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
@@ -272,7 +272,7 @@ def extract_placeholders_from_pptx(pptx_bytes):
                         if token not in seen:
                             tokens.append(token)
                             seen.add(token)
-                if shape.has_table:
+                if hasattr(shape, 'table') and shape.table:
                     for row in shape.table.rows:
                         for cell in row.cells:
                             found = re.findall(r'\{\{.*?\}\}', cell.text)
@@ -589,9 +589,9 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
         
         col1, col2, col3 = st.columns([2, 1, 1])
         with col1:
-            manual_base = st.text_input("Base Name (without _number)", key="manual_base", placeholder="e.g., CUSTOM")
+            manual_base = st.text_input("Base Name (without _number)", key="manual_base", placeholder="e.g., CUSTOM", label_visibility="visible")
         with col2:
-            manual_rows = st.number_input("Number of Rows", min_value=1, value=1, key="manual_rows", step=1)
+            manual_rows = st.number_input("Number of Rows", min_value=1, value=1, key="manual_rows", step=1, label_visibility="visible")
         with col3:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Add Group", key="add_manual_group"):
@@ -634,7 +634,7 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
-# Initialize session state
+# Initialize session state - ALL variables properly initialized
 if "custom_mapping" not in st.session_state:
     st.session_state.custom_mapping = {}
 if "tokens" not in st.session_state:
@@ -703,7 +703,7 @@ with col_template1:
             "Load Template",
             template_options,
             key="saved_template_select",
-            label_visibility="collapsed"
+            label_visibility="visible"
         )
     
     with delete_col:
@@ -807,7 +807,7 @@ with col_template2:
     uploaded_template = st.file_uploader(
         "Upload New Template", 
         type=["pptx", "docx"], 
-        label_visibility="collapsed", 
+        label_visibility="visible", 
         key=uploader_key
     )
     
@@ -892,9 +892,11 @@ if u_template is not None and st.session_state.tokens:
         st.info("No placeholders found in the template.")
     else:
         table_tokens = set()
-        for base_name, config in table_config.items():
-            for token in config['tokens']:
-                table_tokens.add(token)
+        if isinstance(table_config, dict):
+            for base_name, config in table_config.items():
+                if isinstance(config, dict) and 'tokens' in config:
+                    for token in config['tokens']:
+                        table_tokens.add(token)
         
         regular_tokens = [t for t in tokens if t not in table_tokens]
         
@@ -937,8 +939,8 @@ if u_template is not None and st.session_state.tokens:
                                 st.warning("Image replacement only supported in PPTX templates")
                             st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                             text_data[token] = st.text_input(
-                                clean_label, 
-                                key=f"val_{token}", 
+                                label=clean_label,
+                                key=f"val_{token}",
                                 label_visibility="collapsed"
                             )
                             field_types[token] = "Text"
@@ -974,8 +976,8 @@ if u_template is not None and st.session_state.tokens:
                                 st.warning("Image replacement only supported in PPTX templates")
                             st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                             text_data[token] = st.text_input(
-                                clean_label, 
-                                key=f"val_{token}", 
+                                label=clean_label,
+                                key=f"val_{token}",
                                 label_visibility="collapsed"
                             )
                             field_types[token] = "Text"
@@ -983,7 +985,7 @@ if u_template is not None and st.session_state.tokens:
             st.markdown('</div>', unsafe_allow_html=True)
         
         # --- DISPLAY DYNAMIC TABLE ---
-        if table_config and st.session_state.use_dynamic_table and template_type == 'docx' and st.session_state.table_data:
+        if isinstance(table_config, dict) and table_config and st.session_state.use_dynamic_table and template_type == 'docx' and st.session_state.table_data:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Table Data</div>', unsafe_allow_html=True)
             
@@ -991,7 +993,8 @@ if u_template is not None and st.session_state.tokens:
             
             max_rows = 0
             for base_name, config in table_config.items():
-                max_rows = max(max_rows, config['max_row'])
+                if isinstance(config, dict) and 'max_row' in config:
+                    max_rows = max(max_rows, config['max_row'])
             
             st.markdown(f'<div style="font-size:12px;color:#666;margin-bottom:10px;">{len(table_headers)} columns, {max_rows} base rows</div>', unsafe_allow_html=True)
             
@@ -1028,8 +1031,8 @@ if u_template is not None and st.session_state.tokens:
                 for col_idx, header in enumerate(table_headers):
                     with cols[col_idx]:
                         row_data[header] = st.text_input(
-                            f"{header}_{idx+1}", 
-                            value=row_data.get(header, ""), 
+                            label=f"{header}_{idx+1}",
+                            value=row_data.get(header, ""),
                             key=f"table_{header}_{idx}",
                             label_visibility="collapsed",
                             placeholder=f"{header.replace('_', ' ').title()} {idx+1}"
@@ -1048,6 +1051,7 @@ if u_template is not None and st.session_state.tokens:
             st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
+            # Remove table placeholders from text_data
             for key in list(text_data.keys()):
                 if '{{' in key and '_' in key:
                     for base_name in table_config.keys():
@@ -1055,6 +1059,7 @@ if u_template is not None and st.session_state.tokens:
                             del text_data[key]
                             break
             
+            # Add table data to text_data
             for idx, row_data in enumerate(st.session_state.table_data):
                 for base_name in table_config.keys():
                     placeholder = f"{{{{{base_name}_{idx+1}}}}}"
@@ -1095,7 +1100,7 @@ if u_template is not None and st.session_state.template_loaded:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
             try:
-                if st.session_state.use_dynamic_table and st.session_state.table_data and st.session_state.table_config:
+                if st.session_state.use_dynamic_table and st.session_state.table_data and isinstance(st.session_state.table_config, dict) and st.session_state.table_config:
                     docx_data = generate_docx_bytes(
                         template_bytes, 
                         text_data, 
