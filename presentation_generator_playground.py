@@ -379,6 +379,8 @@ if "show_delete_confirm" not in st.session_state:
     st.session_state.show_delete_confirm = False
 if "template_to_delete" not in st.session_state:
     st.session_state.template_to_delete = None
+if "save_template_trigger" not in st.session_state:
+    st.session_state.save_template_trigger = False
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -470,17 +472,20 @@ with col_template2:
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
         
-        save_as_template = st.checkbox("Save as template for future use")
-        
-        if save_as_template:
-            saved_path = save_template_to_file(template_bytes, uploaded_template.name)
-            st.session_state.saved_template_name = uploaded_template.name
-            st.success(f"Template saved: {uploaded_template.name}")
-            
-            if st.session_state.custom_mapping:
-                config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-                save_config_to_file(st.session_state.custom_mapping, config_name)
-            st.rerun()
+        # Save Template Button
+        col_save1, col_save2 = st.columns([3, 1])
+        with col_save2:
+            if st.button("Save Template", key="save_template_btn", use_container_width=True):
+                saved_path = save_template_to_file(template_bytes, uploaded_template.name)
+                st.session_state.saved_template_name = uploaded_template.name
+                st.session_state.save_template_trigger = True
+                
+                if st.session_state.custom_mapping:
+                    config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                    save_config_to_file(st.session_state.custom_mapping, config_name)
+                
+                st.success(f"Template saved: {uploaded_template.name}")
+                st.rerun()
 
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
