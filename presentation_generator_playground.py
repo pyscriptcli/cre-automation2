@@ -145,17 +145,18 @@ def get_saved_templates():
     """Get list of saved templates"""
     storage_dir = get_storage_dir()
     templates = []
-    for file in os.listdir(storage_dir):
-        if file.endswith('.pptx') or file.endswith('.docx'):
-            filepath = os.path.join(storage_dir, file)
-            stat = os.stat(filepath)
-            templates.append({
-                'name': file,
-                'path': filepath,
-                'size': stat.st_size,
-                'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                'type': 'PPTX' if file.endswith('.pptx') else 'DOCX'
-            })
+    if os.path.exists(storage_dir):
+        for file in os.listdir(storage_dir):
+            if file.endswith('.pptx') or file.endswith('.docx'):
+                filepath = os.path.join(storage_dir, file)
+                stat = os.stat(filepath)
+                templates.append({
+                    'name': file,
+                    'path': filepath,
+                    'size': stat.st_size,
+                    'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX'
+                })
     return templates
 
 def delete_template_file(template_name):
@@ -379,6 +380,10 @@ if "show_delete_confirm" not in st.session_state:
     st.session_state.show_delete_confirm = False
 if "template_to_delete" not in st.session_state:
     st.session_state.template_to_delete = None
+if "save_success" not in st.session_state:
+    st.session_state.save_success = False
+if "saved_file_name" not in st.session_state:
+    st.session_state.saved_file_name = None
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -480,14 +485,21 @@ with col_template2:
                 config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
                 save_config_to_file(st.session_state.custom_mapping, config_name)
             
-            # Inject JavaScript to immediately refresh the browser tab
-            st.markdown("""
-                <script>
-                    window.location.reload(true);
-                </script>
-            """, unsafe_allow_html=True)
-            
-            st.stop()  # Stop further execution
+            # Set success state
+            st.session_state.save_success = True
+            st.session_state.saved_file_name = uploaded_template.name
+            st.rerun()
+
+# Show success message if template was just saved
+if st.session_state.save_success:
+    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully!")
+    # Clear the uploaded file to refresh the UI
+    st.session_state.save_success = False
+    st.session_state.saved_file_name = None
+    # Clear the uploader
+    if "new_template_upload" in st.session_state:
+        st.session_state.new_template_upload = None
+    st.rerun()
 
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
