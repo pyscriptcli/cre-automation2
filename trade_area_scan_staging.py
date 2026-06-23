@@ -503,4 +503,4 @@ DEFAULT_RADIUS = 1000
 
 if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
-if 'scanned_records' not in st.ses
+if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
