@@ -149,7 +149,6 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                                 full_text = full_text.replace(token, str(value) if value else '')
                                 modified = True
                         if modified:
-                            # Clear and rebuild the paragraph
                             paragraph.clear()
                             run = paragraph.add_run()
                             run.text = full_text
@@ -226,21 +225,20 @@ st.markdown('<h2 style="font-weight: 700; color: #1A1A1A; margin-bottom: 4px;">D
 app_mode = st.radio("Select Mode:", ["Standard PIS", "Custom Template"], horizontal=True, label_visibility="collapsed")
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# 3-COLUMN LAYOUT
-col_in1, col_in2, col_out = st.columns([1, 1, 1.2], gap="medium")
+# Global PPTX Upload - Full width
+st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+st.markdown('<div class="section-header">Upload Template</div>', unsafe_allow_html=True)
+u_template = st.file_uploader("Master Blueprint (PPTX)", type=["pptx"], label_visibility="collapsed")
+st.markdown('</div>', unsafe_allow_html=True)
 
 text_data = {}
 image_data = {}
 
-# Global PPTX Upload
-with col_in1:
-    st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Upload Template</div>', unsafe_allow_html=True)
-    u_template = st.file_uploader("Master Blueprint (PPTX)", type=["pptx"], label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
-
 if app_mode == "Standard PIS":
-    with col_in1:
+    # Create two columns for fields
+    col1, col2 = st.columns(2)
+    
+    with col1:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Property Details</div>', unsafe_allow_html=True)
         prop_location = simple_form_row("Property Location", "cre_loc")
@@ -252,7 +250,7 @@ if app_mode == "Standard PIS":
         adv_rent = simple_form_row("Advance Rent", "cre_adv")
         st.markdown('</div>', unsafe_allow_html=True)
         
-    with col_in2:
+    with col2:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Additional Information</div>', unsafe_allow_html=True)
         escalation = simple_form_row("Rental Escalation", "cre_esc")
@@ -312,15 +310,16 @@ elif app_mode == "Custom Template" and u_template is not None:
     st.session_state.tokens = tokens
     
     if not tokens:
-        with col_in1:
-            st.info("No placeholders found in the uploaded template.")
+        st.info("No placeholders found in the uploaded template.")
     else:
-        # Distribute tokens evenly between columns
+        # Distribute tokens evenly between two columns
         mid_point = len(tokens) // 2
         col1_tokens = tokens[:mid_point]
         col2_tokens = tokens[mid_point:]
         
-        with col_in1:
+        col1, col2 = st.columns(2)
+        
+        with col1:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col1_tokens:
@@ -335,7 +334,7 @@ elif app_mode == "Custom Template" and u_template is not None:
                     image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], f"val_{token}")
             st.markdown('</div>', unsafe_allow_html=True)
             
-        with col_in2:
+        with col2:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
             for token in col2_tokens:
@@ -350,29 +349,23 @@ elif app_mode == "Custom Template" and u_template is not None:
                     image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], f"val_{token}")
             st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 3RD COLUMN: CONFIGURATION AND EXPORT ---
-with col_out:
-    if app_mode == "Custom Template" and u_template is not None and st.session_state.tokens:
-        st.markdown('<div class="config-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">Configuration</div>', unsafe_allow_html=True)
-        
-        # Upload Config
-        u_json = st.file_uploader("Load Config (JSON)", type=["json"])
-        if u_json is not None:
-            try:
-                loaded_config = json.load(u_json)
-                st.session_state.custom_mapping.update(loaded_config)
-                st.success("Configuration loaded")
-            except Exception:
-                st.error("Invalid JSON file")
-
-        st.markdown("<hr>", unsafe_allow_html=True)
-        
-        # Mapping
-        st.markdown('<div class="section-header">Data Type Mapping</div>', unsafe_allow_html=True)
-        valid_types = ["Short Text", "Paragraph", "Image"]
-        
-        for token in st.session_state.tokens:
+# --- DATA MAPPING SECTION (Only for Custom Template) ---
+if app_mode == "Custom Template" and u_template is not None and st.session_state.tokens:
+    st.markdown('<div class="config-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Data Type Mapping</div>', unsafe_allow_html=True)
+    
+    # Create two columns for mapping
+    map_col1, map_col2 = st.columns(2)
+    
+    # Split tokens for mapping columns
+    mid_point = len(st.session_state.tokens) // 2
+    map_tokens_col1 = st.session_state.tokens[:mid_point]
+    map_tokens_col2 = st.session_state.tokens[mid_point:]
+    
+    valid_types = ["Short Text", "Paragraph", "Image"]
+    
+    with map_col1:
+        for token in map_tokens_col1:
             raw_type = st.session_state.custom_mapping.get(token, "Short Text")
             safe_type = raw_type if raw_type in valid_types else "Short Text"
             
@@ -380,14 +373,31 @@ with col_out:
                 f"{token}",
                 valid_types,
                 index=valid_types.index(safe_type),
-                key=f"config_{token}",
+                key=f"config_{token}_1",
                 label_visibility="collapsed"
             )
             st.session_state.custom_mapping[token] = new_type
-        
-        # Export Config
-        st.markdown("<hr>", unsafe_allow_html=True)
-        config_json_str = json.dumps(st.session_state.custom_mapping, indent=4)
+    
+    with map_col2:
+        for token in map_tokens_col2:
+            raw_type = st.session_state.custom_mapping.get(token, "Short Text")
+            safe_type = raw_type if raw_type in valid_types else "Short Text"
+            
+            new_type = st.selectbox(
+                f"{token}",
+                valid_types,
+                index=valid_types.index(safe_type),
+                key=f"config_{token}_2",
+                label_visibility="collapsed"
+            )
+            st.session_state.custom_mapping[token] = new_type
+    
+    st.markdown("<hr>", unsafe_allow_html=True)
+    
+    # Save Configuration
+    config_json_str = json.dumps(st.session_state.custom_mapping, indent=4)
+    col_json1, col_json2 = st.columns([1, 1])
+    with col_json1:
         st.download_button(
             label="Save Configuration",
             data=config_json_str,
@@ -395,51 +405,62 @@ with col_out:
             mime="application/json",
             use_container_width=True
         )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- GENERATION SECTION ---
-    st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Generate Document</div>', unsafe_allow_html=True)
+    with col_json2:
+        u_json = st.file_uploader("Load Config", type=["json"], label_visibility="collapsed")
+        if u_json is not None:
+            try:
+                loaded_config = json.load(u_json)
+                st.session_state.custom_mapping.update(loaded_config)
+                st.success("Configuration loaded")
+                st.rerun()
+            except Exception:
+                st.error("Invalid JSON file")
     
-    if u_template:
-        if st.button("Generate Presentation", use_container_width=True):
-            with st.spinner("Generating document..."):
-                try:
-                    raw_pptx = generate_pptx_bytes(u_template.getvalue(), text_data, image_data)
-                    st.session_state.final_pptx = raw_pptx
-                    st.session_state.final_pdf = convert_pptx_to_pdf(raw_pptx)
-                    st.success("Document generated successfully")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-        st.markdown("<hr>", unsafe_allow_html=True)
-        
-        # Downloads
-        dl_col1, dl_col2 = st.columns(2)
-        with dl_col1:
-            if st.session_state.final_pptx:
-                st.download_button(
-                    "Download PPTX",
-                    data=st.session_state.final_pptx,
-                    file_name="Generated_Document.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True
-                )
-            else:
-                st.button("Download PPTX", disabled=True, use_container_width=True)
-        
-        with dl_col2:
-            if st.session_state.final_pdf:
-                st.download_button(
-                    "Download PDF",
-                    data=st.session_state.final_pdf,
-                    file_name="Generated_Document.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
-            else:
-                st.button("Download PDF", disabled=True, use_container_width=True)
-    else:
-        st.info("Upload a template to enable generation")
-        
     st.markdown('</div>', unsafe_allow_html=True)
+
+# --- GENERATION SECTION ---
+st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+st.markdown('<div class="section-header">Generate Document</div>', unsafe_allow_html=True)
+
+if u_template:
+    if st.button("Generate Presentation", use_container_width=True):
+        with st.spinner("Generating document..."):
+            try:
+                raw_pptx = generate_pptx_bytes(u_template.getvalue(), text_data, image_data)
+                st.session_state.final_pptx = raw_pptx
+                st.session_state.final_pdf = convert_pptx_to_pdf(raw_pptx)
+                st.success("Document generated successfully")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+    
+    # Downloads
+    dl_col1, dl_col2 = st.columns(2)
+    with dl_col1:
+        if st.session_state.final_pptx:
+            st.download_button(
+                "Download PPTX",
+                data=st.session_state.final_pptx,
+                file_name="Generated_Document.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True
+            )
+        else:
+            st.button("Download PPTX", disabled=True, use_container_width=True)
+    
+    with dl_col2:
+        if st.session_state.final_pdf:
+            st.download_button(
+                "Download PDF",
+                data=st.session_state.final_pdf,
+                file_name="Generated_Document.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+        else:
+            st.button("Download PDF", disabled=True, use_container_width=True)
+else:
+    st.info("Upload a template to enable generation")
+
+st.markdown('</div>', unsafe_allow_html=True)
