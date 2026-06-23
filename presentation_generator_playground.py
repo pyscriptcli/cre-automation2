@@ -304,7 +304,7 @@ def detect_table_placeholders(tokens):
     """
     Automatically detect table placeholders.
     Looks for patterns like {{NAME_1}}, {{NAME_2}}, {{NAME_3}} where NAME is consistent.
-    Returns: dict with structure {base_name: {'rows': max_row_number, 'columns': list_of_suffixes}}
+    Returns: dict with structure {base_name: {'rows': max_row_number, 'tokens': list_of_tokens}}
     """
     table_groups = {}
     
@@ -333,53 +333,64 @@ def detect_table_placeholders(tokens):
         
         # Check if rows are sequential (1, 2, 3, ...)
         expected_rows = set(range(1, max_row + 1))
-        if row_numbers == expected_rows:
-            # Valid table - all rows present
-            validated_groups[base_name] = {
-                'max_row': max_row,
-                'tokens': data['tokens']
-            }
-        else:
-            # Some rows missing - still treat as table but note the gaps
-            validated_groups[base_name] = {
-                'max_row': max_row,
-                'tokens': data['tokens'],
-                'missing_rows': expected_rows - row_numbers
-            }
+        
+        # Check if we have all expected rows
+        missing_rows = expected_rows - row_numbers
+        
+        validated_groups[base_name] = {
+            'max_row': max_row,
+            'tokens': data['tokens'],
+            'missing_rows': list(missing_rows) if missing_rows else []
+        }
     
     return validated_groups
 
-def get_table_column_suffixes(table_tokens):
-    """Extract column suffixes from table tokens"""
-    suffixes = []
-    seen = set()
+def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
+    prs = Presentation(io.BytesIO(template_bytes))
     
-    for token in table_tokens:
-        # Remove {{ and }}
-        clean = token[2:-2]
-        # Split by underscore and get the last part
-        parts = clean.split('_')
-        if len(parts) > 1:
-            # Check if the last part is a number
-            if parts[-1].isdigit():
-                # The column name is everything before the last underscore + the last part
-                # But we want to group by the base name without the number
-                base = '_'.join(parts[:-1])
-                if base not in seen:
-                    seen.add(base)
-                    suffixes.append(base)
-    
-    return suffixes
+    for slide in prs.slides:
+        shapes_to_delete = []
+        images_to_add = []
 
-def generate_table_headers(column_suffixes):
-    """Generate user-friendly headers for table columns"""
-    # Clean up the suffixes for display
-    headers = []
-    for suffix in column_suffixes:
-        # Convert from UPPER_CASE to Title Case
-        header = suffix.replace('_', ' ').title()
-        headers.append(header)
-    return headers
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                text_content = shape.text
+                for img_token, img_file in image_inputs.items():
+                    if img_token in text_content and img_file is not None:
+                        images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
+                        shapes_to_delete.append(shape)
+                        break
+
+        for shape in slide.shapes:
+            if shape not in shapes_to_delete:
+                if shape.has_text_frame:
+                    for paragraph in shape.text_frame.paragraphs:
+                        replace_text_in_paragraph(paragraph, text_inputs)
+                
+                if hasattr(shape, 'table') and shape.table:
+                    for row in shape.table.rows:
+                        for cell in row.cells:
+                            if cell.text_frame:
+                                for paragraph in cell.text_frame.paragraphs:
+                                    replace_text_in_paragraph(paragraph, text_inputs)
+
+        for img_file, left, top, width, height in images_to_add:
+            try:
+                processed_img = smart_crop_to_fit(img_file, width, height)
+                slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
+            except Exception:
+                pass
+
+        for old_shape in shapes_to_delete:
+            try:
+                sp = old_shape._element
+                sp.getparent().remove(sp)
+            except Exception:
+                pass
+
+    pptx_stream = io.BytesIO()
+    prs.save(pptx_stream)
+    return pptx_stream.getvalue()
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=None, table_config=None):
     """Generate DOCX with text, image, and table replacements"""
@@ -429,20 +440,17 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
                                 placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
                                 if placeholder in cell_text:
                                     # Find the matching column value
-                                    col_suffix = base_name
-                                    # Try to find the value
-                                    value = row_data.get(col_suffix, '')
+                                    value = row_data.get(base_name, '')
                                     cell.text = str(value) if value else ''
                                     break
-                            # If no match found, leave as is or replace with standard placeholders
+                            # If no match found, leave as is
                             if '{{' in cell.text and '}}' in cell.text:
                                 # Try to replace with standard placeholders
                                 for base_name in base_names:
-                                    for col_suffix in row_data.keys():
-                                        placeholder = f"{{{{{col_suffix}_{row_idx + 1}}}}}"
-                                        if placeholder in cell.text:
-                                            cell.text = str(row_data.get(col_suffix, ''))
-                                            break
+                                    placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
+                                    if placeholder in cell.text:
+                                        cell.text = str(row_data.get(base_name, ''))
+                                        break
     
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
@@ -598,6 +606,9 @@ with col_template1:
                 
                 # Generate table headers
                 st.session_state.table_headers = list(table_groups.keys())
+            else:
+                st.session_state.use_dynamic_table = False
+                st.session_state.table_data = []
 
 with col_template2:
     uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
@@ -689,7 +700,8 @@ if u_template is not None and st.session_state.tokens:
         # Identify which tokens belong to tables
         table_tokens = set()
         for base_name, config in table_config.items():
-            table_tokens.update(config['tokens'])
+            for token in config['tokens']:
+                table_tokens.add(token)
         
         regular_tokens = [t for t in tokens if t not in table_tokens]
         
@@ -778,7 +790,7 @@ if u_template is not None and st.session_state.tokens:
             st.markdown('</div>', unsafe_allow_html=True)
         
         # --- DISPLAY DYNAMIC TABLE ---
-        if table_config and st.session_state.use_dynamic_table and template_type == 'docx':
+        if table_config and st.session_state.use_dynamic_table and template_type == 'docx' and st.session_state.table_data:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Table Data</div>', unsafe_allow_html=True)
             
