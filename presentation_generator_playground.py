@@ -399,18 +399,27 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
             
             if has_placeholders:
                 # This is a placeholder table - replace with dynamic data
-                # Keep the header row
+                # Remove all rows after header (they will be recreated)
                 while len(table.rows) > 1:
                     table._element.remove(table.rows[-1]._element)
                 
-                # Add data rows from table_data
+                # Add data rows from table_data for ALL rows
                 for data_item in table_data:
                     new_row = table.add_row()
-                    # Assuming the table has 3 columns: Company, Representative, Designation
+                    # Check if table has the expected number of columns
                     if len(new_row.cells) >= 3:
                         new_row.cells[0].text = str(data_item.get('company', ''))
                         new_row.cells[1].text = str(data_item.get('rep', ''))
                         new_row.cells[2].text = str(data_item.get('designation', ''))
+                    else:
+                        # Handle tables with different column counts
+                        for idx, cell in enumerate(new_row.cells):
+                            if idx == 0:
+                                cell.text = str(data_item.get('company', ''))
+                            elif idx == 1:
+                                cell.text = str(data_item.get('rep', ''))
+                            elif idx == 2:
+                                cell.text = str(data_item.get('designation', ''))
             else:
                 # Regular table with fixed rows - just replace text
                 for row in table.rows:
@@ -816,16 +825,18 @@ if u_template is not None and st.session_state.tokens:
             st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # --- FIX: Update text_data with table data for all rows ---
-            # Instead of limiting by table_tokens count, map all rows
+            # --- FIX: Update text_data with table data for ALL rows ---
+            # Clear existing table-related text_data entries first
+            for key in list(text_data.keys()):
+                if any(x in key for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_']):
+                    del text_data[key]
+            
+            # Then add all rows
             for idx, row_data in enumerate(st.session_state.table_data):
-                # Generate placeholders for each row
                 company_placeholder = f"{{{{COMPANY_NAME_{idx+1}}}}}"
                 rep_placeholder = f"{{{{REPRESENTATIVE_{idx+1}}}}}"
                 designation_placeholder = f"{{{{DESIGNATION_{idx+1}}}}}"
                 
-                # Always add to text_data, even if placeholder doesn't exist
-                # This ensures the data is available for dynamic table generation
                 text_data[company_placeholder] = row_data.get("company", "")
                 text_data[rep_placeholder] = row_data.get("rep", "")
                 text_data[designation_placeholder] = row_data.get("designation", "")
@@ -856,7 +867,7 @@ if u_template is not None:
         if docx_disabled:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
-            # Generate the document data directly (not inside a function)
+            # Generate the document data
             try:
                 if st.session_state.use_dynamic_table and st.session_state.table_data:
                     docx_data = generate_docx_bytes(template_bytes, text_data, image_data, st.session_state.table_data)
