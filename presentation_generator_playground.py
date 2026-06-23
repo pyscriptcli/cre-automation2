@@ -384,6 +384,8 @@ if "save_success" not in st.session_state:
     st.session_state.save_success = False
 if "saved_file_name" not in st.session_state:
     st.session_state.saved_file_name = None
+if "clear_uploader" not in st.session_state:
+    st.session_state.clear_uploader = False
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -458,12 +460,19 @@ with col_template1:
             st.session_state.tokens = tokens
 
 with col_template2:
+    # Use a different key if we need to clear the uploader
+    uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
+    
     uploaded_template = st.file_uploader(
         "Upload New Template", 
         type=["pptx", "docx"], 
         label_visibility="collapsed", 
-        key="new_template_upload"
+        key=uploader_key
     )
+    
+    # Reset the clear flag after creating a new uploader
+    if st.session_state.clear_uploader:
+        st.session_state.clear_uploader = False
     
     if uploaded_template:
         template_bytes = uploaded_template.getvalue()
@@ -485,21 +494,17 @@ with col_template2:
                 config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
                 save_config_to_file(st.session_state.custom_mapping, config_name)
             
-            # Set success state
+            # Set success state and clear uploader flag
             st.session_state.save_success = True
             st.session_state.saved_file_name = uploaded_template.name
+            st.session_state.clear_uploader = True
             st.rerun()
 
 # Show success message if template was just saved
 if st.session_state.save_success:
-    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully!")
-    # Clear the uploaded file to refresh the UI
+    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully! Refresh the page to see it in the dropdown.")
     st.session_state.save_success = False
     st.session_state.saved_file_name = None
-    # Clear the uploader
-    if "new_template_upload" in st.session_state:
-        st.session_state.new_template_upload = None
-    st.rerun()
 
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
