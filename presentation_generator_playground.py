@@ -7,6 +7,8 @@ import json
 import streamlit as st
 from pptx import Presentation
 from PIL import Image
+import base64
+from datetime import datetime
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -52,10 +54,97 @@ MINIMAL_CRE_SYSTEM = """
     /* Labels */
     .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 8px; }
     .section-header { font-size: 16px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 12px; }
+    .saved-indicator { background-color: #E8F5E9; padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; }
     
     hr { margin: 16px 0 !important; border-color: #E0E0E0 !important; }
 </style>
 """
+
+# --- FILE MANAGEMENT FUNCTIONS ---
+def get_storage_dir():
+    """Get the directory for storing templates and configs"""
+    storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
+    os.makedirs(storage_dir, exist_ok=True)
+    return storage_dir
+
+def save_template_to_file(template_bytes, template_name):
+    """Save template to file system"""
+    storage_dir = get_storage_dir()
+    # Sanitize filename
+    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
+    if not safe_name.endswith('.pptx'):
+        safe_name += '.pptx'
+    
+    filepath = os.path.join(storage_dir, safe_name)
+    with open(filepath, 'wb') as f:
+        f.write(template_bytes)
+    return filepath
+
+def load_template_from_file(template_name):
+    """Load template from file system"""
+    storage_dir = get_storage_dir()
+    filepath = os.path.join(storage_dir, template_name)
+    if os.path.exists(filepath):
+        with open(filepath, 'rb') as f:
+            return f.read()
+    return None
+
+def get_saved_templates():
+    """Get list of saved templates"""
+    storage_dir = get_storage_dir()
+    templates = []
+    for file in os.listdir(storage_dir):
+        if file.endswith('.pptx'):
+            filepath = os.path.join(storage_dir, file)
+            stat = os.stat(filepath)
+            templates.append({
+                'name': file,
+                'path': filepath,
+                'size': stat.st_size,
+                'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+            })
+    return templates
+
+def delete_template_file(template_name):
+    """Delete a saved template"""
+    storage_dir = get_storage_dir()
+    filepath = os.path.join(storage_dir, template_name)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        return True
+    return False
+
+def save_config_to_file(config_data, config_name="template_config.json"):
+    """Save configuration to file"""
+    storage_dir = get_storage_dir()
+    filepath = os.path.join(storage_dir, config_name)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(config_data, f, indent=4)
+    return filepath
+
+def load_config_from_file(config_name="template_config.json"):
+    """Load configuration from file"""
+    storage_dir = get_storage_dir()
+    filepath = os.path.join(storage_dir, config_name)
+    if os.path.exists(filepath):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return None
+
+def get_saved_configs():
+    """Get list of saved configs"""
+    storage_dir = get_storage_dir()
+    configs = []
+    for file in os.listdir(storage_dir):
+        if file.endswith('.json'):
+            filepath = os.path.join(storage_dir, file)
+            stat = os.stat(filepath)
+            configs.append({
+                'name': file,
+                'path': filepath,
+                'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+            })
+    return configs
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -190,21 +279,21 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     return pptx_stream.getvalue()
 
 # --- UI HELPERS ---
-def simple_form_row(label_text, key, placeholder=""):
+def simple_form_row(label_text, key, placeholder="", value=""):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.text_input("", key=key, label_visibility="collapsed", placeholder=placeholder)
+    return st.text_input("", key=key, label_visibility="collapsed", placeholder=placeholder, value=value)
 
-def simple_textarea_row(label_text, key, placeholder=""):
+def simple_textarea_row(label_text, key, placeholder="", value=""):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.text_area("", key=key, label_visibility="collapsed", placeholder=placeholder, height=100)
+    return st.text_area("", key=key, label_visibility="collapsed", placeholder=placeholder, height=100, value=value)
 
 def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=key, label_visibility="collapsed")
 
-def simple_selector_row(label_text, options, key):
+def simple_selector_row(label_text, options, key, index=0):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.selectbox(label_text, options, key=key, label_visibility="collapsed")
+    return st.selectbox(label_text, options, key=key, label_visibility="collapsed", index=index)
 
 # --- INIT APP ---
 st.set_page_config(page_title="Document Generator", layout="wide")
@@ -218,6 +307,12 @@ if "custom_mapping" not in st.session_state:
     st.session_state.custom_mapping = {}
 if "tokens" not in st.session_state:
     st.session_state.tokens = []
+if "current_template" not in st.session_state:
+    st.session_state.current_template = None
+if "template_bytes" not in st.session_state:
+    st.session_state.template_bytes = None
+if "saved_template_name" not in st.session_state:
+    st.session_state.saved_template_name = None
 
 # --- MAIN LAYOUT ---
 st.markdown('<h2 style="font-weight: 700; color: #1A1A1A; margin-bottom: 4px;">Document Generator</h2>', unsafe_allow_html=True)
@@ -225,16 +320,84 @@ st.markdown('<h2 style="font-weight: 700; color: #1A1A1A; margin-bottom: 4px;">D
 app_mode = st.radio("Select Mode:", ["Standard PIS", "Custom Template"], horizontal=True, label_visibility="collapsed")
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# Global PPTX Upload - Full width
+# --- TEMPLATE MANAGEMENT SECTION ---
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-header">Upload Template</div>', unsafe_allow_html=True)
-u_template = st.file_uploader("Master Blueprint (PPTX)", type=["pptx"], label_visibility="collapsed")
+st.markdown('<div class="section-header">Template Management</div>', unsafe_allow_html=True)
+
+col_template1, col_template2 = st.columns([2, 1])
+
+with col_template1:
+    # Show saved templates
+    saved_templates = get_saved_templates()
+    if saved_templates:
+        template_options = ["--- Select Saved Template ---"] + [t['name'] for t in saved_templates]
+        selected_template = st.selectbox(
+            "Load Saved Template",
+            template_options,
+            key="saved_template_select",
+            label_visibility="collapsed"
+        )
+        
+        if selected_template and selected_template != "--- Select Saved Template ---":
+            template_bytes = load_template_from_file(selected_template)
+            if template_bytes:
+                st.session_state.template_bytes = template_bytes
+                st.session_state.saved_template_name = selected_template
+                st.success(f"Loaded: {selected_template}")
+                
+                # Load associated config if exists
+                config_name = selected_template.replace('.pptx', '_config.json')
+                config_data = load_config_from_file(config_name)
+                if config_data:
+                    st.session_state.custom_mapping = config_data
+                    st.info(f"Configuration loaded: {config_name}")
+    else:
+        st.info("No saved templates found. Upload a new template below.")
+
+with col_template2:
+    # Upload new template
+    st.markdown('<div style="padding-top: 22px;"></div>', unsafe_allow_html=True)
+    uploaded_template = st.file_uploader("Upload New Template", type=["pptx"], label_visibility="collapsed", key="new_template_upload")
+    
+    if uploaded_template:
+        template_bytes = uploaded_template.getvalue()
+        st.session_state.template_bytes = template_bytes
+        st.session_state.saved_template_name = None
+        
+        # Save the template
+        saved_path = save_template_to_file(template_bytes, uploaded_template.name)
+        st.success(f"Template saved: {uploaded_template.name}")
+        
+        # Extract placeholders
+        tokens = extract_placeholders(template_bytes)
+        st.session_state.tokens = tokens
+        
+        # Check if there's a matching config
+        config_name = uploaded_template.name.replace('.pptx', '_config.json')
+        config_data = load_config_from_file(config_name)
+        if config_data:
+            st.session_state.custom_mapping = config_data
+            st.info(f"Configuration loaded: {config_name}")
+        
+        st.rerun()
+
+# Show current template info
+if st.session_state.template_bytes:
+    template_name = st.session_state.saved_template_name or "Unsaved Template"
+    st.markdown(f'<div class="saved-indicator">Active Template: {template_name}</div>', unsafe_allow_html=True)
+
 st.markdown('</div>', unsafe_allow_html=True)
+
+# --- Get current template bytes ---
+u_template = None
+template_bytes = st.session_state.template_bytes
+if template_bytes:
+    u_template = type('obj', (object,), {'getvalue': lambda: template_bytes})()
 
 text_data = {}
 image_data = {}
 
-if app_mode == "Standard PIS":
+if app_mode == "Standard PIS" and u_template:
     # Create two columns for fields
     col1, col2 = st.columns(2)
     
@@ -304,10 +467,11 @@ if app_mode == "Standard PIS":
         "{{PROPERTY_LOTPLAN}}": u_lotplan
     }
 
-elif app_mode == "Custom Template" and u_template is not None:
-    raw_bytes = u_template.getvalue()
-    tokens = extract_placeholders(raw_bytes)
-    st.session_state.tokens = tokens
+elif app_mode == "Custom Template" and u_template:
+    if not st.session_state.tokens:
+        st.session_state.tokens = extract_placeholders(template_bytes)
+    
+    tokens = st.session_state.tokens
     
     if not tokens:
         st.info("No placeholders found in the uploaded template.")
@@ -350,7 +514,7 @@ elif app_mode == "Custom Template" and u_template is not None:
             st.markdown('</div>', unsafe_allow_html=True)
 
 # --- DATA MAPPING SECTION (Only for Custom Template) ---
-if app_mode == "Custom Template" and u_template is not None and st.session_state.tokens:
+if app_mode == "Custom Template" and u_template and st.session_state.tokens:
     st.markdown('<div class="config-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Data Type Mapping</div>', unsafe_allow_html=True)
     
@@ -398,13 +562,24 @@ if app_mode == "Custom Template" and u_template is not None and st.session_state
     config_json_str = json.dumps(st.session_state.custom_mapping, indent=4)
     col_json1, col_json2 = st.columns([1, 1])
     with col_json1:
+        # Save config with template name if available
+        config_filename = "template_config.json"
+        if st.session_state.saved_template_name:
+            config_filename = st.session_state.saved_template_name.replace('.pptx', '_config.json')
+        
         st.download_button(
             label="Save Configuration",
             data=config_json_str,
-            file_name="template_config.json",
+            file_name=config_filename,
             mime="application/json",
             use_container_width=True
         )
+        
+        # Also save to file system
+        if st.button("Save Config to System", use_container_width=True):
+            save_config_to_file(st.session_state.custom_mapping, config_filename)
+            st.success(f"Configuration saved: {config_filename}")
+    
     with col_json2:
         u_json = st.file_uploader("Load Config", type=["json"], label_visibility="collapsed")
         if u_json is not None:
@@ -419,14 +594,14 @@ if app_mode == "Custom Template" and u_template is not None and st.session_state
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- GENERATION SECTION ---
-st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-header">Generate Document</div>', unsafe_allow_html=True)
-
 if u_template:
+    st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Generate Document</div>', unsafe_allow_html=True)
+    
     if st.button("Generate Presentation", use_container_width=True):
         with st.spinner("Generating document..."):
             try:
-                raw_pptx = generate_pptx_bytes(u_template.getvalue(), text_data, image_data)
+                raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
                 st.session_state.final_pptx = raw_pptx
                 st.session_state.final_pdf = convert_pptx_to_pdf(raw_pptx)
                 st.success("Document generated successfully")
@@ -460,7 +635,7 @@ if u_template:
             )
         else:
             st.button("Download PDF", disabled=True, use_container_width=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("Upload a template to enable generation")
-
-st.markdown('</div>', unsafe_allow_html=True)
+    st.info("Please upload or select a template to enable generation")
