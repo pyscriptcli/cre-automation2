@@ -471,7 +471,7 @@ with col_template2:
         st.session_state.tokens = tokens
         
         # Save Template Button
-        if st.button("💾 Save Template", key="save_template_btn", use_container_width=True):
+        if st.button("Save Template", key="save_template_btn", use_container_width=True):
             # Save the template first
             saved_path = save_template_to_file(template_bytes, uploaded_template.name)
             st.session_state.saved_template_name = uploaded_template.name
