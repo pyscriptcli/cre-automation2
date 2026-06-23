@@ -26,66 +26,74 @@ MINIMAL_CRE_SYSTEM = """
 <style>
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
-    .block-container { padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; max-width: 1000px !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+    .block-container { padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; max-width: 1000px !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
     
     /* Hide Streamlit branding */
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    header { visibility: hidden; }
+    .stDeployButton { display: none; }
     
     /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
         background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 3px !important;
         color: #1A1A1A !important;
-        min-height: 26px !important;
+        min-height: 24px !important;
     }
     div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, textarea:focus { border-color: #666666 !important; box-shadow: none !important; }
-    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 12px !important; padding: 2px 8px !important; }
-    
-    /* Make select boxes smaller */
-    div[data-baseweb="select"] > div { min-height: 26px !important; }
-    div[data-baseweb="select"] div[role="button"] { min-height: 26px !important; padding: 0 8px !important; font-size: 11px !important; }
+    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 12px !important; padding: 1px 6px !important; }
     
     /* File Uploader */
-    section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 3px !important; padding: 2px 6px !important; }
-    section[data-testid="stFileUploader"] button { padding: 2px 8px !important; font-size: 11px !important; }
+    section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 3px !important; padding: 1px 4px !important; }
+    section[data-testid="stFileUploader"] button { padding: 1px 6px !important; font-size: 10px !important; }
     
     /* Cards */
-    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 3px; padding: 6px 10px; margin-bottom: 4px; }
+    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 3px; padding: 4px 8px; margin-bottom: 3px; }
     
     /* Buttons */
-    div.stButton > button { background-color: #1A1A1A !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 11px !important; border: none !important; border-radius: 3px !important; padding: 3px 8px !important; width: 100% !important; transition: background-color 0.15s ease; min-height: 26px !important; }
+    div.stButton > button { background-color: #1A1A1A !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 11px !important; border: none !important; border-radius: 3px !important; padding: 2px 8px !important; width: 100% !important; transition: background-color 0.15s ease; min-height: 22px !important; }
     div.stButton > button:hover { background-color: #333333 !important; color: #FFFFFF !important; }
     
-    div[data-testid="stDownloadButton"] > button { background-color: #1A1A1A !important; border-radius: 3px !important; color: #FFFFFF !important; font-weight: 600 !important; padding: 3px 8px !important; width: 100% !important; font-size: 11px !important; min-height: 26px !important; }
+    div[data-testid="stDownloadButton"] > button { background-color: #1A1A1A !important; border-radius: 3px !important; color: #FFFFFF !important; font-weight: 600 !important; padding: 2px 8px !important; width: 100% !important; font-size: 11px !important; min-height: 22px !important; }
     div[data-testid="stDownloadButton"] > button:hover { background-color: #333333 !important; }
     
     /* Delete button */
-    div[data-testid="column"] button { background-color: transparent !important; color: #DC3545 !important; border: 1px solid #DC3545 !important; border-radius: 3px !important; padding: 1px 6px !important; font-size: 14px !important; min-height: 24px !important; width: auto !important; }
+    div[data-testid="column"] button { background-color: transparent !important; color: #DC3545 !important; border: 1px solid #DC3545 !important; border-radius: 3px !important; padding: 1px 4px !important; font-size: 12px !important; min-height: 20px !important; width: auto !important; }
     div[data-testid="column"] button:hover { background-color: #DC3545 !important; color: white !important; }
     
     /* Labels */
-    .field-label { font-size: 11px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 2px !important; margin-bottom: 1px !important; }
-    .section-header { font-size: 12px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 4px !important; }
-    .saved-indicator { background-color: #E8F5E9; padding: 2px 8px; border-radius: 3px; font-size: 11px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 2px; }
+    .field-label { font-size: 10px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 1px !important; margin-bottom: 1px !important; }
+    .section-header { font-size: 11px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 2px !important; }
+    .saved-indicator { background-color: #E8F5E9; padding: 1px 6px; border-radius: 3px; font-size: 10px; color: #2E7D32; border-left: 2px solid #2E7D32; margin-top: 1px; }
     
-    hr { margin: 4px 0 !important; border-color: #E0E0E0 !important; }
+    hr { margin: 2px 0 !important; border-color: #E0E0E0 !important; }
     
     /* Compact spacing */
-    .stSelectbox { margin-bottom: 2px !important; }
+    .stSelectbox { margin-bottom: 1px !important; }
+    .stSelectbox > div { min-height: 22px !important; }
     .stTextInput { margin-bottom: 1px !important; }
     .stTextArea { margin-bottom: 1px !important; }
     .stFileUploader { margin-bottom: 1px !important; }
     .stCheckbox { margin-bottom: 1px !important; }
-    .stSelectbox > div { min-height: 26px !important; }
     
-    /* Save config link */
-    .save-link { color: #1A1A1A; text-decoration: underline; cursor: pointer; font-size: 11px; font-weight: 500; }
-    .save-link:hover { color: #666666; }
+    /* Make select boxes smaller */
+    div[data-baseweb="select"] { min-height: 22px !important; }
+    div[data-baseweb="select"] > div { min-height: 22px !important; padding: 0 4px !important; }
+    div[data-baseweb="select"] select { font-size: 11px !important; padding: 1px 4px !important; }
+    
+    /* Smaller dropdown icon */
+    svg[data-testid="stSelectbox"] { width: 14px !important; height: 14px !important; }
+    div[data-baseweb="select"] svg { width: 14px !important; height: 14px !important; }
     
     /* Compact columns */
-    .row-widget.stColumns { gap: 4px !important; }
-    div[data-testid="column"] { padding: 0 2px !important; }
+    .row-widget.stColumns { gap: 2px !important; }
+    div[data-testid="column"] { padding: 0 1px !important; }
+    
+    /* Hyperlink style for save config */
+    .save-config-link { color: #0066CC !important; text-decoration: underline !important; cursor: pointer !important; font-size: 11px !important; font-weight: 500 !important; }
+    .save-config-link:hover { color: #004499 !important; }
+    
+    /* Title container with no title */
+    .title-container { height: 20px; margin-bottom: 2px; border-bottom: 1px solid #E0E0E0; }
 </style>
 """
 
@@ -344,17 +352,20 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
 
 # --- UI HELPERS ---
 def compact_upload_row(label_text, token):
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([3, 0.8])
     with col1:
         st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
         return st.file_uploader("", type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
     with col2:
-        st.markdown('<div style="padding-top: 2px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="padding-top: 1px;"></div>', unsafe_allow_html=True)
         st.selectbox("Type", ["Image"], key=f"type_{token}", label_visibility="collapsed", disabled=True)
 
 # --- INIT APP ---
 st.set_page_config(page_title="Document Generator", layout="wide")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
+
+# Title container (empty with bottom border)
+st.markdown('<div class="title-container"></div>', unsafe_allow_html=True)
 
 # Initialize session state
 if "final_pptx" not in st.session_state:
@@ -375,18 +386,16 @@ if "template_loaded" not in st.session_state:
     st.session_state.template_loaded = False
 if "template_type" not in st.session_state:
     st.session_state.template_type = None
-if "delete_trigger" not in st.session_state:
-    st.session_state.delete_trigger = False
 if "generated" not in st.session_state:
     st.session_state.generated = False
-if "save_config_trigger" not in st.session_state:
-    st.session_state.save_config_trigger = False
+if "config_saved" not in st.session_state:
+    st.session_state.config_saved = False
 
 # --- TEMPLATE MANAGEMENT ---
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
 
 # Template dropdown and upload in one row
-col1, col2 = st.columns([3, 1])
+col1, col2, col3 = st.columns([3, 0.8, 0.5])
 
 with col1:
     saved_templates = get_saved_templates()
@@ -402,7 +411,8 @@ with col1:
         label_visibility="collapsed"
     )
     
-    if selected_template and selected_template != "Select saved template" and not st.session_state.delete_trigger:
+    # Immediately load template when selected
+    if selected_template and selected_template != "Select saved template":
         template_name = selected_template.split(' (')[0]
         template_bytes = load_template_from_file(template_name)
         if template_bytes:
@@ -417,10 +427,14 @@ with col1:
             if config_data:
                 st.session_state.custom_mapping = config_data
             else:
+                # Default to Text for all fields
                 st.session_state.custom_mapping = {}
             
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
+            
+            # Force a rerun to update the UI immediately
+            st.rerun()
 
 with col2:
     uploaded_template = st.file_uploader(
@@ -440,23 +454,40 @@ with col2:
         
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
+        # Default all to Text
         st.session_state.custom_mapping = {token: "Text" for token in tokens}
+        
+        st.rerun()
 
-# Show active template and save config link
+with col3:
+    st.markdown('<div style="padding-top: 1px;"></div>', unsafe_allow_html=True)
+    if st.session_state.saved_template_name:
+        if st.button("🗑️", key="delete_template", help="Delete this template"):
+            if delete_template_file(st.session_state.saved_template_name):
+                st.session_state.template_bytes = None
+                st.session_state.saved_template_name = None
+                st.session_state.template_loaded = False
+                st.session_state.tokens = []
+                st.session_state.generated = False
+                st.session_state.custom_mapping = {}
+                st.rerun()
+
+# Show save config as hyperlink
+if st.session_state.saved_template_name:
+    col_save1, col_save2, col_save3 = st.columns([3, 0.5, 0.5])
+    with col_save1:
+        st.markdown('<div style="padding-top: 1px;"></div>', unsafe_allow_html=True)
+        # Use a button styled as a hyperlink
+        if st.button("Save template configuration", key="save_config", help="Save current data type mappings"):
+            config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+            save_config_to_file(st.session_state.custom_mapping, config_name)
+            st.session_state.config_saved = True
+            st.success("Configuration saved!")
+
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved"
     template_type = st.session_state.template_type or "Unknown"
-    
-    col_status, col_save = st.columns([4, 1])
-    with col_status:
-        st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
-    with col_save:
-        if st.session_state.saved_template_name:
-            # Save config as hyperlink
-            config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-            if st.button("💾 save config", key="save_config_link", help="Save current data type configuration"):
-                save_config_to_file(st.session_state.custom_mapping, config_name)
-                st.success("Config saved!")
+    st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -494,13 +525,13 @@ if u_template is not None and st.session_state.tokens:
                     image_data[token] = img
                     st.session_state.custom_mapping[token] = "Image"
                 else:
-                    col_a, col_b = st.columns([3, 1.2])
+                    col_a, col_b = st.columns([3, 0.8])
                     with col_a:
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         val = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
                         text_data[token] = val
                     with col_b:
-                        st.markdown('<div style="padding-top: 2px;"></div>', unsafe_allow_html=True)
+                        st.markdown('<div style="padding-top: 1px;"></div>', unsafe_allow_html=True)
                         data_type = st.selectbox(
                             "Type",
                             ["Text", "Image"],
@@ -509,6 +540,9 @@ if u_template is not None and st.session_state.tokens:
                             label_visibility="collapsed"
                         )
                         st.session_state.custom_mapping[token] = data_type
+                        if data_type == "Image" and template_type == 'pptx':
+                            # If changed to Image, show upload
+                            pass
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
@@ -522,13 +556,13 @@ if u_template is not None and st.session_state.tokens:
                     image_data[token] = img
                     st.session_state.custom_mapping[token] = "Image"
                 else:
-                    col_a, col_b = st.columns([3, 1.2])
+                    col_a, col_b = st.columns([3, 0.8])
                     with col_a:
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         val = st.text_input("", key=f"val_{token}_2", label_visibility="collapsed")
                         text_data[token] = val
                     with col_b:
-                        st.markdown('<div style="padding-top: 2px;"></div>', unsafe_allow_html=True)
+                        st.markdown('<div style="padding-top: 1px;"></div>', unsafe_allow_html=True)
                         data_type = st.selectbox(
                             "Type",
                             ["Text", "Image"],
@@ -565,7 +599,7 @@ if u_template is not None:
     
     # Show export buttons only after generation
     if st.session_state.generated:
-        st.markdown("<hr style='margin: 4px 0;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 2px 0;'>", unsafe_allow_html=True)
         dl_col1, dl_col2, dl_col3 = st.columns(3)
         
         with dl_col1:
