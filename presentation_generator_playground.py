@@ -356,14 +356,6 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
-def update_field_type(token):
-    """Callback function to update field type and trigger rerun"""
-    # The session state is already updated by the selectbox
-    # Auto-save the config if template is saved
-    auto_save_config()
-    # Trigger a rerun to update the UI
-    st.rerun()
-
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -529,35 +521,36 @@ if u_template is not None and st.session_state.tokens:
                 # Get the current type from session state, default to "Text"
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                # Determine if we should show image upload or text input
-                # Images are only supported in PPTX templates
-                should_show_image = current_type == "Image" and template_type == 'pptx'
+                # Always show both the type selector and the appropriate input
+                col_a, col_b = st.columns([3, 1])
                 
-                if should_show_image:
-                    # Show image upload
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
-                    field_types[token] = "Image"
-                else:
-                    # Show text input
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
+                with col_b:
+                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                    type_key = f"type_{token}"
+                    data_type = st.selectbox(
+                        "Type",
+                        ["Text", "Image"],
+                        index=0 if current_type == "Text" else 1,
+                        key=type_key,
+                        label_visibility="collapsed"
+                    )
+                    # Update session state with the new type
+                    if data_type != current_type:
+                        st.session_state.custom_mapping[token] = data_type
+                        auto_save_config()
+                        st.rerun()
+                
+                with col_a:
+                    # Show appropriate input based on type
+                    if data_type == "Image" and template_type == 'pptx':
+                        image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                        field_types[token] = "Image"
+                    else:
+                        if data_type == "Image" and template_type != 'pptx':
+                            st.warning("Image replacement only supported in PPTX templates")
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                    with col_b:
-                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                        # Use a unique key for the selectbox
-                        type_key = f"type_{token}"
-                        data_type = st.selectbox(
-                            "Type",
-                            ["Text", "Image"],
-                            index=0 if current_type == "Text" else 1,
-                            key=type_key,
-                            label_visibility="collapsed",
-                            on_change=update_field_type,
-                            args=(token,)
-                        )
-                        # Update session state immediately
-                        st.session_state.custom_mapping[token] = data_type
+                        field_types[token] = "Text"
             st.markdown('</div>', unsafe_allow_html=True)
         
         # --- COLUMN 2 ---
@@ -570,35 +563,36 @@ if u_template is not None and st.session_state.tokens:
                 # Get the current type from session state, default to "Text"
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                # Determine if we should show image upload or text input
-                # Images are only supported in PPTX templates
-                should_show_image = current_type == "Image" and template_type == 'pptx'
+                # Always show both the type selector and the appropriate input
+                col_a, col_b = st.columns([3, 1])
                 
-                if should_show_image:
-                    # Show image upload
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
-                    field_types[token] = "Image"
-                else:
-                    # Show text input
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
+                with col_b:
+                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                    type_key = f"type_{token}_2"
+                    data_type = st.selectbox(
+                        "Type",
+                        ["Text", "Image"],
+                        index=0 if current_type == "Text" else 1,
+                        key=type_key,
+                        label_visibility="collapsed"
+                    )
+                    # Update session state with the new type
+                    if data_type != current_type:
+                        st.session_state.custom_mapping[token] = data_type
+                        auto_save_config()
+                        st.rerun()
+                
+                with col_a:
+                    # Show appropriate input based on type
+                    if data_type == "Image" and template_type == 'pptx':
+                        image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                        field_types[token] = "Image"
+                    else:
+                        if data_type == "Image" and template_type != 'pptx':
+                            st.warning("Image replacement only supported in PPTX templates")
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
-                    with col_b:
-                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
-                        # Use a unique key for the selectbox
-                        type_key = f"type_{token}_2"
-                        data_type = st.selectbox(
-                            "Type",
-                            ["Text", "Image"],
-                            index=0 if current_type == "Text" else 1,
-                            key=type_key,
-                            label_visibility="collapsed",
-                            on_change=update_field_type,
-                            args=(token,)
-                        )
-                        # Update session state immediately
-                        st.session_state.custom_mapping[token] = data_type
+                        field_types[token] = "Text"
             st.markdown('</div>', unsafe_allow_html=True)
 
 # --- DOWNLOAD SECTION ---
