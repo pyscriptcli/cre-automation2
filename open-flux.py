@@ -36,17 +36,6 @@ MINIMAL_CRE_SYSTEM = """
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
     
-    /* Title */
-    .app-title {
-        font-size: 32px !important;
-        font-weight: 700 !important;
-        color: #003366 !important;
-        padding: 20px 0 10px 0 !important;
-        border-bottom: 3px solid #003366 !important;
-        margin-bottom: 20px !important;
-        letter-spacing: -0.5px !important;
-    }
-    
     /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
         background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important;
@@ -405,10 +394,6 @@ st.set_page_config(page_title="Document Generator", layout="wide", initial_sideb
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
 # Initialize all session state variables
-if "final_pptx" not in st.session_state:
-    st.session_state.final_pptx = None
-if "final_docx" not in st.session_state:
-    st.session_state.final_docx = None
 if "custom_mapping" not in st.session_state:
     st.session_state.custom_mapping = {}
 if "tokens" not in st.session_state:
@@ -425,22 +410,10 @@ if "delete_trigger" not in st.session_state:
     st.session_state.delete_trigger = False
 if "config_expanded" not in st.session_state:
     st.session_state.config_expanded = False
-if "generated" not in st.session_state:
-    st.session_state.generated = False
-if "is_loading" not in st.session_state:
-    st.session_state.is_loading = False
-if "loading_message" not in st.session_state:
-    st.session_state.loading_message = ""
 if "show_delete_confirm" not in st.session_state:
     st.session_state.show_delete_confirm = False
 if "template_to_delete" not in st.session_state:
     st.session_state.template_to_delete = None
-if "download_ready" not in st.session_state:
-    st.session_state.download_ready = False
-if "pptx_data" not in st.session_state:
-    st.session_state.pptx_data = None
-if "docx_data" not in st.session_state:
-    st.session_state.docx_data = None
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -528,7 +501,6 @@ with col_template2:
         st.session_state.saved_template_name = None
         st.session_state.template_loaded = True
         st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
-        st.session_state.generated = False
         
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
@@ -670,80 +642,51 @@ if u_template is not None and st.session_state.tokens:
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- EXPORT SECTION ---
+# --- DOWNLOAD SECTION ---
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Export Document</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
     
-    # Two columns for export buttons (PPTX and DOCX only)
+    # Two columns for download buttons (PPTX and DOCX only)
     col1, col2 = st.columns(2)
     
     with col1:
-        # PPTX Button - Direct download
+        # PPTX Download Button - generates and downloads in one click
         pptx_disabled = template_type != 'pptx'
         if pptx_disabled:
-            st.button("Export as PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
+            st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
-            if st.button("Export as PPTX", use_container_width=True, key="export_pptx"):
-                with st.spinner("Generating PPTX file..."):
-                    try:
-                        raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
-                        st.session_state.pptx_data = raw_pptx
-                        st.session_state.final_pptx = raw_pptx
-                        st.session_state.generated = True
-                        st.success("PPTX generated successfully!")
-                    except Exception as e:
-                        st.error(f"Error: {str(e)}")
+            # Create a function that generates the file when download is clicked
+            def generate_pptx():
+                return generate_pptx_bytes(template_bytes, text_data, image_data)
             
-            # Show download button immediately after generation
-            if st.session_state.pptx_data:
-                st.download_button(
-                    "Download PPTX",
-                    data=st.session_state.pptx_data,
-                    file_name="Generated_Document.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True,
-                    key="download_pptx"
-                )
+            st.download_button(
+                label="Download PPTX",
+                data=generate_pptx,
+                file_name="Generated_Document.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True,
+                key="download_pptx"
+            )
     
     with col2:
-        # DOCX Button - Direct download
+        # DOCX Download Button - generates and downloads in one click
         docx_disabled = template_type != 'docx'
         if docx_disabled:
-            st.button("Export as DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
+            st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
-            if st.button("Export as DOCX", use_container_width=True, key="export_docx"):
-                with st.spinner("Generating DOCX file..."):
-                    try:
-                        raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
-                        st.session_state.docx_data = raw_docx
-                        st.session_state.final_docx = raw_docx
-                        st.session_state.generated = True
-                        st.success("DOCX generated successfully!")
-                    except Exception as e:
-                        st.error(f"Error: {str(e)}")
+            # Create a function that generates the file when download is clicked
+            def generate_docx():
+                return generate_docx_bytes(template_bytes, text_data, image_data)
             
-            # Show download button immediately after generation
-            if st.session_state.docx_data:
-                st.download_button(
-                    "Download DOCX",
-                    data=st.session_state.docx_data,
-                    file_name="Generated_Document.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True,
-                    key="download_docx"
-                )
-    
-    # Clear generated data after download or provide reset option
-    if st.session_state.generated:
-        st.markdown("<hr>", unsafe_allow_html=True)
-        if st.button("Start New Generation", use_container_width=True):
-            st.session_state.generated = False
-            st.session_state.final_pptx = None
-            st.session_state.final_docx = None
-            st.session_state.pptx_data = None
-            st.session_state.docx_data = None
-            st.rerun()
+            st.download_button(
+                label="Download DOCX",
+                data=generate_docx,
+                file_name="Generated_Document.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="download_docx"
+            )
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
