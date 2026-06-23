@@ -14,6 +14,7 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
+import time
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -140,6 +141,75 @@ MINIMAL_CRE_SYSTEM = """
         color: #003366;
         padding-right: 10px;
         font-size: 13px;
+    }
+    
+    /* Full screen loading overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 999999;
+        backdrop-filter: blur(5px);
+    }
+    .loading-content {
+        background: white;
+        padding: 40px;
+        border-radius: 12px;
+        text-align: center;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #003366;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .loading-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1A1A1A;
+        margin-bottom: 10px;
+    }
+    .loading-subtitle {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 20px;
+    }
+    .progress-bar-container {
+        width: 100%;
+        height: 8px;
+        background-color: #E0E0E0;
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #003366, #0055AA);
+        transition: width 0.3s ease;
+        border-radius: 4px;
+    }
+    .progress-text {
+        font-size: 14px;
+        font-weight: 600;
+        color: #003366;
+        margin-top: 8px;
     }
 </style>
 """
@@ -324,10 +394,15 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                         replacement = str(value) if value else ''
                         run.text = run.text.replace(token, replacement)
 
-def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
+def generate_pptx_bytes(template_bytes, text_inputs, image_inputs, progress_callback=None):
     prs = Presentation(io.BytesIO(template_bytes))
+    total_slides = len(prs.slides)
     
-    for slide in prs.slides:
+    for slide_idx, slide in enumerate(prs.slides):
+        if progress_callback:
+            progress = int(((slide_idx + 1) / total_slides) * 80) + 10  # 10-90% for slides
+            progress_callback(progress, f"Processing slide {slide_idx + 1} of {total_slides}")
+        
         shapes_to_delete = []
         images_to_add = []
 
@@ -367,16 +442,35 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
             except Exception:
                 pass
 
+    if progress_callback:
+        progress_callback(95, "Saving presentation...")
+    
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
+    
+    if progress_callback:
+        progress_callback(100, "Done!")
+    
     return pptx_stream.getvalue()
 
-def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
+def generate_docx_bytes(template_bytes, text_inputs, image_inputs, progress_callback=None):
     """Generate DOCX with text replacements"""
     doc = Document(io.BytesIO(template_bytes))
     
+    total_paragraphs = len(doc.paragraphs)
+    total_tables = len(doc.tables)
+    total_items = total_paragraphs + total_tables
+    
+    if progress_callback:
+        progress_callback(10, "Processing document...")
+    
     # Process regular paragraphs
-    for paragraph in doc.paragraphs:
+    para_count = 0
+    for para_idx, paragraph in enumerate(doc.paragraphs):
+        if progress_callback:
+            progress_val = int(((para_idx + 1) / total_paragraphs) * 60) + 10
+            progress_callback(progress_val, f"Processing text {para_idx + 1} of {total_paragraphs}")
+        
         # Check for image placeholders - skip them for text replacement
         has_image = False
         for img_token in image_inputs.keys():
@@ -387,17 +481,29 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
         # Only replace text if no image placeholder is present
         if not has_image:
             replace_text_in_paragraph(paragraph, text_inputs)
+        
+        para_count += 1
     
     # Process tables
-    for table in doc.tables:
+    if progress_callback:
+        progress_callback(70, "Processing tables...")
+    
+    for table_idx, table in enumerate(doc.tables):
         for row in table.rows:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
                     replace_text_in_paragraph(paragraph, text_inputs)
     
+    if progress_callback:
+        progress_callback(95, "Saving document...")
+    
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
     doc_stream.seek(0)
+    
+    if progress_callback:
+        progress_callback(100, "Done!")
+    
     return doc_stream.getvalue()
 
 def get_download_filename(template_name, file_type):
@@ -419,6 +525,36 @@ def get_download_filename(template_name, file_type):
 def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
+
+# --- LOADING OVERLAY COMPONENT ---
+def show_loading_overlay(progress, message):
+    """Display loading overlay with progress"""
+    loading_html = f"""
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-title">Generating Document</div>
+            <div class="loading-subtitle">{message}</div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" style="width: {progress}%;"></div>
+            </div>
+            <div class="progress-text">{progress}%</div>
+        </div>
+    </div>
+    """
+    st.markdown(loading_html, unsafe_allow_html=True)
+
+def hide_loading_overlay():
+    """Hide the loading overlay"""
+    hide_html = """
+    <script>
+        var overlay = document.getElementById('loadingOverlay');
+        if (overlay) {{
+            overlay.style.display = 'none';
+        }}
+    </script>
+    """
+    st.markdown(hide_html, unsafe_allow_html=True)
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -449,6 +585,14 @@ if "saved_file_name" not in st.session_state:
     st.session_state.saved_file_name = None
 if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
+if "show_loading" not in st.session_state:
+    st.session_state.show_loading = False
+if "progress_value" not in st.session_state:
+    st.session_state.progress_value = 0
+if "progress_message" not in st.session_state:
+    st.session_state.progress_message = "Initializing..."
+if "download_triggered" not in st.session_state:
+    st.session_state.download_triggered = False
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -685,35 +829,81 @@ if u_template is not None:
     
     col1, col2 = st.columns(2)
     
+    # Progress callback function
+    def update_progress(progress, message):
+        st.session_state.progress_value = progress
+        st.session_state.progress_message = message
+        # Use st.empty() to update the progress in real-time
+        progress_placeholder = st.empty()
+        show_loading_overlay(progress, message)
+    
     with col1:
         pptx_disabled = template_type != 'pptx'
         if pptx_disabled:
             st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
-            try:
-                pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
-                pptx_filename = get_download_filename(base_template_name, "pptx")
-                st.download_button(
-                    label="Download PPTX",
-                    data=pptx_data,
-                    file_name=pptx_filename,
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True,
-                    key="download_pptx"
-                )
-            except Exception as e:
-                st.error(f"Error generating PPTX: {str(e)}")
+            # Check if download was triggered
+            if st.button("Download PPTX", key="download_pptx_btn", use_container_width=True):
+                try:
+                    # Show loading overlay
+                    st.session_state.show_loading = True
+                    st.session_state.progress_value = 0
+                    st.session_state.progress_message = "Starting generation..."
+                    
+                    # Generate PPTX with progress updates
+                    pptx_data = generate_pptx_bytes(
+                        template_bytes, 
+                        text_data, 
+                        image_data,
+                        progress_callback=update_progress
+                    )
+                    
+                    # Hide loading overlay
+                    st.session_state.show_loading = False
+                    hide_loading_overlay()
+                    
+                    # Trigger download
+                    pptx_filename = get_download_filename(base_template_name, "pptx")
+                    st.download_button(
+                        label="Download PPTX",
+                        data=pptx_data,
+                        file_name=pptx_filename,
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        use_container_width=True,
+                        key="download_pptx_final"
+                    )
+                    st.success("Document generated successfully!")
+                    
+                except Exception as e:
+                    st.session_state.show_loading = False
+                    hide_loading_overlay()
+                    st.error(f"Error generating PPTX: {str(e)}")
     
     with col2:
         docx_disabled = template_type != 'docx'
         if docx_disabled:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
-            # Generate the document data
-            try:
-                docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
-                
-                if docx_data:
+            if st.button("Download DOCX", key="download_docx_btn", use_container_width=True):
+                try:
+                    # Show loading overlay
+                    st.session_state.show_loading = True
+                    st.session_state.progress_value = 0
+                    st.session_state.progress_message = "Starting generation..."
+                    
+                    # Generate DOCX with progress updates
+                    docx_data = generate_docx_bytes(
+                        template_bytes, 
+                        text_data, 
+                        image_data,
+                        progress_callback=update_progress
+                    )
+                    
+                    # Hide loading overlay
+                    st.session_state.show_loading = False
+                    hide_loading_overlay()
+                    
+                    # Trigger download
                     docx_filename = get_download_filename(base_template_name, "docx")
                     st.download_button(
                         label="Download DOCX",
@@ -721,13 +911,19 @@ if u_template is not None:
                         file_name=docx_filename,
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True,
-                        key="download_docx"
+                        key="download_docx_final"
                     )
-                else:
-                    st.error("Failed to generate document. Please check the template and try again.")
-            except Exception as e:
-                st.error(f"Error generating document: {str(e)}")
+                    st.success("Document generated successfully!")
+                    
+                except Exception as e:
+                    st.session_state.show_loading = False
+                    hide_loading_overlay()
+                    st.error(f"Error generating DOCX: {str(e)}")
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
     st.info("Please upload or select a template to begin")
+
+# Show loading overlay if active
+if st.session_state.show_loading:
+    show_loading_overlay(st.session_state.progress_value, st.session_state.progress_message)
