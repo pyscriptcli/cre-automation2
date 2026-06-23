@@ -26,7 +26,7 @@ MINIMAL_CRE_SYSTEM = """
 <style>
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; }
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; max-width: 1400px !important; }
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
     
     /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
@@ -34,48 +34,55 @@ MINIMAL_CRE_SYSTEM = """
         color: #1A1A1A !important;
     }
     div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, textarea:focus { border-color: #666666 !important; box-shadow: none !important; }
-    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 14px !important; }
+    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 13px !important; }
     
     /* File Uploader */
-    section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important; padding: 4px 12px !important; }
+    section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important; padding: 2px 8px !important; }
+    section[data-testid="stFileUploader"] button { padding: 4px 8px !important; font-size: 12px !important; }
     
     /* Cards */
-    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 20px; margin-bottom: 16px; }
-    .config-card { background-color: #F8F8F8; border: 1px solid #E0E0E0; border-radius: 4px; padding: 20px; margin-bottom: 16px; }
+    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 12px; margin-bottom: 8px; }
     
     /* Buttons */
-    div.stButton > button { background-color: #1A1A1A !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 14px !important; border: none !important; border-radius: 4px !important; padding: 10px 20px !important; width: 100% !important; transition: background-color 0.15s ease; }
+    div.stButton > button { background-color: #1A1A1A !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 13px !important; border: none !important; border-radius: 4px !important; padding: 6px 12px !important; width: 100% !important; transition: background-color 0.15s ease; }
     div.stButton > button:hover { background-color: #333333 !important; color: #FFFFFF !important; }
     
-    div[data-testid="stDownloadButton"] > button { background-color: #1A1A1A !important; border-radius: 4px !important; color: #FFFFFF !important; font-weight: 600 !important; padding: 10px 20px !important; width: 100% !important; }
+    div[data-testid="stDownloadButton"] > button { background-color: #1A1A1A !important; border-radius: 4px !important; color: #FFFFFF !important; font-weight: 600 !important; padding: 6px 12px !important; width: 100% !important; font-size: 13px !important; }
     div[data-testid="stDownloadButton"] > button:hover { background-color: #333333 !important; }
     
     /* Delete button */
-    .delete-btn { background-color: #DC3545 !important; color: white !important; border: none !important; border-radius: 4px !important; padding: 4px 12px !important; font-size: 12px !important; cursor: pointer !important; }
-    .delete-btn:hover { background-color: #C82333 !important; }
+    div[data-testid="column"] button { background-color: transparent !important; color: #DC3545 !important; border: 1px solid #DC3545 !important; border-radius: 4px !important; padding: 2px 8px !important; font-size: 16px !important; min-height: 32px !important; width: auto !important; }
+    div[data-testid="column"] button:hover { background-color: #DC3545 !important; color: white !important; }
     
     /* Labels */
-    .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 8px; }
-    .section-header { font-size: 16px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 12px; }
-    .saved-indicator { background-color: #E8F5E9; padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 8px; }
+    .field-label { font-size: 12px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 4px !important; margin-bottom: 2px !important; }
+    .section-header { font-size: 14px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 6px !important; }
+    .saved-indicator { background-color: #E8F5E9; padding: 4px 10px; border-radius: 4px; font-size: 12px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 4px; }
     
-    hr { margin: 16px 0 !important; border-color: #E0E0E0 !important; }
+    hr { margin: 8px 0 !important; border-color: #E0E0E0 !important; }
     
-    /* Template row with delete button */
-    .template-row { display: flex; gap: 8px; align-items: center; }
-    .template-select { flex: 1; }
+    /* Compact spacing */
+    .stSelectbox { margin-bottom: 4px !important; }
+    .stTextInput { margin-bottom: 2px !important; }
+    .stTextArea { margin-bottom: 2px !important; }
+    .stFileUploader { margin-bottom: 2px !important; }
+    .stCheckbox { margin-bottom: 2px !important; }
+    
+    /* Row with delete button */
+    .template-row { display: flex; gap: 4px; align-items: center; }
+    
+    /* Expander */
+    .streamlit-expanderHeader { font-size: 13px !important; font-weight: 600 !important; }
 </style>
 """
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
-    """Get the directory for storing templates and configs"""
     storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
     os.makedirs(storage_dir, exist_ok=True)
     return storage_dir
 
 def save_template_to_file(template_bytes, template_name):
-    """Save template to file system"""
     storage_dir = get_storage_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
     if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
@@ -87,7 +94,6 @@ def save_template_to_file(template_bytes, template_name):
     return filepath
 
 def load_template_from_file(template_name):
-    """Load template from file system"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -96,7 +102,6 @@ def load_template_from_file(template_name):
     return None
 
 def get_saved_templates():
-    """Get list of saved templates"""
     storage_dir = get_storage_dir()
     templates = []
     for file in os.listdir(storage_dir):
@@ -113,12 +118,11 @@ def get_saved_templates():
     return templates
 
 def delete_template_file(template_name):
-    """Delete a saved template"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
         os.remove(filepath)
-        # Also delete associated config
+        # Delete associated config
         config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         config_path = os.path.join(storage_dir, config_name)
         if os.path.exists(config_path):
@@ -127,7 +131,6 @@ def delete_template_file(template_name):
     return False
 
 def save_config_to_file(config_data, config_name="template_config.json"):
-    """Save configuration to file"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
     with open(filepath, 'w', encoding='utf-8') as f:
@@ -135,7 +138,6 @@ def save_config_to_file(config_data, config_name="template_config.json"):
     return filepath
 
 def load_config_from_file(config_name="template_config.json"):
-    """Load configuration from file"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
     if os.path.exists(filepath):
@@ -335,45 +337,41 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 # --- UI HELPERS ---
-def simple_form_row_with_type(label_text, key, placeholder="", value=""):
-    col1, col2 = st.columns([3, 1])
+def field_with_type(label_text, token, default_value=""):
+    col1, col2, col3 = st.columns([3, 1.2, 0.5])
     with col1:
         st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-        result = st.text_input("", key=f"val_{key}", label_visibility="collapsed", placeholder=placeholder, value=value)
+        value = st.text_input("", key=f"val_{token}", label_visibility="collapsed", value=default_value)
     with col2:
-        st.markdown('<div style="padding-top: 8px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="padding-top: 4px;"></div>', unsafe_allow_html=True)
         data_type = st.selectbox(
             "Type",
             ["Text", "Image"],
-            key=f"type_{key}",
+            key=f"type_{token}",
             label_visibility="collapsed"
         )
-    return result, data_type
+    with col3:
+        st.markdown('<div style="padding-top: 4px;"></div>', unsafe_allow_html=True)
+        if data_type == "Image":
+            upload = st.file_uploader("", type=["png", "jpg", "jpeg"], key=f"upload_{token}", label_visibility="collapsed")
+            return value, data_type, upload
+        else:
+            return value, data_type, None
 
-def simple_textarea_row_with_type(label_text, key, placeholder="", value=""):
+def compact_upload_row(label_text, token):
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-        result = st.text_area("", key=f"val_{key}", label_visibility="collapsed", placeholder=placeholder, height=100, value=value)
+        return st.file_uploader("", type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
     with col2:
-        st.markdown('<div style="padding-top: 8px;"></div>', unsafe_allow_html=True)
-        data_type = st.selectbox(
-            "Type",
-            ["Text", "Image"],
-            key=f"type_{key}",
-            label_visibility="collapsed"
-        )
-    return result, data_type
-
-def simple_uploader_row(label_text, allowed_types, key):
-    st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
+        st.markdown('<div style="padding-top: 4px;"></div>', unsafe_allow_html=True)
+        st.selectbox("Type", ["Image"], key=f"type_{token}", label_visibility="collapsed", disabled=True)
 
 # --- INIT APP ---
 st.set_page_config(page_title="Document Generator", layout="wide")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
-# Initialize all session state variables
+# Initialize session state
 if "final_pptx" not in st.session_state:
     st.session_state.final_pptx = None
 if "final_docx" not in st.session_state:
@@ -394,32 +392,27 @@ if "template_type" not in st.session_state:
     st.session_state.template_type = None
 if "delete_trigger" not in st.session_state:
     st.session_state.delete_trigger = False
-if "config_expanded" not in st.session_state:
-    st.session_state.config_expanded = False
 
 # --- MAIN LAYOUT ---
-st.markdown('<h2 style="font-weight: 700; color: #1A1A1A; margin-bottom: 4px;">Document Generator</h2>', unsafe_allow_html=True)
-st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown('<h3 style="font-weight: 700; color: #1A1A1A; margin-bottom: 2px;">Document Generator</h3>', unsafe_allow_html=True)
+st.markdown("<hr style='margin: 4px 0 8px 0;'>", unsafe_allow_html=True)
 
-# --- TEMPLATE MANAGEMENT SECTION ---
+# --- TEMPLATE MANAGEMENT ---
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-header">Template</div>', unsafe_allow_html=True)
 
-# Create row with dropdown and upload
-col_template1, col_template2 = st.columns(2)
+col1, col2 = st.columns([2, 1])
 
-with col_template1:
-    # Show saved templates dropdown with delete button
+with col1:
     saved_templates = get_saved_templates()
     template_options = ["Select saved template"]
     if saved_templates:
         for t in saved_templates:
             template_options.append(f"{t['name']} ({t['type']})")
     
-    # Use columns for dropdown and delete button
-    dropdown_col, delete_col = st.columns([4, 1])
-    
-    with dropdown_col:
+    # Row for dropdown and delete button
+    drop_col, del_col = st.columns([6, 1])
+    with drop_col:
         selected_template = st.selectbox(
             "Load Template",
             template_options,
@@ -427,10 +420,10 @@ with col_template1:
             label_visibility="collapsed"
         )
     
-    with delete_col:
+    with del_col:
         if selected_template and selected_template != "Select saved template":
             template_name = selected_template.split(' (')[0]
-            if st.button("✕", key="delete_template", help="Delete this template"):
+            if st.button("🗑️", key="delete_template", help="Delete this template"):
                 if delete_template_file(template_name):
                     st.session_state.delete_trigger = True
                     st.session_state.template_bytes = None
@@ -459,9 +452,9 @@ with col_template1:
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
 
-with col_template2:
+with col2:
     uploaded_template = st.file_uploader(
-        "Upload New Template", 
+        "Upload New", 
         type=["pptx", "docx"], 
         label_visibility="collapsed", 
         key="new_template_upload"
@@ -474,32 +467,26 @@ with col_template2:
         st.session_state.template_loaded = True
         st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
         
-        # Extract placeholders immediately
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
         
-        # Ask if user wants to save as template
-        save_as_template = st.checkbox("Save as template for future use")
-        
-        if save_as_template:
-            saved_path = save_template_to_file(template_bytes, uploaded_template.name)
-            st.success(f"Template saved: {uploaded_template.name}")
-            
-            # Save config if exists
+        save_as = st.checkbox("Save template")
+        if save_as:
+            save_template_to_file(template_bytes, uploaded_template.name)
+            config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
             if st.session_state.custom_mapping:
-                config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
                 save_config_to_file(st.session_state.custom_mapping, config_name)
+            st.success(f"Saved: {uploaded_template.name}")
             st.rerun()
 
-# Show current template info
 if st.session_state.template_bytes is not None:
-    template_name = st.session_state.saved_template_name or "Unsaved Template"
+    template_name = st.session_state.saved_template_name or "Unsaved"
     template_type = st.session_state.template_type or "Unknown"
     st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- Get current template bytes ---
+# --- Get current template ---
 template_bytes = st.session_state.template_bytes
 template_type = st.session_state.template_type
 u_template = None
@@ -508,16 +495,14 @@ if template_bytes is not None:
 
 text_data = {}
 image_data = {}
-field_types = {}
 
 # --- DISPLAY FIELDS ---
 if u_template is not None and st.session_state.tokens:
     tokens = st.session_state.tokens
     
     if not tokens:
-        st.info("No placeholders found in the template.")
+        st.info("No placeholders found")
     else:
-        # Distribute tokens evenly between two columns
         mid_point = len(tokens) // 2
         col1_tokens = tokens[:mid_point]
         col2_tokens = tokens[mid_point:]
@@ -526,23 +511,25 @@ if u_template is not None and st.session_state.tokens:
         
         with col1:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Fields</div>', unsafe_allow_html=True)
             for token in col1_tokens:
                 clean_label = token.replace("{", "").replace("}", "")
-                # Get the stored type or default to Text
                 stored_type = st.session_state.custom_mapping.get(token, "Text")
                 
                 if stored_type == "Image" and template_type == 'pptx':
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
-                    field_types[token] = "Image"
+                    img = compact_upload_row(clean_label, token)
+                    image_data[token] = img
+                    # Store type in mapping
+                    st.session_state.custom_mapping[token] = "Image"
                 else:
-                    # For text fields, show text input with type selector
-                    col_a, col_b = st.columns([3, 1])
+                    # Text field with type selector
+                    col_a, col_b, col_c = st.columns([3, 1.2, 0.5])
                     with col_a:
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                        val = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                        text_data[token] = val
                     with col_b:
-                        st.markdown('<div style="padding-top: 8px;"></div>', unsafe_allow_html=True)
+                        st.markdown('<div style="padding-top: 4px;"></div>', unsafe_allow_html=True)
                         data_type = st.selectbox(
                             "Type",
                             ["Text", "Image"],
@@ -550,28 +537,30 @@ if u_template is not None and st.session_state.tokens:
                             key=f"type_{token}",
                             label_visibility="collapsed"
                         )
-                        field_types[token] = data_type
-                        # Update mapping
                         st.session_state.custom_mapping[token] = data_type
+                    with col_c:
+                        pass
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Field Values</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Fields</div>', unsafe_allow_html=True)
             for token in col2_tokens:
                 clean_label = token.replace("{", "").replace("}", "")
                 stored_type = st.session_state.custom_mapping.get(token, "Text")
                 
                 if stored_type == "Image" and template_type == 'pptx':
-                    image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
-                    field_types[token] = "Image"
+                    img = compact_upload_row(clean_label, token)
+                    image_data[token] = img
+                    st.session_state.custom_mapping[token] = "Image"
                 else:
-                    col_a, col_b = st.columns([3, 1])
+                    col_a, col_b, col_c = st.columns([3, 1.2, 0.5])
                     with col_a:
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                        text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed")
+                        val = st.text_input("", key=f"val_{token}_2", label_visibility="collapsed")
+                        text_data[token] = val
                     with col_b:
-                        st.markdown('<div style="padding-top: 8px;"></div>', unsafe_allow_html=True)
+                        st.markdown('<div style="padding-top: 4px;"></div>', unsafe_allow_html=True)
                         data_type = st.selectbox(
                             "Type",
                             ["Text", "Image"],
@@ -579,119 +568,71 @@ if u_template is not None and st.session_state.tokens:
                             key=f"type_{token}_2",
                             label_visibility="collapsed"
                         )
-                        field_types[token] = data_type
                         st.session_state.custom_mapping[token] = data_type
+                    with col_c:
+                        pass
             st.markdown('</div>', unsafe_allow_html=True)
-
-# --- DATA MAPPING SECTION (Collapsible) ---
-if u_template is not None and st.session_state.tokens:
-    # Create expander for configuration
-    with st.expander("⚙️ Configuration Settings", expanded=st.session_state.config_expanded):
-        st.markdown('<div class="config-card">', unsafe_allow_html=True)
-        
-        # Save Configuration
-        config_json_str = json.dumps(st.session_state.custom_mapping, indent=4)
-        col_json1, col_json2 = st.columns([1, 1])
-        with col_json1:
-            config_filename = "template_config.json"
-            if st.session_state.saved_template_name:
-                config_filename = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-            
-            st.download_button(
-                label="Download Configuration",
-                data=config_json_str,
-                file_name=config_filename,
-                mime="application/json",
-                use_container_width=True
-            )
-        
-        with col_json2:
-            if st.session_state.saved_template_name:
-                if st.button("Save Config with Template", use_container_width=True):
-                    config_filename = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-                    save_config_to_file(st.session_state.custom_mapping, config_filename)
-                    st.success(f"Config saved: {config_filename}")
-            else:
-                st.info("Save template first to persist config")
-        
-        # Load config
-        st.markdown("<br>", unsafe_allow_html=True)
-        u_json = st.file_uploader("Load Configuration", type=["json"], label_visibility="collapsed")
-        if u_json is not None:
-            try:
-                loaded_config = json.load(u_json)
-                st.session_state.custom_mapping.update(loaded_config)
-                st.success("Configuration loaded")
-                st.rerun()
-            except Exception:
-                st.error("Invalid JSON file")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- GENERATION SECTION ---
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Generate Document</div>', unsafe_allow_html=True)
     
-    if st.button("Generate", use_container_width=True):
-        with st.spinner("Generating document..."):
-            try:
-                if template_type == 'pptx':
-                    raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
-                    st.session_state.final_pptx = raw_pptx
-                    st.session_state.final_pdf = convert_pptx_to_pdf(raw_pptx)
-                    st.session_state.final_docx = None
-                else:  # docx
-                    raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
-                    st.session_state.final_docx = raw_docx
-                    st.session_state.final_pdf = convert_docx_to_pdf(raw_docx)
-                    st.session_state.final_pptx = None
-                
-                st.success("Document generated successfully")
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-    st.markdown("<hr>", unsafe_allow_html=True)
+    gen_col, dl1, dl2, dl3 = st.columns([1, 1, 1, 1])
     
-    # Downloads - Three columns for PPTX, PDF, DOCX
-    dl_col1, dl_col2, dl_col3 = st.columns(3)
+    with gen_col:
+        if st.button("Generate", use_container_width=True):
+            with st.spinner("Generating..."):
+                try:
+                    if template_type == 'pptx':
+                        raw_pptx = generate_pptx_bytes(template_bytes, text_data, image_data)
+                        st.session_state.final_pptx = raw_pptx
+                        st.session_state.final_pdf = convert_pptx_to_pdf(raw_pptx)
+                        st.session_state.final_docx = None
+                    else:
+                        raw_docx = generate_docx_bytes(template_bytes, text_data, image_data)
+                        st.session_state.final_docx = raw_docx
+                        st.session_state.final_pdf = convert_docx_to_pdf(raw_docx)
+                        st.session_state.final_pptx = None
+                    st.success("Done!")
+                except Exception as e:
+                    st.error(f"Error: {e}")
     
-    with dl_col1:
+    with dl1:
         if st.session_state.final_pptx:
             st.download_button(
-                "Download PPTX",
+                "PPTX",
                 data=st.session_state.final_pptx,
-                file_name="Generated_Document.pptx",
+                file_name="Generated.pptx",
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 use_container_width=True
             )
         else:
-            st.button("Download PPTX", disabled=True, use_container_width=True)
+            st.button("PPTX", disabled=True, use_container_width=True)
     
-    with dl_col2:
+    with dl2:
         if st.session_state.final_pdf:
             st.download_button(
-                "Download PDF",
+                "PDF",
                 data=st.session_state.final_pdf,
-                file_name="Generated_Document.pdf",
+                file_name="Generated.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
         else:
-            st.button("Download PDF", disabled=True, use_container_width=True)
+            st.button("PDF", disabled=True, use_container_width=True)
     
-    with dl_col3:
+    with dl3:
         if st.session_state.final_docx:
             st.download_button(
-                "Download DOCX",
+                "DOCX",
                 data=st.session_state.final_docx,
-                file_name="Generated_Document.docx",
+                file_name="Generated.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True
             )
         else:
-            st.button("Download DOCX", disabled=True, use_container_width=True)
+            st.button("DOCX", disabled=True, use_container_width=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("Please upload or select a template to begin")
+    st.info("Select or upload a template")
