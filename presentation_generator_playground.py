@@ -129,34 +129,6 @@ MINIMAL_CRE_SYSTEM = """
         padding-right: 10px;
         font-size: 13px;
     }
-    
-    .detection-dialog {
-        background-color: #F8F9FA;
-        border: 2px solid #003366;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 20px 0;
-    }
-    .detection-dialog h3 {
-        color: #003366;
-        margin-top: 0;
-    }
-    .token-badge {
-        background-color: #E8F0FE;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-family: monospace;
-        font-size: 12px;
-        display: inline-block;
-        margin: 2px;
-    }
-    .group-card {
-        background-color: #FFFFFF;
-        border: 1px solid #E0E0E0;
-        border-radius: 4px;
-        padding: 12px;
-        margin: 8px 0;
-    }
 </style>
 """
 
@@ -259,58 +231,50 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
         return img_file
 
 def extract_placeholders_from_pptx(pptx_bytes):
-    try:
-        prs = Presentation(io.BytesIO(pptx_bytes))
-        tokens = []
-        seen = set()
-        
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    found = re.findall(r'\{\{.*?\}\}', shape.text)
-                    for token in found:
-                        if token not in seen:
-                            tokens.append(token)
-                            seen.add(token)
-                if shape.has_table:
-                    for row in shape.table.rows:
-                        for cell in row.cells:
-                            found = re.findall(r'\{\{.*?\}\}', cell.text)
-                            for token in found:
-                                if token not in seen:
-                                    tokens.append(token)
-                                    seen.add(token)
-        return tokens
-    except Exception as e:
-        print(f"Error extracting from PPTX: {e}")
-        return []
+    prs = Presentation(io.BytesIO(pptx_bytes))
+    tokens = []
+    seen = set()
+    
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                found = re.findall(r'\{\{.*?\}\}', shape.text)
+                for token in found:
+                    if token not in seen:
+                        tokens.append(token)
+                        seen.add(token)
+            if shape.has_table:
+                for row in shape.table.rows:
+                    for cell in row.cells:
+                        found = re.findall(r'\{\{.*?\}\}', cell.text)
+                        for token in found:
+                            if token not in seen:
+                                tokens.append(token)
+                                seen.add(token)
+    return tokens
 
 def extract_placeholders_from_docx(docx_bytes):
-    try:
-        doc = Document(io.BytesIO(docx_bytes))
-        tokens = []
-        seen = set()
-        
-        for paragraph in doc.paragraphs:
-            found = re.findall(r'\{\{.*?\}\}', paragraph.text)
-            for token in found:
-                if token not in seen:
-                    tokens.append(token)
-                    seen.add(token)
-        
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    found = re.findall(r'\{\{.*?\}\}', cell.text)
-                    for token in found:
-                        if token not in seen:
-                            tokens.append(token)
-                            seen.add(token)
-        
-        return tokens
-    except Exception as e:
-        print(f"Error extracting from DOCX: {e}")
-        return []
+    doc = Document(io.BytesIO(docx_bytes))
+    tokens = []
+    seen = set()
+    
+    for paragraph in doc.paragraphs:
+        found = re.findall(r'\{\{.*?\}\}', paragraph.text)
+        for token in found:
+            if token not in seen:
+                tokens.append(token)
+                seen.add(token)
+    
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                found = re.findall(r'\{\{.*?\}\}', cell.text)
+                for token in found:
+                    if token not in seen:
+                        tokens.append(token)
+                        seen.add(token)
+    
+    return tokens
 
 def extract_placeholders(template_bytes, template_type):
     if template_type == 'pptx':
@@ -337,15 +301,21 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                         run.text = run.text.replace(token, replacement)
 
 def detect_table_placeholders(tokens):
+    """
+    Automatically detect table placeholders.
+    Looks for patterns like {{NAME_1}}, {{NAME_2}}, {{NAME_3}} where NAME is consistent.
+    Returns: dict with structure {base_name: {'rows': max_row_number, 'columns': list_of_suffixes}}
+    """
     table_groups = {}
     
+    # Pattern to match placeholders with numbers: {{SOMETHING_1}}, {{SOMETHING_2}}, etc.
     pattern = r'\{\{([A-Z_]+)_(\d+)\}\}'
     
     for token in tokens:
         match = re.match(pattern, token)
         if match:
-            base_name = match.group(1)
-            row_num = int(match.group(2))
+            base_name = match.group(1)  # e.g., COMPANY_NAME, LESSOR_REPRESENTATIVE_NAME
+            row_num = int(match.group(2))  # e.g., 1, 2, 3
             
             if base_name not in table_groups:
                 table_groups[base_name] = {
@@ -355,74 +325,67 @@ def detect_table_placeholders(tokens):
             table_groups[base_name]['rows'].add(row_num)
             table_groups[base_name]['tokens'].append(token)
     
+    # Validate and process each group
     validated_groups = {}
     for base_name, data in table_groups.items():
         row_numbers = sorted(data['rows'])
         max_row = max(row_numbers)
         
+        # Check if rows are sequential (1, 2, 3, ...)
         expected_rows = set(range(1, max_row + 1))
-        current_rows = set(row_numbers)
-        missing_rows = expected_rows - current_rows
-        
-        if len(row_numbers) >= 2:
+        if row_numbers == expected_rows:
+            # Valid table - all rows present
+            validated_groups[base_name] = {
+                'max_row': max_row,
+                'tokens': data['tokens']
+            }
+        else:
+            # Some rows missing - still treat as table but note the gaps
             validated_groups[base_name] = {
                 'max_row': max_row,
                 'tokens': data['tokens'],
-                'missing_rows': list(missing_rows) if missing_rows else []
+                'missing_rows': expected_rows - row_numbers
             }
     
     return validated_groups
 
-def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
-    prs = Presentation(io.BytesIO(template_bytes))
+def get_table_column_suffixes(table_tokens):
+    """Extract column suffixes from table tokens"""
+    suffixes = []
+    seen = set()
     
-    for slide in prs.slides:
-        shapes_to_delete = []
-        images_to_add = []
+    for token in table_tokens:
+        # Remove {{ and }}
+        clean = token[2:-2]
+        # Split by underscore and get the last part
+        parts = clean.split('_')
+        if len(parts) > 1:
+            # Check if the last part is a number
+            if parts[-1].isdigit():
+                # The column name is everything before the last underscore + the last part
+                # But we want to group by the base name without the number
+                base = '_'.join(parts[:-1])
+                if base not in seen:
+                    seen.add(base)
+                    suffixes.append(base)
+    
+    return suffixes
 
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                text_content = shape.text
-                for img_token, img_file in image_inputs.items():
-                    if img_token in text_content and img_file is not None:
-                        images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
-                        shapes_to_delete.append(shape)
-                        break
-
-        for shape in slide.shapes:
-            if shape not in shapes_to_delete:
-                if shape.has_text_frame:
-                    for paragraph in shape.text_frame.paragraphs:
-                        replace_text_in_paragraph(paragraph, text_inputs)
-                
-                if hasattr(shape, 'table') and shape.table:
-                    for row in shape.table.rows:
-                        for cell in row.cells:
-                            if cell.text_frame:
-                                for paragraph in cell.text_frame.paragraphs:
-                                    replace_text_in_paragraph(paragraph, text_inputs)
-
-        for img_file, left, top, width, height in images_to_add:
-            try:
-                processed_img = smart_crop_to_fit(img_file, width, height)
-                slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
-            except Exception:
-                pass
-
-        for old_shape in shapes_to_delete:
-            try:
-                sp = old_shape._element
-                sp.getparent().remove(sp)
-            except Exception:
-                pass
-
-    pptx_stream = io.BytesIO()
-    prs.save(pptx_stream)
-    return pptx_stream.getvalue()
+def generate_table_headers(column_suffixes):
+    """Generate user-friendly headers for table columns"""
+    # Clean up the suffixes for display
+    headers = []
+    for suffix in column_suffixes:
+        # Convert from UPPER_CASE to Title Case
+        header = suffix.replace('_', ' ').title()
+        headers.append(header)
+    return headers
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=None, table_config=None):
+    """Generate DOCX with text, image, and table replacements"""
     doc = Document(io.BytesIO(template_bytes))
     
+    # Process regular paragraphs
     for paragraph in doc.paragraphs:
         has_image = False
         for img_token in image_inputs.keys():
@@ -433,10 +396,10 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
         if not has_image:
             replace_text_in_paragraph(paragraph, text_inputs)
     
+    # Process tables with dynamic data
     if table_data and table_config:
-        base_names = list(table_config.keys())
-        
         for table in doc.tables:
+            # Check if this table has placeholders
             has_placeholders = False
             for row in table.rows:
                 for cell in row.cells:
@@ -447,18 +410,39 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
                     break
             
             if has_placeholders:
+                # Get the base names for this table
+                base_names = list(table_config.keys())
+                
+                # Remove all rows after the first (header)
                 while len(table.rows) > 1:
                     table._element.remove(table.rows[-1]._element)
                 
+                # Add data rows
                 for row_idx, row_data in enumerate(table_data):
-                    new_row = table.add_row()
-                    for col_idx, cell in enumerate(new_row.cells):
-                        for base_name in base_names:
-                            placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
-                            if placeholder in cell.text:
-                                value = row_data.get(base_name, '')
-                                cell.text = str(value) if value else ''
-                                break
+                    if row_idx < len(table_data):
+                        new_row = table.add_row()
+                        # For each cell, check if it needs replacement
+                        for col_idx, cell in enumerate(new_row.cells):
+                            # Try to match based on the column pattern
+                            cell_text = cell.text
+                            for base_name in base_names:
+                                placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
+                                if placeholder in cell_text:
+                                    # Find the matching column value
+                                    col_suffix = base_name
+                                    # Try to find the value
+                                    value = row_data.get(col_suffix, '')
+                                    cell.text = str(value) if value else ''
+                                    break
+                            # If no match found, leave as is or replace with standard placeholders
+                            if '{{' in cell.text and '}}' in cell.text:
+                                # Try to replace with standard placeholders
+                                for base_name in base_names:
+                                    for col_suffix in row_data.keys():
+                                        placeholder = f"{{{{{col_suffix}_{row_idx + 1}}}}}"
+                                        if placeholder in cell.text:
+                                            cell.text = str(row_data.get(col_suffix, ''))
+                                            break
     
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
@@ -475,160 +459,10 @@ def get_download_filename(template_name, file_type):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"Generated_Document_{timestamp}.{file_type}"
 
-def load_saved_template_config(template_name):
-    """Load saved configuration for a template if it exists"""
-    config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-    config_data = load_config_from_file(config_name)
-    
-    if config_data and 'table_config' in config_data:
-        return config_data['table_config']
-    return None
-
-def save_and_load_template(template_bytes, template_name, template_type, tokens, confirmed_groups):
-    """Save template to file and load with confirmed configuration"""
-    # Save the template file
-    saved_path = save_template_to_file(template_bytes, template_name)
-    
-    # Save config with table_config
-    config_data = {
-        'table_config': confirmed_groups,
-        'custom_mapping': st.session_state.custom_mapping
-    }
-    config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-    save_config_to_file(config_data, config_name)
-    
-    # Load into session state
-    st.session_state.table_config = confirmed_groups
-    st.session_state.tokens = tokens
-    st.session_state.template_bytes = template_bytes
-    st.session_state.template_type = template_type
-    st.session_state.template_loaded = True
-    st.session_state.saved_template_name = template_name
-    st.session_state.saved_file_name = template_name
-    st.session_state.save_success = True
-    st.session_state.use_dynamic_table = True if confirmed_groups else False
-    st.session_state.table_headers = list(confirmed_groups.keys()) if confirmed_groups else []
-    
-    if confirmed_groups and template_type == 'docx':
-        max_rows = 0
-        for base_name, config in confirmed_groups.items():
-            max_rows = max(max_rows, config['max_row'])
-        
-        st.session_state.table_data = []
-        for i in range(max_rows):
-            row_data = {}
-            for base_name in confirmed_groups.keys():
-                row_data[base_name] = ""
-            st.session_state.table_data.append(row_data)
-    else:
-        st.session_state.table_data = []
-    
-    # Reset pending state
-    st.session_state.show_detection_dialog = False
-    st.session_state.pending_tokens = []
-    st.session_state.pending_template_bytes = None
-    st.session_state.pending_template_type = None
-    st.session_state.pending_template_name = None
-    st.session_state.confirmed_groups = {}
-
 # --- UI HELPERS ---
 def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
-
-def show_placeholder_detection_dialog(tokens, detected_groups):
-    """Show detected placeholders and ask for confirmation"""
-    
-    st.markdown('<div class="detection-dialog">', unsafe_allow_html=True)
-    st.markdown("### Placeholder Detection Results")
-    st.markdown(f"**Total placeholders found:** {len(tokens)}")
-    
-    with st.expander("View All Placeholders", expanded=False):
-        cols = st.columns(4)
-        for idx, token in enumerate(sorted(tokens)):
-            cols[idx % 4].markdown(f'<span class="token-badge">{token}</span>', unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    confirmed_groups = {}
-    
-    if detected_groups:
-        st.markdown("### Detected Table Groups")
-        st.markdown("Patterns with numbered suffixes (_1, _2, _3) were detected:")
-        
-        for base_name, config in detected_groups.items():
-            st.markdown('<div class="group-card">', unsafe_allow_html=True)
-            
-            cols = st.columns([1, 2, 1])
-            with cols[0]:
-                st.markdown(f"**{base_name}**")
-                st.caption(f"Max rows: {config['max_row']}")
-            
-            with cols[1]:
-                tokens_display = ", ".join(config['tokens'])
-                st.markdown(f'<span style="font-size:12px;">{tokens_display}</span>', unsafe_allow_html=True)
-            
-            with cols[2]:
-                confirm = st.checkbox(
-                    "Group as table",
-                    value=True,
-                    key=f"confirm_group_{base_name}"
-                )
-                if confirm:
-                    confirmed_groups[base_name] = config
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.info("No table patterns detected. All placeholders will be treated as regular fields.")
-    
-    st.markdown("---")
-    
-    with st.expander("Manual Grouping (Optional)"):
-        st.markdown("Create a custom table group by specifying the base name and number of rows.")
-        st.caption("Example: If you have CUSTOM_1, CUSTOM_2, CUSTOM_3, enter base name as 'CUSTOM'")
-        
-        col1, col2, col3 = st.columns([2, 1, 1])
-        with col1:
-            manual_base = st.text_input("Base Name (without _number)", key="manual_base", placeholder="e.g., CUSTOM")
-        with col2:
-            manual_rows = st.number_input("Number of Rows", min_value=1, value=1, key="manual_rows", step=1)
-        with col3:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Add Group", key="add_manual_group"):
-                if manual_base:
-                    manual_tokens = []
-                    for i in range(1, manual_rows + 1):
-                        manual_tokens.append(f"{{{{{manual_base}_{i}}}}}")
-                    
-                    existing_tokens = [t for t in manual_tokens if t in tokens]
-                    if existing_tokens:
-                        confirmed_groups[manual_base] = {
-                            'max_row': manual_rows,
-                            'tokens': existing_tokens,
-                            'missing_rows': []
-                        }
-                        st.success(f"Added manual group: {manual_base}")
-                        st.rerun()
-                    else:
-                        st.warning(f"No tokens found matching pattern {manual_base}_1, {manual_base}_2, ...")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Save Template button
-    if st.button("Save Template", use_container_width=True, type="primary"):
-        if st.session_state.pending_template_name:
-            save_and_load_template(
-                st.session_state.pending_template_bytes,
-                st.session_state.pending_template_name,
-                st.session_state.pending_template_type,
-                st.session_state.pending_tokens,
-                confirmed_groups
-            )
-            st.rerun()
-        else:
-            st.error("Template name not found. Please try uploading again.")
-    
-    return confirmed_groups
 
 # --- MAIN APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -667,18 +501,6 @@ if "table_config" not in st.session_state:
     st.session_state.table_config = {}
 if "table_headers" not in st.session_state:
     st.session_state.table_headers = []
-if "show_detection_dialog" not in st.session_state:
-    st.session_state.show_detection_dialog = False
-if "confirmed_groups" not in st.session_state:
-    st.session_state.confirmed_groups = {}
-if "pending_tokens" not in st.session_state:
-    st.session_state.pending_tokens = []
-if "pending_template_bytes" not in st.session_state:
-    st.session_state.pending_template_bytes = None
-if "pending_template_type" not in st.session_state:
-    st.session_state.pending_template_type = None
-if "pending_template_name" not in st.session_state:
-    st.session_state.pending_template_name = None
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -740,66 +562,42 @@ with col_template1:
         template_name = selected_template.split(' (')[0]
         template_bytes = load_template_from_file(template_name)
         if template_bytes:
-            # Determine template type from file extension
-            template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+            st.session_state.template_bytes = template_bytes
+            st.session_state.saved_template_name = template_name
+            st.session_state.template_loaded = True
+            st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
             
-            # Check if this template has a saved configuration
-            saved_table_config = load_saved_template_config(template_name)
+            config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+            config_data = load_config_from_file(config_name)
+            if config_data:
+                st.session_state.custom_mapping = config_data
             
-            if saved_table_config:
-                # Load directly from saved config
-                st.session_state.template_bytes = template_bytes
-                st.session_state.saved_template_name = template_name
-                st.session_state.template_loaded = True
-                st.session_state.template_type = template_type
-                
-                tokens = extract_placeholders(template_bytes, template_type)
-                st.session_state.tokens = tokens
-                
-                # Load saved config
-                st.session_state.table_config = saved_table_config
+            tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+            st.session_state.tokens = tokens
+            
+            # Auto-detect table placeholders
+            table_groups = detect_table_placeholders(tokens)
+            st.session_state.table_config = table_groups
+            
+            if table_groups and st.session_state.template_type == 'docx':
                 st.session_state.use_dynamic_table = True
-                st.session_state.table_headers = list(saved_table_config.keys())
                 
-                # Initialize table data
+                # Get the max rows from the first group
                 max_rows = 0
-                for base_name, config in saved_table_config.items():
+                for base_name, config in table_groups.items():
                     max_rows = max(max_rows, config['max_row'])
                 
-                st.session_state.table_data = []
-                for i in range(max_rows):
-                    row_data = {}
-                    for base_name in saved_table_config.keys():
-                        row_data[base_name] = ""
-                    st.session_state.table_data.append(row_data)
-                
-                # Load custom mapping
-                config_data = load_config_from_file(template_name.replace('.pptx', '').replace('.docx', '') + '_config.json')
-                if config_data and 'custom_mapping' in config_data:
-                    st.session_state.custom_mapping = config_data['custom_mapping']
-            else:
-                # No saved config, check for detection
-                tokens = extract_placeholders(template_bytes, template_type)
-                st.session_state.tokens = tokens
-                
-                detected_groups = detect_table_placeholders(tokens)
-                
-                if detected_groups and template_type == 'docx':
-                    st.session_state.show_detection_dialog = True
-                    st.session_state.pending_tokens = tokens
-                    st.session_state.pending_template_bytes = template_bytes
-                    st.session_state.pending_template_type = template_type
-                    st.session_state.pending_template_name = template_name
-                    st.session_state.template_loaded = False
-                else:
-                    st.session_state.template_bytes = template_bytes
-                    st.session_state.saved_template_name = template_name
-                    st.session_state.template_loaded = True
-                    st.session_state.template_type = template_type
-                    st.session_state.use_dynamic_table = False
-                    st.session_state.table_config = {}
+                # Initialize table data with empty rows
+                if not st.session_state.table_data:
                     st.session_state.table_data = []
-                    st.session_state.table_headers = []
+                    for i in range(max_rows):
+                        row_data = {}
+                        for base_name in table_groups.keys():
+                            row_data[base_name] = ""
+                        st.session_state.table_data.append(row_data)
+                
+                # Generate table headers
+                st.session_state.table_headers = list(table_groups.keys())
 
 with col_template2:
     uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
@@ -816,68 +614,65 @@ with col_template2:
     
     if uploaded_template:
         template_bytes = uploaded_template.getvalue()
-        template_name = uploaded_template.name
-        template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+        st.session_state.template_bytes = template_bytes
+        st.session_state.saved_template_name = None
+        st.session_state.template_loaded = True
+        st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
         
-        tokens = extract_placeholders(template_bytes, template_type)
-        detected_groups = detect_table_placeholders(tokens)
+        tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+        st.session_state.tokens = tokens
         
-        if detected_groups and template_type == 'docx':
-            st.session_state.show_detection_dialog = True
-            st.session_state.pending_tokens = tokens
-            st.session_state.pending_template_bytes = template_bytes
-            st.session_state.pending_template_type = template_type
-            st.session_state.pending_template_name = template_name
-            st.session_state.template_bytes = None
-            st.session_state.template_loaded = False
-        else:
-            st.session_state.template_bytes = template_bytes
-            st.session_state.saved_template_name = None
-            st.session_state.template_loaded = True
-            st.session_state.template_type = template_type
-            st.session_state.tokens = tokens
-            st.session_state.use_dynamic_table = False
-            st.session_state.table_config = {}
-            st.session_state.table_data = []
-            st.session_state.table_headers = []
+        # Auto-detect table placeholders
+        table_groups = detect_table_placeholders(tokens)
+        st.session_state.table_config = table_groups
+        
+        if table_groups and st.session_state.template_type == 'docx':
+            st.session_state.use_dynamic_table = True
+            max_rows = 0
+            for base_name, config in table_groups.items():
+                max_rows = max(max_rows, config['max_row'])
             
-            if st.button("Save Template", key="save_template_btn", use_container_width=True):
-                saved_path = save_template_to_file(template_bytes, uploaded_template.name)
-                st.session_state.saved_template_name = uploaded_template.name
-                
-                if st.session_state.custom_mapping:
-                    config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-                    save_config_to_file(st.session_state.custom_mapping, config_name)
-                
-                st.session_state.save_success = True
-                st.session_state.saved_file_name = uploaded_template.name
-                st.session_state.clear_uploader = True
-                st.rerun()
-
-# --- SHOW DETECTION DIALOG ---
-if st.session_state.show_detection_dialog and st.session_state.pending_tokens:
-    st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    detected_groups = detect_table_placeholders(st.session_state.pending_tokens)
-    show_placeholder_detection_dialog(st.session_state.pending_tokens, detected_groups)
-    st.markdown('</div>', unsafe_allow_html=True)
+            if not st.session_state.table_data:
+                st.session_state.table_data = []
+                for i in range(max_rows):
+                    row_data = {}
+                    for base_name in table_groups.keys():
+                        row_data[base_name] = ""
+                    st.session_state.table_data.append(row_data)
+            
+            st.session_state.table_headers = list(table_groups.keys())
+        else:
+            st.session_state.use_dynamic_table = False
+        
+        if st.button("Save Template", key="save_template_btn", use_container_width=True):
+            saved_path = save_template_to_file(template_bytes, uploaded_template.name)
+            st.session_state.saved_template_name = uploaded_template.name
+            
+            if st.session_state.custom_mapping:
+                config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                save_config_to_file(st.session_state.custom_mapping, config_name)
+            
+            st.session_state.save_success = True
+            st.session_state.saved_file_name = uploaded_template.name
+            st.session_state.clear_uploader = True
+            st.rerun()
 
 if st.session_state.save_success:
-    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully!")
+    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully! Refresh the page to see it in the dropdown.")
     st.session_state.save_success = False
     st.session_state.saved_file_name = None
 
-if st.session_state.template_bytes is not None and st.session_state.template_loaded:
+if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
     template_type = st.session_state.template_type or "Unknown"
     st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- MAIN CONTENT ---
 template_bytes = st.session_state.template_bytes
 template_type = st.session_state.template_type
 u_template = None
-if template_bytes is not None and st.session_state.template_loaded:
+if template_bytes is not None:
     u_template = type('obj', (object,), {'getvalue': lambda: template_bytes})()
 
 text_data = {}
@@ -891,10 +686,10 @@ if u_template is not None and st.session_state.tokens:
     if not tokens:
         st.info("No placeholders found in the template.")
     else:
+        # Identify which tokens belong to tables
         table_tokens = set()
         for base_name, config in table_config.items():
-            for token in config['tokens']:
-                table_tokens.add(token)
+            table_tokens.update(config['tokens'])
         
         regular_tokens = [t for t in tokens if t not in table_tokens]
         
@@ -983,18 +778,21 @@ if u_template is not None and st.session_state.tokens:
             st.markdown('</div>', unsafe_allow_html=True)
         
         # --- DISPLAY DYNAMIC TABLE ---
-        if table_config and st.session_state.use_dynamic_table and template_type == 'docx' and st.session_state.table_data:
+        if table_config and st.session_state.use_dynamic_table and template_type == 'docx':
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             st.markdown('<div class="section-header">Table Data</div>', unsafe_allow_html=True)
             
+            # Get table headers from the config
             table_headers = list(table_config.keys())
             
+            # Display current max rows
             max_rows = 0
             for base_name, config in table_config.items():
                 max_rows = max(max_rows, config['max_row'])
             
-            st.markdown(f'<div style="font-size:12px;color:#666;margin-bottom:10px;">{len(table_headers)} columns, {max_rows} base rows</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:12px;color:#666;margin-bottom:10px;">Detected {len(table_headers)} columns and {max_rows} rows from placeholders</div>', unsafe_allow_html=True)
             
+            # Table controls
             col_controls1, col_controls2, col_controls3 = st.columns([1, 1, 6])
             with col_controls1:
                 if st.button("Add Row", use_container_width=True, key="add_table_row"):
@@ -1009,17 +807,20 @@ if u_template is not None and st.session_state.tokens:
                         st.session_state.table_data.pop()
                         st.rerun()
             
+            # Table header
             col_count = len(table_headers)
             col_widths = [2] * col_count + [0.5]
             col_headers = st.columns(col_widths)
             
             for idx, header in enumerate(table_headers):
+                # Clean up header for display
                 display_header = header.replace('_', ' ').title()
                 with col_headers[idx]:
                     st.markdown(f'<strong>{display_header}</strong>', unsafe_allow_html=True)
             with col_headers[-1]:
                 st.markdown('', unsafe_allow_html=True)
             
+            # Display each row
             rows_to_delete = []
             for idx, row_data in enumerate(st.session_state.table_data):
                 col_widths = [2] * col_count + [0.5]
@@ -1048,20 +849,24 @@ if u_template is not None and st.session_state.tokens:
             st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
+            # Update text_data with table data
+            # Clear existing table entries
             for key in list(text_data.keys()):
                 if '{{' in key and '_' in key:
+                    # Check if it matches any table token pattern
                     for base_name in table_config.keys():
                         if f'{{{{{base_name}_' in key:
                             del text_data[key]
                             break
             
+            # Add all rows
             for idx, row_data in enumerate(st.session_state.table_data):
                 for base_name in table_config.keys():
                     placeholder = f"{{{{{base_name}_{idx+1}}}}}"
                     text_data[placeholder] = row_data.get(base_name, "")
 
 # --- DOWNLOAD SECTION ---
-if u_template is not None and st.session_state.template_loaded:
+if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
     
@@ -1120,9 +925,7 @@ if u_template is not None and st.session_state.template_loaded:
                     st.error("Failed to generate document. Please check the template and try again.")
             except Exception as e:
                 st.error(f"Error generating document: {str(e)}")
-                st.error(traceback.format_exc())
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
-    if not st.session_state.show_detection_dialog:
-        st.info("Please upload or select a template to begin")
+    st.info("Please upload or select a template to begin")
