@@ -14,7 +14,6 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
-import zipfile
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -182,12 +181,8 @@ def load_template_from_file(template_name):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
-        try:
-            with open(filepath, 'rb') as f:
-                return f.read()
-        except Exception as e:
-            st.error(f"Error loading template: {str(e)}")
-            return None
+        with open(filepath, 'rb') as f:
+            return f.read()
     return None
 
 def get_saved_templates():
@@ -197,34 +192,25 @@ def get_saved_templates():
         for file in os.listdir(storage_dir):
             if file.endswith('.pptx') or file.endswith('.docx'):
                 filepath = os.path.join(storage_dir, file)
-                try:
-                    stat = os.stat(filepath)
-                    templates.append({
-                        'name': file,
-                        'path': filepath,
-                        'size': stat.st_size,
-                        'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                        'type': 'PPTX' if file.endswith('.pptx') else 'DOCX'
-                    })
-                except:
-                    continue
+                stat = os.stat(filepath)
+                templates.append({
+                    'name': file,
+                    'path': filepath,
+                    'size': stat.st_size,
+                    'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX'
+                })
     return templates
 
 def delete_template_file(template_name):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
-        try:
-            os.remove(filepath)
-        except:
-            pass
+        os.remove(filepath)
         config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         config_path = os.path.join(storage_dir, config_name)
         if os.path.exists(config_path):
-            try:
-                os.remove(config_path)
-            except:
-                pass
+            os.remove(config_path)
         return True
     return False
 
@@ -239,11 +225,8 @@ def load_config_from_file(config_name="template_config.json"):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
     if os.path.exists(filepath):
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return None
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
     return None
 
 def auto_save_config():
@@ -275,64 +258,39 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     except Exception:
         return img_file
 
-def is_valid_docx(file_bytes):
-    """Check if the file is a valid DOCX file"""
-    try:
-        # DOCX is a ZIP file containing specific files
-        with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
-            # Check for required files in a DOCX
-            required_files = ['word/document.xml', '[Content_Types].xml']
-            zf_names = zf.namelist()
-            for req in required_files:
-                if req not in zf_names:
-                    return False
-            return True
-    except:
-        return False
-
 def extract_placeholders_from_pptx(pptx_bytes):
     try:
         prs = Presentation(io.BytesIO(pptx_bytes))
-    except:
+        tokens = []
+        seen = set()
+        
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    found = re.findall(r'\{\{.*?\}\}', shape.text)
+                    for token in found:
+                        if token not in seen:
+                            tokens.append(token)
+                            seen.add(token)
+                if shape.has_table:
+                    for row in shape.table.rows:
+                        for cell in row.cells:
+                            found = re.findall(r'\{\{.*?\}\}', cell.text)
+                            for token in found:
+                                if token not in seen:
+                                    tokens.append(token)
+                                    seen.add(token)
+        return tokens
+    except Exception as e:
+        print(f"Error extracting from PPTX: {e}")
         return []
-    
-    tokens = []
-    seen = set()
-    
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                found = re.findall(r'\{\{.*?\}\}', shape.text)
-                for token in found:
-                    if token not in seen:
-                        tokens.append(token)
-                        seen.add(token)
-            if shape.has_table:
-                for row in shape.table.rows:
-                    for cell in row.cells:
-                        found = re.findall(r'\{\{.*?\}\}', cell.text)
-                        for token in found:
-                            if token not in seen:
-                                tokens.append(token)
-                                seen.add(token)
-    return tokens
 
 def extract_placeholders_from_docx(docx_bytes):
-    # Validate DOCX file
-    if not is_valid_docx(docx_bytes):
-        st.error("Invalid DOCX file. The file appears to be corrupted or not a valid Word document.")
-        return []
-    
     try:
         doc = Document(io.BytesIO(docx_bytes))
-    except Exception as e:
-        st.error(f"Error reading DOCX file: {str(e)}")
-        return []
-    
-    tokens = []
-    seen = set()
-    
-    try:
+        tokens = []
+        seen = set()
+        
         for paragraph in doc.paragraphs:
             found = re.findall(r'\{\{.*?\}\}', paragraph.text)
             for token in found:
@@ -348,10 +306,11 @@ def extract_placeholders_from_docx(docx_bytes):
                         if token not in seen:
                             tokens.append(token)
                             seen.add(token)
-    except:
-        pass
-    
-    return tokens
+        
+        return tokens
+    except Exception as e:
+        print(f"Error extracting from DOCX: {e}")
+        return []
 
 def extract_placeholders(template_bytes, template_type):
     if template_type == 'pptx':
@@ -415,11 +374,7 @@ def detect_table_placeholders(tokens):
     return validated_groups
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
-    try:
-        prs = Presentation(io.BytesIO(template_bytes))
-    except:
-        st.error("Error reading PPTX template")
-        return None
+    prs = Presentation(io.BytesIO(template_bytes))
     
     for slide in prs.slides:
         shapes_to_delete = []
@@ -466,63 +421,44 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     return pptx_stream.getvalue()
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=None, table_config=None):
-    # Validate DOCX file
-    if not is_valid_docx(template_bytes):
-        st.error("Invalid DOCX template. The file appears to be corrupted.")
-        return None
+    doc = Document(io.BytesIO(template_bytes))
     
-    try:
-        doc = Document(io.BytesIO(template_bytes))
-    except Exception as e:
-        st.error(f"Error reading DOCX template: {str(e)}")
-        return None
+    for paragraph in doc.paragraphs:
+        has_image = False
+        for img_token in image_inputs.keys():
+            if img_token in paragraph.text:
+                has_image = True
+                break
+        
+        if not has_image:
+            replace_text_in_paragraph(paragraph, text_inputs)
     
-    try:
-        for paragraph in doc.paragraphs:
-            has_image = False
-            for img_token in image_inputs.keys():
-                if img_token in paragraph.text:
-                    has_image = True
+    if table_data and table_config:
+        base_names = list(table_config.keys())
+        
+        for table in doc.tables:
+            has_placeholders = False
+            for row in table.rows:
+                for cell in row.cells:
+                    if '{{' in cell.text and '}}' in cell.text:
+                        has_placeholders = True
+                        break
+                if has_placeholders:
                     break
             
-            if not has_image:
-                replace_text_in_paragraph(paragraph, text_inputs)
-        
-        if table_data and table_config:
-            base_names = list(table_config.keys())
-            
-            for table in doc.tables:
-                has_placeholders = False
-                for row in table.rows:
-                    for cell in row.cells:
-                        if '{{' in cell.text and '}}' in cell.text:
-                            has_placeholders = True
-                            break
-                    if has_placeholders:
-                        break
+            if has_placeholders:
+                while len(table.rows) > 1:
+                    table._element.remove(table.rows[-1]._element)
                 
-                if has_placeholders:
-                    while len(table.rows) > 1:
-                        try:
-                            table._element.remove(table.rows[-1]._element)
-                        except:
-                            break
-                    
-                    for row_idx, row_data in enumerate(table_data):
-                        try:
-                            new_row = table.add_row()
-                            for col_idx, cell in enumerate(new_row.cells):
-                                for base_name in base_names:
-                                    placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
-                                    if placeholder in cell.text:
-                                        value = row_data.get(base_name, '')
-                                        cell.text = str(value) if value else ''
-                                        break
-                        except:
-                            pass
-    except Exception as e:
-        st.error(f"Error generating document: {str(e)}")
-        return None
+                for row_idx, row_data in enumerate(table_data):
+                    new_row = table.add_row()
+                    for col_idx, cell in enumerate(new_row.cells):
+                        for base_name in base_names:
+                            placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
+                            if placeholder in cell.text:
+                                value = row_data.get(base_name, '')
+                                cell.text = str(value) if value else ''
+                                break
     
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
@@ -550,61 +486,50 @@ def load_saved_template_config(template_name):
 
 def save_and_load_template(template_bytes, template_name, template_type, tokens, confirmed_groups):
     """Save template to file and load with confirmed configuration"""
-    # Validate the template before saving
-    if template_type == 'docx' and not is_valid_docx(template_bytes):
-        st.error("Cannot save invalid DOCX file. Please check the file and try again.")
-        return False
+    # Save the template file
+    saved_path = save_template_to_file(template_bytes, template_name)
     
-    try:
-        # Save the template file
-        saved_path = save_template_to_file(template_bytes, template_name)
+    # Save config with table_config
+    config_data = {
+        'table_config': confirmed_groups,
+        'custom_mapping': st.session_state.custom_mapping
+    }
+    config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+    save_config_to_file(config_data, config_name)
+    
+    # Load into session state
+    st.session_state.table_config = confirmed_groups
+    st.session_state.tokens = tokens
+    st.session_state.template_bytes = template_bytes
+    st.session_state.template_type = template_type
+    st.session_state.template_loaded = True
+    st.session_state.saved_template_name = template_name
+    st.session_state.saved_file_name = template_name
+    st.session_state.save_success = True
+    st.session_state.use_dynamic_table = True if confirmed_groups else False
+    st.session_state.table_headers = list(confirmed_groups.keys()) if confirmed_groups else []
+    
+    if confirmed_groups and template_type == 'docx':
+        max_rows = 0
+        for base_name, config in confirmed_groups.items():
+            max_rows = max(max_rows, config['max_row'])
         
-        # Save config with table_config
-        config_data = {
-            'table_config': confirmed_groups,
-            'custom_mapping': st.session_state.custom_mapping
-        }
-        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-        save_config_to_file(config_data, config_name)
-        
-        # Load into session state
-        st.session_state.table_config = confirmed_groups
-        st.session_state.tokens = tokens
-        st.session_state.template_bytes = template_bytes
-        st.session_state.template_type = template_type
-        st.session_state.template_loaded = True
-        st.session_state.saved_template_name = template_name
-        st.session_state.saved_file_name = template_name
-        st.session_state.save_success = True
-        st.session_state.use_dynamic_table = True if confirmed_groups else False
-        st.session_state.table_headers = list(confirmed_groups.keys()) if confirmed_groups else []
-        
-        if confirmed_groups and template_type == 'docx':
-            max_rows = 0
-            for base_name, config in confirmed_groups.items():
-                max_rows = max(max_rows, config['max_row'])
-            
-            st.session_state.table_data = []
-            for i in range(max_rows):
-                row_data = {}
-                for base_name in confirmed_groups.keys():
-                    row_data[base_name] = ""
-                st.session_state.table_data.append(row_data)
-        else:
-            st.session_state.table_data = []
-        
-        # Reset pending state
-        st.session_state.show_detection_dialog = False
-        st.session_state.pending_tokens = []
-        st.session_state.pending_template_bytes = None
-        st.session_state.pending_template_type = None
-        st.session_state.pending_template_name = None
-        st.session_state.confirmed_groups = {}
-        
-        return True
-    except Exception as e:
-        st.error(f"Error saving template: {str(e)}")
-        return False
+        st.session_state.table_data = []
+        for i in range(max_rows):
+            row_data = {}
+            for base_name in confirmed_groups.keys():
+                row_data[base_name] = ""
+            st.session_state.table_data.append(row_data)
+    else:
+        st.session_state.table_data = []
+    
+    # Reset pending state
+    st.session_state.show_detection_dialog = False
+    st.session_state.pending_tokens = []
+    st.session_state.pending_template_bytes = None
+    st.session_state.pending_template_type = None
+    st.session_state.pending_template_name = None
+    st.session_state.confirmed_groups = {}
 
 # --- UI HELPERS ---
 def simple_uploader_row(label_text, allowed_types, key):
@@ -692,15 +617,14 @@ def show_placeholder_detection_dialog(tokens, detected_groups):
     # Save Template button
     if st.button("Save Template", use_container_width=True, type="primary"):
         if st.session_state.pending_template_name:
-            success = save_and_load_template(
+            save_and_load_template(
                 st.session_state.pending_template_bytes,
                 st.session_state.pending_template_name,
                 st.session_state.pending_template_type,
                 st.session_state.pending_tokens,
                 confirmed_groups
             )
-            if success:
-                st.rerun()
+            st.rerun()
         else:
             st.error("Template name not found. Please try uploading again.")
     
@@ -816,10 +740,11 @@ with col_template1:
         template_name = selected_template.split(' (')[0]
         template_bytes = load_template_from_file(template_name)
         if template_bytes:
+            # Determine template type from file extension
+            template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+            
             # Check if this template has a saved configuration
             saved_table_config = load_saved_template_config(template_name)
-            
-            template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
             
             if saved_table_config:
                 # Load directly from saved config
@@ -868,6 +793,7 @@ with col_template1:
                     st.session_state.template_loaded = False
                 else:
                     st.session_state.template_bytes = template_bytes
+                    st.session_state.saved_template_name = template_name
                     st.session_state.template_loaded = True
                     st.session_state.template_type = template_type
                     st.session_state.use_dynamic_table = False
@@ -893,44 +819,40 @@ with col_template2:
         template_name = uploaded_template.name
         template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
         
-        # Validate DOCX file
-        if template_type == 'docx' and not is_valid_docx(template_bytes):
-            st.error("Invalid DOCX file. Please ensure this is a valid Word document.")
+        tokens = extract_placeholders(template_bytes, template_type)
+        detected_groups = detect_table_placeholders(tokens)
+        
+        if detected_groups and template_type == 'docx':
+            st.session_state.show_detection_dialog = True
+            st.session_state.pending_tokens = tokens
+            st.session_state.pending_template_bytes = template_bytes
+            st.session_state.pending_template_type = template_type
+            st.session_state.pending_template_name = template_name
+            st.session_state.template_bytes = None
+            st.session_state.template_loaded = False
         else:
-            tokens = extract_placeholders(template_bytes, template_type)
-            detected_groups = detect_table_placeholders(tokens)
+            st.session_state.template_bytes = template_bytes
+            st.session_state.saved_template_name = None
+            st.session_state.template_loaded = True
+            st.session_state.template_type = template_type
+            st.session_state.tokens = tokens
+            st.session_state.use_dynamic_table = False
+            st.session_state.table_config = {}
+            st.session_state.table_data = []
+            st.session_state.table_headers = []
             
-            if detected_groups and template_type == 'docx':
-                st.session_state.show_detection_dialog = True
-                st.session_state.pending_tokens = tokens
-                st.session_state.pending_template_bytes = template_bytes
-                st.session_state.pending_template_type = template_type
-                st.session_state.pending_template_name = template_name
-                st.session_state.template_bytes = None
-                st.session_state.template_loaded = False
-            else:
-                st.session_state.template_bytes = template_bytes
-                st.session_state.saved_template_name = None
-                st.session_state.template_loaded = True
-                st.session_state.template_type = template_type
-                st.session_state.tokens = tokens
-                st.session_state.use_dynamic_table = False
-                st.session_state.table_config = {}
-                st.session_state.table_data = []
-                st.session_state.table_headers = []
+            if st.button("Save Template", key="save_template_btn", use_container_width=True):
+                saved_path = save_template_to_file(template_bytes, uploaded_template.name)
+                st.session_state.saved_template_name = uploaded_template.name
                 
-                if st.button("Save Template", key="save_template_btn", use_container_width=True):
-                    saved_path = save_template_to_file(template_bytes, uploaded_template.name)
-                    st.session_state.saved_template_name = uploaded_template.name
-                    
-                    if st.session_state.custom_mapping:
-                        config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-                        save_config_to_file(st.session_state.custom_mapping, config_name)
-                    
-                    st.session_state.save_success = True
-                    st.session_state.saved_file_name = uploaded_template.name
-                    st.session_state.clear_uploader = True
-                    st.rerun()
+                if st.session_state.custom_mapping:
+                    config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                    save_config_to_file(st.session_state.custom_mapping, config_name)
+                
+                st.session_state.save_success = True
+                st.session_state.saved_file_name = uploaded_template.name
+                st.session_state.clear_uploader = True
+                st.rerun()
 
 # --- SHOW DETECTION DIALOG ---
 if st.session_state.show_detection_dialog and st.session_state.pending_tokens:
@@ -1155,16 +1077,15 @@ if u_template is not None and st.session_state.template_loaded:
         else:
             try:
                 pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
-                if pptx_data:
-                    pptx_filename = get_download_filename(base_template_name, "pptx")
-                    st.download_button(
-                        label="Download PPTX",
-                        data=pptx_data,
-                        file_name=pptx_filename,
-                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        use_container_width=True,
-                        key="download_pptx"
-                    )
+                pptx_filename = get_download_filename(base_template_name, "pptx")
+                st.download_button(
+                    label="Download PPTX",
+                    data=pptx_data,
+                    file_name=pptx_filename,
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True,
+                    key="download_pptx"
+                )
             except Exception as e:
                 st.error(f"Error generating PPTX: {str(e)}")
     
