@@ -60,6 +60,8 @@ st.markdown("""
             position: relative !important;
             z-index: 100 !important;
             flex-shrink: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
         }
         
         /* Sidebar collapsed state - dynamic */
@@ -314,9 +316,12 @@ st.markdown("""
 
         /* Workspace in sidebar */
         .workspace-section {
-            margin-top: 10px;
+            margin-top: 8px;
             border-top: 1px solid rgba(0, 51, 102, 0.08);
             padding-top: 8px;
+            flex: 1;
+            overflow-y: auto;
+            min-height: 100px;
         }
         .workspace-header {
             font-size: 9px;
@@ -327,7 +332,9 @@ st.markdown("""
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(0, 51, 102, 0.05);
         }
         .workspace-count {
             background: rgba(0, 51, 102, 0.08);
@@ -335,23 +342,60 @@ st.markdown("""
             border-radius: 2px;
             font-size: 8px;
         }
+        .workspace-layer {
+            margin-bottom: 4px;
+        }
+        .workspace-layer-header {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 8px;
+            font-weight: 600;
+            color: #003366;
+            padding: 2px 0;
+        }
         .workspace-item {
             font-size: 8px;
-            padding: 2px 4px;
-            border-bottom: 1px solid rgba(0, 51, 102, 0.05);
+            padding: 2px 4px 2px 16px;
+            border-bottom: 1px solid rgba(0, 51, 102, 0.03);
             display: flex;
             justify-content: space-between;
             align-items: center;
             cursor: pointer;
+            color: #555;
         }
         .workspace-item:hover {
             background: rgba(0, 51, 102, 0.03);
+            color: #003366;
         }
         .workspace-item-name {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 180px;
+            max-width: 200px;
+        }
+        .workspace-item-type {
+            font-size: 6px;
+            color: #888780;
+            background: rgba(0, 51, 102, 0.05);
+            padding: 0 4px;
+            border-radius: 2px;
+        }
+        .color-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            border: 1px solid rgba(0,0,0,0.08);
+            flex-shrink: 0;
+        }
+        
+        /* Empty workspace state */
+        .workspace-empty {
+            font-size: 8px;
+            color: #888780;
+            padding: 16px 4px;
+            text-align: center;
         }
 
         /* Python Engine Core Centered Progress Stopwatch HUD Panel Overlay */
@@ -398,8 +442,6 @@ st.markdown("""
         .api-log-warning { color: #ffaa66; }
         .api-log-close { cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
         .api-log-close:hover { color: #ff8888; }
-        
-        .color-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
         
         /* Fullscreen toggle button on map - top left */
         .map-fullscreen-btn {
@@ -492,6 +534,21 @@ st.markdown("""
         .config-flex-row select, .config-flex-row input { font-size: 8px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 2px; outline: none; }
         .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 3px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
         .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 8px; border-radius: 50%; background: #003366; cursor: pointer; }
+        
+        /* Button row for search */
+        .search-button-row {
+            display: flex;
+            gap: 4px;
+            margin-top: 2px;
+        }
+        .search-button-row .stButton {
+            flex: 1;
+        }
+        .search-button-row .stButton button {
+            padding: 4px 8px !important;
+            font-size: 8px !important;
+            min-height: 28px !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -515,6 +572,7 @@ if 'api_logs' not in st.session_state: st.session_state.api_logs = []
 if 'search_cooldown_until' not in st.session_state: st.session_state.search_cooldown_until = 0
 if 'search_count' not in st.session_state: st.session_state.search_count = 0
 if 'search_reset_time' not in st.session_state: st.session_state.search_reset_time = time.time()
+if 'last_search_query' not in st.session_state: st.session_state.last_search_query = ""
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -551,6 +609,24 @@ class SearchGuardrails:
         r'[<>{}()\[\]|\\;]',
         r'\b(select|insert|update|delete|drop|union|exec|script|javascript)\b',
     ]
+    
+    # Brand name variations for better matching
+    BRAND_VARIATIONS = {
+        'jollibee': ['jolibee', 'jbee', 'jfc', 'jollibee foods'],
+        'mcdonalds': ['mcdonald', 'mcdo', 'mcd', 'golden arches'],
+        '7-eleven': ['7/11', '7-11', '711', 'seven eleven'],
+        'kfc': ['kentucky fried chicken', 'kfc'],
+        'greenwich': ['greenwich pizza'],
+        'chowking': ['chow king'],
+        'burger king': ['bk', 'burgerking'],
+        'starbucks': ['starbucks coffee'],
+        'ministop': ['mini stop'],
+        'family mart': ['family mart'],
+        'lawson': ['lawson'],
+        'shell': ['shell gas', 'shell station'],
+        'petron': ['petron gas'],
+        'caltex': ['caltex gas'],
+    }
     
     @classmethod
     def validate_query(cls, query):
@@ -614,6 +690,27 @@ class SearchGuardrails:
         return query
     
     @classmethod
+    def get_brand_variations(cls, query):
+        """Get brand variations for better fuzzy matching"""
+        query_lower = query.lower()
+        variations = [query_lower]
+        
+        # Check if query matches any known brand
+        for brand, variants in cls.BRAND_VARIATIONS.items():
+            if query_lower in [brand] + variants:
+                variations.extend([brand] + variants)
+                break
+        
+        # Check for partial matches
+        for brand, variants in cls.BRAND_VARIATIONS.items():
+            for variant in variants:
+                if variant in query_lower or query_lower in variant:
+                    variations.extend([brand] + variants)
+                    break
+        
+        return list(set(variations))
+    
+    @classmethod
     def sanitize_for_overpass(cls, query):
         sanitized = re.sub(r'[^a-zA-Z0-9\s\-/.]', '', query)
         if len(sanitized) > 50:
@@ -630,12 +727,16 @@ OVERPASS_ENDPOINTS = [
 ]
 
 def build_overpass_query(lat, lon, radius, search_terms):
-    """Build Overpass QL from search terms with fuzzy matching"""
+    """Build Overpass QL from search terms with improved fuzzy matching"""
     
-    terms = search_terms.split()
+    # Get brand variations
+    variations = SearchGuardrails.get_brand_variations(search_terms)
+    terms = search_terms.lower().split()
+    
     statements = []
+    seen_statements = set()
     
-    # 1. Exact amenity/shop/tourism matches
+    # 1. Tag mappings (amenity, shop, tourism, etc.)
     tag_mappings = {
         'restaurant': 'amenity=restaurant',
         'cafe': 'amenity=cafe',
@@ -674,43 +775,68 @@ def build_overpass_query(lat, lon, radius, search_terms):
         'market': 'shop=market',
     }
     
-    # Check each term against mappings
+    # 2. Build tag-based queries
     for term in terms:
         term_lower = term.lower()
         
         # Exact match
         if term_lower in tag_mappings:
-            statements.append(f"nwr[{tag_mappings[term_lower]}](around:{radius},{lat},{lon});")
+            stmt = f"nwr[{tag_mappings[term_lower]}](around:{radius},{lat},{lon});"
+            if stmt not in seen_statements:
+                seen_statements.add(stmt)
+                statements.append(stmt)
         
-        # Fuzzy match against tag keys
+        # Fuzzy match (lower threshold for better matching)
         for key, tag in tag_mappings.items():
-            if SequenceMatcher(None, term_lower, key).ratio() > 0.6:
-                statements.append(f"nwr[{tag}](around:{radius},{lat},{lon});")
+            if SequenceMatcher(None, term_lower, key).ratio() > 0.5:
+                stmt = f"nwr[{tag}](around:{radius},{lat},{lon});"
+                if stmt not in seen_statements:
+                    seen_statements.add(stmt)
+                    statements.append(stmt)
     
-    # 2. Name search (always include for brand names)
+    # 3. Brand variations (important for Jollibee, 7-Eleven, etc.)
+    for variation in variations:
+        if len(variation) >= 2:
+            escaped = re.escape(variation)
+            # Brand tag
+            stmt = f'nwr[~"brand"~"{escaped}",i](around:{radius},{lat},{lon});'
+            if stmt not in seen_statements:
+                seen_statements.add(stmt)
+                statements.append(stmt)
+            
+            # Name tag
+            stmt = f'nwr[~"name"~"{escaped}",i](around:{radius},{lat},{lon});'
+            if stmt not in seen_statements:
+                seen_statements.add(stmt)
+                statements.append(stmt)
+            
+            # Operator tag (some places use operator)
+            stmt = f'nwr[~"operator"~"{escaped}",i](around:{radius},{lat},{lon});'
+            if stmt not in seen_statements:
+                seen_statements.add(stmt)
+                statements.append(stmt)
+    
+    # 4. Name search for each term
     for term in terms:
         if len(term) >= 3:
             escaped = re.escape(term)
-            statements.append(f'nwr[~"name"~"{escaped}",i](around:{radius},{lat},{lon});')
+            stmt = f'nwr[~"name"~"{escaped}",i](around:{radius},{lat},{lon});'
+            if stmt not in seen_statements:
+                seen_statements.add(stmt)
+                statements.append(stmt)
     
-    # 3. Brand search (for chains like 7-Eleven, Jollibee)
-    for term in terms:
-        if len(term) >= 3:
-            escaped = re.escape(term)
-            statements.append(f'nwr[~"brand"~"{escaped}",i](around:{radius},{lat},{lon});')
-    
-    # 4. Generic fallback if no statements were generated
+    # 5. Generic fallback if no statements were generated
     if not statements:
         for term in terms:
             if len(term) >= 3:
                 escaped = re.escape(term)
-                statements.append(f'nwr[~".*"~"{escaped}",i](around:{radius},{lat},{lon});')
+                stmt = f'nwr[~".*"~"{escaped}",i](around:{radius},{lat},{lon});'
+                if stmt not in seen_statements:
+                    seen_statements.add(stmt)
+                    statements.append(stmt)
     
-    # Deduplicate statements
-    statements = list(dict.fromkeys(statements))
-    
-    # Limit to 15 statements to avoid oversized queries
-    statements = statements[:15]
+    # Deduplicate and limit
+    statements = statements[:20]
     
     ql = f'[out:json][timeout:90];(\n' + '\n'.join(statements) + '\n);out center;'
     return ql
@@ -748,7 +874,7 @@ def execute_overpass_query(ql, timeout=90):
     return []
 
 def process_overpass_results(elements):
-    """Process Overpass results into records"""
+    """Process Overpass results into records with better name handling"""
     records = []
     
     for idx, el in enumerate(elements):
@@ -757,12 +883,19 @@ def process_overpass_results(elements):
         
         if e_lat and e_lon:
             tags = el.get('tags', {})
-            name = tags.get('name', 'Unknown')
+            name = tags.get('name', '')
+            
+            # Try multiple sources for name
+            if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']:
+                name = tags.get('brand', '')
+            
+            if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']:
+                name = tags.get('operator', '')
             
             if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']:
                 # Use tag value as name
-                poi_type = tags.get('amenity') or tags.get('shop') or tags.get('tourism') or tags.get('leisure') or 'Node'
-                if poi_type and poi_type != 'Node':
+                poi_type = tags.get('amenity') or tags.get('shop') or tags.get('tourism') or tags.get('leisure') or ''
+                if poi_type:
                     name = poi_type.capitalize()
                 else:
                     continue
@@ -772,7 +905,7 @@ def process_overpass_results(elements):
             records.append({
                 "lat": e_lat,
                 "lon": e_lon,
-                "name": str(name),
+                "name": str(name)[:50],
                 "type": str(poi_type),
                 "source": "overpass",
                 "has_footprint": False,
@@ -888,7 +1021,7 @@ with st.sidebar:
             else:
                 st.markdown(f'<div class="search-char-counter">{char_count}/{SearchGuardrails.MAX_QUERY_LENGTH}</div>', unsafe_allow_html=True)
     
-    # Search button
+    # Search button row
     col_search, col_clear = st.columns([3, 1])
     
     with col_search:
@@ -898,30 +1031,29 @@ with st.sidebar:
         clear_clicked = st.button("✕", use_container_width=True, key="clear_search_btn")
         if clear_clicked:
             st.session_state.search_bar_input = ""
+            st.session_state.last_search_query = ""
             st.rerun()
     
     # Process search
-    search_error = None
-    search_success = None
-    
     if search_clicked and search_query.strip():
+        # Store the search query
+        st.session_state.last_search_query = search_query
+        
         # Validate
         is_valid, error_msg = SearchGuardrails.validate_query(search_query)
         if not is_valid:
-            search_error = error_msg
-            st.markdown(f'<div class="search-error">⚠️ {search_error}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="search-error">⚠️ {error_msg}</div>', unsafe_allow_html=True)
         else:
             # Rate limit
             is_allowed, rate_msg = SearchGuardrails.check_rate_limit()
             if not is_allowed:
-                search_error = rate_msg
-                st.markdown(f'<div class="search-error">⏳ {search_error}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="search-error">⏳ {rate_msg}</div>', unsafe_allow_html=True)
             else:
                 # Execute search
                 normalized = SearchGuardrails.normalize_query(search_query)
                 sanitized = SearchGuardrails.sanitize_for_overpass(normalized)
                 
-                add_api_log(f"Search: '{search_query}' → normalized: '{normalized}'", "INFO")
+                add_api_log(f"Search: '{search_query}'", "INFO")
                 
                 # Update rate limiting
                 st.session_state.search_count += 1
@@ -933,6 +1065,10 @@ with st.sidebar:
     if time.time() < st.session_state.search_cooldown_until:
         remaining = int(st.session_state.search_cooldown_until - time.time())
         st.markdown(f'<div class="search-cooldown">⏳ Cooldown: {remaining}s</div>', unsafe_allow_html=True)
+    
+    # Show last search
+    if st.session_state.last_search_query:
+        st.markdown(f'<div style="font-size:7px; color:#888780; margin-top:2px;">Last search: "{st.session_state.last_search_query}"</div>', unsafe_allow_html=True)
     
     # ========================================================================
     # COORDINATES & RADIUS
@@ -974,39 +1110,46 @@ with st.sidebar:
                 grouped[rec_type] = []
             grouped[rec_type].append(record)
         
-        # Show layers with color dots
+        # Show layers with color dots and items
         for rec_type, items in grouped.items():
             color = st.session_state.layer_meta.get(rec_type, {}).get('color', '#003366')
+            
+            # Layer header
             st.markdown(f"""
-                <div style='display:flex; align-items:center; gap:4px; font-size:8px; font-weight:600; color:#003366; padding:2px 0;'>
-                    <span class="color-dot" style="background-color:{color};"></span>
-                    {rec_type}
-                    <span style='font-weight:400; color:#888780; font-size:7px;'>({len(items)})</span>
-                </div>
+                <div class="workspace-layer">
+                    <div class="workspace-layer-header">
+                        <span class="color-dot" style="background-color:{color};"></span>
+                        {rec_type}
+                        <span style='font-weight:400; color:#888780; font-size:7px; margin-left:auto;'>({len(items)})</span>
+                    </div>
             """, unsafe_allow_html=True)
             
-            # Show first 5 items
-            for item in items[:5]:
-                name = item.get('name', 'Unknown')[:25]
-                if len(item.get('name', '')) > 25:
+            # Show items (limit to first 10 for performance)
+            display_items = items[:10]
+            for item in display_items:
+                name = item.get('name', 'Unknown')[:30]
+                if len(item.get('name', '')) > 30:
                     name += '...'
                 st.markdown(f"""
                     <div class="workspace-item">
                         <span class="workspace-item-name">{name}</span>
-                        <span style='font-size:7px; color:#888780;'>●</span>
+                        <span class="workspace-item-type">{item.get('type', '')[:15]}</span>
                     </div>
                 """, unsafe_allow_html=True)
             
-            if len(items) > 5:
+            if len(items) > 10:
                 st.markdown(f"""
-                    <div style='font-size:7px; color:#888780; padding:2px 4px;'>
-                        + {len(items) - 5} more
+                    <div style='font-size:7px; color:#888780; padding:2px 4px 2px 16px;'>
+                        + {len(items) - 10} more
                     </div>
                 """, unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.markdown("""
-            <div style='font-size:8px; color:#888780; padding:8px 4px; text-align:center;'>
-                No items. Search to populate.
+            <div class="workspace-empty">
+                No items found.<br>
+                Search to populate workspace.
             </div>
         """, unsafe_allow_html=True)
     
@@ -1019,17 +1162,18 @@ with st.sidebar:
     visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
     with col1:
         st.download_button(
-            "EXPORT",
+            "📥 EXPORT",
             json.dumps(visible_only_records),
             "scan.json",
             "application/json",
             use_container_width=True
         )
     with col2:
-        if st.button("CLEAR", type="primary", key="clear_btn", use_container_width=True):
+        if st.button("🗑️ CLEAR", type="primary", key="clear_btn", use_container_width=True):
             st.session_state.scanned_records = []
             st.session_state.layer_meta = {}
             st.session_state.scan_active_loading = False
+            st.session_state.last_search_query = ""
             clear_api_logs()
             add_api_log("Cleared all data", "INFO")
             st.rerun()
@@ -1039,13 +1183,13 @@ with st.sidebar:
     # ========================================================================
     st.markdown("<hr style='margin: 8px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     
-    with st.expander("LOGS", expanded=False):
+    with st.expander("📋 LOGS", expanded=False):
         col_log1, col_log2 = st.columns(2)
         with col_log1:
-            if st.button("REFRESH", key="refresh_logs", use_container_width=True):
+            if st.button("🔄 REFRESH", key="refresh_logs", use_container_width=True):
                 st.rerun()
         with col_log2:
-            if st.button("CLEAR", key="clear_logs_btn", use_container_width=True):
+            if st.button("🧹 CLEAR", key="clear_logs_btn", use_container_width=True):
                 st.session_state.api_logs = []
                 st.rerun()
         
@@ -1069,7 +1213,7 @@ if st.session_state.scan_active_loading:
         <div class="py-loading-container">
             <div class="py-spinner"></div>
             <div class="py-loading-title">SEARCHING...</div>
-            <div class="py-loading-subtitle">Radius: {radius_val}m | Query: {st.session_state.search_bar_input[:30]}</div>
+            <div class="py-loading-subtitle">Radius: {radius_val}m | Query: "{st.session_state.last_search_query[:30]}"</div>
             <div class="py-loading-subtitle" id="scan-status-text">Connecting to Overpass...</div>
         </div>
         <script>
@@ -1091,10 +1235,11 @@ if st.session_state.scan_active_loading:
         </script>
     ''', unsafe_allow_html=True)
     
-    add_api_log(f"Searching: '{st.session_state.search_bar_input}'", "INFO")
+    search_term = st.session_state.last_search_query or st.session_state.search_bar_input or ""
+    add_api_log(f"Searching: '{search_term}'", "INFO")
     
-    # Build query
-    normalized = SearchGuardrails.normalize_query(st.session_state.search_bar_input)
+    # Build query with improved fuzzy search
+    normalized = SearchGuardrails.normalize_query(search_term)
     sanitized = SearchGuardrails.sanitize_for_overpass(normalized)
     
     ql = build_overpass_query(lat_coord, lon_coord, radius_val, sanitized)
