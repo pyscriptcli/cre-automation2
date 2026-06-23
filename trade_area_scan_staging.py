@@ -385,7 +385,7 @@ def clear_api_logs():
     st.session_state.api_logs = []
 
 # -----------------------------------------------------------------------------
-# 4. SEARCH PROTECTION GUARDRAILS
+# 4. SEARCH PROTECTION GUARDRAILS - IMPROVED FUZZY SEARCH
 # -----------------------------------------------------------------------------
 class SearchGuardrails:
     MAX_QUERY_LENGTH = 100
@@ -400,21 +400,50 @@ class SearchGuardrails:
         r'\b(select|insert|update|delete|drop|union|exec|script|javascript)\b',
     ]
     
+    # EXPANDED BRAND VARIATIONS WITH PRIORITY
     BRAND_VARIATIONS = {
-        'jollibee': ['jolibee', 'jbee', 'jfc', 'jollibee foods'],
-        'mcdonalds': ['mcdonald', 'mcdo', 'mcd', 'golden arches'],
-        '7-eleven': ['7/11', '7-11', '711', 'seven eleven'],
-        'kfc': ['kentucky fried chicken', 'kfc'],
-        'greenwich': ['greenwich pizza'],
-        'chowking': ['chow king'],
-        'burger king': ['bk', 'burgerking'],
-        'starbucks': ['starbucks coffee'],
-        'ministop': ['mini stop'],
-        'family mart': ['family mart'],
+        'jollibee': ['jolibee', 'jbee', 'jfc', 'jollibee foods', 'jollibee food corporation'],
+        'mcdonalds': ['mcdonald', 'mcdo', 'mcd', 'golden arches', 'mickey d'],
+        '7-eleven': ['7/11', '7-11', '711', 'seven eleven', 'seven-eleven'],
+        'kfc': ['kentucky fried chicken', 'kfc', 'kentucky'],
+        'greenwich': ['greenwich pizza', 'greenwich'],
+        'chowking': ['chow king', 'chowking'],
+        'burger king': ['bk', 'burgerking', 'burger king'],
+        'starbucks': ['starbucks coffee', 'starbucks'],
+        'ministop': ['mini stop', 'ministop'],
+        'family mart': ['family mart', 'familymart'],
         'lawson': ['lawson'],
-        'shell': ['shell gas', 'shell station'],
-        'petron': ['petron gas'],
-        'caltex': ['caltex gas'],
+        'shell': ['shell gas', 'shell station', 'shell'],
+        'petron': ['petron gas', 'petron'],
+        'caltex': ['caltex gas', 'caltex'],
+    }
+    
+    # CATEGORY MAPPINGS WITH WEIGHTS
+    CATEGORY_MAPPINGS = {
+        'veterinary': ['vet', 'veterinary', 'animal clinic', 'pet clinic', 'animal hospital'],
+        'clinic': ['clinic', 'medical clinic', 'health clinic', 'doctor'],
+        'restaurant': ['restaurant', 'eatery', 'dining', 'food place'],
+        'cafe': ['cafe', 'coffee', 'coffee shop', 'cafeteria'],
+        'bakery': ['bakery', 'bread', 'pastry'],
+        'supermarket': ['supermarket', 'grocery', 'market', 'store'],
+        'pharmacy': ['pharmacy', 'drugstore', 'chemist', 'medicine'],
+        'hospital': ['hospital', 'medical center', 'health center'],
+        'school': ['school', 'academy', 'learning center'],
+        'hotel': ['hotel', 'motel', 'lodging', 'inn'],
+        'gas': ['gas', 'fuel', 'petrol', 'gas station'],
+        'parking': ['parking', 'car park', 'parking lot'],
+        'bank': ['bank', 'financial', 'credit union'],
+        'police': ['police', 'police station', 'precinct'],
+        'fire': ['fire station', 'fire department'],
+        'library': ['library', 'bookstore'],
+        'mall': ['mall', 'shopping center', 'shopping mall'],
+        'cinema': ['cinema', 'movie theater', 'theater'],
+        'park': ['park', 'garden', 'recreation'],
+        'gym': ['gym', 'fitness', 'exercise'],
+        'church': ['church', 'place of worship', 'cathedral'],
+        'bar': ['bar', 'pub', 'tavern', 'nightclub'],
+        'fast food': ['fast food', 'fastfood', 'quick service'],
+        'convenience': ['convenience store', 'convenience', 'mini mart'],
     }
     
     @classmethod
@@ -459,18 +488,66 @@ class SearchGuardrails:
     
     @classmethod
     def get_brand_variations(cls, query):
-        query_lower = query.lower()
-        variations = [query_lower]
+        """Get brand variations with exact matching priority"""
+        query_lower = query.lower().strip()
+        variations = []
+        
+        # Check exact brand matches first (highest priority)
         for brand, variants in cls.BRAND_VARIATIONS.items():
-            if query_lower in [brand] + variants:
-                variations.extend([brand] + variants)
+            # Check if query exactly matches brand or any variant
+            if query_lower == brand or query_lower in variants:
+                variations = [brand] + variants
                 break
-        for brand, variants in cls.BRAND_VARIATIONS.items():
-            for variant in variants:
-                if variant in query_lower or query_lower in variant:
-                    variations.extend([brand] + variants)
+        
+        # If no exact match, check for partial matches
+        if not variations:
+            for brand, variants in cls.BRAND_VARIATIONS.items():
+                for variant in variants:
+                    if variant in query_lower or query_lower in variant:
+                        variations = [brand] + variants
+                        break
+                if variations:
                     break
+        
+        # If still no variations, just use the original query
+        if not variations:
+            variations = [query_lower]
+        
         return list(set(variations))
+    
+    @classmethod
+    def get_category_match(cls, query):
+        """Get category match from query with fuzzy matching"""
+        query_lower = query.lower().strip()
+        
+        # Check exact category matches first
+        for category, terms in cls.CATEGORY_MAPPINGS.items():
+            if query_lower == category or query_lower in terms:
+                return category
+        
+        # Check partial matches with SequenceMatcher
+        best_match = None
+        best_score = 0.0
+        
+        for category, terms in cls.CATEGORY_MAPPINGS.items():
+            # Check against category name
+            score = SequenceMatcher(None, query_lower, category).ratio()
+            if score > best_score:
+                best_score = score
+                best_match = category
+            
+            # Check against terms
+            for term in terms:
+                score = SequenceMatcher(None, query_lower, term).ratio()
+                if score > best_score:
+                    best_score = score
+                    best_match = category
+        
+        # Return match if score is above threshold
+        if best_score >= 0.6:
+            return best_match
+        
+        return None
     
     @classmethod
     def sanitize_for_overpass(cls, query):
@@ -480,7 +557,7 @@ class SearchGuardrails:
         return sanitized
 
 # -----------------------------------------------------------------------------
-# 5. OVERPASS QUERY PIPELINE MODULE
+# 5. OVERPASS QUERY PIPELINE MODULE - IMPROVED
 # -----------------------------------------------------------------------------
 OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
@@ -489,50 +566,121 @@ OVERPASS_ENDPOINTS = [
 ]
 
 def build_overpass_query(lat, lon, radius, search_terms):
-    variations = SearchGuardrails.get_brand_variations(search_terms)
+    """Build Overpass QL with improved brand and category matching"""
+    add_api_log(f"Building query for: '{search_terms}'", "INFO")
+    
+    # Get brand variations (high priority)
+    brand_variations = SearchGuardrails.get_brand_variations(search_terms)
+    add_api_log(f"Brand variations: {brand_variations}", "INFO")
+    
+    # Get category match
+    category_match = SearchGuardrails.get_category_match(search_terms)
+    if category_match:
+        add_api_log(f"Category match: {category_match}", "INFO")
+    
     terms = search_terms.lower().split()
     statements = []
     seen_statements = set()
     
+    # TAG MAPPINGS FOR CATEGORIES
     tag_mappings = {
-        'restaurant': 'amenity=restaurant', 'cafe': 'amenity=cafe', 'coffee': 'amenity=cafe',
-        'bakery': 'shop=bakery', 'supermarket': 'shop=supermarket', 'grocery': 'shop=supermarket',
-        'pharmacy': 'amenity=pharmacy', 'hospital': 'amenity=hospital', 'clinic': 'amenity=clinic',
-        'school': 'amenity=school', 'university': 'amenity=university', 'college': 'amenity=college',
-        'hotel': 'tourism=hotel', 'motel': 'tourism=motel', 'gas': 'amenity=fuel', 'fuel': 'amenity=fuel',
-        'parking': 'amenity=parking', 'bank': 'amenity=bank', 'atm': 'amenity=atm', 'police': 'amenity=police',
-        'fire': 'amenity=fire_station', 'library': 'amenity=library', 'post': 'amenity=post_office',
-        'mall': 'shop=mall', 'cinema': 'amenity=cinema', 'theatre': 'amenity=theatre', 'park': 'leisure=park',
-        'gym': 'leisure=fitness_centre', 'church': 'amenity=place_of_worship', 'mosque': 'amenity=place_of_worship',
-        'bar': 'amenity=bar', 'pub': 'amenity=pub', 'fast food': 'amenity=fast_food', 'convenience': 'shop=convenience',
-        'market': 'shop=market', 'vet': 'amenity=veterinary', 'veterinary': 'amenity=veterinary', 'grooming': 'shop=pet_grooming',
-        'animal clinic': 'amenity=veterinary'
+        'restaurant': 'amenity=restaurant',
+        'cafe': 'amenity=cafe',
+        'coffee': 'amenity=cafe',
+        'bakery': 'shop=bakery',
+        'supermarket': 'shop=supermarket',
+        'grocery': 'shop=supermarket',
+        'pharmacy': 'amenity=pharmacy',
+        'hospital': 'amenity=hospital',
+        'clinic': 'amenity=clinic',
+        'veterinary': 'amenity=veterinary',
+        'school': 'amenity=school',
+        'university': 'amenity=university',
+        'college': 'amenity=college',
+        'hotel': 'tourism=hotel',
+        'motel': 'tourism=motel',
+        'gas': 'amenity=fuel',
+        'fuel': 'amenity=fuel',
+        'parking': 'amenity=parking',
+        'bank': 'amenity=bank',
+        'atm': 'amenity=atm',
+        'police': 'amenity=police',
+        'fire': 'amenity=fire_station',
+        'library': 'amenity=library',
+        'post': 'amenity=post_office',
+        'mall': 'shop=mall',
+        'cinema': 'amenity=cinema',
+        'theatre': 'amenity=theatre',
+        'park': 'leisure=park',
+        'gym': 'leisure=fitness_centre',
+        'church': 'amenity=place_of_worship',
+        'mosque': 'amenity=place_of_worship',
+        'bar': 'amenity=bar',
+        'pub': 'amenity=pub',
+        'fast food': 'amenity=fast_food',
+        'convenience': 'shop=convenience',
+        'market': 'shop=market',
+        'grooming': 'shop=pet_grooming',
     }
     
-    for term in terms:
-        term_lower = term.lower()
-        if term_lower in tag_mappings:
-            stmt = f"nwr[{tag_mappings[term_lower]}](around:{radius},{lat},{lon});"
+    # 1. BRAND SEARCH (Highest Priority)
+    # Search for brand tags with exact and partial matching
+    for variation in brand_variations:
+        if len(variation) >= 2:
+            escaped = re.escape(variation)
+            # Brand tag (primary)
+            stmt = f'nwr[~"brand"~"^{escaped}$",i](around:{radius},{lat},{lon});'
             if stmt not in seen_statements:
                 seen_statements.add(stmt)
                 statements.append(stmt)
-        for key, tag in tag_mappings.items():
-            if SequenceMatcher(None, term_lower, key).ratio() > 0.6:
-                stmt = f"nwr[{tag}](around:{radius},{lat},{lon});"
-                if stmt not in seen_statements:
-                    seen_statements.add(stmt)
-                    statements.append(stmt)
+            
+            # Name tag with exact match
+            stmt = f'nwr[~"name"~"^{escaped}$",i](around:{radius},{lat},{lon});'
+            if stmt not in seen_statements:
+                seen_statements.add(stmt)
+                statements.append(stmt)
+            
+            # Name tag with partial match (for cases like "Jollibee Restaurant")
+            stmt = f'nwr[~"name"~"{escaped}",i](around:{radius},{lat},{lon});'
+            if stmt not in seen_statements:
+                seen_statements.add(stmt)
+                statements.append(stmt)
+            
+            # Operator tag
+            stmt = f'nwr[~"operator"~"{escaped}",i](around:{radius},{lat},{lon});'
+            if stmt not in seen_statements:
+                seen_statements.add(stmt)
+                statements.append(stmt)
     
-    for variation in variations:
-        if len(variation) >= 2:
-            escaped = re.escape(variation)
-            for tag_type in ["brand", "name", "operator"]:
-                stmt = f'nwr[~"{tag_type}"~"{escaped}",i](around:{radius},{lat},{lon});'
+    # 2. CATEGORY SEARCH (if no brand matches found or as fallback)
+    if len(statements) < 2:
+        if category_match and category_match in tag_mappings:
+            stmt = f"nwr[{tag_mappings[category_match]}](around:{radius},{lat},{lon});"
+            if stmt not in seen_statements:
+                seen_statements.add(stmt)
+                statements.append(stmt)
+    
+    # 3. FUZZY TAG MATCHING
+    if len(statements) < 3:
+        for term in terms:
+            term_lower = term.lower()
+            # Check exact tag mappings
+            if term_lower in tag_mappings:
+                stmt = f"nwr[{tag_mappings[term_lower]}](around:{radius},{lat},{lon});"
                 if stmt not in seen_statements:
                     seen_statements.add(stmt)
                     statements.append(stmt)
-                    
-    if not statements:
+            
+            # Fuzzy match against tag keys
+            for key, tag in tag_mappings.items():
+                if SequenceMatcher(None, term_lower, key).ratio() > 0.65:
+                    stmt = f"nwr[{tag}](around:{radius},{lat},{lon});"
+                    if stmt not in seen_statements:
+                        seen_statements.add(stmt)
+                        statements.append(stmt)
+    
+    # 4. NAME SEARCH FALLBACK
+    if len(statements) < 3:
         for term in terms:
             if len(term) >= 3:
                 escaped = re.escape(term)
@@ -540,9 +688,28 @@ def build_overpass_query(lat, lon, radius, search_terms):
                 if stmt not in seen_statements:
                     seen_statements.add(stmt)
                     statements.append(stmt)
-                    
+    
+    # 5. GENERIC FALLBACK (only if absolutely no statements)
+    if not statements:
+        for term in terms:
+            if len(term) >= 3:
+                escaped = re.escape(term)
+                stmt = f'nwr[~".*"~"{escaped}",i](around:{radius},{lat},{lon});'
+                if stmt not in seen_statements:
+                    seen_statements.add(stmt)
+                    statements.append(stmt)
+    
+    # Limit to 25 statements
     statements = statements[:25]
-    return f'[out:json][timeout:90];(\n' + '\n'.join(statements) + '\n);out center;'
+    
+    ql = f'[out:json][timeout:90];(\n' + '\n'.join(statements) + '\n);out center;'
+    
+    # Log the query for debugging
+    add_api_log(f"Generated query with {len(statements)} statements", "INFO")
+    if len(statements) > 0:
+        add_api_log(f"First statement: {statements[0][:50]}", "INFO")
+    
+    return ql
 
 def execute_overpass_query(ql, timeout=90):
     for endpoint in OVERPASS_ENDPOINTS:
@@ -552,8 +719,8 @@ def execute_overpass_query(ql, timeout=90):
             if res.status_code == 200:
                 return res.json().get("elements", [])
             elif res.status_code == 429:
-                add_api_log("Endpoint heavily throttled. Backing away out of loop...", "WARNING")
-                time.sleep(1.5)
+                add_api_log("Endpoint throttled, backing off...", "WARNING")
+                time.sleep(2)
         except Exception as e:
             add_api_log(f"Connection failure: {str(e)[:40]}", "ERROR")
             continue
@@ -611,20 +778,20 @@ if st.session_state.sidebar_collapsed:
     st.markdown("<script>document.querySelector('[data-testid=\"stAppViewContainer\"]').classList.add('sidebar-collapsed'); document.getElementById('sidebarToggleBtn').textContent='OPEN';</script>", unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 7. HIGH-LEVEL CONFIGURATION DRAWER (STREAMLIT NATIVE CONTROL INTERFACE)
+# 7. HIGH-LEVEL CONFIGURATION DRAWER
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
     # SEARCH ENGINE COMPONENT BLOCK
-    st.markdown("<div style='font-size: 10px; font-weight: 700; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;'>🔍 Discovery Engine</div>", unsafe_allow_html=True)
-    search_query = st.text_input("", placeholder="e.g., Vet, animal clinic, grooming", key="search_bar_input", label_visibility="collapsed", max_chars=SearchGuardrails.MAX_QUERY_LENGTH)
+    st.markdown("<div style='font-size: 10px; font-weight: 700; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;'>Discovery Engine</div>", unsafe_allow_html=True)
+    search_query = st.text_input("", placeholder="e.g., jollibee, veterinary, 7-eleven", key="search_bar_input", label_visibility="collapsed", max_chars=SearchGuardrails.MAX_QUERY_LENGTH)
     
     col_search, col_clear = st.columns([3, 1])
     with col_search:
-        search_clicked = st.button("🔍 SEARCH", use_container_width=True, type="secondary", key="search_btn")
+        search_clicked = st.button("SEARCH", use_container_width=True, type="secondary", key="search_btn")
     with col_clear:
-        if st.button("✕", use_container_width=True, key="clear_search_btn"):
+        if st.button("X", use_container_width=True, key="clear_search_btn"):
             st.session_state.search_bar_input = ""
             st.session_state.last_search_query = ""
             st.rerun()
@@ -659,7 +826,7 @@ with st.sidebar:
         lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.64650, 121.05804)
 
     # REPOSITIONED BASEMAP & CANVAS CONTROLLER LAYOUT MODULE
-    with st.expander("🗺️ BASEMAP CONTROLS", expanded=True):
+    with st.expander("BASEMAP CONTROLS", expanded=True):
         basemap_choice = st.selectbox("ACTIVE BASEMAP", ["osm", "satellite", "carto"], index=0, key="persistent_basemap")
         show_labels = st.checkbox("Enable Overlay Typography", value=True, key="persistent_labels")
         label_size = st.slider("Typography Size Bounds", min_value=6, max_value=20, value=10, key="label_size")
@@ -668,11 +835,11 @@ with st.sidebar:
         marker_style = st.selectbox("MARKER ICON DESIGN", ["dots", "pin", "modern-pin"], key="global_marker_style")
         marker_color = st.color_picker("MARKER PRIMARY HEX", "#003366", key="global_marker_color")
 
-    # UN-SMUSHED COMPACT WORKSPACE MODULE
+    # WORKSPACE MODULE
     st.markdown(f"""
         <div class="workspace-section">
             <div class="workspace-header">
-                <span>📋 Workspace Assets</span>
+                <span>Workspace Assets</span>
                 <span class="workspace-count">{len(st.session_state.scanned_records)}</span>
             </div>
         </div>
@@ -717,16 +884,16 @@ with st.sidebar:
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        st.download_button("📥 EXPORT", json.dumps([p for p in st.session_state.scanned_records]), "spatial_scan.json", "application/json", use_container_width=True)
+        st.download_button("EXPORT", json.dumps([p for p in st.session_state.scanned_records]), "spatial_scan.json", "application/json", use_container_width=True)
     with col2:
-        if st.button("🗑️ CLEAR", type="primary", use_container_width=True):
+        if st.button("CLEAR", type="primary", use_container_width=True):
             st.session_state.scanned_records = []
             st.session_state.layer_meta = {}
             st.session_state.scan_active_loading = False
             clear_api_logs()
             st.rerun()
             
-    with st.expander("📋 CORE PIPELINE LOGS", expanded=False):
+    with st.expander("PIPELINE LOGS", expanded=False):
         if st.session_state.api_logs:
             log_text = "".join([f"[{l['level']}] [{l['time']}] {l['message']}\n" for l in st.session_state.api_logs[-15:]])
             st.code(log_text, language="text")
@@ -748,27 +915,32 @@ if st.session_state.scan_active_loading:
     ''', unsafe_allow_html=True)
     
     search_term = st.session_state.last_search_query or ""
-    sanitized = SearchGuardrails.sanitize_for_overpass(SearchGuardrails.normalize_query(search_term))
+    normalized = SearchGuardrails.normalize_query(search_term)
+    sanitized = SearchGuardrails.sanitize_for_overpass(normalized)
+    
     ql = build_overpass_query(lat_coord, lon_coord, radius_val, sanitized)
     elements = execute_overpass_query(ql)
     
     if elements:
         records = process_overpass_results(elements)
-        st.session_state.scanned_records = records
-        st.session_state.last_scan_lat = lat_coord
-        st.session_state.last_scan_lon = lon_coord
-        
-        unique_layers = list(set([r.get('type', 'Unclassified') for r in records]))
-        palette = ["#003366", "#C9AB4C", "#1E40AF", "#B45309", "#0369A1", "#78350F", "#334155"]
-        for idx, layer in enumerate(unique_layers):
-            st.session_state.layer_meta[layer] = {
-                "color": palette[idx % len(palette)],
-                "style": marker_style,
-                "size": 12
-            }
-        add_api_log(f"Successfully integrated {len(records)} map records", "INFO")
+        if records:
+            st.session_state.scanned_records = records
+            st.session_state.last_scan_lat = lat_coord
+            st.session_state.last_scan_lon = lon_coord
+            
+            unique_layers = list(set([r.get('type', 'Unclassified') for r in records]))
+            palette = ["#003366", "#C9AB4C", "#1E40AF", "#B45309", "#0369A1", "#78350F", "#334155"]
+            for idx, layer in enumerate(unique_layers):
+                st.session_state.layer_meta[layer] = {
+                    "color": palette[idx % len(palette)],
+                    "style": marker_style,
+                    "size": 12
+                }
+            add_api_log(f"Successfully integrated {len(records)} map records", "INFO")
+        else:
+            add_api_log("Zero valid POI records found after processing", "WARNING")
     else:
-        add_api_log("Zero nodes matched current context query attributes", "WARNING")
+        add_api_log("No data returned from Overpass endpoints", "WARNING")
         
     st.session_state.scan_active_loading = False
     st.rerun()
@@ -776,6 +948,10 @@ if st.session_state.scan_active_loading:
 # -----------------------------------------------------------------------------
 # 9. ENGINE TEMPLATE COMPILER & RENDER
 # -----------------------------------------------------------------------------
+# Fix: Define render_lat and render_lon before using them
+fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.64650, 121.05804)
+
 layer_meta_json = json.dumps(st.session_state.layer_meta)
 geojson_str = json.dumps(st.session_state.scanned_records)
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
