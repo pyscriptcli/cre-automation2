@@ -7,10 +7,8 @@ import json
 import streamlit as st
 from pptx import Presentation
 from PIL import Image
-import base64
 from datetime import datetime
 from docx import Document
-from docx.shared import Inches
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -52,14 +50,14 @@ MINIMAL_CRE_SYSTEM = """
     /* Labels */
     .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 8px; }
     .section-header { font-size: 16px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 12px; }
-    .saved-indicator { background-color: #E8F5E9; padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; }
+    .saved-indicator { background-color: #E8F5E9; padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 8px; }
     
     hr { margin: 16px 0 !important; border-color: #E0E0E0 !important; }
     
-    /* Flex layout for template management */
-    .template-row { display: flex; gap: 16px; align-items: center; }
-    .template-select { flex: 2; }
-    .template-upload { flex: 2; }
+    /* Compact template row */
+    .template-row { display: flex; gap: 12px; align-items: center; }
+    .template-select { flex: 1; }
+    .template-upload { flex: 1; }
 </style>
 """
 
@@ -133,21 +131,6 @@ def load_config_from_file(config_name="template_config.json"):
             return json.load(f)
     return None
 
-def get_saved_configs():
-    """Get list of saved configs"""
-    storage_dir = get_storage_dir()
-    configs = []
-    for file in os.listdir(storage_dir):
-        if file.endswith('.json'):
-            filepath = os.path.join(storage_dir, file)
-            stat = os.stat(filepath)
-            configs.append({
-                'name': file,
-                'path': filepath,
-                'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
-            })
-    return configs
-
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     try:
@@ -195,7 +178,6 @@ def convert_pptx_to_docx(pptx_bytes):
         doc = Document()
         
         for slide_num, slide in enumerate(prs.slides, 1):
-            # Add slide header
             doc.add_heading(f'Slide {slide_num}', level=1)
             
             for shape in slide.shapes:
@@ -209,7 +191,6 @@ def convert_pptx_to_docx(pptx_bytes):
                     rows = len(table.rows)
                     cols = len(table.columns)
                     
-                    # Create a table in Word
                     word_table = doc.add_table(rows=rows, cols=cols)
                     word_table.style = 'Table Grid'
                     
@@ -217,7 +198,6 @@ def convert_pptx_to_docx(pptx_bytes):
                         for j, cell in enumerate(row.cells):
                             word_table.cell(i, j).text = cell.text
             
-            # Add a page break between slides
             if slide_num < len(prs.slides):
                 doc.add_page_break()
         
@@ -333,14 +313,11 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=key, label_visibility="collapsed")
 
-def simple_selector_row(label_text, options, key, index=0):
-    st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
-    return st.selectbox(label_text, options, key=key, label_visibility="collapsed", index=index)
-
 # --- INIT APP ---
 st.set_page_config(page_title="Document Generator", layout="wide")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
+# Initialize all session state variables at the start
 if "final_pptx" not in st.session_state:
     st.session_state.final_pptx = None
 if "final_pdf" not in st.session_state:
@@ -351,12 +328,12 @@ if "custom_mapping" not in st.session_state:
     st.session_state.custom_mapping = {}
 if "tokens" not in st.session_state:
     st.session_state.tokens = []
-if "current_template" not in st.session_state:
-    st.session_state.current_template = None
 if "template_bytes" not in st.session_state:
     st.session_state.template_bytes = None
 if "saved_template_name" not in st.session_state:
     st.session_state.saved_template_name = None
+if "template_loaded" not in st.session_state:
+    st.session_state.template_loaded = False
 
 # --- MAIN LAYOUT ---
 st.markdown('<h2 style="font-weight: 700; color: #1A1A1A; margin-bottom: 4px;">Document Generator</h2>', unsafe_allow_html=True)
@@ -372,46 +349,54 @@ col_template1, col_template2 = st.columns(2)
 with col_template1:
     # Show saved templates dropdown
     saved_templates = get_saved_templates()
+    template_options = ["Select saved template"]
     if saved_templates:
-        template_options = ["Select saved template"] + [t['name'] for t in saved_templates]
-        selected_template = st.selectbox(
-            "Load Template",
-            template_options,
-            key="saved_template_select",
-            label_visibility="collapsed"
-        )
-        
-        if selected_template and selected_template != "Select saved template":
-            template_bytes = load_template_from_file(selected_template)
-            if template_bytes:
-                st.session_state.template_bytes = template_bytes
-                st.session_state.saved_template_name = selected_template
-                st.success(f"Loaded: {selected_template}")
-                
-                # Load associated config if exists
-                config_name = selected_template.replace('.pptx', '_config.json')
-                config_data = load_config_from_file(config_name)
-                if config_data:
-                    st.session_state.custom_mapping = config_data
-                    st.info(f"Config loaded")
-                
-                # Extract placeholders
-                tokens = extract_placeholders(template_bytes)
-                st.session_state.tokens = tokens
-                
-                st.rerun()
-    else:
-        st.info("No saved templates")
+        template_options.extend([t['name'] for t in saved_templates])
+    
+    selected_template = st.selectbox(
+        "Load Template",
+        template_options,
+        key="saved_template_select",
+        label_visibility="collapsed"
+    )
+    
+    if selected_template and selected_template != "Select saved template":
+        template_bytes = load_template_from_file(selected_template)
+        if template_bytes:
+            st.session_state.template_bytes = template_bytes
+            st.session_state.saved_template_name = selected_template
+            st.session_state.template_loaded = True
+            
+            # Load associated config if exists
+            config_name = selected_template.replace('.pptx', '_config.json')
+            config_data = load_config_from_file(config_name)
+            if config_data:
+                st.session_state.custom_mapping = config_data
+            
+            # Extract placeholders
+            tokens = extract_placeholders(template_bytes)
+            st.session_state.tokens = tokens
+            
+            st.rerun()
 
 with col_template2:
     # Upload new template
-    st.markdown('<div style="padding-top: 0px;"></div>', unsafe_allow_html=True)
-    uploaded_template = st.file_uploader("Upload New Template", type=["pptx"], label_visibility="collapsed", key="new_template_upload")
+    uploaded_template = st.file_uploader(
+        "Upload New Template", 
+        type=["pptx"], 
+        label_visibility="collapsed", 
+        key="new_template_upload"
+    )
     
     if uploaded_template:
         template_bytes = uploaded_template.getvalue()
         st.session_state.template_bytes = template_bytes
         st.session_state.saved_template_name = None
+        st.session_state.template_loaded = True
+        
+        # Extract placeholders immediately
+        tokens = extract_placeholders(template_bytes)
+        st.session_state.tokens = tokens
         
         # Ask if user wants to save as template
         save_as_template = st.checkbox("Save as template for future use")
@@ -424,33 +409,26 @@ with col_template2:
             if st.session_state.custom_mapping:
                 config_name = uploaded_template.name.replace('.pptx', '_config.json')
                 save_config_to_file(st.session_state.custom_mapping, config_name)
-        
-        # Extract placeholders
-        tokens = extract_placeholders(template_bytes)
-        st.session_state.tokens = tokens
-        
-        st.rerun()
+            st.rerun()
 
 # Show current template info
-if st.session_state.template_bytes:
+if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
     st.markdown(f'<div class="saved-indicator">Active: {template_name}</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Get current template bytes ---
-u_template = None
 template_bytes = st.session_state.template_bytes
-if template_bytes:
+u_template = None
+if template_bytes is not None:
     u_template = type('obj', (object,), {'getvalue': lambda: template_bytes})()
 
 text_data = {}
 image_data = {}
 
-if u_template:
-    if not st.session_state.tokens:
-        st.session_state.tokens = extract_placeholders(template_bytes)
-    
+# --- DISPLAY FIELDS ---
+if u_template is not None and st.session_state.tokens:
     tokens = st.session_state.tokens
     
     if not tokens:
@@ -494,7 +472,7 @@ if u_template:
             st.markdown('</div>', unsafe_allow_html=True)
 
 # --- DATA MAPPING SECTION ---
-if u_template and st.session_state.tokens:
+if u_template is not None and st.session_state.tokens:
     st.markdown('<div class="config-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Data Type Mapping</div>', unsafe_allow_html=True)
     
@@ -555,14 +533,13 @@ if u_template and st.session_state.tokens:
         )
     
     with col_json2:
-        # Save config to system if template is saved
         if st.session_state.saved_template_name:
             if st.button("Save Config with Template", use_container_width=True):
                 config_filename = st.session_state.saved_template_name.replace('.pptx', '_config.json')
                 save_config_to_file(st.session_state.custom_mapping, config_filename)
                 st.success(f"Config saved: {config_filename}")
         else:
-            st.info("Save template first to persist config")
+            st.info("Save template first")
     
     # Load config
     st.markdown("<br>", unsafe_allow_html=True)
@@ -579,7 +556,7 @@ if u_template and st.session_state.tokens:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- GENERATION SECTION ---
-if u_template:
+if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Generate Document</div>', unsafe_allow_html=True)
     
@@ -638,6 +615,3 @@ if u_template:
     st.markdown('</div>', unsafe_allow_html=True)
 else:
     st.info("Please upload or select a template to begin")
-
-# Add requirement for python-docx
-# Run: pip install python-docx
