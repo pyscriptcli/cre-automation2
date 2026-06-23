@@ -303,6 +303,43 @@ def extract_placeholders(template_bytes, template_type):
         return extract_placeholders_from_docx(template_bytes)
     return []
 
+def detect_table_pattern(tokens):
+    """Detect if tokens follow a table pattern and organize them"""
+    # Find all company name placeholders to determine if this is a table
+    company_placeholders = [t for t in tokens if 'COMPANY_NAME_' in t]
+    rep_placeholders = [t for t in tokens if 'REPRESENTATIVE_' in t]
+    designation_placeholders = [t for t in tokens if 'DESIGNATION_' in t]
+    
+    # Check if we have a complete set of table tokens
+    if (len(company_placeholders) > 0 and 
+        len(rep_placeholders) == len(company_placeholders) and 
+        len(designation_placeholders) == len(company_placeholders)):
+        
+        # Extract row numbers
+        row_numbers = []
+        for p in company_placeholders:
+            match = re.search(r'COMPANY_NAME_(\d+)', p)
+            if match:
+                row_numbers.append(int(match.group(1)))
+        
+        # Sort numbers to get row count
+        row_numbers.sort()
+        max_rows = max(row_numbers) if row_numbers else 0
+        
+        # Create table data structure
+        table_data = []
+        for i in range(1, max_rows + 1):
+            row = {
+                'company': f'{{{{COMPANY_NAME_{i}}}}}',
+                'rep': f'{{{{REPRESENTATIVE_{i}}}}}',
+                'designation': f'{{{{DESIGNATION_{i}}}}}'
+            }
+            table_data.append(row)
+        
+        return table_data
+    
+    return None
+
 def replace_text_in_paragraph(paragraph, text_inputs):
     """Replace text in a paragraph while preserving formatting"""
     # First pass: replace in runs
@@ -595,19 +632,23 @@ with col_template1:
             if config_data:
                 st.session_state.custom_mapping = config_data
             
+            # Extract all placeholders first
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
             
-            # Detect if this is a table template
-            table_tokens = [t for t in tokens if any(x in t for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_'])]
-            if table_tokens and st.session_state.template_type == 'docx':
-                st.session_state.use_dynamic_table = True
-                # Initialize table data with empty rows based on placeholders
-                if not st.session_state.table_data:
-                    row_count = len([t for t in table_tokens if 'COMPANY_NAME_' in t])
+            # Then detect table patterns from the extracted tokens
+            if st.session_state.template_type == 'docx':
+                detected_table = detect_table_pattern(tokens)
+                if detected_table:
+                    st.session_state.use_dynamic_table = True
+                    # Initialize table data with empty values but preserve the structure
                     st.session_state.table_data = [
-                        {"company": "", "rep": "", "designation": ""} for _ in range(row_count)
+                        {"company": "", "rep": "", "designation": ""} for _ in range(len(detected_table))
                     ]
+                else:
+                    st.session_state.use_dynamic_table = False
+            else:
+                st.session_state.use_dynamic_table = False
 
 with col_template2:
     uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
@@ -629,17 +670,20 @@ with col_template2:
         st.session_state.template_loaded = True
         st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
         
+        # Extract all placeholders first
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
         
-        # Detect if this is a table template
-        table_tokens = [t for t in tokens if any(x in t for x in ['COMPANY_NAME_', 'REPRESENTATIVE_', 'DESIGNATION_'])]
-        if table_tokens and st.session_state.template_type == 'docx':
-            st.session_state.use_dynamic_table = True
-            row_count = len([t for t in table_tokens if 'COMPANY_NAME_' in t])
-            st.session_state.table_data = [
-                {"company": "", "rep": "", "designation": ""} for _ in range(row_count)
-            ]
+        # Then detect table patterns from the extracted tokens
+        if st.session_state.template_type == 'docx':
+            detected_table = detect_table_pattern(tokens)
+            if detected_table:
+                st.session_state.use_dynamic_table = True
+                st.session_state.table_data = [
+                    {"company": "", "rep": "", "designation": ""} for _ in range(len(detected_table))
+                ]
+            else:
+                st.session_state.use_dynamic_table = False
         else:
             st.session_state.use_dynamic_table = False
         
