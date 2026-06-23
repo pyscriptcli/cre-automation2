@@ -333,9 +333,10 @@ def detect_table_placeholders(tokens):
         
         # Check if rows are sequential (1, 2, 3, ...)
         expected_rows = set(range(1, max_row + 1))
+        current_rows = set(row_numbers)
         
-        # Check if we have all expected rows
-        missing_rows = expected_rows - row_numbers
+        # Find missing rows using set difference
+        missing_rows = expected_rows - current_rows
         
         validated_groups[base_name] = {
             'max_row': max_row,
@@ -435,10 +436,9 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs, table_data=No
                         # For each cell, check if it needs replacement
                         for col_idx, cell in enumerate(new_row.cells):
                             # Try to match based on the column pattern
-                            cell_text = cell.text
                             for base_name in base_names:
                                 placeholder = f"{{{{{base_name}_{row_idx + 1}}}}}"
-                                if placeholder in cell_text:
+                                if placeholder in cell.text:
                                     # Find the matching column value
                                     value = row_data.get(base_name, '')
                                     cell.text = str(value) if value else ''
