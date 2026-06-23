@@ -102,39 +102,6 @@ MINIMAL_CRE_SYSTEM = """
         box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
     }
     
-    /* Progress Bar */
-    .progress-container {
-        width: 100%;
-        background-color: #E8E8E8;
-        border-radius: 4px;
-        overflow: hidden;
-        margin: 10px 0;
-        height: 20px;
-        position: relative;
-    }
-    .progress-bar {
-        width: 0%;
-        height: 100%;
-        background: linear-gradient(90deg, #003366, #004488);
-        border-radius: 4px;
-        transition: width 0.3s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 11px;
-        font-weight: 600;
-    }
-    .progress-text {
-        position: absolute;
-        width: 100%;
-        text-align: center;
-        color: #1A1A1A;
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 20px;
-    }
-    
     /* Delete button - made smaller */
     div[data-testid="column"] button { 
         background-color: transparent !important; 
@@ -174,6 +141,36 @@ MINIMAL_CRE_SYSTEM = """
         color: #003366;
         padding-right: 10px;
         font-size: 13px;
+    }
+    
+    /* Progress bar styling */
+    .progress-container {
+        margin: 16px 0;
+        padding: 12px;
+        background-color: #F8F9FA;
+        border-radius: 4px;
+        border: 1px solid #E0E0E0;
+    }
+    .progress-bar {
+        width: 100%;
+        height: 20px;
+        background-color: #E9ECEF;
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+    }
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #003366, #0055A0);
+        border-radius: 10px;
+        transition: width 0.3s ease;
+        width: 0%;
+    }
+    .progress-text {
+        text-align: center;
+        font-size: 13px;
+        color: #1A1A1A;
+        margin-top: 6px;
     }
 </style>
 """
@@ -454,19 +451,18 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
-# --- PROGRESS BAR HELPER ---
-def show_progress_bar(progress, status_text):
-    """Display a progress bar with percentage"""
-    progress_percent = int(progress * 100)
-    bar_style = f"""
+# --- PROGRESS BAR COMPONENT ---
+def show_progress_bar(progress_value, progress_text="Processing..."):
+    """Display a custom progress bar"""
+    progress_html = f"""
     <div class="progress-container">
-        <div class="progress-bar" style="width: {progress_percent}%;">
-            {progress_percent}%
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {progress_value}%;"></div>
         </div>
-        <div class="progress-text">{status_text}</div>
+        <div class="progress-text">{progress_text} ({progress_value}%)</div>
     </div>
     """
-    st.markdown(bar_style, unsafe_allow_html=True)
+    st.markdown(progress_html, unsafe_allow_html=True)
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -497,16 +493,14 @@ if "saved_file_name" not in st.session_state:
     st.session_state.saved_file_name = None
 if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
-if "download_in_progress" not in st.session_state:
-    st.session_state.download_in_progress = False
-if "download_status" not in st.session_state:
-    st.session_state.download_status = ""
-if "download_progress" not in st.session_state:
-    st.session_state.download_progress = 0
-if "download_data" not in st.session_state:
-    st.session_state.download_data = None
-if "download_filename" not in st.session_state:
-    st.session_state.download_filename = None
+if "show_progress" not in st.session_state:
+    st.session_state.show_progress = False
+if "progress_value" not in st.session_state:
+    st.session_state.progress_value = 0
+if "progress_text" not in st.session_state:
+    st.session_state.progress_text = "Preparing download..."
+if "download_triggered" not in st.session_state:
+    st.session_state.download_triggered = False
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -748,166 +742,125 @@ if u_template is not None:
         if pptx_disabled:
             st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
-            # Check if download was triggered
-            if st.button("Generate & Download PPTX", key="generate_pptx", use_container_width=True):
-                st.session_state.download_in_progress = True
-                st.session_state.download_progress = 0
-                st.session_state.download_status = "Initializing..."
+            try:
+                # Generate the document data
+                pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
+                pptx_filename = get_download_filename(base_template_name, "pptx")
                 
-                # Start progress simulation
-                progress_placeholder = st.empty()
+                # Show progress bar if download is triggered
+                if st.session_state.show_progress and st.session_state.download_triggered:
+                    show_progress_bar(st.session_state.progress_value, st.session_state.progress_text)
                 
-                try:
-                    # Simulate progress
-                    for i in range(1, 101, 10):
-                        st.session_state.download_progress = i / 100
-                        st.session_state.download_status = f"Processing... {i}%"
-                        with progress_placeholder.container():
-                            show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
-                        time.sleep(0.1)
-                    
-                    # Actually generate the file
-                    st.session_state.download_status = "Generating document..."
-                    st.session_state.download_progress = 0.9
-                    with progress_placeholder.container():
-                        show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
-                    
-                    pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
-                    
-                    # Complete
-                    st.session_state.download_progress = 1.0
-                    st.session_state.download_status = "Complete!"
-                    with progress_placeholder.container():
-                        show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
-                    
-                    # Store data for download
-                    st.session_state.download_data = pptx_data
-                    st.session_state.download_filename = get_download_filename(base_template_name, "pptx")
-                    
-                    # Short delay to show completion
-                    time.sleep(0.5)
-                    
-                    # Clear progress and trigger download
-                    st.session_state.download_in_progress = False
-                    st.session_state.download_progress = 0
-                    progress_placeholder.empty()
-                    
-                    # Auto-download
-                    st.download_button(
-                        label="Download PPTX",
-                        data=pptx_data,
-                        file_name=st.session_state.download_filename,
-                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        use_container_width=True,
-                        key="download_pptx_auto"
-                    )
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.session_state.download_in_progress = False
-                    st.session_state.download_progress = 0
-                    progress_placeholder.empty()
-                    st.error(f"Error generating PPTX: {str(e)}")
-            
-            # Show download button if data is ready
-            if st.session_state.download_data and not st.session_state.download_in_progress:
-                st.download_button(
+                download_clicked = st.download_button(
                     label="Download PPTX",
-                    data=st.session_state.download_data,
-                    file_name=st.session_state.download_filename,
+                    data=pptx_data,
+                    file_name=pptx_filename,
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True,
-                    key="download_pptx_ready"
+                    key="download_pptx"
                 )
-                # Clear data after showing button
-                st.session_state.download_data = None
-                st.session_state.download_filename = None
-            
-            # Show progress if in progress
-            if st.session_state.download_in_progress:
-                show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
+                
+                # If download button is clicked, show progress
+                if download_clicked:
+                    st.session_state.show_progress = True
+                    st.session_state.download_triggered = True
+                    
+                    # Simulate progress steps
+                    for i in range(1, 101):
+                        if i <= 30:
+                            st.session_state.progress_value = i
+                            st.session_state.progress_text = "Preparing document..."
+                        elif i <= 60:
+                            st.session_state.progress_value = i
+                            st.session_state.progress_text = "Processing content..."
+                        elif i <= 85:
+                            st.session_state.progress_value = i
+                            st.session_state.progress_text = "Formatting document..."
+                        else:
+                            st.session_state.progress_value = i
+                            st.session_state.progress_text = "Finalizing..."
+                        
+                        # Update progress in real-time
+                        # Note: In a real app, you'd want to use actual progress from the generation process
+                        # This is a simulation for demonstration
+                        if i == 100:
+                            st.session_state.progress_text = "Complete! Download starting..."
+                            time.sleep(0.5)
+                            st.session_state.show_progress = False
+                            st.session_state.download_triggered = False
+                            st.session_state.progress_value = 0
+                            st.rerun()
+                        
+                        time.sleep(0.02)  # Simulate processing time
+                    
+            except Exception as e:
+                st.error(f"Error generating PPTX: {str(e)}")
+                st.session_state.show_progress = False
+                st.session_state.download_triggered = False
     
     with col2:
         docx_disabled = template_type != 'docx'
         if docx_disabled:
             st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
-            if st.button("Generate & Download DOCX", key="generate_docx", use_container_width=True):
-                st.session_state.download_in_progress = True
-                st.session_state.download_progress = 0
-                st.session_state.download_status = "Initializing..."
+            # Generate the document data
+            try:
+                docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
                 
-                progress_placeholder = st.empty()
-                
-                try:
-                    # Simulate progress
-                    for i in range(1, 101, 10):
-                        st.session_state.download_progress = i / 100
-                        st.session_state.download_status = f"Processing... {i}%"
-                        with progress_placeholder.container():
-                            show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
-                        time.sleep(0.1)
+                if docx_data:
+                    docx_filename = get_download_filename(base_template_name, "docx")
                     
-                    # Actually generate the file
-                    st.session_state.download_status = "Generating document..."
-                    st.session_state.download_progress = 0.9
-                    with progress_placeholder.container():
-                        show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
+                    # Show progress bar if download is triggered
+                    if st.session_state.show_progress and st.session_state.download_triggered:
+                        show_progress_bar(st.session_state.progress_value, st.session_state.progress_text)
                     
-                    docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
-                    
-                    # Complete
-                    st.session_state.download_progress = 1.0
-                    st.session_state.download_status = "Complete!"
-                    with progress_placeholder.container():
-                        show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
-                    
-                    # Store data for download
-                    st.session_state.download_data = docx_data
-                    st.session_state.download_filename = get_download_filename(base_template_name, "docx")
-                    
-                    # Short delay to show completion
-                    time.sleep(0.5)
-                    
-                    # Clear progress and trigger download
-                    st.session_state.download_in_progress = False
-                    st.session_state.download_progress = 0
-                    progress_placeholder.empty()
-                    
-                    # Auto-download
-                    st.download_button(
+                    download_clicked = st.download_button(
                         label="Download DOCX",
                         data=docx_data,
-                        file_name=st.session_state.download_filename,
+                        file_name=docx_filename,
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True,
-                        key="download_docx_auto"
+                        key="download_docx"
                     )
-                    st.rerun()
                     
-                except Exception as e:
-                    st.session_state.download_in_progress = False
-                    st.session_state.download_progress = 0
-                    progress_placeholder.empty()
-                    st.error(f"Error generating document: {str(e)}")
-            
-            # Show download button if data is ready
-            if st.session_state.download_data and not st.session_state.download_in_progress:
-                st.download_button(
-                    label="Download DOCX",
-                    data=st.session_state.download_data,
-                    file_name=st.session_state.download_filename,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True,
-                    key="download_docx_ready"
-                )
-                # Clear data after showing button
-                st.session_state.download_data = None
-                st.session_state.download_filename = None
-            
-            # Show progress if in progress
-            if st.session_state.download_in_progress:
-                show_progress_bar(st.session_state.download_progress, st.session_state.download_status)
+                    # If download button is clicked, show progress
+                    if download_clicked:
+                        st.session_state.show_progress = True
+                        st.session_state.download_triggered = True
+                        
+                        # Simulate progress steps
+                        for i in range(1, 101):
+                            if i <= 30:
+                                st.session_state.progress_value = i
+                                st.session_state.progress_text = "Preparing document..."
+                            elif i <= 60:
+                                st.session_state.progress_value = i
+                                st.session_state.progress_text = "Processing content..."
+                            elif i <= 85:
+                                st.session_state.progress_value = i
+                                st.session_state.progress_text = "Formatting document..."
+                            else:
+                                st.session_state.progress_value = i
+                                st.session_state.progress_text = "Finalizing..."
+                            
+                            # Update progress in real-time
+                            if i == 100:
+                                st.session_state.progress_text = "Complete! Download starting..."
+                                time.sleep(0.5)
+                                st.session_state.show_progress = False
+                                st.session_state.download_triggered = False
+                                st.session_state.progress_value = 0
+                                st.rerun()
+                            
+                            time.sleep(0.02)  # Simulate processing time
+                else:
+                    st.error("Failed to generate document. Please check the template and try again.")
+                    st.session_state.show_progress = False
+                    st.session_state.download_triggered = False
+            except Exception as e:
+                st.error(f"Error generating document: {str(e)}")
+                st.session_state.show_progress = False
+                st.session_state.download_triggered = False
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
