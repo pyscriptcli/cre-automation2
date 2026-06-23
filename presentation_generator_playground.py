@@ -879,4 +879,329 @@ with col_template2:
     uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
     
     uploaded_template = st.file_uploader(
-        "
+        "Upload New Template", 
+        type=["pptx", "docx"], 
+        label_visibility="collapsed", 
+        key=uploader_key
+    )
+    
+    if st.session_state.clear_uploader:
+        st.session_state.clear_uploader = False
+    
+    if uploaded_template:
+        template_bytes = uploaded_template.getvalue()
+        template_name = uploaded_template.name
+        template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+        
+        # Validate DOCX file
+        if template_type == 'docx' and not is_valid_docx(template_bytes):
+            st.error("Invalid DOCX file. Please ensure this is a valid Word document.")
+        else:
+            tokens = extract_placeholders(template_bytes, template_type)
+            detected_groups = detect_table_placeholders(tokens)
+            
+            if detected_groups and template_type == 'docx':
+                st.session_state.show_detection_dialog = True
+                st.session_state.pending_tokens = tokens
+                st.session_state.pending_template_bytes = template_bytes
+                st.session_state.pending_template_type = template_type
+                st.session_state.pending_template_name = template_name
+                st.session_state.template_bytes = None
+                st.session_state.template_loaded = False
+            else:
+                st.session_state.template_bytes = template_bytes
+                st.session_state.saved_template_name = None
+                st.session_state.template_loaded = True
+                st.session_state.template_type = template_type
+                st.session_state.tokens = tokens
+                st.session_state.use_dynamic_table = False
+                st.session_state.table_config = {}
+                st.session_state.table_data = []
+                st.session_state.table_headers = []
+                
+                if st.button("Save Template", key="save_template_btn", use_container_width=True):
+                    saved_path = save_template_to_file(template_bytes, uploaded_template.name)
+                    st.session_state.saved_template_name = uploaded_template.name
+                    
+                    if st.session_state.custom_mapping:
+                        config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                        save_config_to_file(st.session_state.custom_mapping, config_name)
+                    
+                    st.session_state.save_success = True
+                    st.session_state.saved_file_name = uploaded_template.name
+                    st.session_state.clear_uploader = True
+                    st.rerun()
+
+# --- SHOW DETECTION DIALOG ---
+if st.session_state.show_detection_dialog and st.session_state.pending_tokens:
+    st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+    detected_groups = detect_table_placeholders(st.session_state.pending_tokens)
+    show_placeholder_detection_dialog(st.session_state.pending_tokens, detected_groups)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+if st.session_state.save_success:
+    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully!")
+    st.session_state.save_success = False
+    st.session_state.saved_file_name = None
+
+if st.session_state.template_bytes is not None and st.session_state.template_loaded:
+    template_name = st.session_state.saved_template_name or "Unsaved Template"
+    template_type = st.session_state.template_type or "Unknown"
+    st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# --- MAIN CONTENT ---
+template_bytes = st.session_state.template_bytes
+template_type = st.session_state.template_type
+u_template = None
+if template_bytes is not None and st.session_state.template_loaded:
+    u_template = type('obj', (object,), {'getvalue': lambda: template_bytes})()
+
+text_data = {}
+image_data = {}
+field_types = {}
+
+if u_template is not None and st.session_state.tokens:
+    tokens = st.session_state.tokens
+    table_config = st.session_state.table_config
+    
+    if not tokens:
+        st.info("No placeholders found in the template.")
+    else:
+        table_tokens = set()
+        for base_name, config in table_config.items():
+            for token in config['tokens']:
+                table_tokens.add(token)
+        
+        regular_tokens = [t for t in tokens if t not in table_tokens]
+        
+        # --- DISPLAY REGULAR FIELDS ---
+        if regular_tokens:
+            st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">General Information</div>', unsafe_allow_html=True)
+            
+            mid_point = len(regular_tokens) // 2
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                for token in regular_tokens[:mid_point]:
+                    clean_label = token.replace("{", "").replace("}", "")
+                    current_type = st.session_state.custom_mapping.get(token, "Text")
+                    col_a, col_b = st.columns([3, 1])
+                    
+                    with col_b:
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                        type_key = f"type_{token}"
+                        data_type = st.selectbox(
+                            "Type",
+                            ["Text", "Image"],
+                            index=0 if current_type == "Text" else 1,
+                            key=type_key,
+                            label_visibility="collapsed"
+                        )
+                        if data_type != current_type:
+                            st.session_state.custom_mapping[token] = data_type
+                            auto_save_config()
+                            st.rerun()
+                    
+                    with col_a:
+                        if data_type == "Image" and template_type == 'pptx':
+                            image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                            field_types[token] = "Image"
+                            st.caption("Upload image (PNG, JPG)")
+                        else:
+                            if data_type == "Image" and template_type != 'pptx':
+                                st.warning("Image replacement only supported in PPTX templates")
+                            st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                            text_data[token] = st.text_input(
+                                clean_label, 
+                                key=f"val_{token}", 
+                                label_visibility="collapsed"
+                            )
+                            field_types[token] = "Text"
+            
+            with col2:
+                for token in regular_tokens[mid_point:]:
+                    clean_label = token.replace("{", "").replace("}", "")
+                    current_type = st.session_state.custom_mapping.get(token, "Text")
+                    col_a, col_b = st.columns([3, 1])
+                    
+                    with col_b:
+                        st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                        type_key = f"type_{token}_2"
+                        data_type = st.selectbox(
+                            "Type",
+                            ["Text", "Image"],
+                            index=0 if current_type == "Text" else 1,
+                            key=type_key,
+                            label_visibility="collapsed"
+                        )
+                        if data_type != current_type:
+                            st.session_state.custom_mapping[token] = data_type
+                            auto_save_config()
+                            st.rerun()
+                    
+                    with col_a:
+                        if data_type == "Image" and template_type == 'pptx':
+                            image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                            field_types[token] = "Image"
+                            st.caption("Upload image (PNG, JPG)")
+                        else:
+                            if data_type == "Image" and template_type != 'pptx':
+                                st.warning("Image replacement only supported in PPTX templates")
+                            st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                            text_data[token] = st.text_input(
+                                clean_label, 
+                                key=f"val_{token}", 
+                                label_visibility="collapsed"
+                            )
+                            field_types[token] = "Text"
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # --- DISPLAY DYNAMIC TABLE ---
+        if table_config and st.session_state.use_dynamic_table and template_type == 'docx' and st.session_state.table_data:
+            st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Table Data</div>', unsafe_allow_html=True)
+            
+            table_headers = list(table_config.keys())
+            
+            max_rows = 0
+            for base_name, config in table_config.items():
+                max_rows = max(max_rows, config['max_row'])
+            
+            st.markdown(f'<div style="font-size:12px;color:#666;margin-bottom:10px;">{len(table_headers)} columns, {max_rows} base rows</div>', unsafe_allow_html=True)
+            
+            col_controls1, col_controls2, col_controls3 = st.columns([1, 1, 6])
+            with col_controls1:
+                if st.button("Add Row", use_container_width=True, key="add_table_row"):
+                    new_row = {}
+                    for header in table_headers:
+                        new_row[header] = ""
+                    st.session_state.table_data.append(new_row)
+                    st.rerun()
+            with col_controls2:
+                if len(st.session_state.table_data) > 1:
+                    if st.button("Remove Last", use_container_width=True, key="remove_last_row"):
+                        st.session_state.table_data.pop()
+                        st.rerun()
+            
+            col_count = len(table_headers)
+            col_widths = [2] * col_count + [0.5]
+            col_headers = st.columns(col_widths)
+            
+            for idx, header in enumerate(table_headers):
+                display_header = header.replace('_', ' ').title()
+                with col_headers[idx]:
+                    st.markdown(f'<strong>{display_header}</strong>', unsafe_allow_html=True)
+            with col_headers[-1]:
+                st.markdown('', unsafe_allow_html=True)
+            
+            rows_to_delete = []
+            for idx, row_data in enumerate(st.session_state.table_data):
+                col_widths = [2] * col_count + [0.5]
+                cols = st.columns(col_widths)
+                
+                for col_idx, header in enumerate(table_headers):
+                    with cols[col_idx]:
+                        row_data[header] = st.text_input(
+                            f"{header}_{idx+1}", 
+                            value=row_data.get(header, ""), 
+                            key=f"table_{header}_{idx}",
+                            label_visibility="collapsed",
+                            placeholder=f"{header.replace('_', ' ').title()} {idx+1}"
+                        )
+                
+                with cols[-1]:
+                    if len(st.session_state.table_data) > 1:
+                        if st.button("Delete", key=f"delete_row_{idx}"):
+                            rows_to_delete.append(idx)
+            
+            if rows_to_delete:
+                for idx in sorted(rows_to_delete, reverse=True):
+                    st.session_state.table_data.pop(idx)
+                st.rerun()
+            
+            st.markdown(f'<div style="font-size:12px;color:#666;margin-top:8px;">Total rows: {len(st.session_state.table_data)}</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            for key in list(text_data.keys()):
+                if '{{' in key and '_' in key:
+                    for base_name in table_config.keys():
+                        if f'{{{{{base_name}_' in key:
+                            del text_data[key]
+                            break
+            
+            for idx, row_data in enumerate(st.session_state.table_data):
+                for base_name in table_config.keys():
+                    placeholder = f"{{{{{base_name}_{idx+1}}}}}"
+                    text_data[placeholder] = row_data.get(base_name, "")
+
+# --- DOWNLOAD SECTION ---
+if u_template is not None and st.session_state.template_loaded:
+    st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
+    
+    template_name = st.session_state.saved_template_name or "Generated_Document"
+    base_template_name = re.sub(r'\.(pptx|docx)$', '', template_name)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        pptx_disabled = template_type != 'pptx'
+        if pptx_disabled:
+            st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
+        else:
+            try:
+                pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
+                if pptx_data:
+                    pptx_filename = get_download_filename(base_template_name, "pptx")
+                    st.download_button(
+                        label="Download PPTX",
+                        data=pptx_data,
+                        file_name=pptx_filename,
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        use_container_width=True,
+                        key="download_pptx"
+                    )
+            except Exception as e:
+                st.error(f"Error generating PPTX: {str(e)}")
+    
+    with col2:
+        docx_disabled = template_type != 'docx'
+        if docx_disabled:
+            st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
+        else:
+            try:
+                if st.session_state.use_dynamic_table and st.session_state.table_data and st.session_state.table_config:
+                    docx_data = generate_docx_bytes(
+                        template_bytes, 
+                        text_data, 
+                        image_data, 
+                        st.session_state.table_data,
+                        st.session_state.table_config
+                    )
+                else:
+                    docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
+                
+                if docx_data:
+                    docx_filename = get_download_filename(base_template_name, "docx")
+                    st.download_button(
+                        label="Download DOCX",
+                        data=docx_data,
+                        file_name=docx_filename,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key="download_docx"
+                    )
+                else:
+                    st.error("Failed to generate document. Please check the template and try again.")
+            except Exception as e:
+                st.error(f"Error generating document: {str(e)}")
+                st.error(traceback.format_exc())
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+else:
+    if not st.session_state.show_detection_dialog:
+        st.info("Please upload or select a template to begin")
