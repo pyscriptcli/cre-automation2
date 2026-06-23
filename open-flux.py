@@ -485,7 +485,7 @@ def simple_uploader_row(label_text, allowed_types, key):
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
 # --- INIT APP ---
-st.set_page_config(page_title="Document Generator", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
 # Initialize all session state variables
