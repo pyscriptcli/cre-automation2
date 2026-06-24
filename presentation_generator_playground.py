@@ -420,7 +420,7 @@ def render_isolated_map_editor():
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.6, 2.0, 0.8, 1.2, 3.4])
     
     with c_btn:
-        export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
+        export_clicked = st.button("Export Map", type="primary", key=f"export_map_{token_key}", use_container_width=True)
         
     with c_style:
         basemap_style = st.selectbox(label="Basemap Layer", options=["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
@@ -737,10 +737,10 @@ else:
         stored_templates = [t for t in saved_templates if t['source'] == 'stored']
         
         if github_templates:
-            template_options.append("--- GitHub Templates ---")
+            template_options.append("--- Templates ---")
             for t in github_templates: template_options.append(f"{t['display_name']} ({t['type']})")
         if stored_templates:
-            template_options.append("--- Stored Templates ---")
+            template_options.append("--- User Uploaded Templates ---")
             for t in stored_templates: template_options.append(f"{t['display_name']} ({t['type']})")
         
         dropdown_col, delete_col = st.columns([4, 1])
