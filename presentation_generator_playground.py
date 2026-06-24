@@ -71,15 +71,6 @@ MINIMAL_CRE_SYSTEM = """
     
     /* Clean up form container borders */
     div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
-    
-    /* Marker button style */
-    .marker-btn {
-        background-color: #DC3545 !important;
-        color: white !important;
-    }
-    .marker-btn:hover {
-        background-color: #B02A37 !important;
-    }
 </style>
 """
 
@@ -156,7 +147,7 @@ def auto_save_config():
 
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite", pin_color="#DC3545", pin_size=32):
     """Generates high-res map with pin included"""
     target_width_tiles = 10
     lon_span = e - w
@@ -190,10 +181,9 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     styles = {
         "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
+        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
     }
-    url_template = styles.get(style, styles["Hybrid"])
+    url_template = styles.get(style, styles["Satellite"])
     
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
@@ -247,6 +237,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     # Pin dimensions
     w_px = int(16 * scale)
     h_px = int(32 * scale)
+    inner_radius = int(w_px * 0.33)
     
     # Draw pin shadow
     shadow_offset = int(2 * scale)
@@ -258,12 +249,14 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     ], fill=(0, 0, 0, 60))
     
     # Draw pin base (white circle and triangle)
+    # Triangle base
     draw.polygon([
         (pin_local_x, pin_local_y), 
         (pin_local_x - w_px, pin_local_y - h_px), 
         (pin_local_x + w_px, pin_local_y - h_px)
     ], fill=(255, 255, 255))
     
+    # Circle base
     draw.ellipse([
         pin_local_x - w_px, 
         pin_local_y - h_px - w_px, 
@@ -279,6 +272,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         (pin_local_x + body_width, pin_local_y - h_px)
     ], fill=pin_color)
     
+    # Colored circle
     draw.ellipse([
         pin_local_x - body_width, 
         pin_local_y - h_px - body_width, 
@@ -295,7 +289,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         pin_local_y - h_px + inner_radius
     ], fill=(255, 255, 255))
     
-    # Inner colored dot
+    # Inner colored dot (optional - for better visibility)
     dot_radius = max(2, int(inner_radius * 0.4))
     draw.ellipse([
         pin_local_x - dot_radius, 
@@ -318,40 +312,34 @@ def render_isolated_map_editor():
     
     col_back, col_title = st.columns([1, 4])
     with col_back:
-        if st.button("← Back to Document"):
+        if st.button(" Back to Document"):
             st.session_state.active_map_editor_token = None
             st.rerun()
     with col_title:
-        st.markdown(f"### 🗺️ Full-Screen Map Editor: {token_key}")
+        st.markdown(f"###  Full-Screen Map Editor: {token_key}")
     
     st.markdown("</div><br>", unsafe_allow_html=True)
 
-    # Define all keys
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
     size_key = f"map_size_{token_key}"
     dragged_key = f"map_dragged_{token_key}"
     image_key = f"map_bytes_holder_{token_key}"
-    marker_key = f"map_marker_{token_key}"
-    bounds_key = f"map_bounds_{token_key}"
-    
-    # Initialize all keys with Manila coordinates (14.5995, 120.9842)
-    if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
-    if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"  # Manila
-    if color_key not in st.session_state: st.session_state[color_key] = "#DC3545"
-    if size_key not in st.session_state: st.session_state[size_key] = 32
-    if image_key not in st.session_state: st.session_state[image_key] = None
-    if marker_key not in st.session_state: st.session_state[marker_key] = None
-    if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     
     # Safe Bridge State: Applies changes BEFORE the text_input widget renders
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
+    if style_key not in st.session_state: st.session_state[style_key] = "Satellite"
+    if coord_key not in st.session_state: st.session_state[coord_key] = "14.3294, 120.9368"
+    if color_key not in st.session_state: st.session_state[color_key] = "#DC3545"
+    if size_key not in st.session_state: st.session_state[size_key] = 32
+    if image_key not in st.session_state: st.session_state[image_key] = None
+
     c1, c2, c3, c4 = st.columns([1.5, 2, 1, 2])
-    basemap_style = c1.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
+    basemap_style = c1.selectbox("Map Layer", ["Satellite", "Carto Light", "OSM"], key=style_key)
     coord_input = c2.text_input("Coordinates (Lat, Lon)", key=coord_key)
     pin_color = c3.color_picker("Pin Color", key=color_key)
     pin_size = c4.slider("Pin Size", 16, 64, key=size_key)
@@ -359,19 +347,17 @@ def render_isolated_map_editor():
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
-        plat, plon = 14.5995, 120.9842  # Manila default
+        plat, plon = 14.3294, 120.9368
 
     tiles_dict = {
         "OSM": "OpenStreetMap",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
+        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
     }
     attr_dict = {
         "OSM": "OpenStreetMap",
         "Carto Light": "CartoDB",
-        "Satellite": "Google Maps",
-        "Hybrid": "Google Maps (Clean Streets)"
+        "Satellite": "Google Maps"
     }
     
     m = folium.Map(
@@ -382,7 +368,6 @@ def render_isolated_map_editor():
         zoom_control=True
     )
 
-    # Create pin icon
     icon_html = f"""
     <div style="position: relative;">
         <span style="position: absolute; left: -{pin_size//2}px; top: -{pin_size}px; width: {pin_size}px; height: {pin_size}px; background-color: {pin_color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></span>
@@ -390,18 +375,8 @@ def render_isolated_map_editor():
     </div>
     """
     
-    # Add marker
-    marker = folium.Marker(
-        [plat, plon], 
-        draggable=True, 
-        icon=folium.DivIcon(html=icon_html)
-    )
-    marker.add_to(m)
+    folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
     
-    # Store marker reference
-    st.session_state[marker_key] = marker
-    
-    # Add draw control
     draw = Draw(
         export=False, position='topleft',
         draw_options={'polyline':False, 'polygon':False, 'circle':False, 'marker':False, 'circlemarker':False, 'rectangle':True},
@@ -409,25 +384,18 @@ def render_isolated_map_editor():
     )
     draw.add_to(m)
     
-    st.info("✏️ Use the **Rectangle tool** (square icon) to frame your export area. Drag the pin to move it.")
+    st.info(" Use the **Rectangle tool** (square icon) to frame your export area. Drag the pin to move it.")
     
-    # Display map
     map_data = st_folium(
         m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}",
         returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
     )
 
-    # Store bounds from map_data for export
-    if isinstance(map_data, dict) and map_data.get("bounds"):
-        st.session_state[bounds_key] = map_data["bounds"]
-
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Export button
-    if st.button("✅ Confirm and Export High-Res Image to Document", type="primary", use_container_width=True):
+    if st.button(" Confirm and Export High-Res Image to Document", type="primary", use_container_width=True):
         with st.spinner("Compiling Crisp High-Density API Asset. This takes approx 3 seconds..."):
             
-            # Get the latest marker position
             export_lat, export_lon = plat, plon
             if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
                 moved = map_data["last_marker_moved"]
@@ -435,10 +403,7 @@ def render_isolated_map_editor():
                     export_lat = moved["lat"]
                     export_lon = moved["lng"]
 
-            # Get bounds - first from drawn rectangle, then from map bounds
             n, s, e, w = None, None, None, None
-            
-            # Try to get from drawn rectangle
             if isinstance(map_data, dict) and map_data.get("last_active_drawing"):
                 drawing = map_data["last_active_drawing"]
                 if drawing and drawing.get("geometry", {}).get("type") == "Polygon":
@@ -449,24 +414,19 @@ def render_isolated_map_editor():
                         n, s = max(lats), min(lats)
                         e, w = max(lons), min(lons)
             
-            # If no rectangle, use map bounds from session state
-            if n is None and st.session_state.get(bounds_key):
-                b = st.session_state[bounds_key]
+            if n is None and isinstance(map_data, dict) and map_data.get("bounds"):
+                b = map_data["bounds"]
                 if b and "_northEast" in b and "_southWest" in b:
-                    n = b["_northEast"]["lat"]
-                    s = b["_southWest"]["lat"]
-                    e = b["_northEast"]["lng"]
-                    w = b["_southWest"]["lng"]
+                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
+                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
             
-            # Fallback to area around pin
             if n is None:
-                n, s = export_lat + 0.02, export_lat - 0.02
-                e, w = export_lon + 0.02, export_lon - 0.02
+                n, s, e, w = export_lat + 0.01, export_lat - 0.01, export_lon + 0.01, export_lon - 0.01
 
-            # Generate high-res image with pin at the exported position
+            # Generate high-res image with pin
             map_img_bytes = generate_static_map_bounds(
                 n, s, e, w, 
-                export_lat, export_lon,  # Use the pin position from the map
+                export_lat, export_lon, 
                 style=basemap_style, 
                 pin_color=pin_color, 
                 pin_size=pin_size
@@ -479,17 +439,15 @@ def render_isolated_map_editor():
             st.session_state[dragged_key] = f"{export_lat}, {export_lon}"
             
             st.session_state.active_map_editor_token = None
-            st.success("✅ High-res map rendering attached successfully! Returning to document...")
+            st.success(" High-res map rendering attached successfully! Returning to document...")
             st.rerun()
 
-    # Handle marker movement - sync with text input
     if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
         moved = map_data["last_marker_moved"]
         if moved:
             mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
-            new_coord = f"{mlat}, {mlon}"
-            if new_coord != st.session_state.get(coord_key, ""):
-                st.session_state[dragged_key] = new_coord
+            if f"{mlat}, {mlon}" != st.session_state.get(coord_key, ""):
+                st.session_state[dragged_key] = f"{mlat}, {mlon}"
                 st.rerun()
 
 # --- CORE UTILITIES ---
@@ -682,7 +640,7 @@ else:
     st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
     
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">📄 Template Setup</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header"> Template Setup</div>', unsafe_allow_html=True)
 
     col_template1, col_template2 = st.columns(2)
 
@@ -698,7 +656,7 @@ else:
         with delete_col:
             if selected_template and selected_template != "Select saved template":
                 template_name = selected_template.split(' (')[0]
-                if st.button("🗑️", key="delete_template", help="Delete this template"):
+                if st.button("", key="delete_template", help="Delete this template"):
                     st.session_state.show_delete_confirm = True
                     st.session_state.template_to_delete = template_name
                     st.rerun()
@@ -752,7 +710,7 @@ else:
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
             
-            if st.button("💾 Save Template", key="save_template_btn", use_container_width=True):
+            if st.button(" Save Template", key="save_template_btn", use_container_width=True):
                 saved_path = save_template_to_file(template_bytes, uploaded_template.name)
                 st.session_state.saved_template_name = uploaded_template.name
                 if st.session_state.custom_mapping:
@@ -764,14 +722,14 @@ else:
                 st.rerun()
 
     if st.session_state.save_success:
-        st.success(f"✅ Template '{st.session_state.saved_file_name}' saved successfully!")
+        st.success(f" Template '{st.session_state.saved_file_name}' saved successfully!")
         st.session_state.save_success = False
         st.session_state.saved_file_name = None
 
     if st.session_state.template_bytes is not None:
         template_name = st.session_state.saved_template_name or "Unsaved Template"
         template_type = st.session_state.template_type or "Unknown"
-        st.markdown(f'<div class="saved-indicator">✅ Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="saved-indicator"> Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -791,7 +749,7 @@ else:
             st.info("No placeholders found in the template.")
         else:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">📝 Placeholder Values</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header"> Placeholder Values</div>', unsafe_allow_html=True)
             
             mid_point = len(tokens) // 2
             col1, col2 = st.columns(2)
@@ -825,15 +783,15 @@ else:
                                 saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
                                 if saved_map_img:
                                     image_data[token] = saved_map_img
-                                    st.success("✅ Map snapshot attached")
+                                    st.success(" Map snapshot attached")
                                 
-                                if st.button(f"🗺️ Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
+                                if st.button(f" Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
                                     st.session_state.active_map_editor_token = token
                                     st.rerun()
                                 field_types[token] = "Image"
                             else:
                                 if data_type in ["Image", "Map"] and template_type != 'pptx':
-                                    st.warning("⚠️ Media & Map uploads are only supported in PPTX files.")
+                                    st.warning(" Media & Map uploads are only supported in PPTX files.")
                                 st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                                 text_data[token] = st.text_input(clean_label, key=f"val_{token}", label_visibility="collapsed")
                                 field_types[token] = "Text"
@@ -845,7 +803,7 @@ else:
     # --- DOWNLOAD SECTION ---
     if u_template is not None:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">⬇️ Download Document</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header"> Download Document</div>', unsafe_allow_html=True)
         
         template_name = st.session_state.saved_template_name or "Generated_Document"
         base_template_name = re.sub(r'\.(pptx|docx)$', '', template_name)
@@ -853,12 +811,12 @@ else:
         
         with col1:
             if template_type != 'pptx':
-                st.button("📄 Download PPTX", disabled=True, use_container_width=True)
+                st.button(" Download PPTX", disabled=True, use_container_width=True)
             else:
                 try:
                     pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
                     st.download_button(
-                        label="📄 Download PPTX", data=pptx_data,
+                        label=" Download PPTX", data=pptx_data,
                         file_name=get_download_filename(base_template_name, "pptx"),
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                         use_container_width=True, key="download_pptx"
@@ -868,13 +826,13 @@ else:
                     
         with col2:
             if template_type != 'docx':
-                st.button("📄 Download DOCX", disabled=True, use_container_width=True)
+                st.button(" Download DOCX", disabled=True, use_container_width=True)
             else:
                 try:
                     docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
                     if docx_data:
                         st.download_button(
-                            label="📄 Download DOCX", data=docx_data,
+                            label=" Download DOCX", data=docx_data,
                             file_name=get_download_filename(base_template_name, "docx"),
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             use_container_width=True, key="download_docx"
@@ -883,4 +841,4 @@ else:
                     st.error(f"Error generating document: {str(e)}")
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("📂 Please upload or select a template to begin")
+        st.info(" Please upload or select a template to begin")
