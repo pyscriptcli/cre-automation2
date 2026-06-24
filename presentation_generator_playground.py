@@ -130,9 +130,6 @@ MINIMAL_CRE_SYSTEM = """
 
 
 # === ONE-TIME TEMPLATE EXPORT FUNCTION ===
-# Idagdag ito para ma-download ang lahat ng templates
-# Pwede mong tawagin sa sidebar or sa main area
-
 def export_all_templates_simple():
     """Simple function to download all templates"""
     saved = get_saved_templates()
@@ -153,11 +150,6 @@ def export_all_templates_simple():
                 )
     else:
         st.info("No templates saved yet")
-
-# Ilagay ito sa sidebar or main area:
-# with st.sidebar:
-#     export_all_templates_simple()
-
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
@@ -841,6 +833,68 @@ if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
 if "map_data" not in st.session_state:
     st.session_state.map_data = {}
+
+# --- SIDEBAR ---
+with st.sidebar:
+    st.markdown("### 📁 Template Management")
+    st.markdown("---")
+    
+    # Export all templates button
+    st.markdown("#### 📤 Export Templates")
+    
+    saved_templates_sidebar = get_saved_templates()
+    if saved_templates_sidebar:
+        # Option 1: Download all as individual buttons
+        st.write(f"**{len(saved_templates_sidebar)} templates found**")
+        
+        # Single download all button (ZIP)
+        try:
+            import zipfile
+            from io import BytesIO
+            
+            zip_buffer = BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+                for t in saved_templates_sidebar:
+                    data = load_template_from_file(t['name'])
+                    if data:
+                        zip_file.writestr(t['name'], data)
+            
+            zip_buffer.seek(0)
+            
+            st.download_button(
+                label="📦 Download All as ZIP",
+                data=zip_buffer,
+                file_name=f"all_templates_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                mime="application/zip",
+                use_container_width=True,
+                key="download_all_zip"
+            )
+        except Exception as e:
+            st.warning("ZIP download not available, use individual downloads below")
+        
+        st.markdown("---")
+        st.write("**Individual Templates:**")
+        
+        # Individual download buttons
+        for t in saved_templates_sidebar:
+            data = load_template_from_file(t['name'])
+            if data:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"📄 {t['name']}")
+                with col2:
+                    mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation" if t['name'].endswith('.pptx') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    st.download_button(
+                        label="⬇️",
+                        data=data,
+                        file_name=t['name'],
+                        mime=mime_type,
+                        key=f"sidebar_dl_{t['name']}",
+                        help=f"Download {t['name']}"
+                    )
+    else:
+        st.info("No templates saved yet")
+        st.caption("Upload a template and click 'Save Template' to store it here.")
 
 # --- MAIN UI ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
