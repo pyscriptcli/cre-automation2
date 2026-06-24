@@ -645,7 +645,7 @@ with col_template2:
             st.rerun()
 
 if st.session_state.save_success:
-    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully to 'OpenFlux Templates' folder and synced to GitHub!")
+    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully.")
     st.session_state.save_success = False
     st.session_state.saved_file_name = None
 
