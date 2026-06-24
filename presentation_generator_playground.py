@@ -14,6 +14,7 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
+import shutil
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -146,13 +147,35 @@ MINIMAL_CRE_SYSTEM = """
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
-    """Get the directory for storing templates and configs"""
-    storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
+    """
+    Get the directory for storing templates and configs in the GitHub repository.
+    Creates an 'OpenFlux Templates' folder in the source code directory.
+    """
+    # Get the directory where the script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Create 'OpenFlux Templates' folder in the source code directory
+    storage_dir = os.path.join(script_dir, "OpenFlux Templates")
+    
+    # Create the directory if it doesn't exist
     os.makedirs(storage_dir, exist_ok=True)
+    
+    # Create a README file to explain the folder's purpose (optional)
+    readme_path = os.path.join(storage_dir, "README.md")
+    if not os.path.exists(readme_path):
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write("# OpenFlux Templates\n\n")
+            f.write("This folder stores templates and configurations for the OpenFlux application.\n")
+            f.write("Files in this folder are tracked by Git and should be committed to the repository.\n\n")
+            f.write("## Files\n")
+            f.write("- `*.pptx` - PowerPoint templates\n")
+            f.write("- `*.docx` - Word templates\n")
+            f.write("- `*_config.json` - Configuration files for templates\n")
+    
     return storage_dir
 
 def save_template_to_file(template_bytes, template_name):
-    """Save template to file system"""
+    """Save template to the GitHub repository folder"""
     storage_dir = get_storage_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
     if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
@@ -164,7 +187,7 @@ def save_template_to_file(template_bytes, template_name):
     return filepath
 
 def load_template_from_file(template_name):
-    """Load template from file system"""
+    """Load template from the GitHub repository folder"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -173,7 +196,7 @@ def load_template_from_file(template_name):
     return None
 
 def get_saved_templates():
-    """Get list of saved templates"""
+    """Get list of saved templates from the GitHub repository folder"""
     storage_dir = get_storage_dir()
     templates = []
     if os.path.exists(storage_dir):
@@ -191,7 +214,7 @@ def get_saved_templates():
     return templates
 
 def delete_template_file(template_name):
-    """Delete a saved template"""
+    """Delete a saved template from the GitHub repository folder"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -204,7 +227,7 @@ def delete_template_file(template_name):
     return False
 
 def save_config_to_file(config_data, config_name="template_config.json"):
-    """Save configuration to file"""
+    """Save configuration to the GitHub repository folder"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
     with open(filepath, 'w', encoding='utf-8') as f:
@@ -212,7 +235,7 @@ def save_config_to_file(config_data, config_name="template_config.json"):
     return filepath
 
 def load_config_from_file(config_name="template_config.json"):
-    """Load configuration from file"""
+    """Load configuration from the GitHub repository folder"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
     if os.path.exists(filepath):
@@ -225,6 +248,64 @@ def auto_save_config():
     if st.session_state.saved_template_name and st.session_state.custom_mapping:
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
+
+def git_add_templates():
+    """
+    Optional: Automatically add template files to Git staging area.
+    This allows you to commit and push changes easily.
+    """
+    try:
+        storage_dir = get_storage_dir()
+        # Add all template files in the folder to git staging
+        subprocess.run(['git', 'add', storage_dir], check=False, capture_output=True)
+        return True
+    except Exception:
+        return False
+
+def commit_templates_to_git(commit_message="Update templates"):
+    """
+    Optional: Commit template changes to Git.
+    Returns: (success, output/error message)
+    """
+    try:
+        storage_dir = get_storage_dir()
+        # First, add all changes
+        subprocess.run(['git', 'add', storage_dir], check=True, capture_output=True)
+        
+        # Then commit with the provided message
+        result = subprocess.run(
+            ['git', 'commit', '-m', commit_message],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode == 0:
+            return True, result.stdout
+        else:
+            # If no changes to commit, that's fine
+            if "nothing to commit" in result.stderr:
+                return True, "No changes to commit"
+            return False, result.stderr
+    except Exception as e:
+        return False, str(e)
+
+def push_templates_to_github():
+    """
+    Optional: Push committed changes to GitHub remote.
+    Returns: (success, output/error message)
+    """
+    try:
+        result = subprocess.run(
+            ['git', 'push'],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return True, result.stdout
+        else:
+            return False, result.stderr
+    except Exception as e:
+        return False, str(e)
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -555,13 +636,16 @@ with col_template2:
                 config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
                 save_config_to_file(st.session_state.custom_mapping, config_name)
             
+            # Optional: Auto-add to git staging
+            git_add_templates()
+            
             st.session_state.save_success = True
             st.session_state.saved_file_name = uploaded_template.name
             st.session_state.clear_uploader = True
             st.rerun()
 
 if st.session_state.save_success:
-    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully! Refresh the page to see it in the dropdown.")
+    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully to 'OpenFlux Templates' folder! Don't forget to commit and push to GitHub.")
     st.session_state.save_success = False
     st.session_state.saved_file_name = None
 
@@ -570,8 +654,57 @@ if st.session_state.template_bytes is not None:
     template_type = st.session_state.template_type or "Unknown"
     st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
+# --- GIT STATUS SECTION ---
+with st.expander("Git Management (Optional)"):
+    st.markdown("### Manage Templates in GitHub")
+    
+    col_git1, col_git2, col_git3 = st.columns(3)
+    
+    with col_git1:
+        if st.button("📁 Show Templates Folder", use_container_width=True):
+            storage_dir = get_storage_dir()
+            try:
+                if os.name == 'nt':  # Windows
+                    os.startfile(storage_dir)
+                else:  # Mac/Linux
+                    subprocess.run(['open' if os.name == 'posix' else 'xdg-open', storage_dir], check=False)
+            except:
+                st.info(f"Open this folder manually: `{storage_dir}`")
+    
+    with col_git2:
+        commit_message = st.text_input("Commit message", value="Update templates", label_visibility="collapsed")
+        if st.button("📝 Commit Changes", use_container_width=True):
+            success, output = commit_templates_to_git(commit_message)
+            if success:
+                st.success(f"✅ Changes committed: {output}")
+            else:
+                st.error(f"❌ Commit failed: {output}")
+    
+    with col_git3:
+        if st.button("🚀 Push to GitHub", use_container_width=True):
+            success, output = push_templates_to_github()
+            if success:
+                st.success(f"✅ Pushed to GitHub successfully: {output}")
+            else:
+                st.error(f"❌ Push failed: {output}")
+    
+    # Show git status
+    if st.button("📊 Check Git Status", use_container_width=True):
+        try:
+            result = subprocess.run(['git', 'status', '--short'], capture_output=True, text=True)
+            if result.stdout:
+                st.code(f"Git Status:\n{result.stdout}", language="bash")
+            else:
+                st.info("No changes in repository")
+        except Exception as e:
+            st.error(f"Error checking git status: {e}")
+
 st.markdown('</div>', unsafe_allow_html=True)
 
+# Rest of the code remains the same...
+# (Placeholder values section, download section, etc.)
+
+# --- CONTINUE WITH THE REST OF YOUR ORIGINAL CODE ---
 template_bytes = st.session_state.template_bytes
 template_type = st.session_state.template_type
 u_template = None
