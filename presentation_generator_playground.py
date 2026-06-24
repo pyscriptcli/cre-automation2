@@ -174,56 +174,6 @@ def get_storage_dir():
     
     return storage_dir
 
-def git_auto_save():
-    """
-    Automatically add, commit, and push template files to GitHub.
-    Runs silently in the background with no user interaction.
-    """
-    try:
-        storage_dir = get_storage_dir()
-        
-        # Check if we're in a git repository
-        git_check = subprocess.run(
-            ['git', 'rev-parse', '--git-dir'],
-            capture_output=True,
-            text=True
-        )
-        if git_check.returncode != 0:
-            return  # Not a git repository, skip
-        
-        # Add all template files
-        subprocess.run(['git', 'add', storage_dir], check=False, capture_output=True)
-        
-        # Check if there are changes to commit
-        status_result = subprocess.run(
-            ['git', 'status', '--porcelain', storage_dir],
-            capture_output=True,
-            text=True
-        )
-        
-        # If there are changes, commit and push
-        if status_result.stdout.strip():
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            commit_message = f"Auto-update OpenFlux templates - {timestamp}"
-            
-            # Commit the changes
-            commit_result = subprocess.run(
-                ['git', 'commit', '-m', commit_message],
-                capture_output=True,
-                text=True
-            )
-            
-            if commit_result.returncode == 0:
-                # Try to push to GitHub
-                subprocess.run(
-                    ['git', 'push'],
-                    check=False,
-                    capture_output=True
-                )
-    except Exception:
-        # Silently fail - don't disrupt the user experience
-        pass
-
 def save_template_to_file(template_bytes, template_name):
     """Save template to the GitHub repository folder"""
     storage_dir = get_storage_dir()
@@ -234,10 +184,6 @@ def save_template_to_file(template_bytes, template_name):
     filepath = os.path.join(storage_dir, safe_name)
     with open(filepath, 'wb') as f:
         f.write(template_bytes)
-    
-    # Auto-save to GitHub in the background
-    git_auto_save()
-    
     return filepath
 
 def load_template_from_file(template_name):
@@ -277,9 +223,6 @@ def delete_template_file(template_name):
         config_path = os.path.join(storage_dir, config_name)
         if os.path.exists(config_path):
             os.remove(config_path)
-        
-        # Auto-save to GitHub in the background
-        git_auto_save()
         return True
     return False
 
@@ -289,10 +232,6 @@ def save_config_to_file(config_data, config_name="template_config.json"):
     filepath = os.path.join(storage_dir, config_name)
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(config_data, f, indent=4)
-    
-    # Auto-save to GitHub in the background
-    git_auto_save()
-    
     return filepath
 
 def load_config_from_file(config_name="template_config.json"):
@@ -309,6 +248,64 @@ def auto_save_config():
     if st.session_state.saved_template_name and st.session_state.custom_mapping:
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
+
+def git_add_templates():
+    """
+    Optional: Automatically add template files to Git staging area.
+    This allows you to commit and push changes easily.
+    """
+    try:
+        storage_dir = get_storage_dir()
+        # Add all template files in the folder to git staging
+        subprocess.run(['git', 'add', storage_dir], check=False, capture_output=True)
+        return True
+    except Exception:
+        return False
+
+def commit_templates_to_git(commit_message="Update templates"):
+    """
+    Optional: Commit template changes to Git.
+    Returns: (success, output/error message)
+    """
+    try:
+        storage_dir = get_storage_dir()
+        # First, add all changes
+        subprocess.run(['git', 'add', storage_dir], check=True, capture_output=True)
+        
+        # Then commit with the provided message
+        result = subprocess.run(
+            ['git', 'commit', '-m', commit_message],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode == 0:
+            return True, result.stdout
+        else:
+            # If no changes to commit, that's fine
+            if "nothing to commit" in result.stderr:
+                return True, "No changes to commit"
+            return False, result.stderr
+    except Exception as e:
+        return False, str(e)
+
+def push_templates_to_github():
+    """
+    Optional: Push committed changes to GitHub remote.
+    Returns: (success, output/error message)
+    """
+    try:
+        result = subprocess.run(
+            ['git', 'push'],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return True, result.stdout
+        else:
+            return False, result.stderr
+    except Exception as e:
+        return False, str(e)
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -639,13 +636,16 @@ with col_template2:
                 config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
                 save_config_to_file(st.session_state.custom_mapping, config_name)
             
+            # Optional: Auto-add to git staging
+            git_add_templates()
+            
             st.session_state.save_success = True
             st.session_state.saved_file_name = uploaded_template.name
             st.session_state.clear_uploader = True
             st.rerun()
 
 if st.session_state.save_success:
-    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully.")
+    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully to 'OpenFlux Templates' folder! Don't forget to commit and push to GitHub.")
     st.session_state.save_success = False
     st.session_state.saved_file_name = None
 
@@ -653,6 +653,51 @@ if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
     template_type = st.session_state.template_type or "Unknown"
     st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
+
+# --- GIT STATUS SECTION ---
+with st.expander("Git Management (Optional)"):
+    st.markdown("### Manage Templates in GitHub")
+    
+    col_git1, col_git2, col_git3 = st.columns(3)
+    
+    with col_git1:
+        if st.button("📁 Show Templates Folder", use_container_width=True):
+            storage_dir = get_storage_dir()
+            try:
+                if os.name == 'nt':  # Windows
+                    os.startfile(storage_dir)
+                else:  # Mac/Linux
+                    subprocess.run(['open' if os.name == 'posix' else 'xdg-open', storage_dir], check=False)
+            except:
+                st.info(f"Open this folder manually: `{storage_dir}`")
+    
+    with col_git2:
+        commit_message = st.text_input("Commit message", value="Update templates", label_visibility="collapsed")
+        if st.button("📝 Commit Changes", use_container_width=True):
+            success, output = commit_templates_to_git(commit_message)
+            if success:
+                st.success(f"✅ Changes committed: {output}")
+            else:
+                st.error(f"❌ Commit failed: {output}")
+    
+    with col_git3:
+        if st.button("🚀 Push to GitHub", use_container_width=True):
+            success, output = push_templates_to_github()
+            if success:
+                st.success(f"✅ Pushed to GitHub successfully: {output}")
+            else:
+                st.error(f"❌ Push failed: {output}")
+    
+    # Show git status
+    if st.button("📊 Check Git Status", use_container_width=True):
+        try:
+            result = subprocess.run(['git', 'status', '--short'], capture_output=True, text=True)
+            if result.stdout:
+                st.code(f"Git Status:\n{result.stdout}", language="bash")
+            else:
+                st.info("No changes in repository")
+        except Exception as e:
+            st.error(f"Error checking git status: {e}")
 
 st.markdown('</div>', unsafe_allow_html=True)
 
