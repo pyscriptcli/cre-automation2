@@ -15,7 +15,6 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
-import zipfile
 
 # --- MAP SPECIFIC DEPENDENCIES ---
 import folium
@@ -80,6 +79,52 @@ def get_storage_dir():
     os.makedirs(storage_dir, exist_ok=True)
     return storage_dir
 
+def load_github_pptx(filepath):
+    """
+    Special function to load PPTX files from GitHub repository
+    This mimics how Streamlit handles uploaded files
+    """
+    try:
+        # Read the file as binary
+        with open(filepath, 'rb') as f:
+            file_bytes = f.read()
+        
+        # Test if we can open it with Presentation (like user upload)
+        try:
+            prs = Presentation(io.BytesIO(file_bytes))
+            # If we get here, the file is valid
+            return file_bytes
+        except Exception as e:
+            # If it fails, it might be a different issue
+            st.error(f"Error opening GitHub PPTX file: {str(e)}")
+            return None
+    except Exception as e:
+        st.error(f"Error reading GitHub file: {str(e)}")
+        return None
+
+def load_github_docx(filepath):
+    """
+    Special function to load DOCX files from GitHub repository
+    This mimics how Streamlit handles uploaded files
+    """
+    try:
+        # Read the file as binary
+        with open(filepath, 'rb') as f:
+            file_bytes = f.read()
+        
+        # Test if we can open it with Document (like user upload)
+        try:
+            doc = Document(io.BytesIO(file_bytes))
+            # If we get here, the file is valid
+            return file_bytes
+        except Exception as e:
+            # If it fails, it might be a different issue
+            st.error(f"Error opening GitHub DOCX file: {str(e)}")
+            return None
+    except Exception as e:
+        st.error(f"Error reading GitHub file: {str(e)}")
+        return None
+
 def get_github_templates():
     """
     Detect all templates from the GitHub root folder (same directory as source code)
@@ -93,49 +138,29 @@ def get_github_templates():
             # Check if file starts with 'template_' and ends with .pptx or .docx
             if file.startswith('template_') and (file.endswith('.pptx') or file.endswith('.docx')):
                 filepath = os.path.join(root_dir, file)
-                try:
-                    # Read the file in BINARY mode - CRITICAL FIX
-                    with open(filepath, 'rb') as f:
-                        file_bytes = f.read()
-                    
-                    # Test if it's a valid zip file (for both PPTX and DOCX)
-                    try:
-                        with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
-                            # Just test if we can open it
-                            pass
-                        is_valid = True
-                        error_msg = None
-                    except zipfile.BadZipFile:
-                        # If it's not a zip file, it might be corrupted
-                        is_valid = False
-                        error_msg = "File is not a valid zip archive"
-                    
-                    stat = os.stat(filepath)
-                    # Extract display name (remove 'template_' prefix and extension)
-                    display_name = file.replace('template_', '').replace('.pptx', '').replace('.docx', '')
-                    templates.append({
-                        'name': file,
-                        'display_name': display_name,
-                        'path': filepath,
-                        'size': stat.st_size,
-                        'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                        'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
-                        'source': 'github',
-                        'valid': is_valid,
-                        'error': error_msg
-                    })
-                except Exception as e:
-                    templates.append({
-                        'name': file,
-                        'display_name': file.replace('template_', '').replace('.pptx', '').replace('.docx', ''),
-                        'path': filepath,
-                        'size': 0,
-                        'modified': 'Unknown',
-                        'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
-                        'source': 'github',
-                        'valid': False,
-                        'error': f"Error reading file: {str(e)}"
-                    })
+                stat = os.stat(filepath)
+                # Extract display name (remove 'template_' prefix and extension)
+                display_name = file.replace('template_', '').replace('.pptx', '').replace('.docx', '')
+                
+                # Test if the file is valid by trying to open it
+                is_valid = False
+                if file.endswith('.pptx'):
+                    test_bytes = load_github_pptx(filepath)
+                    is_valid = test_bytes is not None
+                elif file.endswith('.docx'):
+                    test_bytes = load_github_docx(filepath)
+                    is_valid = test_bytes is not None
+                
+                templates.append({
+                    'name': file,
+                    'display_name': display_name,
+                    'path': filepath,
+                    'size': stat.st_size,
+                    'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
+                    'source': 'github',
+                    'valid': is_valid
+                })
     
     return templates
 
@@ -145,7 +170,7 @@ def save_template_to_file(template_bytes, template_name):
     if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
         safe_name += '.docx'
     filepath = os.path.join(storage_dir, safe_name)
-    with open(filepath, 'wb') as f:  # Write in binary mode
+    with open(filepath, 'wb') as f:
         f.write(template_bytes)
     return filepath
 
@@ -155,29 +180,19 @@ def load_template_from_file(template_name):
     root_filepath = os.path.join(root_dir, template_name)
     
     if os.path.exists(root_filepath):
-        try:
-            # Read in BINARY mode - CRITICAL FIX
-            with open(root_filepath, 'rb') as f:
-                file_bytes = f.read()
-            
-            # Validate it's a proper zip file
-            try:
-                with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
-                    # Test if we can read the zip structure
-                    pass
-                return file_bytes
-            except zipfile.BadZipFile as e:
-                st.error(f"File '{template_name}' is corrupted: {str(e)}")
-                return None
-        except Exception as e:
-            st.error(f"Error loading template '{template_name}': {str(e)}")
+        # Use the special loader functions for GitHub files
+        if template_name.endswith('.pptx'):
+            return load_github_pptx(root_filepath)
+        elif template_name.endswith('.docx'):
+            return load_github_docx(root_filepath)
+        else:
             return None
     
     # Then check stored templates
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
-        with open(filepath, 'rb') as f:  # Read in binary mode
+        with open(filepath, 'rb') as f:
             return f.read()
     return None
 
@@ -202,8 +217,7 @@ def get_saved_templates():
                     'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
                     'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
                     'source': 'stored',
-                    'valid': True,
-                    'error': None
+                    'valid': True
                 })
     
     # Get templates from GitHub root folder
@@ -778,24 +792,20 @@ else:
         if github_templates:
             template_options.append("--- GitHub Templates ---")
             for t in github_templates:
-                # Only show valid templates
-                if t['valid']:
-                    template_options.append(f"📁 {t['display_name']} ({t['type']})")
+                template_options.append(f"{t['display_name']} ({t['type']})")
         
         if stored_templates:
             template_options.append("--- Stored Templates ---")
             for t in stored_templates:
-                template_options.append(f"💾 {t['display_name']} ({t['type']})")
+                template_options.append(f"{t['display_name']} ({t['type']})")
         
         dropdown_col, delete_col = st.columns([4, 1])
         with dropdown_col:
             selected_template = st.selectbox("Load Template", template_options, key="saved_template_select", label_visibility="collapsed")
         with delete_col:
             if selected_template and selected_template != "Select saved template" and not selected_template.startswith("---"):
-                # Extract template name (remove icon and type)
+                # Extract template name (remove type)
                 template_display = selected_template.split(' (')[0].strip()
-                if template_display.startswith('📁 ') or template_display.startswith('💾 '):
-                    template_display = template_display[2:].strip()
                 
                 # Find the actual template name
                 for t in saved_templates:
@@ -831,8 +841,6 @@ else:
         if selected_template and selected_template != "Select saved template" and not selected_template.startswith("---"):
             # Extract template name
             template_display = selected_template.split(' (')[0].strip()
-            if template_display.startswith('📁 ') or template_display.startswith('💾 '):
-                template_display = template_display[2:].strip()
             
             # Find the actual template
             for t in saved_templates:
