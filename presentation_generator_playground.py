@@ -14,7 +14,10 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
-import shutil
+import folium
+from streamlit_folium import folium_static
+import requests
+import time
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -123,6 +126,24 @@ MINIMAL_CRE_SYSTEM = """
     .section-header { font-size: 15px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 10px; }
     .saved-indicator { background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 6px; }
     
+    /* Map container styling */
+    .map-container { 
+        border: 1px solid #E0E0E0; 
+        border-radius: 4px; 
+        padding: 8px; 
+        background-color: #F8F9FA;
+        margin: 8px 0;
+    }
+    .map-saved-indicator {
+        background-color: #E3F2FD;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        color: #003366;
+        border-left: 3px solid #003366;
+        margin: 4px 0;
+    }
+    
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
     /* Expander */
@@ -142,40 +163,35 @@ MINIMAL_CRE_SYSTEM = """
         padding-right: 10px;
         font-size: 13px;
     }
+    
+    /* Map specific styles */
+    .map-input-wrapper {
+        border: 1px solid #E0E0E0;
+        border-radius: 4px;
+        padding: 12px;
+        margin: 8px 0;
+        background: #FAFAFA;
+    }
+    .map-coords-display {
+        font-family: monospace;
+        font-size: 12px;
+        color: #003366;
+        background: #F0F4F8;
+        padding: 4px 8px;
+        border-radius: 3px;
+    }
 </style>
 """
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
-    """
-    Get the directory for storing templates and configs in the GitHub repository.
-    Creates an 'OpenFlux Templates' folder in the source code directory.
-    """
-    # Get the directory where the script is located
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Create 'OpenFlux Templates' folder in the source code directory
-    storage_dir = os.path.join(script_dir, "OpenFlux Templates")
-    
-    # Create the directory if it doesn't exist
+    """Get the directory for storing templates and configs"""
+    storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
     os.makedirs(storage_dir, exist_ok=True)
-    
-    # Create a README file to explain the folder's purpose (optional)
-    readme_path = os.path.join(storage_dir, "README.md")
-    if not os.path.exists(readme_path):
-        with open(readme_path, "w", encoding="utf-8") as f:
-            f.write("# OpenFlux Templates\n\n")
-            f.write("This folder stores templates and configurations for the OpenFlux application.\n")
-            f.write("Files in this folder are tracked by Git and should be committed to the repository.\n\n")
-            f.write("## Files\n")
-            f.write("- `*.pptx` - PowerPoint templates\n")
-            f.write("- `*.docx` - Word templates\n")
-            f.write("- `*_config.json` - Configuration files for templates\n")
-    
     return storage_dir
 
 def save_template_to_file(template_bytes, template_name):
-    """Save template to the GitHub repository folder"""
+    """Save template to file system"""
     storage_dir = get_storage_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
     if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
@@ -187,7 +203,7 @@ def save_template_to_file(template_bytes, template_name):
     return filepath
 
 def load_template_from_file(template_name):
-    """Load template from the GitHub repository folder"""
+    """Load template from file system"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -196,7 +212,7 @@ def load_template_from_file(template_name):
     return None
 
 def get_saved_templates():
-    """Get list of saved templates from the GitHub repository folder"""
+    """Get list of saved templates"""
     storage_dir = get_storage_dir()
     templates = []
     if os.path.exists(storage_dir):
@@ -214,7 +230,7 @@ def get_saved_templates():
     return templates
 
 def delete_template_file(template_name):
-    """Delete a saved template from the GitHub repository folder"""
+    """Delete a saved template"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -227,15 +243,27 @@ def delete_template_file(template_name):
     return False
 
 def save_config_to_file(config_data, config_name="template_config.json"):
-    """Save configuration to the GitHub repository folder"""
+    """Save configuration to file"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
+    # Ensure map data is serializable (remove binary data)
+    serializable_config = {}
+    for key, value in config_data.items():
+        if isinstance(value, dict) and 'screenshot' in value:
+            # Don't save screenshot binary data
+            serializable_config[key] = {
+                'type': value.get('type', 'Map'),
+                'lat': value.get('lat'),
+                'lng': value.get('lng')
+            }
+        else:
+            serializable_config[key] = value
     with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(config_data, f, indent=4)
+        json.dump(serializable_config, f, indent=4)
     return filepath
 
 def load_config_from_file(config_name="template_config.json"):
-    """Load configuration from the GitHub repository folder"""
+    """Load configuration from file"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
     if os.path.exists(filepath):
@@ -248,64 +276,6 @@ def auto_save_config():
     if st.session_state.saved_template_name and st.session_state.custom_mapping:
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
-
-def git_add_templates():
-    """
-    Optional: Automatically add template files to Git staging area.
-    This allows you to commit and push changes easily.
-    """
-    try:
-        storage_dir = get_storage_dir()
-        # Add all template files in the folder to git staging
-        subprocess.run(['git', 'add', storage_dir], check=False, capture_output=True)
-        return True
-    except Exception:
-        return False
-
-def commit_templates_to_git(commit_message="Update templates"):
-    """
-    Optional: Commit template changes to Git.
-    Returns: (success, output/error message)
-    """
-    try:
-        storage_dir = get_storage_dir()
-        # First, add all changes
-        subprocess.run(['git', 'add', storage_dir], check=True, capture_output=True)
-        
-        # Then commit with the provided message
-        result = subprocess.run(
-            ['git', 'commit', '-m', commit_message],
-            capture_output=True,
-            text=True
-        )
-        
-        if result.returncode == 0:
-            return True, result.stdout
-        else:
-            # If no changes to commit, that's fine
-            if "nothing to commit" in result.stderr:
-                return True, "No changes to commit"
-            return False, result.stderr
-    except Exception as e:
-        return False, str(e)
-
-def push_templates_to_github():
-    """
-    Optional: Push committed changes to GitHub remote.
-    Returns: (success, output/error message)
-    """
-    try:
-        result = subprocess.run(
-            ['git', 'push'],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0:
-            return True, result.stdout
-        else:
-            return False, result.stderr
-    except Exception as e:
-        return False, str(e)
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -386,15 +356,12 @@ def extract_placeholders(template_bytes, template_type):
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """Replace text in a paragraph while preserving formatting"""
-    # First pass: replace in runs
     for run in paragraph.runs:
         for token, value in text_inputs.items():
             if token in run.text:
-                # Replace with empty string if value is None or empty
                 replacement = str(value) if value else ''
                 run.text = run.text.replace(token, replacement)
     
-    # Second pass: handle text that might not be in runs
     if hasattr(paragraph, 'text') and paragraph.text:
         for token, value in text_inputs.items():
             if token in paragraph.text:
@@ -456,20 +423,16 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     """Generate DOCX with text replacements"""
     doc = Document(io.BytesIO(template_bytes))
     
-    # Process regular paragraphs
     for paragraph in doc.paragraphs:
-        # Check for image placeholders - skip them for text replacement
         has_image = False
         for img_token in image_inputs.keys():
             if img_token in paragraph.text:
                 has_image = True
                 break
         
-        # Only replace text if no image placeholder is present
         if not has_image:
             replace_text_in_paragraph(paragraph, text_inputs)
     
-    # Process tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
@@ -484,25 +447,189 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
 def get_download_filename(template_name, file_type):
     """Generate download filename based on template name"""
     if template_name:
-        # Remove the extension if present
         base_name = re.sub(r'\.(pptx|docx)$', '', template_name)
-        # Clean up the name
         base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
-        # Add timestamp to avoid overwriting
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"{base_name}_{timestamp}.{file_type}"
     else:
-        # Default name if no template name
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"Generated_Document_{timestamp}.{file_type}"
 
-# --- UI HELPERS ---
+# --- MAP FUNCTIONALITY ---
+def capture_map_screenshot(lat, lng, zoom=15):
+    """Capture a screenshot of the map at the specified coordinates using static map API"""
+    try:
+        # Use OpenStreetMap static tile service
+        # Note: For production, consider using Google Maps Static API with your API key
+        map_url = f"https://maps.geoapify.com/v1/staticmap?style=osm-bright&width=600&height=400&center=lonlat:{lng},{lat}&zoom={zoom}&marker=lonlat:{lng},{lat};color:%23FF0000;size:medium&apiKey=YOUR_API_KEY"
+        
+        # Fallback to using a simpler method without API key
+        # Using static map from OpenStreetMap
+        map_url = f"https://staticmap.openstreetmap.de/staticmap.php?center={lat},{lng}&zoom={zoom}&size=600x400&maptype=mapnik&markers={lat},{lng},red"
+        
+        response = requests.get(map_url, timeout=10)
+        if response.status_code == 200:
+            img = Image.open(io.BytesIO(response.content))
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+            return img_byte_arr
+        else:
+            # Fallback: Create a simple placeholder image with coordinates
+            return create_placeholder_map(lat, lng)
+    except Exception as e:
+        st.error(f"Could not capture map: {str(e)}")
+        return create_placeholder_map(lat, lng)
+
+def create_placeholder_map(lat, lng):
+    """Create a placeholder image with coordinates when map capture fails"""
+    from PIL import Image, ImageDraw, ImageFont
+    
+    img = Image.new('RGB', (600, 400), color='#F0F4F8')
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a simple map-like background
+    draw.rectangle([50, 50, 550, 350], outline='#003366', width=2)
+    draw.ellipse([280, 180, 320, 220], fill='#FF0000', outline='#FF0000')
+    draw.text((250, 230), f"📍 {lat:.6f}, {lng:.6f}", fill='#003366')
+    draw.text((260, 250), "Location Pin", fill='#003366')
+    
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    return img_byte_arr
+
+def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120.9842):
+    """Interactive map input with pin placement"""
+    
+    map_key = f"map_{token}"
+    
+    # Initialize session state for this map
+    if map_key not in st.session_state:
+        st.session_state[map_key] = {
+            "lat": default_lat,
+            "lng": default_lng,
+            "screenshot": None,
+            "saved": False
+        }
+    
+    st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+    
+    # Display current saved status
+    if st.session_state[map_key]["saved"]:
+        st.markdown(f'<div class="map-saved-indicator">✅ Location saved: {st.session_state[map_key]["lat"]:.6f}, {st.session_state[map_key]["lng"]:.6f}</div>', unsafe_allow_html=True)
+    
+    # Coordinate input
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        lat = st.number_input(
+            "Latitude",
+            value=float(st.session_state[map_key]["lat"]),
+            format="%.6f",
+            key=f"lat_{token}",
+            step=0.0001,
+            label_visibility="collapsed"
+        )
+    with col2:
+        lng = st.number_input(
+            "Longitude",
+            value=float(st.session_state[map_key]["lng"]),
+            format="%.6f",
+            key=f"lng_{token}",
+            step=0.0001,
+            label_visibility="collapsed"
+        )
+    with col3:
+        st.markdown('<div style="padding-top: 20px;"></div>', unsafe_allow_html=True)
+        if st.button("📍", key=f"map_btn_{token}", help="Save location"):
+            if lat and lng:
+                st.session_state[map_key]["lat"] = lat
+                st.session_state[map_key]["lng"] = lng
+                st.session_state[map_key]["saved"] = True
+                
+                # Capture screenshot
+                with st.spinner("Capturing map..."):
+                    screenshot = capture_map_screenshot(lat, lng)
+                    st.session_state[map_key]["screenshot"] = screenshot
+                
+                auto_save_config()
+                st.rerun()
+    
+    # Interactive map
+    st.markdown('<div class="map-container">', unsafe_allow_html=True)
+    
+    try:
+        # Create map centered on current coordinates
+        m = folium.Map(
+            location=[float(lat), float(lng)],
+            zoom_start=14,
+            width='100%',
+            height=350
+        )
+        
+        # Add marker at current location
+        folium.Marker(
+            [float(lat), float(lng)],
+            popup=f"{clean_label}<br>{lat:.6f}, {lng:.6f}",
+            icon=folium.Icon(color='red', icon='info-sign')
+        ).add_to(m)
+        
+        # Add circle to show area
+        folium.Circle(
+            [float(lat), float(lng)],
+            radius=100,
+            color='#003366',
+            fill=True,
+            fillOpacity=0.1,
+            popup="Location area"
+        ).add_to(m)
+        
+        # Add click handler (using JavaScript)
+        click_js = f"""
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {{
+                setTimeout(function() {{
+                    var map = document.querySelector('.folium-map');
+                    if (map) {{
+                        map.addEventListener('click', function(e) {{
+                            var lat = e.latlng.lat;
+                            var lng = e.latlng.lng;
+                            var inputLat = document.querySelector('input[data-key="lat_{token}"]');
+                            var inputLng = document.querySelector('input[data-key="lng_{token}"]');
+                            if (inputLat && inputLng) {{
+                                inputLat.value = lat.toFixed(6);
+                                inputLng.value = lng.toFixed(6);
+                            }}
+                        }});
+                    }}
+                }}, 1000);
+            }});
+        </script>
+        """
+        
+        # Display the map
+        folium_static(m, width=700, height=350)
+        
+        # Add click handler note
+        st.caption("💡 Click on the map to set coordinates, then click the 📍 button to save")
+        
+    except Exception as e:
+        st.warning(f"Map display limited: {str(e)}")
+        st.info(f"Enter coordinates manually and click 📍 to save")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Return the screenshot if saved
+    if st.session_state[map_key]["saved"]:
+        return st.session_state[map_key]["screenshot"]
+    return None
+
 def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
 # --- INIT APP ---
-st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="OpenFlux - Template Automation", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
 # Initialize all session state variables
@@ -530,13 +657,15 @@ if "saved_file_name" not in st.session_state:
     st.session_state.saved_file_name = None
 if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
+if "map_data" not in st.session_state:
+    st.session_state.map_data = {}
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
 
 # --- TEMPLATE MANAGEMENT SECTION ---
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-header">Template</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">📄 Template Management</div>', unsafe_allow_html=True)
 
 col_template1, col_template2 = st.columns(2)
 
@@ -560,7 +689,7 @@ with col_template1:
     with delete_col:
         if selected_template and selected_template != "Select saved template":
             template_name = selected_template.split(' (')[0]
-            if st.button("Delete", key="delete_template", help="Delete this template"):
+            if st.button("🗑️", key="delete_template", help="Delete this template"):
                 st.session_state.show_delete_confirm = True
                 st.session_state.template_to_delete = template_name
                 st.rerun()
@@ -600,7 +729,6 @@ with col_template1:
             if config_data:
                 st.session_state.custom_mapping = config_data
             
-            # Simply extract all placeholders - no auto-detection
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
 
@@ -624,11 +752,10 @@ with col_template2:
         st.session_state.template_loaded = True
         st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
         
-        # Simply extract all placeholders - no auto-detection
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
         
-        if st.button("Save Template", key="save_template_btn", use_container_width=True):
+        if st.button("💾 Save Template", key="save_template_btn", use_container_width=True):
             saved_path = save_template_to_file(template_bytes, uploaded_template.name)
             st.session_state.saved_template_name = uploaded_template.name
             
@@ -636,75 +763,23 @@ with col_template2:
                 config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
                 save_config_to_file(st.session_state.custom_mapping, config_name)
             
-            # Optional: Auto-add to git staging
-            git_add_templates()
-            
             st.session_state.save_success = True
             st.session_state.saved_file_name = uploaded_template.name
             st.session_state.clear_uploader = True
             st.rerun()
 
 if st.session_state.save_success:
-    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully to 'OpenFlux Templates' folder! Don't forget to commit and push to GitHub.")
+    st.success(f"✅ Template '{st.session_state.saved_file_name}' saved successfully!")
     st.session_state.save_success = False
     st.session_state.saved_file_name = None
 
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
     template_type = st.session_state.template_type or "Unknown"
-    st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
-
-# --- GIT STATUS SECTION ---
-with st.expander("Git Management (Optional)"):
-    st.markdown("### Manage Templates in GitHub")
-    
-    col_git1, col_git2, col_git3 = st.columns(3)
-    
-    with col_git1:
-        if st.button("📁 Show Templates Folder", use_container_width=True):
-            storage_dir = get_storage_dir()
-            try:
-                if os.name == 'nt':  # Windows
-                    os.startfile(storage_dir)
-                else:  # Mac/Linux
-                    subprocess.run(['open' if os.name == 'posix' else 'xdg-open', storage_dir], check=False)
-            except:
-                st.info(f"Open this folder manually: `{storage_dir}`")
-    
-    with col_git2:
-        commit_message = st.text_input("Commit message", value="Update templates", label_visibility="collapsed")
-        if st.button("📝 Commit Changes", use_container_width=True):
-            success, output = commit_templates_to_git(commit_message)
-            if success:
-                st.success(f"✅ Changes committed: {output}")
-            else:
-                st.error(f"❌ Commit failed: {output}")
-    
-    with col_git3:
-        if st.button("🚀 Push to GitHub", use_container_width=True):
-            success, output = push_templates_to_github()
-            if success:
-                st.success(f"✅ Pushed to GitHub successfully: {output}")
-            else:
-                st.error(f"❌ Push failed: {output}")
-    
-    # Show git status
-    if st.button("📊 Check Git Status", use_container_width=True):
-        try:
-            result = subprocess.run(['git', 'status', '--short'], capture_output=True, text=True)
-            if result.stdout:
-                st.code(f"Git Status:\n{result.stdout}", language="bash")
-            else:
-                st.info("No changes in repository")
-        except Exception as e:
-            st.error(f"Error checking git status: {e}")
+    st.markdown(f'<div class="saved-indicator">📌 Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Rest of the code remains the same...
-# (Placeholder values section, download section, etc.)
-
-# --- CONTINUE WITH THE REST OF YOUR ORIGINAL CODE ---
 template_bytes = st.session_state.template_bytes
 template_type = st.session_state.template_type
 u_template = None
@@ -713,16 +788,18 @@ if template_bytes is not None:
 
 text_data = {}
 image_data = {}
+map_data = {}
 field_types = {}
 
 if u_template is not None and st.session_state.tokens:
     tokens = st.session_state.tokens
     
     if not tokens:
-        st.info("No placeholders found in the template.")
+        st.info("ℹ️ No placeholders found in the template.")
     else:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">🔧 Placeholder Values</div>', unsafe_allow_html=True)
+        st.info(f"Found {len(tokens)} placeholders. Select type for each: Text, Image, or Map")
         
         # Split tokens into two columns
         mid_point = len(tokens) // 2
@@ -740,8 +817,8 @@ if u_template is not None and st.session_state.tokens:
                     type_key = f"type_{token}"
                     data_type = st.selectbox(
                         "Type",
-                        ["Text", "Image"],
-                        index=0 if current_type == "Text" else 1,
+                        ["Text", "Image", "Map"],
+                        index=0 if current_type == "Text" else (1 if current_type == "Image" else 2),
                         key=type_key,
                         label_visibility="collapsed"
                     )
@@ -754,10 +831,15 @@ if u_template is not None and st.session_state.tokens:
                     if data_type == "Image" and template_type == 'pptx':
                         image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                         field_types[token] = "Image"
-                        st.caption("Upload image (PNG, JPG)")
+                        st.caption("📷 Upload image (PNG, JPG)")
+                    elif data_type == "Map":
+                        # Map input component
+                        st.session_state.map_data[token] = map_input_component(token, clean_label)
+                        field_types[token] = "Map"
+                        st.caption("🗺️ Click map to set location, then save")
                     else:
                         if data_type == "Image" and template_type != 'pptx':
-                            st.warning("Image replacement only supported in PPTX templates")
+                            st.warning("⚠️ Image replacement only supported in PPTX templates")
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input(
                             clean_label, 
@@ -778,8 +860,8 @@ if u_template is not None and st.session_state.tokens:
                     type_key = f"type_{token}_2"
                     data_type = st.selectbox(
                         "Type",
-                        ["Text", "Image"],
-                        index=0 if current_type == "Text" else 1,
+                        ["Text", "Image", "Map"],
+                        index=0 if current_type == "Text" else (1 if current_type == "Image" else 2),
                         key=type_key,
                         label_visibility="collapsed"
                     )
@@ -792,10 +874,15 @@ if u_template is not None and st.session_state.tokens:
                     if data_type == "Image" and template_type == 'pptx':
                         image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                         field_types[token] = "Image"
-                        st.caption("Upload image (PNG, JPG)")
+                        st.caption("📷 Upload image (PNG, JPG)")
+                    elif data_type == "Map":
+                        # Map input component
+                        st.session_state.map_data[token] = map_input_component(token, clean_label)
+                        field_types[token] = "Map"
+                        st.caption("🗺️ Click map to set location, then save")
                     else:
                         if data_type == "Image" and template_type != 'pptx':
-                            st.warning("Image replacement only supported in PPTX templates")
+                            st.warning("⚠️ Image replacement only supported in PPTX templates")
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input(
                             clean_label, 
@@ -809,11 +896,15 @@ if u_template is not None and st.session_state.tokens:
 # --- DOWNLOAD SECTION ---
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📥 Download Document</div>', unsafe_allow_html=True)
+    
+    # Merge map screenshots into image_data for document generation
+    for token, map_screenshot in st.session_state.map_data.items():
+        if map_screenshot is not None:
+            image_data[token] = map_screenshot
     
     # Get template name for file naming
     template_name = st.session_state.saved_template_name or "Generated_Document"
-    # Remove extension for clean name
     base_template_name = re.sub(r'\.(pptx|docx)$', '', template_name)
     
     col1, col2 = st.columns(2)
@@ -821,13 +912,13 @@ if u_template is not None:
     with col1:
         pptx_disabled = template_type != 'pptx'
         if pptx_disabled:
-            st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
+            st.button("📊 Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
             try:
                 pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
                 pptx_filename = get_download_filename(base_template_name, "pptx")
                 st.download_button(
-                    label="Download PPTX",
+                    label="📊 Download PPTX",
                     data=pptx_data,
                     file_name=pptx_filename,
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -840,16 +931,15 @@ if u_template is not None:
     with col2:
         docx_disabled = template_type != 'docx'
         if docx_disabled:
-            st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
+            st.button("📄 Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
-            # Generate the document data
             try:
                 docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
                 
                 if docx_data:
                     docx_filename = get_download_filename(base_template_name, "docx")
                     st.download_button(
-                        label="Download DOCX",
+                        label="📄 Download DOCX",
                         data=docx_data,
                         file_name=docx_filename,
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -863,4 +953,8 @@ if u_template is not None:
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("Please upload or select a template to begin")
+    st.info("📌 Please upload or select a template to begin")
+
+# --- FOOTER ---
+st.markdown("---")
+st.caption("OpenFlux v2.0 | Template Automation with Map Support")
