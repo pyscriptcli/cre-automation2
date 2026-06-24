@@ -148,6 +148,7 @@ def auto_save_config():
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
+    """Calculates deep zoom levels to generate crisp print-quality document assets."""
     target_width_tiles = 10
     lon_span = e - w
     if lon_span <= 0: lon_span = 0.001
@@ -169,6 +170,12 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         zoom -= 1
         x_min, y_min = deg2num(n, w, zoom)
         x_max, y_max = deg2num(s, e, zoom)
+        
+    # Buffer fetched tiles to prevent edge clipping when PIL draws the vector pin
+    x_min -= 1
+    x_max += 1
+    y_min -= 1
+    y_max += 1
         
     width_tiles = x_max - x_min + 1
     height_tiles = y_max - y_min + 1
@@ -216,21 +223,29 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
+    # STAMP VECTOR PIN
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
     canvas_scale_factor = max(right - left, bottom - top) / 800.0
+    canvas_scale_factor = max(1.0, canvas_scale_factor)
     scale = (pin_size / 32.0) * canvas_scale_factor * 1.5
+    
     w_px = 16 * scale
     h_px = 32 * scale
     
     draw.polygon([(pin_local_x, pin_local_y), (pin_local_x - w_px, pin_local_y - h_px), (pin_local_x + w_px, pin_local_y - h_px)], fill="#ffffff")
     draw.ellipse([pin_local_x - w_px, pin_local_y - h_px - w_px, pin_local_x + w_px, pin_local_y - h_px + w_px], fill="#ffffff")
-    draw.polygon([(pin_local_x, pin_local_y - (4 * scale)), (pin_local_x - (w_px * 0.75), pin_local_y - h_px), (pin_local_x + (w_px * 0.75), pin_local_y - h_px)], fill=pin_color)
-    draw.ellipse([pin_local_x - (w_px * 0.75), pin_local_y - h_px - (w_px * 0.75), pin_local_x + (w_px * 0.75), pin_local_y - h_px + (w_px * 0.75)], fill=pin_color)
-    draw.ellipse([pin_local_x - (w_px * 0.33), pin_local_y - h_px - (w_px * 0.33), pin_local_x + (w_px * 0.33), pin_local_y - h_px + (w_px * 0.33)], fill="#ffffff")
+    
+    cw = w_px * 0.8
+    ch = h_px * 0.95
+    draw.polygon([(pin_local_x, pin_local_y - (4 * scale)), (pin_local_x - cw, pin_local_y - ch), (pin_local_x + cw, pin_local_y - ch)], fill=pin_color)
+    draw.ellipse([pin_local_x - cw, pin_local_y - ch - cw, pin_local_x + cw, pin_local_y - ch + cw], fill=pin_color)
+    
+    dw = w_px * 0.3
+    draw.ellipse([pin_local_x - dw, pin_local_y - ch - dw, pin_local_x + dw, pin_local_y - ch + dw], fill="#ffffff")
     
     final_img = cropped.convert("RGB")
     img_byte_arr = io.BytesIO()
@@ -331,9 +346,6 @@ def render_isolated_map_editor():
         with st.spinner("Compiling Crisp High-Density API Asset. This takes approx 3 seconds..."):
             
             export_lat, export_lon = plat, plon
-            if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
-                export_lat = map_data["last_marker_moved"]["lat"]
-                export_lon = map_data["last_marker_moved"]["lng"]
 
             n, s, e, w = None, None, None, None
             if isinstance(map_data, dict) and map_data.get("last_active_drawing"):
@@ -353,6 +365,14 @@ def render_isolated_map_editor():
             if n is None:
                 n, s, e, w = export_lat + 0.01, export_lat - 0.01, export_lon + 0.01, export_lon - 0.01
 
+            # Force boundaries to heavily enclose the pin so it is never clipped off the edge
+            lat_span = abs(n - s)
+            lon_span = abs(e - w)
+            n = max(n, export_lat + (lat_span * 0.15))
+            s = min(s, export_lat - (lat_span * 0.15))
+            e = max(e, export_lon + (lon_span * 0.15))
+            w = min(w, export_lon - (lon_span * 0.15))
+
             map_img_bytes = generate_static_map_bounds(
                 n, s, e, w, export_lat, export_lon, 
                 style=basemap_style, pin_color=pin_color, pin_size=pin_size
@@ -360,9 +380,7 @@ def render_isolated_map_editor():
             
             st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
             
-            # The Fix: Safe buffer setting instead of modifying the active widget key
             st.session_state[dragged_key] = f"{export_lat}, {export_lon}"
-            
             st.session_state.active_map_editor_token = None
             st.success("High-res map rendering attached successfully! Returning to document...")
             st.rerun()
