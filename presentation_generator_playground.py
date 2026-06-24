@@ -14,6 +14,8 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
+import requests
+from urllib.parse import urlparse
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -141,46 +143,22 @@ MINIMAL_CRE_SYSTEM = """
         padding-right: 10px;
         font-size: 13px;
     }
+    
+    /* GitHub detection badge */
+    .github-badge {
+        background-color: #E8F0FE;
+        border: 1px solid #0366D6;
+        border-radius: 4px;
+        padding: 4px 12px;
+        font-size: 12px;
+        color: #0366D6;
+        display: inline-block;
+        margin-bottom: 8px;
+    }
 </style>
 """
 
 # --- FILE MANAGEMENT FUNCTIONS ---
-def get_root_templates():
-    """Scan root directory for files starting with 'template_'"""
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    templates = []
-    
-    try:
-        for file in os.listdir(root_dir):
-            if file.startswith('template_') and (file.endswith('.pptx') or file.endswith('.docx')):
-                # Extract display name (remove 'template_' prefix and extension)
-                display_name = file.replace('template_', '')
-                display_name = re.sub(r'\.(pptx|docx)$', '', display_name)
-                templates.append({
-                    'name': display_name,
-                    'file': file,
-                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
-                    'source': 'root',
-                    'path': os.path.join(root_dir, file)
-                })
-    except Exception as e:
-        st.warning(f"Error scanning root templates: {str(e)}")
-    
-    return templates
-
-def load_template_from_root(template_file):
-    """Load template from root directory"""
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    filepath = os.path.join(root_dir, template_file)
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, 'rb') as f:
-                return f.read()
-        except Exception as e:
-            st.error(f"Error loading template from root: {str(e)}")
-            return None
-    return None
-
 def get_storage_dir():
     """Get the directory for storing templates and configs"""
     storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
@@ -204,66 +182,39 @@ def load_template_from_file(template_name):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
-        try:
-            with open(filepath, 'rb') as f:
-                return f.read()
-        except Exception as e:
-            st.error(f"Error loading template from file: {str(e)}")
-            return None
+        with open(filepath, 'rb') as f:
+            return f.read()
     return None
 
 def get_saved_templates():
-    """Get list of saved templates (user uploaded + root templates)"""
-    templates = []
-    
-    # Get root templates (template_*.pptx/docx)
-    root_templates = get_root_templates()
-    for t in root_templates:
-        templates.append({
-            'name': t['name'],
-            'file': t['file'],
-            'type': t['type'],
-            'source': 'root',
-            'display': f"{t['name']} (root)"
-        })
-    
-    # Get user uploaded templates
+    """Get list of saved templates"""
     storage_dir = get_storage_dir()
+    templates = []
     if os.path.exists(storage_dir):
-        try:
-            for file in os.listdir(storage_dir):
-                if file.endswith('.pptx') or file.endswith('.docx'):
-                    filepath = os.path.join(storage_dir, file)
-                    stat = os.stat(filepath)
-                    templates.append({
-                        'name': file,
-                        'path': filepath,
-                        'size': stat.st_size,
-                        'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                        'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
-                        'source': 'user',
-                        'display': f"{file} (uploaded)"
-                    })
-        except Exception as e:
-            st.warning(f"Error reading user templates: {str(e)}")
-    
+        for file in os.listdir(storage_dir):
+            if file.endswith('.pptx') or file.endswith('.docx'):
+                filepath = os.path.join(storage_dir, file)
+                stat = os.stat(filepath)
+                templates.append({
+                    'name': file,
+                    'path': filepath,
+                    'size': stat.st_size,
+                    'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX'
+                })
     return templates
 
 def delete_template_file(template_name):
-    """Delete a saved template (user uploaded only)"""
+    """Delete a saved template"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
-        try:
-            os.remove(filepath)
-            config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-            config_path = os.path.join(storage_dir, config_name)
-            if os.path.exists(config_path):
-                os.remove(config_path)
-            return True
-        except Exception as e:
-            st.error(f"Error deleting template: {str(e)}")
-            return False
+        os.remove(filepath)
+        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+        config_path = os.path.join(storage_dir, config_name)
+        if os.path.exists(config_path):
+            os.remove(config_path)
+        return True
     return False
 
 def save_config_to_file(config_data, config_name="template_config.json"):
@@ -279,12 +230,8 @@ def load_config_from_file(config_name="template_config.json"):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
     if os.path.exists(filepath):
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            st.warning(f"Error loading config: {str(e)}")
-            return None
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
     return None
 
 def auto_save_config():
@@ -293,43 +240,115 @@ def auto_save_config():
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
-def validate_office_file(file_bytes):
-    """Validate if the file is a valid Office file (PPTX or DOCX)"""
-    if not file_bytes or len(file_bytes) < 4:
-        return False, "File is empty or too small"
+# --- GITHUB TEMPLATE DETECTION FUNCTIONS ---
+def detect_github_template(template_bytes, template_name):
+    """
+    Detect if a template is from a GitHub repository by checking for 
+    specific patterns in the template or using a mapping file.
+    """
+    # Check if we have a GitHub mapping file
+    storage_dir = get_storage_dir()
+    github_mapping_file = os.path.join(storage_dir, "github_template_mapping.json")
     
-    # Check for ZIP signature (PK)
-    if file_bytes[:2] != b'PK':
-        return False, "File is not a valid ZIP archive (not a valid Office file)"
+    if os.path.exists(github_mapping_file):
+        with open(github_mapping_file, 'r', encoding='utf-8') as f:
+            mapping = json.load(f)
+        
+        # Check if template name matches any GitHub template
+        for repo_url, template_info in mapping.items():
+            if template_info.get('template_name') == template_name:
+                return repo_url, template_info
     
-    # Try to read the ZIP contents
+    # Check for GitHub URL in template content (if it's a DOCX or PPTX)
     try:
-        import zipfile
-        with zipfile.ZipFile(io.BytesIO(file_bytes), 'r') as z:
-            # Check for [Content_Types].xml
-            if '[Content_Types].xml' not in z.namelist():
-                return False, "File is missing [Content_Types].xml"
-            
-            # Read content types to determine file type
-            content_types = z.read('[Content_Types].xml').decode('utf-8', errors='ignore')
-            
-            if 'pptx' in content_types.lower() or 'presentation' in content_types.lower():
-                return True, 'pptx'
-            elif 'docx' in content_types.lower() or 'document' in content_types.lower():
-                return True, 'docx'
-            else:
-                return False, "File type could not be determined"
-    except zipfile.BadZipFile:
-        return False, "File is not a valid ZIP archive"
-    except Exception as e:
-        return False, f"Error validating file: {str(e)}"
+        if template_name.endswith('.docx'):
+            doc = Document(io.BytesIO(template_bytes))
+            for paragraph in doc.paragraphs:
+                if 'github.com' in paragraph.text.lower():
+                    # Extract GitHub URL
+                    match = re.search(r'https?://github\.com/[^\s]+', paragraph.text)
+                    if match:
+                        return match.group(0), {'detected': True}
+        elif template_name.endswith('.pptx'):
+            prs = Presentation(io.BytesIO(template_bytes))
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if shape.has_text_frame:
+                        if 'github.com' in shape.text.lower():
+                            match = re.search(r'https?://github\.com/[^\s]+', shape.text)
+                            if match:
+                                return match.group(0), {'detected': True}
+    except:
+        pass
+    
+    return None, None
 
-def detect_file_type(file_bytes):
-    """Detect if file is PPTX or DOCX based on file signature"""
-    valid, result = validate_office_file(file_bytes)
-    if valid:
-        return result
+def fetch_github_mapping(repo_url):
+    """
+    Fetch the placeholder mapping from a GitHub repository.
+    Expects a mapping.json file in the repository.
+    """
+    # Convert GitHub URL to raw content URL
+    # Example: https://github.com/user/repo -> https://raw.githubusercontent.com/user/repo/main/
+    parsed = urlparse(repo_url)
+    path_parts = parsed.path.strip('/').split('/')
+    
+    if len(path_parts) >= 2:
+        owner = path_parts[0]
+        repo = path_parts[1]
+        
+        # Try to get mapping from the repository
+        mapping_url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/template_mapping.json"
+        
+        try:
+            response = requests.get(mapping_url, timeout=5)
+            if response.status_code == 200:
+                return response.json()
+        except:
+            pass
+        
+        # Try with master branch
+        mapping_url = f"https://raw.githubusercontent.com/{owner}/{repo}/master/template_mapping.json"
+        try:
+            response = requests.get(mapping_url, timeout=5)
+            if response.status_code == 200:
+                return response.json()
+        except:
+            pass
+    
     return None
+
+def apply_github_mapping(tokens, github_mapping):
+    """
+    Apply GitHub mapping to tokens if available.
+    The mapping should define placeholder types and default values.
+    """
+    if not github_mapping:
+        return {}
+    
+    custom_mapping = {}
+    
+    # Check if mapping has placeholder definitions
+    if 'placeholders' in github_mapping:
+        for token in tokens:
+            clean_token = token.replace('{{', '').replace('}}', '').strip()
+            
+            # Look for mapping for this token
+            if clean_token in github_mapping['placeholders']:
+                placeholder_info = github_mapping['placeholders'][clean_token]
+                
+                # Set type based on mapping
+                if placeholder_info.get('type', 'text').lower() == 'image':
+                    custom_mapping[token] = 'Image'
+                else:
+                    custom_mapping[token] = 'Text'
+                
+                # Store default value if provided
+                if 'default' in placeholder_info and placeholder_info['default']:
+                    # We'll need to apply this when generating the document
+                    pass
+    
+    return custom_mapping
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -356,58 +375,50 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
         return img_file
 
 def extract_placeholders_from_pptx(pptx_bytes):
-    try:
-        prs = Presentation(io.BytesIO(pptx_bytes))
-        tokens = []
-        seen = set()
-        
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    found = re.findall(r'\{\{.*?\}\}', shape.text)
-                    for token in found:
-                        if token not in seen:
-                            tokens.append(token)
-                            seen.add(token)
-                if shape.has_table:
-                    for row in shape.table.rows:
-                        for cell in row.cells:
-                            found = re.findall(r'\{\{.*?\}\}', cell.text)
-                            for token in found:
-                                if token not in seen:
-                                    tokens.append(token)
-                                    seen.add(token)
-        return tokens
-    except Exception as e:
-        st.error(f"Error reading PPTX file: {str(e)}")
-        return []
+    prs = Presentation(io.BytesIO(pptx_bytes))
+    tokens = []
+    seen = set()
+    
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                found = re.findall(r'\{\{.*?\}\}', shape.text)
+                for token in found:
+                    if token not in seen:
+                        tokens.append(token)
+                        seen.add(token)
+            if shape.has_table:
+                for row in shape.table.rows:
+                    for cell in row.cells:
+                        found = re.findall(r'\{\{.*?\}\}', cell.text)
+                        for token in found:
+                            if token not in seen:
+                                tokens.append(token)
+                                seen.add(token)
+    return tokens
 
 def extract_placeholders_from_docx(docx_bytes):
-    try:
-        doc = Document(io.BytesIO(docx_bytes))
-        tokens = []
-        seen = set()
-        
-        for paragraph in doc.paragraphs:
-            found = re.findall(r'\{\{.*?\}\}', paragraph.text)
-            for token in found:
-                if token not in seen:
-                    tokens.append(token)
-                    seen.add(token)
-        
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    found = re.findall(r'\{\{.*?\}\}', cell.text)
-                    for token in found:
-                        if token not in seen:
-                            tokens.append(token)
-                            seen.add(token)
-        
-        return tokens
-    except Exception as e:
-        st.error(f"Error reading DOCX file: {str(e)}")
-        return []
+    doc = Document(io.BytesIO(docx_bytes))
+    tokens = []
+    seen = set()
+    
+    for paragraph in doc.paragraphs:
+        found = re.findall(r'\{\{.*?\}\}', paragraph.text)
+        for token in found:
+            if token not in seen:
+                tokens.append(token)
+                seen.add(token)
+    
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                found = re.findall(r'\{\{.*?\}\}', cell.text)
+                for token in found:
+                    if token not in seen:
+                        tokens.append(token)
+                        seen.add(token)
+    
+    return tokens
 
 def extract_placeholders(template_bytes, template_type):
     if template_type == 'pptx':
@@ -562,6 +573,10 @@ if "saved_file_name" not in st.session_state:
     st.session_state.saved_file_name = None
 if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
+if "github_detected" not in st.session_state:
+    st.session_state.github_detected = False
+if "github_repo_url" not in st.session_state:
+    st.session_state.github_repo_url = None
 
 # --- MAIN LAYOUT ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -577,10 +592,7 @@ with col_template1:
     template_options = ["Select saved template"]
     if saved_templates:
         for t in saved_templates:
-            if t.get('source') == 'root':
-                template_options.append(f"{t['name']} (root)")
-            else:
-                template_options.append(f"{t['name']} ({t['type']})")
+            template_options.append(f"{t['name']} ({t['type']})")
     
     dropdown_col, delete_col = st.columns([4, 1])
     
@@ -594,14 +606,11 @@ with col_template1:
     
     with delete_col:
         if selected_template and selected_template != "Select saved template":
-            # Only show delete for user uploaded templates
-            is_root = "(root)" in selected_template
-            if not is_root:
-                template_name = selected_template.split(' (')[0]
-                if st.button("Delete", key="delete_template", help="Delete this template"):
-                    st.session_state.show_delete_confirm = True
-                    st.session_state.template_to_delete = template_name
-                    st.rerun()
+            template_name = selected_template.split(' (')[0]
+            if st.button("Delete", key="delete_template", help="Delete this template"):
+                st.session_state.show_delete_confirm = True
+                st.session_state.template_to_delete = template_name
+                st.rerun()
     
     if st.session_state.show_delete_confirm:
         st.warning(f"Are you sure you want to delete '{st.session_state.template_to_delete}'?")
@@ -616,6 +625,8 @@ with col_template1:
                     st.session_state.tokens = []
                     st.session_state.show_delete_confirm = False
                     st.session_state.template_to_delete = None
+                    st.session_state.github_detected = False
+                    st.session_state.github_repo_url = None
                     st.success(f"Deleted: {st.session_state.template_to_delete}")
                     st.rerun()
         with col_confirm2:
@@ -625,46 +636,44 @@ with col_template1:
                 st.rerun()
     
     if selected_template and selected_template != "Select saved template" and not st.session_state.delete_trigger:
-        is_root = "(root)" in selected_template
         template_name = selected_template.split(' (')[0]
-        template_bytes = None
-        template_type = None
-        
-        if is_root:
-            # Load from root directory
-            root_templates = get_root_templates()
-            for t in root_templates:
-                if t['name'] == template_name:
-                    template_bytes = load_template_from_root(t['file'])
-                    template_type = 'pptx' if t['type'] == 'PPTX' else 'docx'
-                    break
-        else:
-            # Load from user storage
-            template_bytes = load_template_from_file(template_name)
-            if template_bytes:
-                # Validate and detect type
-                valid, result = validate_office_file(template_bytes)
-                if valid:
-                    template_type = result
-                else:
-                    st.error(f"Invalid file: {result}")
-        
-        if template_bytes and template_type:
+        template_bytes = load_template_from_file(template_name)
+        if template_bytes:
             st.session_state.template_bytes = template_bytes
             st.session_state.saved_template_name = template_name
             st.session_state.template_loaded = True
-            st.session_state.template_type = template_type
+            st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+            
+            # Check for GitHub template detection
+            repo_url, github_info = detect_github_template(template_bytes, template_name)
+            if repo_url:
+                st.session_state.github_detected = True
+                st.session_state.github_repo_url = repo_url
+                st.markdown(f'<div class="github-badge">🔗 Detected GitHub Template: {repo_url}</div>', unsafe_allow_html=True)
+                
+                # Try to fetch mapping from GitHub
+                github_mapping = fetch_github_mapping(repo_url)
+                if github_mapping:
+                    # Apply GitHub mapping to tokens
+                    github_custom_mapping = apply_github_mapping([], github_mapping)
+                    if github_custom_mapping:
+                        st.session_state.custom_mapping = github_custom_mapping
+                        # Save the config
+                        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                        save_config_to_file(st.session_state.custom_mapping, config_name)
+                        st.success("📥 GitHub template mapping applied!")
+            else:
+                st.session_state.github_detected = False
+                st.session_state.github_repo_url = None
             
             config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
             config_data = load_config_from_file(config_name)
             if config_data:
                 st.session_state.custom_mapping = config_data
             
-            # Extract placeholders
-            tokens = extract_placeholders(template_bytes, template_type)
+            # Simply extract all placeholders - no auto-detection
+            tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
-        elif template_bytes and not template_type:
-            st.error("Could not detect file type. Please make sure the file is a valid PPTX or DOCX.")
 
 with col_template2:
     uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
@@ -681,37 +690,46 @@ with col_template2:
     
     if uploaded_template:
         template_bytes = uploaded_template.getvalue()
-        template_name = uploaded_template.name
+        st.session_state.template_bytes = template_bytes
+        st.session_state.saved_template_name = None
+        st.session_state.template_loaded = True
+        st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
         
-        # Validate the file
-        valid, result = validate_office_file(template_bytes)
-        
-        if valid:
-            template_type = result
-            st.session_state.template_bytes = template_bytes
-            st.session_state.saved_template_name = None
-            st.session_state.template_loaded = True
-            st.session_state.template_type = template_type
+        # Check for GitHub template detection
+        repo_url, github_info = detect_github_template(template_bytes, uploaded_template.name)
+        if repo_url:
+            st.session_state.github_detected = True
+            st.session_state.github_repo_url = repo_url
+            st.markdown(f'<div class="github-badge">🔗 Detected GitHub Template: {repo_url}</div>', unsafe_allow_html=True)
             
-            # Extract placeholders
-            tokens = extract_placeholders(template_bytes, template_type)
-            st.session_state.tokens = tokens
-            
-            if st.button("Save Template", key="save_template_btn", use_container_width=True):
-                saved_path = save_template_to_file(template_bytes, template_name)
-                st.session_state.saved_template_name = template_name
-                
-                if st.session_state.custom_mapping:
-                    config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-                    save_config_to_file(st.session_state.custom_mapping, config_name)
-                
-                st.session_state.save_success = True
-                st.session_state.saved_file_name = template_name
-                st.session_state.clear_uploader = True
-                st.rerun()
+            # Try to fetch mapping from GitHub
+            github_mapping = fetch_github_mapping(repo_url)
+            if github_mapping:
+                # Apply GitHub mapping to tokens
+                github_custom_mapping = apply_github_mapping([], github_mapping)
+                if github_custom_mapping:
+                    st.session_state.custom_mapping = github_custom_mapping
+                    st.success("📥 GitHub template mapping applied!")
         else:
-            st.error(f"Invalid file: {result}")
-            st.info("Please upload a valid PPTX or DOCX file.")
+            st.session_state.github_detected = False
+            st.session_state.github_repo_url = None
+        
+        # Simply extract all placeholders - no auto-detection
+        tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+        st.session_state.tokens = tokens
+        
+        if st.button("Save Template", key="save_template_btn", use_container_width=True):
+            saved_path = save_template_to_file(template_bytes, uploaded_template.name)
+            st.session_state.saved_template_name = uploaded_template.name
+            
+            if st.session_state.custom_mapping:
+                config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                save_config_to_file(st.session_state.custom_mapping, config_name)
+            
+            st.session_state.save_success = True
+            st.session_state.saved_file_name = uploaded_template.name
+            st.session_state.clear_uploader = True
+            st.rerun()
 
 if st.session_state.save_success:
     st.success(f"Template '{st.session_state.saved_file_name}' saved successfully! Refresh the page to see it in the dropdown.")
