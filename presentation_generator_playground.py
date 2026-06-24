@@ -71,6 +71,15 @@ MINIMAL_CRE_SYSTEM = """
     
     /* Clean up form container borders */
     div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
+    
+    /* Marker button style */
+    .marker-btn {
+        background-color: #DC3545 !important;
+        color: white !important;
+    }
+    .marker-btn:hover {
+        background-color: #B02A37 !important;
+    }
 </style>
 """
 
@@ -147,7 +156,7 @@ def auto_save_config():
 
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32, marker_style="default"):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
     """Generates high-res map with pin included"""
     target_width_tiles = 10
     lon_span = e - w
@@ -286,7 +295,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         pin_local_y - h_px + inner_radius
     ], fill=(255, 255, 255))
     
-    # Inner dot
+    # Inner colored dot
     dot_radius = max(2, int(inner_radius * 0.4))
     draw.ellipse([
         pin_local_x - dot_radius, 
@@ -317,64 +326,41 @@ def render_isolated_map_editor():
     
     st.markdown("</div><br>", unsafe_allow_html=True)
 
-    # Define all session state keys
+    # Define all keys
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
     size_key = f"map_size_{token_key}"
+    dragged_key = f"map_dragged_{token_key}"
     image_key = f"map_bytes_holder_{token_key}"
+    marker_key = f"map_marker_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
-    pin_key = f"map_pin_{token_key}"
-    map_center_key = f"map_center_{token_key}"
-    map_zoom_key = f"map_zoom_{token_key}"
     
-    # Initialize all keys with None/default values
+    # Initialize all keys with Manila coordinates (14.5995, 120.9842)
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
-    if coord_key not in st.session_state: st.session_state[coord_key] = ""
+    if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"  # Manila
     if color_key not in st.session_state: st.session_state[color_key] = "#DC3545"
     if size_key not in st.session_state: st.session_state[size_key] = 32
     if image_key not in st.session_state: st.session_state[image_key] = None
+    if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
-    if pin_key not in st.session_state: st.session_state[pin_key] = None
-    if map_center_key not in st.session_state: st.session_state[map_center_key] = None
-    if map_zoom_key not in st.session_state: st.session_state[map_zoom_key] = 10
-
-    # UI Controls
-    c1, c2, c3, c4 = st.columns([1.5, 2, 1, 1])
-    with c1:
-        basemap_style = st.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
-    with c2:
-        coord_input = st.text_input("Coordinates (Lat, Lon)", placeholder="Enter coordinates, e.g. 40.7128, -74.0060", key=coord_key)
-    with c3:
-        pin_color = st.color_picker("Pin Color", key=color_key)
-    with c4:
-        pin_size = st.slider("Pin Size", 16, 64, key=size_key)
     
-    # Add Marker button
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
-    with col_btn2:
-        if st.button("📍 Add Marker", use_container_width=True):
-            try:
-                lat, lon = map(float, coord_input.split(","))
-                st.session_state[pin_key] = (lat, lon)
-                st.session_state[coord_key] = f"{lat}, {lon}"
-                st.rerun()
-            except ValueError:
-                st.error("Please enter valid coordinates (e.g., 40.7128, -74.0060)")
+    # Safe Bridge State: Applies changes BEFORE the text_input widget renders
+    if dragged_key in st.session_state:
+        st.session_state[coord_key] = st.session_state[dragged_key]
+        del st.session_state[dragged_key]
 
-    # Get current pin position
-    if st.session_state[pin_key]:
-        plat, plon = st.session_state[pin_key]
-    elif coord_input and coord_input.strip():
-        try:
-            plat, plon = map(float, coord_input.split(","))
-            st.session_state[pin_key] = (plat, plon)
-        except ValueError:
-            plat, plon = 0, 0
-    else:
-        plat, plon = 0, 0
+    c1, c2, c3, c4 = st.columns([1.5, 2, 1, 2])
+    basemap_style = c1.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
+    coord_input = c2.text_input("Coordinates (Lat, Lon)", key=coord_key)
+    pin_color = c3.color_picker("Pin Color", key=color_key)
+    pin_size = c4.slider("Pin Size", 16, 64, key=size_key)
 
-    # Build the map
+    try:
+        plat, plon = map(float, coord_input.split(","))
+    except ValueError:
+        plat, plon = 14.5995, 120.9842  # Manila default
+
     tiles_dict = {
         "OSM": "OpenStreetMap",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
@@ -388,34 +374,32 @@ def render_isolated_map_editor():
         "Hybrid": "Google Maps (Clean Streets)"
     }
     
-    # Use stored center if available
-    if st.session_state[map_center_key]:
-        map_center = st.session_state[map_center_key]
-    else:
-        map_center = [plat if plat != 0 else 0, plon if plon != 0 else 0]
-    
     m = folium.Map(
-        location=map_center,
-        zoom_start=st.session_state[map_zoom_key],
+        location=[plat, plon], 
+        zoom_start=15,
         tiles=tiles_dict[basemap_style],
         attr=attr_dict[basemap_style],
         zoom_control=True
     )
 
-    # Add marker if coordinates exist
-    if st.session_state[pin_key] and (plat != 0 or plon != 0):
-        icon_html = f"""
-        <div style="position: relative;">
-            <span style="position: absolute; left: -{pin_size//2}px; top: -{pin_size}px; width: {pin_size}px; height: {pin_size}px; background-color: {pin_color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></span>
-            <span style="position: absolute; left: -{max(2, int(pin_size/6))}px; top: -{int(pin_size * 0.66)}px; width: {max(4, int(pin_size/3))}px; height: {max(4, int(pin_size/3))}px; background-color: white; border-radius: 50%;"></span>
-        </div>
-        """
-        
-        folium.Marker(
-            [plat, plon], 
-            draggable=True, 
-            icon=folium.DivIcon(html=icon_html)
-        ).add_to(m)
+    # Create pin icon
+    icon_html = f"""
+    <div style="position: relative;">
+        <span style="position: absolute; left: -{pin_size//2}px; top: -{pin_size}px; width: {pin_size}px; height: {pin_size}px; background-color: {pin_color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></span>
+        <span style="position: absolute; left: -{max(2, int(pin_size/6))}px; top: -{int(pin_size * 0.66)}px; width: {max(4, int(pin_size/3))}px; height: {max(4, int(pin_size/3))}px; background-color: white; border-radius: 50%;"></span>
+    </div>
+    """
+    
+    # Add marker
+    marker = folium.Marker(
+        [plat, plon], 
+        draggable=True, 
+        icon=folium.DivIcon(html=icon_html)
+    )
+    marker.add_to(m)
+    
+    # Store marker reference
+    st.session_state[marker_key] = marker
     
     # Add draw control
     draw = Draw(
@@ -427,91 +411,62 @@ def render_isolated_map_editor():
     
     st.info("✏️ Use the **Rectangle tool** (square icon) to frame your export area. Drag the pin to move it.")
     
-    # Display the map
+    # Display map
     map_data = st_folium(
         m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}",
-        returned_objects=["last_active_drawing", "bounds", "last_marker_moved", "center", "zoom"]
+        returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
     )
 
-    # Store map state from interactions
-    if map_data and isinstance(map_data, dict):
-        # Store center
-        if map_data.get("center"):
-            st.session_state[map_center_key] = [
-                map_data["center"]["lat"],
-                map_data["center"]["lng"]
-            ]
-        
-        # Store zoom
-        if map_data.get("zoom"):
-            st.session_state[map_zoom_key] = map_data["zoom"]
-        
-        # Store bounds from drawing or map view
-        if map_data.get("last_active_drawing"):
-            st.session_state[bounds_key] = map_data["last_active_drawing"]
-        elif map_data.get("bounds"):
-            st.session_state[bounds_key] = map_data["bounds"]
-        
-        # Update pin position from marker drag
-        if map_data.get("last_marker_moved"):
-            moved = map_data["last_marker_moved"]
-            if moved:
-                mlat, mlon = moved["lat"], moved["lng"]
-                st.session_state[pin_key] = (mlat, mlon)
-                st.session_state[coord_key] = f"{mlat}, {mlon}"
+    # Store bounds from map_data for export
+    if isinstance(map_data, dict) and map_data.get("bounds"):
+        st.session_state[bounds_key] = map_data["bounds"]
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Export button - captures the current state
-    if st.button("✅ Export High-Res Image to Document", type="primary", use_container_width=True):
-        with st.spinner("Compiling High-Resolution Map Asset..."):
+    # Export button
+    if st.button("✅ Confirm and Export High-Res Image to Document", type="primary", use_container_width=True):
+        with st.spinner("Compiling Crisp High-Density API Asset. This takes approx 3 seconds..."):
             
-            # Get current pin position from session state
-            if st.session_state[pin_key]:
-                export_lat, export_lon = st.session_state[pin_key]
-            else:
-                export_lat, export_lon = plat, plon
-            
-            # Get bounds from stored state
+            # Get the latest marker position
+            export_lat, export_lon = plat, plon
+            if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
+                moved = map_data["last_marker_moved"]
+                if moved:
+                    export_lat = moved["lat"]
+                    export_lon = moved["lng"]
+
+            # Get bounds - first from drawn rectangle, then from map bounds
             n, s, e, w = None, None, None, None
             
-            # Try to get bounds from drawing
-            if st.session_state[bounds_key]:
-                bounds = st.session_state[bounds_key]
-                if isinstance(bounds, dict):
-                    # Check if it's a drawing (Polygon)
-                    if bounds.get("geometry") and bounds["geometry"].get("type") == "Polygon":
-                        coords = bounds["geometry"]["coordinates"][0]
-                        if coords and len(coords) >= 4:
-                            lats = [c[1] for c in coords]
-                            lons = [c[0] for c in coords]
-                            n, s = max(lats), min(lats)
-                            e, w = max(lons), min(lons)
-                    # Check if it's map bounds
-                    elif "_northEast" in bounds and "_southWest" in bounds:
-                        n = bounds["_northEast"]["lat"]
-                        s = bounds["_southWest"]["lat"]
-                        e = bounds["_northEast"]["lng"]
-                        w = bounds["_southWest"]["lng"]
+            # Try to get from drawn rectangle
+            if isinstance(map_data, dict) and map_data.get("last_active_drawing"):
+                drawing = map_data["last_active_drawing"]
+                if drawing and drawing.get("geometry", {}).get("type") == "Polygon":
+                    coords = drawing["geometry"]["coordinates"][0]
+                    if coords and len(coords) >= 4:
+                        lats = [c[1] for c in coords]
+                        lons = [c[0] for c in coords]
+                        n, s = max(lats), min(lats)
+                        e, w = max(lons), min(lons)
             
-            # Fallback to current view
-            if n is None and map_data and isinstance(map_data, dict) and map_data.get("bounds"):
-                b = map_data["bounds"]
+            # If no rectangle, use map bounds from session state
+            if n is None and st.session_state.get(bounds_key):
+                b = st.session_state[bounds_key]
                 if b and "_northEast" in b and "_southWest" in b:
                     n = b["_northEast"]["lat"]
                     s = b["_southWest"]["lat"]
                     e = b["_northEast"]["lng"]
                     w = b["_southWest"]["lng"]
             
-            # Final fallback
+            # Fallback to area around pin
             if n is None:
                 n, s = export_lat + 0.02, export_lat - 0.02
                 e, w = export_lon + 0.02, export_lon - 0.02
 
-            # Generate high-res image with current state
+            # Generate high-res image with pin at the exported position
             map_img_bytes = generate_static_map_bounds(
                 n, s, e, w, 
-                export_lat, export_lon, 
+                export_lat, export_lon,  # Use the pin position from the map
                 style=basemap_style, 
                 pin_color=pin_color, 
                 pin_size=pin_size
@@ -520,10 +475,22 @@ def render_isolated_map_editor():
             # Store in session state
             st.session_state[image_key] = map_img_bytes
             
-            # Clear editor state and return
+            # Update coordinates
+            st.session_state[dragged_key] = f"{export_lat}, {export_lon}"
+            
             st.session_state.active_map_editor_token = None
             st.success("✅ High-res map rendering attached successfully! Returning to document...")
             st.rerun()
+
+    # Handle marker movement - sync with text input
+    if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
+        moved = map_data["last_marker_moved"]
+        if moved:
+            mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
+            new_coord = f"{mlat}, {mlon}"
+            if new_coord != st.session_state.get(coord_key, ""):
+                st.session_state[dragged_key] = new_coord
+                st.rerun()
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
