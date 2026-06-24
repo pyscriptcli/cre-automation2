@@ -1016,7 +1016,7 @@ def process_overpass_results(elements):
 # -----------------------------------------------------------------------------
 # 6. STREAMLIT DYNAMIC INTERACTION INJECTION LAYER
 # -----------------------------------------------------------------------------
-# Inject HTML for floating UI
+# Inject HTML for floating UI - This includes the search bar you designed
 st.markdown("""
     <!-- Floating Controls -->
     <div class="floating-controls">
@@ -1030,9 +1030,9 @@ st.markdown("""
             <div class="search-wrapper">
                 <span class="search-icon">🔍</span>
                 <input id="search-input" type="text" placeholder="Search establishments..." 
-                       onkeydown="if(event.key==='Enter'){document.getElementById('search-btn').click()}">
+                       onkeydown="if(event.key==='Enter'){performSearch()}">
             </div>
-            <button id="search-btn">Search</button>
+            <button id="search-btn" onclick="performSearch()">Search</button>
         </div>
 
         <!-- Edit Button -->
@@ -1140,7 +1140,25 @@ st.markdown("""
     </div>
 
     <script>
-        // Sidebar toggle
+        // --- Search functionality ---
+        function performSearch() {
+            const searchInput = document.getElementById('search-input');
+            const hiddenSearchInput = document.getElementById('search_bar_input');
+            const searchBtn = document.getElementById('search_btn');
+            
+            if (searchInput && hiddenSearchInput) {
+                // Update the hidden Streamlit input
+                hiddenSearchInput.value = searchInput.value;
+                hiddenSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                
+                // Click the hidden Streamlit button
+                if (searchBtn) {
+                    searchBtn.click();
+                }
+            }
+        }
+
+        // --- Sidebar toggle ---
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             sidebar.classList.toggle('collapsed');
@@ -1151,13 +1169,13 @@ st.markdown("""
             }
         }
 
-        // Styling panel toggle
+        // --- Styling panel toggle ---
         function toggleStylingPanel() {
             const panel = document.getElementById('styling-panel');
             panel.classList.toggle('open');
         }
 
-        // Styling functions
+        // --- Styling functions ---
         function setMarkerColor(color, btn) {
             document.querySelectorAll('.color-options button').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
@@ -1192,14 +1210,14 @@ st.markdown("""
             }
         }
 
-        // Footer update function
+        // --- Footer update function ---
         function updateFooter(lat, lng, zoom) {
             document.getElementById('footer-lat').textContent = 'LAT: ' + (lat ? lat.toFixed(5) : '--');
             document.getElementById('footer-lng').textContent = 'LNG: ' + (lng ? lng.toFixed(5) : '--');
             document.getElementById('footer-zoom').textContent = 'ZOOM: ' + (zoom || '--');
         }
 
-        // Initial sidebar state
+        // --- Initial sidebar state ---
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
             const hiddenInput = document.getElementById('sidebar_state_input');
@@ -1208,7 +1226,7 @@ st.markdown("""
             }
         });
 
-        // Close styling panel on outside click
+        // --- Close styling panel on outside click ---
         document.addEventListener('click', function(e) {
             const panel = document.getElementById('styling-panel');
             const btn = document.getElementById('toggle-styling');
@@ -1219,12 +1237,16 @@ st.markdown("""
     </script>
 """, unsafe_allow_html=True)
 
-# Hidden inputs for Streamlit state - using st.text_input with labels
+# Hidden inputs for Streamlit state
 st.text_input("Sidebar State", key="sidebar_state_input", label_visibility="collapsed", placeholder="sidebar_state")
 st.text_input("Marker Color", key="marker_color_input", label_visibility="collapsed", placeholder="marker_color")
 st.text_input("Marker Style", key="marker_style_input", label_visibility="collapsed", placeholder="marker_style")
 st.text_input("Labels", key="labels_input", label_visibility="collapsed", placeholder="labels")
 st.text_input("Basemap", key="basemap_input", label_visibility="collapsed", placeholder="basemap")
+
+# Hidden search input - this is the one that Streamlit uses
+search_query = st.text_input("Search", key="search_bar_input", label_visibility="collapsed", placeholder="", max_chars=SearchGuardrails.MAX_QUERY_LENGTH)
+search_clicked = st.button("SEARCH", key="search_btn", label_visibility="collapsed")
 
 # Update state from hidden inputs
 if st.session_state.get('sidebar_state_input') == "collapsed":
@@ -1247,17 +1269,14 @@ if st.session_state.get('basemap_input'):
     st.session_state.basemap_choice = st.session_state.basemap_input
 
 # -----------------------------------------------------------------------------
-# 7. HIGH-LEVEL CONFIGURATION (Hidden - controlled by UI)
+# 7. HANDLE SEARCH
 # -----------------------------------------------------------------------------
-# Get coords and radius from sidebar inputs via JavaScript will update these
+# Get coords and radius
 coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
 lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.64650, 121.05804)
 radius_val = st.session_state.geo_radius
 
-# Handle search from UI - using proper labels
-search_query = st.text_input("Search", key="search_bar_input", label_visibility="collapsed", placeholder="Search establishments...", max_chars=SearchGuardrails.MAX_QUERY_LENGTH)
-search_clicked = st.button("SEARCH", key="search_btn")
-
+# Handle search - this triggers when the hidden button is clicked
 if search_clicked and search_query.strip():
     st.session_state.last_search_query = search_query
     is_valid, error_msg = SearchGuardrails.validate_query(search_query)
@@ -1272,12 +1291,6 @@ if search_clicked and search_query.strip():
             st.session_state.search_cooldown_until = time.time() + SearchGuardrails.COOLDOWN_SECONDS
             st.session_state.scan_active_loading = True
             st.rerun()
-
-# Clear button handler
-if st.button("✕", key="clear_search_btn"):
-    st.session_state.search_bar_input = ""
-    st.session_state.last_search_query = ""
-    st.rerun()
 
 # -----------------------------------------------------------------------------
 # 8. PIPELINE RUNTIME EVALUATION LOOP
@@ -1334,7 +1347,6 @@ layer_meta_json = json.dumps(st.session_state.layer_meta)
 geojson_str = json.dumps(st.session_state.scanned_records)
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 
-# Use the marker_color from session state
 marker_color = st.session_state.marker_color
 
 leaflet_template = """
@@ -1485,11 +1497,9 @@ leaflet_html = (leaflet_template
                 .replace("__MARKER_STYLE__", st.session_state.marker_style)
                 .replace("__MARKER_COLOR__", marker_color))
 
-# Use st.iframe instead of st.components.v1.html (deprecated) - removed scrolling parameter
 st.iframe(leaflet_html, height=900)
 
-# Update sidebar via Streamlit (workspace content)
-# This runs after the HTML is rendered
+# Update sidebar workspace content
 if st.session_state.scanned_records:
     grouped = {}
     for record in st.session_state.scanned_records:
@@ -1523,7 +1533,6 @@ if st.session_state.scanned_records:
             workspace_html += f'<div style="font-size:9px; color:#6b7280; padding:4px 12px;">+ {len(items) - 12} more</div>'
         workspace_html += '</div>'
     
-    # Update workspace content via JavaScript
     st.markdown(f"""
         <script>
             const workspaceContent = document.getElementById('workspace-content');
