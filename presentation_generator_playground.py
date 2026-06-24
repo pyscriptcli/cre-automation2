@@ -153,11 +153,12 @@ def auto_save_config():
 # --- DYNAMIC HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
     """Dynamically scales zoom to construct a massive high-res stitch and drops styled vector pins"""
-    target_tiles_span = 6  # High res density multiplier
+    target_tiles_span = 8  # Increased multiplier for Ultra High-Res
     lon_span = e - w
     if lon_span <= 0: lon_span = 0.001
     
-    zoom = int(math.log2(360.0 / lon_span * target_tiles_span))
+    # Overdrive zoom resolution +1 level deep for crisp rendering
+    zoom = int(math.log2(360.0 / lon_span * target_tiles_span)) + 1
     zoom = max(10, min(19, zoom))
     
     def deg2num(lat_deg, lon_deg, z):
@@ -170,7 +171,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     x_min, y_min = deg2num(n, w, zoom)
     x_max, y_max = deg2num(s, e, zoom)
     
-    if (x_max - x_min + 1) * (y_max - y_min + 1) > 140:
+    if (x_max - x_min + 1) * (y_max - y_min + 1) > 160:
         zoom -= 1
         x_min, y_min = deg2num(n, w, zoom)
         x_max, y_max = deg2num(s, e, zoom)
@@ -186,7 +187,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
         "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        # apistyle parameters completely strip away business/establishment icons natively
         "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
     }
     url_template = styles.get(style, styles["Hybrid"])
@@ -222,13 +222,13 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # STAMP PROPORTIONALLY SCALED PIN AT EXACT PIXEL COORDINATES
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
-    scale = pin_size / 32.0
+    # Scale multiplier accommodates deep zoom rendering densities
+    scale = (pin_size / 32.0) * 1.5
     w_px = 16 * scale
     h_px = 32 * scale
     
@@ -277,18 +277,15 @@ def map_editor_modal(token_key):
     </style>
     """, unsafe_allow_html=True)
     
-    # Initialize keys directly into session state to avoid refresh updates breaking context
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
     size_key = f"map_size_{token_key}"
-    zoom_key = f"map_zoom_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.3294, 120.9368"
     if color_key not in st.session_state: st.session_state[color_key] = "#DC3545"
     if size_key not in st.session_state: st.session_state[size_key] = 32
-    if zoom_key not in st.session_state: st.session_state[zoom_key] = 15
 
     # Tiny Horizontally Packed Controls
     c1, c2, c3, c4 = st.columns([1.2, 1.6, 0.6, 1.2])
@@ -301,7 +298,6 @@ def map_editor_modal(token_key):
     with c4:
         pin_size = st.slider("Pin Size", 16, 64, key=size_key)
     
-    # Safe Coordinate Calculation Handling
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
@@ -322,13 +318,12 @@ def map_editor_modal(token_key):
     
     m = folium.Map(
         location=[plat, plon], 
-        zoom_start=st.session_state[zoom_key],
+        zoom_start=15,
         tiles=tiles_dict[basemap_style],
         attr=attr_dict[basemap_style],
         zoom_control=True
     )
 
-    # Injecting parameterized pin asset sizes cleanly
     icon_html = f"""
     <div style="position: relative;">
         <span style="position: absolute; left: -{pin_size//2}px; top: -{pin_size}px; width: {pin_size}px; height: {pin_size}px; background-color: {pin_color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></span>
@@ -345,28 +340,22 @@ def map_editor_modal(token_key):
     )
     draw.add_to(m)
     
-    st.caption("✏️ **Use the Rectangle tool (⬛) on the left to draw your crop box.** If no box is explicitly drawn, the current map view boundaries will be exported.")
+    st.caption("✏️ **Use the Rectangle tool (⬛) to frame your export.** Live edits to sliders/colors won't flash the map out of existence anymore.")
     
-    # Large Viewport Canvas Map
+    # Decoupled tracking prevents infinite reruns. We strictly pull ONLY the bounds and drawings.
     map_data = st_folium(
-        m, height=680, width=1150, use_container_width=True, key=f"int_map_{token_key}",
-        returned_objects=["last_marker_moved", "all_drawings", "center", "zoom", "bounds"]
+        m, height=680, width=1150, key=f"int_map_{token_key}",
+        returned_objects=["last_marker_moved", "all_drawings", "bounds"]
     )
     
-    # Decoupled Non-refresh State Synchronization Logic Box
-    if isinstance(map_data, dict):
-        if map_data.get("last_marker_moved"):
-            moved = map_data["last_marker_moved"]
-            mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
-            # Silent check to only adjust string representations if values meaningfully split
-            if f"{mlat}, {mlon}" != st.session_state[coord_key]:
-                st.session_state[coord_key] = f"{mlat}, {mlon}"
-                
-        if map_data.get("zoom"):
-            st.session_state[zoom_key] = map_data["zoom"]
+    # Handle marker dragging purely in state without forcing immediate visual redraws
+    if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
+        moved = map_data["last_marker_moved"]
+        mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
+        st.session_state[coord_key] = f"{mlat}, {mlon}"
 
-    # Export & Output Rendering Pipeline Action Triggers
-    if st.button("🚀 Confirm & Export Map Snapshot", key=f"exp_{token_key}", use_container_width=True):
+    # Execution Action Trigger
+    if st.button("🚀 Confirm & Export High-Res Map", key=f"exp_{token_key}"):
         with st.spinner("Compiling Crisp High-Density Image Assets..."):
             n, s, e, w = None, None, None, None
             if isinstance(map_data, dict) and map_data.get("all_drawings"):
@@ -383,7 +372,6 @@ def map_editor_modal(token_key):
                 n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
                 e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
             
-            # Absolute processing safe fallbacks
             if n is None:
                 n, s, e, w = plat + 0.01, plat - 0.01, plon + 0.01, plon - 0.01
 
@@ -392,7 +380,7 @@ def map_editor_modal(token_key):
                 style=basemap_style, pin_color=pin_color, pin_size=pin_size
             )
             st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
-            st.success("High-res map snap generated inside context pipelines!")
+            st.success("High-res map snap generated!")
             st.rerun()
 
 # --- CORE UTILITIES ---
