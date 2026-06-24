@@ -360,26 +360,29 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
 def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
     
-    # Custom CSS to strictly align inline widget rows inside the Map Editor
+    # Custom CSS adjustments to normalize default Streamlit widget margins
     st.markdown("""
         <style>
-            /* Force all elements inside the control columns to align vertically in the center */
+            /* Aligns block contents explicitly to their bottom bounding baseline */
             div[data-testid="stHorizontalBlock"] {
                 align-items: flex-end !important;
+                gap: 8px !important;
             }
-            /* Global fix to make sure text input and select box match heights perfectly */
-            div[data-baseweb="input"], div[data-baseweb="select"] {
+            /* Match form element wrapper heights exactly to standard buttons */
+            div[data-baseweb="input"], div[data-baseweb="select"], .stColorPicker div {
                 height: 38px !important;
             }
-            .matrix-control-wrapper {
-                display: flex;
-                align-items: center;
-                gap: 8px;
+            /* Clean structural padding for custom size badge element */
+            .custom-size-badge {
+                font-size: 13px; 
+                font-weight: 600; 
+                line-height: 36px; 
+                text-align: center; 
+                color: #1A1A1A; 
+                border: 1px solid #CCCCCC; 
+                border-radius: 4px; 
+                background-color: #F8F9FA; 
                 height: 38px;
-                background-color: #F8F9FA;
-                border: 1px solid #CCCCCC;
-                border-radius: 4px;
-                padding: 0 10px;
                 width: 100%;
             }
         </style>
@@ -417,9 +420,8 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    # --- PERFECTLY BALANCED SYMMETRICAL CONTROL ROW ---
-    # 4 distinct columns: Action Button | Map Selector Dropdown | Compact Size & Color Block | Coordinates Input
-    c_btn, c_style, c_size_block, c_coord = st.columns([1.5, 1.8, 2.5, 3.5])
+    # --- FLAT SLICK 5-COLUMN HORIZONTAL CONTROLS MATRIX ---
+    c_btn, c_style, c_color, c_size_cnt, c_coord = st.columns([1.5, 1.8, 0.6, 2.2, 3.2])
     
     with c_btn:
         export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
@@ -427,29 +429,19 @@ def render_isolated_map_editor():
     with c_style:
         basemap_style = st.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key, label_visibility="collapsed")
         
-    with c_size_block:
-        # We leverage a sub-grid of columns here to pack color controls tightly on a flat horizontal layout line
-        sub_color, sub_min, sub_val, sub_pls = st.columns([1.0, 0.8, 1.0, 0.8])
+    with c_color:
+        pin_color = st.color_picker("Pin Color", key=color_key, label_visibility="collapsed")
         
-        with sub_color:
-            pin_color = st.color_picker("Pin Color", key=color_key, label_visibility="collapsed")
-            
+    with c_size_cnt:
+        # Mini-columns nested inside the Size space to tightly snap button components next to value indicator
+        sub_min, sub_val, sub_pls = st.columns([0.8, 1.4, 0.8])
         with sub_min:
             if st.button("-", key=f"size_minus_{token_key}", use_container_width=True):
                 if st.session_state[size_key] > 16:
                     st.session_state[size_key] -= 2
                     st.rerun()
-                    
         with sub_val:
-            # Sits flat inside the horizontal container block matching standard 38px components height profiles
-            st.markdown(f"""
-                <div style="font-size: 13px; font-weight: 600; line-height: 38px; 
-                            text-align: center; color: #1A1A1A; border: 1px solid #CCCCCC; 
-                            border-radius: 4px; background-color: #F8F9FA; height: 38px;">
-                    Size: {st.session_state[size_key]}
-                </div>
-            """, unsafe_allow_html=True)
-            
+            st.markdown(f'<div class="custom-size-badge">Size: {st.session_state[size_key]}</div>', unsafe_allow_html=True)
         with sub_pls:
             if st.button("+", key=f"size_plus_{token_key}", use_container_width=True):
                 if st.session_state[size_key] < 64:
