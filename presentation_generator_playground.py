@@ -16,7 +16,6 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
 import time
-import pickle
 
 # --- MAP SPECIFIC DEPENDENCIES ---
 import folium
@@ -74,11 +73,11 @@ MINIMAL_CRE_SYSTEM = """
     
     div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
     
-    /* Clean 2-column layout for placeholders */
-    .placeholder-grid-2col {
+    /* 2-column layout for placeholders */
+    .placeholder-grid {
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
-        gap: 12px 24px !important;
+        gap: 16px 24px !important;
         width: 100% !important;
         padding: 8px 0 !important;
     }
@@ -87,7 +86,7 @@ MINIMAL_CRE_SYSTEM = """
         display: flex !important;
         flex-direction: column !important;
         gap: 4px !important;
-        padding: 6px 0 !important;
+        padding: 8px 0 !important;
     }
     
     .placeholder-label {
@@ -139,74 +138,64 @@ MINIMAL_CRE_SYSTEM = """
         color: #333 !important;
     }
     
+    /* Map editor controls */
+    .map-controls-row {
+        display: flex !important;
+        gap: 12px !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        margin-bottom: 12px !important;
+    }
+    .map-control-item {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+    .map-control-item label {
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        color: #333 !important;
+        white-space: nowrap !important;
+    }
+    .size-control {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }
+    .size-control button {
+        min-width: 28px !important;
+        height: 28px !important;
+        padding: 0 8px !important;
+        font-size: 14px !important;
+        background: #f0f0f0 !important;
+        border: 1px solid #ccc !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+    }
+    .size-control button:hover {
+        background: #e0e0e0 !important;
+    }
+    .size-control span {
+        min-width: 30px !important;
+        text-align: center !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+    }
+    
     @media (max-width: 768px) {
-        .placeholder-grid-2col {
+        .placeholder-grid {
             grid-template-columns: 1fr !important;
         }
         .type-mapping-grid {
             grid-template-columns: 1fr !important;
         }
+        .map-controls-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+        }
     }
 </style>
 """
-
-# --- TEMP DATA STORAGE FUNCTIONS ---
-def get_temp_dir():
-    temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp_data")
-    os.makedirs(temp_dir, exist_ok=True)
-    return temp_dir
-
-def save_temp_form_data(form_data, template_name):
-    """Save temporary form data"""
-    if not form_data or not template_name:
-        return
-    temp_dir = get_temp_dir()
-    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
-    temp_file = os.path.join(temp_dir, f"{safe_name}_temp.pkl")
-    try:
-        with open(temp_file, 'wb') as f:
-            pickle.dump(form_data, f)
-    except Exception as e:
-        print(f"Error saving temp data: {e}")
-
-def load_temp_form_data(template_name):
-    """Load temporary form data"""
-    if not template_name:
-        return None
-    temp_dir = get_temp_dir()
-    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
-    temp_file = os.path.join(temp_dir, f"{safe_name}_temp.pkl")
-    if os.path.exists(temp_file):
-        try:
-            with open(temp_file, 'rb') as f:
-                return pickle.load(f)
-        except Exception as e:
-            print(f"Error loading temp data: {e}")
-    return None
-
-def clear_temp_form_data(template_name):
-    """Clear temporary form data"""
-    if not template_name:
-        return
-    temp_dir = get_temp_dir()
-    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
-    temp_file = os.path.join(temp_dir, f"{safe_name}_temp.pkl")
-    if os.path.exists(temp_file):
-        try:
-            os.remove(temp_file)
-        except Exception:
-            pass
-
-def clear_all_temp_data():
-    """Clear all temporary data files"""
-    temp_dir = get_temp_dir()
-    if os.path.exists(temp_dir):
-        for file in os.listdir(temp_dir):
-            if file.endswith('_temp.pkl'):
-                try:
-                    os.remove(os.path.join(temp_dir, file))
-                except Exception:
-                    pass
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
@@ -316,7 +305,6 @@ def delete_template_file(template_name):
         config_path = os.path.join(storage_dir, config_name)
         if os.path.exists(config_path):
             os.remove(config_path)
-        clear_temp_form_data(template_name)
         return True
     return False
 
@@ -485,7 +473,6 @@ def render_isolated_map_editor():
     col_back, col_title = st.columns([1, 4])
     with col_back:
         if st.button("Back to Document", key="back_from_map"):
-            # Signal to restore form data from temp
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
             st.rerun()
@@ -518,56 +505,52 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    c1, c2 = st.columns([1, 3])
+    # All controls in one row
+    st.markdown('<div class="map-controls-row">', unsafe_allow_html=True)
     
-    with c1:
-        # Export button placed left of map layer
-        if st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True):
-            with st.spinner("Compiling map asset..."):
-                try:
-                    plat, plon = map(float, coord_input.split(","))
-                except:
-                    plat, plon = 14.5995, 120.9842
-                
-                # Get bounds from session state
-                n, s, e, w = None, None, None, None
-                
-                if st.session_state.get(bounds_key):
-                    b = st.session_state[bounds_key]
-                    if b and "_northEast" in b and "_southWest" in b:
-                        n = b["_northEast"]["lat"]
-                        s = b["_southWest"]["lat"]
-                        e = b["_northEast"]["lng"]
-                        w = b["_southWest"]["lng"]
-                
-                if n is None:
-                    n, s = plat + 0.005, plat - 0.005
-                    e, w = plon + 0.005, plon - 0.005
-                
-                map_img_bytes = generate_static_map_bounds(
-                    n, s, e, w, 
-                    plat, plon,
-                    style=st.session_state[style_key], 
-                    pin_color=st.session_state[color_key], 
-                    pin_size=st.session_state[size_key]
-                )
-                
-                st.session_state[image_key] = map_img_bytes
-                st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
-                st.session_state.restore_form_data = True
-                st.session_state.active_map_editor_token = None
-                st.success("Map attached successfully!")
-                time.sleep(0.3)
+    # Export button
+    st.markdown('<div class="map-control-item" style="flex: 0 0 auto;">', unsafe_allow_html=True)
+    export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Map layer
+    st.markdown('<div class="map-control-item" style="flex: 1;">', unsafe_allow_html=True)
+    basemap_style = st.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key, label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Pin color
+    st.markdown('<div class="map-control-item" style="flex: 0 0 auto;">', unsafe_allow_html=True)
+    pin_color = st.color_picker("Pin Color", key=color_key, label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Pin size with plus/minus
+    st.markdown('<div class="map-control-item" style="flex: 0 0 auto;">', unsafe_allow_html=True)
+    st.markdown('<label>Size</label>', unsafe_allow_html=True)
+    st.markdown('<div class="size-control">', unsafe_allow_html=True)
+    
+    col_minus, col_size, col_plus = st.columns([1, 1, 1])
+    with col_minus:
+        if st.button("-", key=f"size_minus_{token_key}"):
+            current_size = st.session_state[size_key]
+            if current_size > 16:
+                st.session_state[size_key] = current_size - 2
+                st.rerun()
+    with col_size:
+        st.markdown(f'<span>{st.session_state[size_key]}</span>', unsafe_allow_html=True)
+    with col_plus:
+        if st.button("+", key=f"size_plus_{token_key}"):
+            current_size = st.session_state[size_key]
+            if current_size < 64:
+                st.session_state[size_key] = current_size + 2
                 st.rerun()
     
-    with c2:
-        # Map layer selector
-        basemap_style = st.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    # Coordinate input row
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Coordinate input below
     coord_input = st.text_input("Coordinates (Lat, Lon)", key=coord_key)
-    pin_color = st.color_picker("Pin Color", key=color_key)
-    pin_size = st.slider("Pin Size", 16, 64, key=size_key)
 
     try:
         plat, plon = map(float, coord_input.split(","))
@@ -596,6 +579,7 @@ def render_isolated_map_editor():
     )
 
     # Create blue circle with white star marker
+    pin_size = st.session_state[size_key]
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40">
@@ -642,6 +626,40 @@ def render_isolated_map_editor():
     # Store bounds from map_data for export
     if isinstance(map_data, dict) and map_data.get("bounds"):
         st.session_state[bounds_key] = map_data["bounds"]
+
+    # Handle export
+    if export_clicked:
+        with st.spinner("Compiling map asset..."):
+            # Get bounds from session state
+            n, s, e, w = None, None, None, None
+            
+            if st.session_state.get(bounds_key):
+                b = st.session_state[bounds_key]
+                if b and "_northEast" in b and "_southWest" in b:
+                    n = b["_northEast"]["lat"]
+                    s = b["_southWest"]["lat"]
+                    e = b["_northEast"]["lng"]
+                    w = b["_southWest"]["lng"]
+            
+            if n is None:
+                n, s = plat + 0.005, plat - 0.005
+                e, w = plon + 0.005, plon - 0.005
+            
+            map_img_bytes = generate_static_map_bounds(
+                n, s, e, w, 
+                plat, plon,
+                style=basemap_style, 
+                pin_color=pin_color, 
+                pin_size=pin_size
+            )
+            
+            st.session_state[image_key] = map_img_bytes
+            st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
+            st.session_state.restore_form_data = True
+            st.session_state.active_map_editor_token = None
+            st.success("Map attached successfully!")
+            time.sleep(0.3)
+            st.rerun()
 
     # Handle marker movement
     if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
@@ -816,33 +834,30 @@ def simple_uploader_row(label_text, allowed_types, key):
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
 # --- Form Data Management Functions ---
-def save_current_form_data():
-    """Save all current form data to temp storage"""
+def save_form_data_to_session():
+    """Save all current form data to session state"""
     if st.session_state.saved_template_name and st.session_state.tokens:
         form_data = {}
         for token in st.session_state.tokens:
             key = f"val_{token}"
             if key in st.session_state:
                 form_data[token] = st.session_state[key]
-        if form_data:
-            save_temp_form_data(form_data, st.session_state.saved_template_name)
+        st.session_state.temp_form_data = form_data
 
-def restore_form_data_from_temp():
-    """Restore form data from temp storage"""
-    if st.session_state.saved_template_name:
-        temp_data = load_temp_form_data(st.session_state.saved_template_name)
-        if temp_data:
-            for token, value in temp_data.items():
-                key = f"val_{token}"
-                if key in st.session_state:
-                    st.session_state[key] = value
-            return True
+def restore_form_data_from_session():
+    """Restore form data from session state"""
+    if hasattr(st.session_state, 'temp_form_data') and st.session_state.temp_form_data:
+        for token, value in st.session_state.temp_form_data.items():
+            key = f"val_{token}"
+            if key in st.session_state:
+                st.session_state[key] = value
+        return True
     return False
 
-def clear_form_data_after_download():
-    """Clear temp data after download"""
-    if st.session_state.saved_template_name:
-        clear_temp_form_data(st.session_state.saved_template_name)
+def clear_form_data_from_session():
+    """Clear form data from session state"""
+    if hasattr(st.session_state, 'temp_form_data'):
+        st.session_state.temp_form_data = {}
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -863,15 +878,16 @@ if "saved_file_name" not in st.session_state: st.session_state.saved_file_name =
 if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = False
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
+if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
 
 
 # --- ISOLATED APP ROUTER ---
 if st.session_state.active_map_editor_token:
     render_isolated_map_editor()
 else:
-    # Restore form data from temp if needed
+    # Restore form data from session if needed
     if st.session_state.restore_form_data:
-        restore_form_data_from_temp()
+        restore_form_data_from_session()
         st.session_state.restore_form_data = False
     
     # --- MAIN DOCUMENT GENERATOR APP ---
@@ -927,7 +943,7 @@ else:
                         st.session_state.saved_template_name = None
                         st.session_state.template_loaded = False
                         st.session_state.tokens = []
-                        clear_temp_form_data(st.session_state.template_to_delete)
+                        st.session_state.temp_form_data = {}
                         st.session_state.show_delete_confirm = False
                         st.session_state.template_to_delete = None
                         st.rerun()
@@ -946,7 +962,7 @@ else:
                     if template_bytes:
                         # Clear old temp data when template changes
                         if st.session_state.saved_template_name and st.session_state.saved_template_name != template_name:
-                            clear_temp_form_data(st.session_state.saved_template_name)
+                            st.session_state.temp_form_data = {}
                         
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
@@ -959,7 +975,7 @@ else:
                         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
                         st.session_state.tokens = tokens
                         # Try to restore temp data for the new template
-                        restore_form_data_from_temp()
+                        restore_form_data_from_session()
                     break
 
     with col_template2:
@@ -975,6 +991,7 @@ else:
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
+            st.session_state.temp_form_data = {}
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 saved_path = save_template_to_file(template_bytes, uploaded_template.name)
@@ -1055,7 +1072,7 @@ else:
             st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
             
             # Split into two columns for the actual form inputs
-            st.markdown('<div class="placeholder-grid-2col">', unsafe_allow_html=True)
+            st.markdown('<div class="placeholder-grid">', unsafe_allow_html=True)
             
             for token in tokens:
                 clean_label = token.replace("{", "").replace("}", "")
@@ -1078,8 +1095,7 @@ else:
                     
                     # Save form data before opening map editor
                     if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
-                        # Save current form data to temp storage
-                        save_current_form_data()
+                        save_form_data_to_session()
                         st.session_state.active_map_editor_token = token
                         st.rerun()
                     field_types[token] = "Image"
@@ -1096,9 +1112,9 @@ else:
             
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Auto-save form data to temp storage
+            # Auto-save form data to session
             if st.session_state.saved_template_name:
-                save_current_form_data()
+                save_form_data_to_session()
             
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1122,7 +1138,7 @@ else:
                         file_name=get_download_filename(base_template_name, "pptx"),
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                         use_container_width=True, key="download_pptx",
-                        on_click=clear_form_data_after_download
+                        on_click=clear_form_data_from_session
                     )
                 except Exception as e:
                     st.error(f"Error generating PPTX: {str(e)}")
@@ -1139,7 +1155,7 @@ else:
                             file_name=get_download_filename(base_template_name, "docx"),
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             use_container_width=True, key="download_docx",
-                            on_click=clear_form_data_after_download
+                            on_click=clear_form_data_from_session
                         )
                 except Exception as e:
                     st.error(f"Error generating document: {str(e)}")
