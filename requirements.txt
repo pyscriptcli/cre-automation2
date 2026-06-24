@@ -9,7 +9,10 @@ streamlit-folium>=0.15.0
 folium>=0.15.0
 contextily>=1.4.0
 requests>=2.31.0
-python-pptx
-Pillow
-python-docx
-reportlab
+python-pptx>=0.6.21
+Pillow>=10.0.0
+python-docx>=0.8.11
+reportlab>=4.0.0
+html2image>=2.0.0
+selenium>=4.0.0
+webdriver-manager>=3.8.0
