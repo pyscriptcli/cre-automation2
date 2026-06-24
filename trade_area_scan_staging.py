@@ -228,7 +228,8 @@ st.markdown("""
             const isCollapsed = container.classList.contains('sidebar-collapsed');
             btn.textContent = isCollapsed ? 'Open Panel' : 'Close Panel';
             
-            const hiddenInput = document.getElementById('sidebar_state_input');
+            // FIX: Targeted using the placeholder attribute since custom keys do not write structural IDs directly to input tags
+            const hiddenInput = document.querySelector('input[placeholder="sidebar_state"]');
             if (hiddenInput) {
                 hiddenInput.value = isCollapsed ? 'collapsed' : 'expanded';
                 hiddenInput.dispatchEvent(new Event('change'));
@@ -237,7 +238,6 @@ st.markdown("""
     </script>
 """, unsafe_allow_html=True)
 
-# FIX: Added required non-empty string labels for standard accessibility parsers
 sidebar_state = st.text_input("Sidebar Internal State Controller", key="sidebar_state_input", label_visibility="collapsed", placeholder="sidebar_state")
 if sidebar_state == "collapsed":
     st.session_state.sidebar_collapsed = True
@@ -255,7 +255,6 @@ with st.sidebar:
     radius_val = st.number_input("RADIUS BOUND ENVELOPE (METERS)", min_value=100, max_value=30000, value=st.session_state.map_radius, step=100)
     
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    # FIX: Attached non-empty accessibility identifier string
     search_query = st.text_input("DISCOVERY SEARCH INSTANCE INPUT", placeholder="e.g. Jollibee, Cafe, Hospital", key="search_bar_input", label_visibility="collapsed")
     
     if st.button("EXECUTE SCAN RUNTIME", use_container_width=True):
@@ -369,5 +368,4 @@ compiled_html_output = (leaflet_template
     .replace("__RADIUS__", str(st.session_state.map_radius))
     .replace("__GEOJSON_STR__", json.dumps(st.session_state.scanned_records)))
 
-# FIX: Migrated from the deprecated st.components.v1.html block to the standardized modern iframe view layer
 st.components.v1.html(compiled_html_output, height=1000, scrolling=False)
