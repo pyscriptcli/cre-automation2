@@ -158,16 +158,16 @@ def auto_save_config():
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
 
-# --- DYNAMIC HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
+# --- ENHANCED HIGH-RESOLUTION MAP GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
-    """Dynamically scales zoom to construct a massive high-res stitch and drops styled vector pins"""
-    target_tiles_span = 8  # Increased for higher resolution
+    """Generates high-res map with proper pin rendering for both documents and exports"""
+    target_tiles_span = 12  # Increased for higher resolution
     lon_span = e - w
     if lon_span <= 0: lon_span = 0.001
     
     # Calculate optimal zoom level for high resolution
     zoom = int(math.log2(360.0 / lon_span * target_tiles_span))
-    zoom = max(10, min(18, zoom))  # Cap at 18 to prevent excessive tile downloads
+    zoom = max(10, min(18, zoom))
     
     def deg2num(lat_deg, lon_deg, z):
         lat_rad = math.radians(lat_deg)
@@ -179,13 +179,12 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     x_min, y_min = deg2num(n, w, zoom)
     x_max, y_max = deg2num(s, e, zoom)
     
-    # Limit tile count to prevent memory issues
+    # Limit tile count but allow more for higher resolution
     tile_count = (x_max - x_min + 1) * (y_max - y_min + 1)
-    if tile_count > 100:
+    if tile_count > 150:
         zoom -= 1
         x_min, y_min = deg2num(n, w, zoom)
         x_max, y_max = deg2num(s, e, zoom)
-        tile_count = (x_max - x_min + 1) * (y_max - y_min + 1)
         
     width_tiles = x_max - x_min + 1
     height_tiles = y_max - y_min + 1
@@ -216,7 +215,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
                         break
                 except Exception:
                     if attempt == max_retries - 1:
-                        pass  # Skip failed tile
+                        pass
                     continue
                 
     def num2px(lat_deg, lon_deg, z):
@@ -245,7 +244,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # STAMP PROPORTIONALLY SCALED PIN AT EXACT PIXEL COORDINATES
+    # ENHANCED PIN RENDERING - Now includes proper styling and shadow
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
@@ -260,12 +259,14 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     h_px = 32 * scale
     
     # Draw pin shadow
+    shadow_offset_x = int(2 * scale)
+    shadow_offset_y = int(2 * scale)
     draw.ellipse([
-        pin_local_x - w_px - 2, pin_local_y - h_px - w_px + 2, 
-        pin_local_x + w_px + 2, pin_local_y - h_px + w_px + 2
-    ], fill="rgba(0,0,0,0.3)")
+        pin_local_x - w_px - shadow_offset_x, pin_local_y - h_px - w_px + shadow_offset_y, 
+        pin_local_x + w_px + shadow_offset_x, pin_local_y - h_px + w_px + shadow_offset_y
+    ], fill="rgba(0,0,0,0.35)")
     
-    # Draw pin base
+    # Draw pin base (white background)
     draw.polygon([
         (pin_local_x, pin_local_y), 
         (pin_local_x - w_px, pin_local_y - h_px), 
@@ -276,7 +277,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         pin_local_x + w_px, pin_local_y - h_px + w_px
     ], fill="#ffffff")
     
-    # Draw pin body
+    # Draw pin body (colored)
     draw.polygon([
         (pin_local_x, pin_local_y - (4 * scale)), 
         (pin_local_x - (w_px * 0.75), pin_local_y - h_px), 
@@ -287,36 +288,47 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         pin_local_x + (w_px * 0.75), pin_local_y - h_px + (w_px * 0.75)
     ], fill=pin_color)
     
-    # Draw inner circle
+    # Draw inner circle (white center)
     inner_radius = w_px * 0.33
     draw.ellipse([
         pin_local_x - inner_radius, pin_local_y - h_px - inner_radius, 
         pin_local_x + inner_radius, pin_local_y - h_px + inner_radius
     ], fill="#ffffff")
     
+    # Draw pin outline for better definition
+    outline_width = max(1, int(scale))
+    draw.polygon([
+        (pin_local_x, pin_local_y), 
+        (pin_local_x - w_px, pin_local_y - h_px), 
+        (pin_local_x + w_px, pin_local_y - h_px)
+    ], outline="#333333", width=outline_width)
+    
     final_img = cropped.convert("RGB")
     
-    # Upscale for higher resolution if needed
-    if cropped.width < 1000 or cropped.height < 1000:
-        scale_factor = 2
-        new_width = cropped.width * scale_factor
-        new_height = cropped.height * scale_factor
-        final_img = final_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    # Upscale for higher resolution output (3x for document quality)
+    scale_factor = 3
+    new_width = cropped.width * scale_factor
+    new_height = cropped.height * scale_factor
+    final_img = final_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
     
     img_byte_arr = io.BytesIO()
-    final_img.save(img_byte_arr, format='PNG', quality=95, optimize=True)
+    final_img.save(img_byte_arr, format='PNG', quality=95, optimize=False)
     img_byte_arr.seek(0)
     return img_byte_arr
 
-# --- MAP EDITOR MODAL WITH FIXED AUTO-REFRESH ---
+# --- MAP EDITOR MODAL WITH STABLE STATE MANAGEMENT ---
 @st.dialog("Map Editor Config", width="large")
 def map_editor_modal(token_key):
-    # Create a unique session state key for this map instance
+    """
+    Fixed map editor with stable state management to prevent continuous refreshes.
+    Uses unique session state keys and st_folium with no auto-reruns.
+    """
+    # Create unique session state keys for this map instance
     map_state_key = f"map_state_{token_key}"
     map_data_key = f"map_data_{token_key}"
     map_exported_key = f"map_exported_{token_key}"
     
-    # Initialize map state if not exists
+    # Initialize map state if not exists (only once)
     if map_state_key not in st.session_state:
         st.session_state[map_state_key] = {
             "style": "Hybrid",
@@ -324,7 +336,9 @@ def map_editor_modal(token_key):
             "color": "#DC3545",
             "size": 32,
             "zoom": 15,
-            "bounds": None
+            "bounds": None,
+            "plat": 14.3294,
+            "plon": 120.9368
         }
     
     # Get current state
@@ -345,6 +359,7 @@ def map_editor_modal(token_key):
     
     # Tiny Horizontally Packed Controls
     c1, c2, c3, c4 = st.columns([1.2, 1.6, 0.6, 1.2])
+    
     with c1:
         basemap_style = st.selectbox(
             "Map Style", 
@@ -352,18 +367,24 @@ def map_editor_modal(token_key):
             index=["Hybrid", "Satellite", "Carto Light", "OSM"].index(map_state["style"]),
             key=f"map_style_{token_key}"
         )
+        map_state["style"] = basemap_style
+    
     with c2:
         coord_input = st.text_input(
             "Center Pin Coordinates", 
             value=map_state["coord"],
             key=f"map_coord_{token_key}"
         )
+        map_state["coord"] = coord_input
+    
     with c3:
         pin_color = st.color_picker(
             "Pin Color", 
             value=map_state["color"],
             key=f"map_color_{token_key}"
         )
+        map_state["color"] = pin_color
+    
     with c4:
         pin_size = st.slider(
             "Pin Size", 
@@ -371,24 +392,19 @@ def map_editor_modal(token_key):
             value=map_state["size"],
             key=f"map_size_{token_key}"
         )
-    
-    # Update state from UI
-    map_state["style"] = basemap_style
-    map_state["coord"] = coord_input
-    map_state["color"] = pin_color
-    map_state["size"] = pin_size
+        map_state["size"] = pin_size
     
     # Safe Coordinate Calculation
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
-        plat, plon = 14.3294, 120.9368
+        plat, plon = map_state.get("plat", 14.3294), map_state.get("plon", 120.9368)
     
     # Update state with current coordinates
     map_state["plat"] = plat
     map_state["plon"] = plon
     
-    # Build map
+    # Build map with proper tile attribution
     tiles_dict = {
         "OSM": "OpenStreetMap",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
@@ -410,7 +426,7 @@ def map_editor_modal(token_key):
         zoom_control=True
     )
     
-    # Pin icon
+    # Pin icon HTML
     icon_html = f"""
     <div style="position: relative;">
         <span style="position: absolute; left: -{pin_size//2}px; top: -{pin_size}px; width: {pin_size}px; height: {pin_size}px; background-color: {pin_color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></span>
@@ -429,7 +445,7 @@ def map_editor_modal(token_key):
     
     st.caption("✏️ **Use the Rectangle tool (⬛) on the left to draw your crop box.** If no box is explicitly drawn, the current map view boundaries will be exported.")
     
-    # Only render the map with a stable key
+    # Render map with stable key to prevent continuous refreshes
     map_data = st_folium(
         m, 
         height=680, 
@@ -439,16 +455,15 @@ def map_editor_modal(token_key):
         returned_objects=["last_marker_moved", "all_drawings", "center", "zoom", "bounds"]
     )
     
-    # Process map data WITHOUT causing re-renders
+    # Process map data without causing re-renders
     if map_data and isinstance(map_data, dict):
-        # Handle marker movement - update state but don't trigger rerun
+        # Handle marker movement
         if map_data.get("last_marker_moved"):
             moved = map_data["last_marker_moved"]
             if moved:
                 mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
                 new_coord = f"{mlat}, {mlon}"
-                if map_state["coord"] != new_coord:
-                    map_state["coord"] = new_coord
+                map_state["coord"] = new_coord
         
         # Update zoom
         if map_data.get("zoom"):
@@ -458,7 +473,7 @@ def map_editor_modal(token_key):
         if map_data.get("bounds"):
             map_state["bounds"] = map_data["bounds"]
     
-    # Export button - this is the only thing that should trigger a rerun
+    # Export button - only action that triggers rerun
     if st.button("🚀 Confirm & Export Map Snapshot", key=f"exp_{token_key}", use_container_width=True):
         with st.spinner("Compiling Crisp High-Density Image Assets..."):
             # Get bounds from map data or fallback
@@ -491,7 +506,7 @@ def map_editor_modal(token_key):
                 n, s = plat + 0.02, plat - 0.02
                 e, w = plon + 0.02, plon - 0.02
             
-            # Generate high-res map
+            # Generate high-res map with proper pin rendering
             map_img_bytes = generate_static_map_bounds(
                 n, s, e, w, plat, plon, 
                 style=basemap_style, 
@@ -596,18 +611,27 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                         run.text = run.text.replace(token, replacement)
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
+    """Generate PPTX with proper image and map insertion"""
     prs = Presentation(io.BytesIO(template_bytes))
     for slide in prs.slides:
         shapes_to_delete = []
         images_to_add = []
+        
+        # First pass: identify image placeholders
         for shape in slide.shapes:
             if shape.has_text_frame:
                 text_content = shape.text
-                for img_token, img_file in image_inputs.items():
-                    if img_token in text_content and img_file is not None:
-                        images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
+                for img_token, img_data in image_inputs.items():
+                    if img_token in text_content and img_data is not None:
+                        # Handle both file objects and BytesIO objects
+                        if isinstance(img_data, io.BytesIO):
+                            images_to_add.append((img_data, shape.left, shape.top, shape.width, shape.height))
+                        else:
+                            images_to_add.append((img_data, shape.left, shape.top, shape.width, shape.height))
                         shapes_to_delete.append(shape)
                         break
+        
+        # Second pass: replace text in non-image shapes
         for shape in slide.shapes:
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
@@ -619,37 +643,73 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                             if cell.text_frame:
                                 for paragraph in cell.text_frame.paragraphs:
                                     replace_text_in_paragraph(paragraph, text_inputs)
-        for img_file, left, top, width, height in images_to_add:
+        
+        # Third pass: add images
+        for img_data, left, top, width, height in images_to_add:
             try:
-                processed_img = smart_crop_to_fit(img_file, width, height)
-                slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
-            except Exception:
+                # Handle BytesIO objects (from map generation)
+                if isinstance(img_data, io.BytesIO):
+                    img_data.seek(0)
+                    slide.shapes.add_picture(img_data, left, top, width=width, height=height)
+                else:
+                    # Handle file objects
+                    processed_img = smart_crop_to_fit(img_data, width, height)
+                    slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
+            except Exception as e:
+                print(f"Error adding image: {e}")
                 pass
+        
+        # Delete placeholder shapes
         for old_shape in shapes_to_delete:
             try:
                 sp = old_shape._element
                 sp.getparent().remove(sp)
             except Exception:
                 pass
+    
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
     return pptx_stream.getvalue()
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
+    """Generate DOCX with proper image and map insertion"""
     doc = Document(io.BytesIO(template_bytes))
+    
     for paragraph in doc.paragraphs:
         has_image = False
-        for img_token in image_inputs.keys():
-            if img_token in paragraph.text:
+        img_to_add = None
+        img_token = None
+        
+        # Check if paragraph contains image placeholder
+        for token, img_data in image_inputs.items():
+            if token in paragraph.text and img_data is not None:
                 has_image = True
+                img_to_add = img_data
+                img_token = token
                 break
-        if not has_image:
+        
+        if has_image and img_to_add:
+            # Clear paragraph and add image
+            paragraph.clear()
+            try:
+                if isinstance(img_to_add, io.BytesIO):
+                    img_to_add.seek(0)
+                    paragraph.add_run().add_picture(img_to_add, width=Inches(5))
+                else:
+                    paragraph.add_run().add_picture(img_to_add, width=Inches(5))
+            except Exception as e:
+                paragraph.add_run(f"[Image: {img_token}]")
+        else:
+            # Replace text placeholders
             replace_text_in_paragraph(paragraph, text_inputs)
+    
+    # Process tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
                     replace_text_in_paragraph(paragraph, text_inputs)
+    
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
     doc_stream.seek(0)
