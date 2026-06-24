@@ -74,77 +74,100 @@ MINIMAL_CRE_SYSTEM = """
     
     div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
     
-    /* Clean 2-column layout for placeholders */
-    .placeholder-grid {
+    /* Compressed 2-column layout for placeholders */
+    .placeholder-grid-compressed {
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
-        gap: 8px 20px !important;
+        gap: 4px 12px !important;
         width: 100% !important;
     }
     
-    .placeholder-item {
+    .placeholder-item-compressed {
         display: flex !important;
-        flex-direction: column !important;
-        gap: 2px !important;
-        padding: 4px 0 !important;
+        align-items: center !important;
+        gap: 4px !important;
+        padding: 2px 0 !important;
+        border-bottom: 1px solid #f0f0f0 !important;
     }
     
-    .placeholder-label {
+    .placeholder-label-compressed {
         font-weight: 600 !important;
-        font-size: 12px !important;
+        font-size: 11px !important;
         color: #1A1A1A !important;
-        margin-bottom: 2px !important;
+        min-width: 80px !important;
+        max-width: 80px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        flex-shrink: 0 !important;
     }
     
-    .placeholder-input {
-        width: 100% !important;
+    .placeholder-input-compressed {
+        flex: 1 !important;
+        min-width: 0 !important;
     }
-    .placeholder-input input {
-        font-size: 13px !important;
-        padding: 6px 10px !important;
-        height: 34px !important;
+    .placeholder-input-compressed input {
+        font-size: 12px !important;
+        padding: 3px 6px !important;
+        height: 28px !important;
         width: 100% !important;
     }
     
-    /* Collapsible type mapping section */
+    .placeholder-map-btn {
+        font-size: 11px !important;
+        padding: 2px 8px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+    }
+    
+    /* Type mapping section */
     .type-mapping-section {
         background-color: #F8F9FA !important;
         border: 1px solid #E0E0E0 !important;
         border-radius: 6px !important;
-        padding: 12px !important;
-        margin: 8px 0 12px 0 !important;
+        padding: 10px !important;
+        margin: 6px 0 10px 0 !important;
     }
     .type-mapping-grid {
         display: grid !important;
         grid-template-columns: 1fr 1fr 1fr !important;
-        gap: 6px 16px !important;
-        margin-top: 8px !important;
+        gap: 4px 10px !important;
+        margin-top: 4px !important;
     }
     .type-mapping-item {
         display: flex !important;
         align-items: center !important;
-        gap: 6px !important;
-        font-size: 12px !important;
+        gap: 4px !important;
+        font-size: 11px !important;
     }
     .type-mapping-item select {
-        font-size: 11px !important;
-        padding: 2px 4px !important;
-        height: 28px !important;
-        min-height: 28px !important;
+        font-size: 10px !important;
+        padding: 1px 3px !important;
+        height: 24px !important;
+        min-height: 24px !important;
         flex: 1 !important;
     }
     .type-mapping-item label {
-        min-width: 80px !important;
+        min-width: 60px !important;
         font-weight: 500 !important;
         color: #333 !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
     
     @media (max-width: 768px) {
-        .placeholder-grid {
+        .placeholder-grid-compressed {
             grid-template-columns: 1fr !important;
         }
         .type-mapping-grid {
             grid-template-columns: 1fr !important;
+        }
+        .placeholder-label-compressed {
+            min-width: 60px !important;
+            max-width: 60px !important;
+            font-size: 10px !important;
         }
     }
 </style>
@@ -158,10 +181,12 @@ def get_cache_dir():
 
 def save_form_data_to_cache(form_data, template_name):
     """Save form data to local cache file"""
-    if not form_data:
+    if not form_data or not template_name:
         return
     cache_dir = get_cache_dir()
-    cache_file = os.path.join(cache_dir, f"{template_name}_form_data.pkl")
+    # Sanitize template name for filename
+    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
+    cache_file = os.path.join(cache_dir, f"{safe_name}_form_data.pkl")
     try:
         with open(cache_file, 'wb') as f:
             pickle.dump(form_data, f)
@@ -170,8 +195,11 @@ def save_form_data_to_cache(form_data, template_name):
 
 def load_form_data_from_cache(template_name):
     """Load form data from local cache file"""
+    if not template_name:
+        return None
     cache_dir = get_cache_dir()
-    cache_file = os.path.join(cache_dir, f"{template_name}_form_data.pkl")
+    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
+    cache_file = os.path.join(cache_dir, f"{safe_name}_form_data.pkl")
     if os.path.exists(cache_file):
         try:
             with open(cache_file, 'rb') as f:
@@ -182,8 +210,11 @@ def load_form_data_from_cache(template_name):
 
 def clear_form_cache(template_name):
     """Clear cached form data for a template"""
+    if not template_name:
+        return
     cache_dir = get_cache_dir()
-    cache_file = os.path.join(cache_dir, f"{template_name}_form_data.pkl")
+    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
+    cache_file = os.path.join(cache_dir, f"{safe_name}_form_data.pkl")
     if os.path.exists(cache_file):
         try:
             os.remove(cache_file)
@@ -466,7 +497,7 @@ def render_isolated_map_editor():
     
     col_back, col_title = st.columns([1, 4])
     with col_back:
-        if st.button("← Back to Document", key="back_from_map"):
+        if st.button("Back to Document", key="back_from_map"):
             # Signal to restore form data from cache
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
@@ -500,11 +531,56 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    c1, c2, c3, c4 = st.columns([1.5, 2, 1, 2])
-    basemap_style = c1.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
-    coord_input = c2.text_input("Coordinates (Lat, Lon)", key=coord_key)
-    pin_color = c3.color_picker("Pin Color", key=color_key)
-    pin_size = c4.slider("Pin Size", 16, 64, key=size_key)
+    c1, c2 = st.columns([1, 3])
+    
+    with c1:
+        # Export button placed left of map layer
+        if st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True):
+            with st.spinner("Compiling map asset..."):
+                try:
+                    plat, plon = map(float, coord_input.split(","))
+                except:
+                    plat, plon = 14.5995, 120.9842
+                
+                # Get bounds from session state
+                n, s, e, w = None, None, None, None
+                
+                if st.session_state.get(bounds_key):
+                    b = st.session_state[bounds_key]
+                    if b and "_northEast" in b and "_southWest" in b:
+                        n = b["_northEast"]["lat"]
+                        s = b["_southWest"]["lat"]
+                        e = b["_northEast"]["lng"]
+                        w = b["_southWest"]["lng"]
+                
+                if n is None:
+                    n, s = plat + 0.005, plat - 0.005
+                    e, w = plon + 0.005, plon - 0.005
+                
+                map_img_bytes = generate_static_map_bounds(
+                    n, s, e, w, 
+                    plat, plon,
+                    style=st.session_state[style_key], 
+                    pin_color=st.session_state[color_key], 
+                    pin_size=st.session_state[size_key]
+                )
+                
+                st.session_state[image_key] = map_img_bytes
+                st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
+                st.session_state.restore_form_data = True
+                st.session_state.active_map_editor_token = None
+                st.success("Map attached successfully!")
+                time.sleep(0.3)
+                st.rerun()
+    
+    with c2:
+        # Map layer selector
+        basemap_style = st.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
+    
+    # Coordinate input row
+    coord_input = st.text_input("Coordinates (Lat, Lon)", key=coord_key)
+    pin_color = st.color_picker("Pin Color", key=color_key)
+    pin_size = st.slider("Pin Size", 16, 64, key=size_key)
 
     try:
         plat, plon = map(float, coord_input.split(","))
@@ -568,7 +644,7 @@ def render_isolated_map_editor():
     )
     draw.add_to(m)
     
-    st.info("Use the Rectangle tool (square icon) to frame your export area. Drag the pin to move it.")
+    st.info("Use the Rectangle tool to frame your export area. Drag the pin to move it.")
     
     # Display map
     map_data = st_folium(
@@ -579,72 +655,6 @@ def render_isolated_map_editor():
     # Store bounds from map_data for export
     if isinstance(map_data, dict) and map_data.get("bounds"):
         st.session_state[bounds_key] = map_data["bounds"]
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Export button
-    if st.button("Confirm and Export High-Res Image to Document", type="primary", use_container_width=True, key=f"export_map_{token_key}"):
-        with st.spinner("Compiling High-Density Map Asset..."):
-            
-            # Get the latest marker position
-            export_lat, export_lon = plat, plon
-            if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
-                moved = map_data["last_marker_moved"]
-                if moved:
-                    export_lat = moved["lat"]
-                    export_lon = moved["lng"]
-
-            # Get bounds - first from drawn rectangle, then from map bounds
-            n, s, e, w = None, None, None, None
-            
-            # Try to get from drawn rectangle
-            if isinstance(map_data, dict) and map_data.get("last_active_drawing"):
-                drawing = map_data["last_active_drawing"]
-                if drawing and drawing.get("geometry", {}).get("type") == "Polygon":
-                    coords = drawing["geometry"]["coordinates"][0]
-                    if coords and len(coords) >= 4:
-                        lats = [c[1] for c in coords]
-                        lons = [c[0] for c in coords]
-                        n, s = max(lats), min(lats)
-                        e, w = max(lons), min(lons)
-            
-            # If no rectangle, use map bounds from session state
-            if n is None and st.session_state.get(bounds_key):
-                b = st.session_state[bounds_key]
-                if b and "_northEast" in b and "_southWest" in b:
-                    n = b["_northEast"]["lat"]
-                    s = b["_southWest"]["lat"]
-                    e = b["_northEast"]["lng"]
-                    w = b["_southWest"]["lng"]
-            
-            # Fallback to area around pin - smaller for better zoom
-            if n is None:
-                n, s = export_lat + 0.005, export_lat - 0.005
-                e, w = export_lon + 0.005, export_lon - 0.005
-
-            # Generate high-res image with pin at the exported position
-            map_img_bytes = generate_static_map_bounds(
-                n, s, e, w, 
-                export_lat, export_lon,
-                style=basemap_style, 
-                pin_color=pin_color, 
-                pin_size=pin_size
-            )
-            
-            # Store in session state
-            st.session_state[image_key] = map_img_bytes
-            
-            # Update coordinates using a key that won't conflict with widgets
-            coord_value = f"{export_lat}, {export_lon}"
-            st.session_state[f"coord_{token_key}"] = coord_value
-            
-            # Signal to restore form data from cache
-            st.session_state.restore_form_data = True
-            
-            st.session_state.active_map_editor_token = None
-            st.success("High-res map rendering attached successfully!")
-            time.sleep(0.5)
-            st.rerun()
 
     # Handle marker movement
     if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
@@ -909,7 +919,7 @@ else:
                     if t['display_name'] == template_display:
                         template_name = t['name']
                         if t['source'] == 'stored':
-                            if st.button("🗑️", key="delete_template", help="Delete this template"):
+                            if st.button("Delete", key="delete_template", help="Delete this template"):
                                 st.session_state.show_delete_confirm = True
                                 st.session_state.template_to_delete = template_name
                                 st.rerun()
@@ -944,6 +954,10 @@ else:
                     template_name = t['name']
                     template_bytes = load_template_from_file(template_name)
                     if template_bytes:
+                        # Clear old form cache when template changes
+                        if st.session_state.saved_template_name and st.session_state.saved_template_name != template_name:
+                            clear_form_cache(st.session_state.saved_template_name)
+                        
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
                         st.session_state.template_loaded = True
@@ -955,7 +969,7 @@ else:
                         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
                         st.session_state.tokens = tokens
                         st.session_state.form_data = {}
-                        # Try to restore cached form data
+                        # Try to restore cached form data for the new template
                         restore_form_data_from_cache()
                     break
 
@@ -1018,7 +1032,7 @@ else:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
             
             # Type Mapping Section (Collapsible)
-            with st.expander("⚙️ Data Type Mapping", expanded=st.session_state.show_type_mapping):
+            with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
                 st.markdown("Configure the data type for each placeholder field.")
                 
                 # Create a grid for type mappings
@@ -1034,7 +1048,7 @@ else:
                         
                         col_label, col_select = st.columns([1, 1.5])
                         with col_label:
-                            st.markdown(f'<span style="font-size:12px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
+                            st.markdown(f'<span style="font-size:11px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
                         with col_select:
                             data_type = st.selectbox(
                                 "", 
@@ -1052,30 +1066,32 @@ else:
             
             st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
             
-            # Split into two columns for the actual form inputs
-            st.markdown('<div class="placeholder-grid">', unsafe_allow_html=True)
+            # Split into two columns for the actual form inputs - compressed layout
+            st.markdown('<div class="placeholder-grid-compressed">', unsafe_allow_html=True)
             
             for token in tokens:
                 clean_label = token.replace("{", "").replace("}", "")
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                st.markdown('<div class="placeholder-item">', unsafe_allow_html=True)
+                st.markdown('<div class="placeholder-item-compressed">', unsafe_allow_html=True)
                 
                 # Label
-                st.markdown(f'<div class="placeholder-label">{clean_label}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="placeholder-label-compressed" title="{clean_label}">{clean_label}</div>', unsafe_allow_html=True)
                 
                 # Input field
                 if current_type == "Image" and template_type == 'pptx':
+                    st.markdown('<div class="placeholder-input-compressed">', unsafe_allow_html=True)
                     image_data[token] = simple_uploader_row("", ["png", "jpg", "jpeg"], token)
+                    st.markdown('</div>', unsafe_allow_html=True)
                     field_types[token] = "Image"
                 elif current_type == "Map" and template_type == 'pptx':
                     saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
                     if saved_map_img:
                         image_data[token] = saved_map_img
-                        st.caption("Map snapshot attached.")
+                        st.caption("Map attached.")
                     
                     # Save form data before opening map editor
-                    if st.button("🗺️ Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
+                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
                         # Save current form data to cache
                         save_current_form_data()
                         st.session_state.active_map_editor_token = token
@@ -1084,8 +1100,10 @@ else:
                 else:
                     if current_type in ["Image", "Map"] and template_type != 'pptx':
                         st.warning("Media and Map uploads are only supported in PPTX files.")
+                    st.markdown('<div class="placeholder-input-compressed">', unsafe_allow_html=True)
                     input_key = f"val_{token}"
-                    text_data[token] = st.text_input("", key=input_key, label_visibility="collapsed", placeholder="Enter value...")
+                    text_data[token] = st.text_input("", key=input_key, label_visibility="collapsed", placeholder="...")
+                    st.markdown('</div>', unsafe_allow_html=True)
                     field_types[token] = "Text"
                 
                 st.markdown('</div>', unsafe_allow_html=True)
