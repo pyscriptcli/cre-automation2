@@ -148,12 +148,33 @@ st.markdown("""
             font-family: 'Montserrat', sans-serif !important;
         }
         
-        div[data-baseweb="input"], div[data-baseweb="select"] { 
-            background-color: transparent !important; 
-            border: none !important; 
-            border-bottom: 1px solid rgba(201, 171, 76, 0.5) !important; 
-            border-radius: 0px !important; 
-            box-shadow: none !important; 
+        /* UNIFIED SIDEBAR INPUT STYLES */
+        [data-testid="stSidebar"] div[data-baseweb="input"], 
+        [data-testid="stSidebar"] div[data-baseweb="select"],
+        [data-testid="stSidebar"] .stTextInput,
+        [data-testid="stSidebar"] .stNumberInput,
+        [data-testid="stSidebar"] .stSelectbox {
+            background-color: transparent !important;
+            border: none !important;
+            border-bottom: 1px solid rgba(201, 171, 76, 0.5) !important;
+            border-radius: 0px !important;
+            box-shadow: none !important;
+            margin-bottom: 12px !important;
+            padding: 4px 0 !important;
+        }
+        
+        [data-testid="stSidebar"] .stTextInput > div,
+        [data-testid="stSidebar"] .stNumberInput > div,
+        [data-testid="stSidebar"] .stSelectbox > div {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        
+        [data-testid="stSidebar"] .stTextInput input,
+        [data-testid="stSidebar"] .stNumberInput input,
+        [data-testid="stSidebar"] .stSelectbox select {
+            padding: 6px 0 !important;
+            font-size: 12px !important;
         }
         
         div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button { 
@@ -163,6 +184,8 @@ st.markdown("""
             width: 100% !important; 
             padding: 6px !important; 
             box-shadow: var(--soft-shadow) !important; 
+            height: 32px !important;
+            font-size: 10px !important;
         }
         div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover { 
             background-color: var(--brand-gold) !important; 
@@ -181,7 +204,8 @@ st.markdown("""
             border: none !important; 
             border-radius: 4px !important; 
             width: 100% !important; 
-            padding: 6px !important; 
+            padding: 6px !important;
+            height: 32px !important;
         }
         div.stDownloadButton > button:hover { background-color: var(--brand-gold) !important; }
         
@@ -191,6 +215,7 @@ st.markdown("""
             color: #AA2E20 !important; 
             padding: 4px !important; 
             border-radius: 4px;
+            height: 32px !important;
         }
         div.stButton > button[kind="primary"]:hover {
             background: rgba(170, 46, 32, 0.05) !important;
@@ -210,35 +235,48 @@ st.markdown("""
             box-shadow: 0 2px 6px rgba(0,0,0,0.01) !important;
         }
         
+        [data-testid="stSidebar"] .st-expander summary {
+            padding: 6px 8px !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.5px !important;
+        }
+        
+        [data-testid="stSidebar"] .st-expander .streamlit-expanderContent {
+            padding: 4px 8px 8px 8px !important;
+        }
+        
         .brand-title { 
             font-family: 'Cormorant Garamond', serif !important; 
             font-style: italic; 
             color: var(--brand-midnight); 
-            font-size: 32px; 
+            font-size: 28px !important; 
             text-align: center; 
             border-bottom: 1px solid var(--brand-gold); 
-            padding-bottom: 8px; 
-            margin-bottom: 16px; 
-            margin-top: 48px;
+            padding-bottom: 6px !important; 
+            margin-bottom: 12px !important; 
+            margin-top: 40px !important;
         }
+        
         .stTextInput label p, .stNumberInput label p, .stSelectbox label p { 
-            font-size: 10px !important; 
+            font-size: 9px !important; 
             font-weight: 600 !important; 
             color: var(--brand-midnight) !important; 
             letter-spacing: 0.3px;
+            margin-bottom: 2px !important;
         }
 
         /* WORKSPACE MODERN ARCHITECTURE */
         .workspace-section {
-            margin-top: 14px;
+            margin-top: 8px;
             border-top: 1px solid rgba(0, 51, 102, 0.08);
-            padding-top: 12px;
+            padding-top: 8px;
             flex: 1;
             display: flex;
             flex-direction: column;
         }
         .workspace-header {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             color: #003366;
             text-transform: uppercase;
@@ -246,7 +284,7 @@ st.markdown("""
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         .workspace-count {
             background: rgba(0, 51, 102, 0.08);
@@ -256,7 +294,7 @@ st.markdown("""
             font-weight: 700;
         }
         .workspace-layer {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             background: #ffffff;
             border: 1px solid rgba(0, 51, 102, 0.04);
             border-radius: 4px;
@@ -266,15 +304,15 @@ st.markdown("""
             display: flex;
             align-items: center;
             gap: 6px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             color: #003366;
-            padding: 4px 2px;
+            padding: 3px 2px;
             border-bottom: 1px solid rgba(0, 51, 102, 0.03);
         }
         .workspace-item {
-            font-size: 11px;
-            padding: 5px 6px 5px 14px;
+            font-size: 10px;
+            padding: 4px 6px 4px 14px;
             border-bottom: 1px solid rgba(0, 51, 102, 0.02);
             display: flex;
             justify-content: space-between;
@@ -292,7 +330,7 @@ st.markdown("""
             max-width: 170px;
         }
         .workspace-item-type {
-            font-size: 9px;
+            font-size: 8px;
             color: #64748b;
             background: #f1f5f9;
             padding: 1px 6px;
@@ -307,9 +345,9 @@ st.markdown("""
             flex-shrink: 0;
         }
         .workspace-empty {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-muted);
-            padding: 24px 8px;
+            padding: 20px 8px;
             text-align: center;
             border: 1px dashed rgba(0, 51, 102, 0.1);
             border-radius: 6px;
@@ -351,6 +389,58 @@ st.markdown("""
         .api-log-info { color: #34d399; }
         .api-log-error { color: #f87171; }
         .api-log-warning { color: #fb923c; }
+        
+        /* MAP CONTEXT MENU */
+        .map-context-menu {
+            position: fixed;
+            background: #ffffff;
+            border: 1px solid rgba(0, 51, 102, 0.15);
+            border-radius: 6px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            padding: 4px 0;
+            z-index: 100000;
+            min-width: 200px;
+            display: none;
+            font-family: 'Montserrat', sans-serif;
+        }
+        .map-context-menu-item {
+            padding: 8px 16px;
+            font-size: 11px;
+            color: #003366;
+            cursor: pointer;
+            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid rgba(0, 51, 102, 0.04);
+        }
+        .map-context-menu-item:hover {
+            background: rgba(0, 51, 102, 0.05);
+        }
+        .map-context-menu-item:last-child {
+            border-bottom: none;
+        }
+        .map-context-menu-item .icon {
+            font-size: 14px;
+            width: 20px;
+            text-align: center;
+        }
+        .map-context-menu-divider {
+            height: 1px;
+            background: rgba(0, 51, 102, 0.08);
+            margin: 2px 0;
+        }
+        
+        /* SECTION HEADERS */
+        .section-header {
+            font-size: 9px;
+            font-weight: 700;
+            color: #003366;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin: 8px 0 4px 0;
+            padding: 0;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -373,6 +463,8 @@ if 'search_cooldown_until' not in st.session_state: st.session_state.search_cool
 if 'search_count' not in st.session_state: st.session_state.search_count = 0
 if 'search_reset_time' not in st.session_state: st.session_state.search_reset_time = time.time()
 if 'last_search_query' not in st.session_state: st.session_state.last_search_query = ""
+if 'target_lat' not in st.session_state: st.session_state.target_lat = None
+if 'target_lon' not in st.session_state: st.session_state.target_lon = None
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -756,7 +848,7 @@ def process_overpass_results(elements):
 # 6. STREAMLIT DYNAMIC INTERACTION INJECTION LAYER - FIXED
 # -----------------------------------------------------------------------------
 st.markdown("""
-    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebarDynamic()">CLOSE PANEL</button>
+    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebarDynamic()">CLOSE</button>
     <script>
         function toggleSidebarDynamic() {
             const container = document.querySelector('[data-testid="stAppViewContainer"]');
@@ -764,7 +856,7 @@ st.markdown("""
             container.classList.toggle('sidebar-collapsed');
             
             const isCollapsed = container.classList.contains('sidebar-collapsed');
-            btn.textContent = isCollapsed ? 'OPEN PANEL' : 'CLOSE PANEL';
+            btn.textContent = isCollapsed ? 'OPEN' : 'CLOSE';
             
             // Send state to Streamlit
             const hiddenInput = document.getElementById('sidebar_state_input');
@@ -780,7 +872,7 @@ st.markdown("""
             const btn = document.getElementById('sidebarToggleBtn');
             if (container && btn) {
                 const isCollapsed = container.classList.contains('sidebar-collapsed');
-                btn.textContent = isCollapsed ? 'OPEN PANEL' : 'CLOSE PANEL';
+                btn.textContent = isCollapsed ? 'OPEN' : 'CLOSE';
             }
         });
     </script>
@@ -803,7 +895,7 @@ if st.session_state.sidebar_collapsed:
                     container.classList.add('sidebar-collapsed');
                 }
                 if (btn) {
-                    btn.textContent = 'OPEN PANEL';
+                    btn.textContent = 'OPEN';
                 }
             })();
         </script>
@@ -816,17 +908,12 @@ with st.sidebar:
     st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
     # SEARCH ENGINE COMPONENT BLOCK
-    st.markdown("<div style='font-size: 10px; font-weight: 700; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;'>Discovery Engine</div>", unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Discovery Engine</div>', unsafe_allow_html=True)
     search_query = st.text_input("", placeholder="e.g., jollibee, veterinary, 7-eleven", key="search_bar_input", label_visibility="collapsed", max_chars=SearchGuardrails.MAX_QUERY_LENGTH)
     
-    col_search, col_clear = st.columns([3, 1])
-    with col_search:
+    col_search = st.columns([1])
+    with col_search[0]:
         search_clicked = st.button("SEARCH", use_container_width=True, type="secondary", key="search_btn")
-    with col_clear:
-        if st.button("X", use_container_width=True, key="clear_search_btn"):
-            st.session_state.search_bar_input = ""
-            st.session_state.last_search_query = ""
-            st.rerun()
             
     if search_clicked and search_query.strip():
         st.session_state.last_search_query = search_query
@@ -844,7 +931,7 @@ with st.sidebar:
                 st.rerun()
 
     # LOCATION BOUNDARY PARAMETERS
-    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Location Parameters</div>', unsafe_allow_html=True)
     location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
     st.session_state.geo_radius = radius_val
@@ -857,17 +944,7 @@ with st.sidebar:
         fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
         lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.64650, 121.05804)
 
-    # REPOSITIONED BASEMAP & CANVAS CONTROLLER LAYOUT MODULE
-    with st.expander("BASEMAP CONTROLS", expanded=True):
-        basemap_choice = st.selectbox("ACTIVE BASEMAP", ["osm", "satellite", "carto"], index=0, key="persistent_basemap")
-        show_labels = st.checkbox("Enable Overlay Typography", value=True, key="persistent_labels")
-        label_size = st.slider("Typography Size Bounds", min_value=6, max_value=20, value=10, key="label_size")
-        
-        st.markdown("<hr style='margin: 8px 0; border:0; border-top:1px solid rgba(0,0,0,0.05);'>", unsafe_allow_html=True)
-        marker_style = st.selectbox("MARKER ICON DESIGN", ["dots", "pin", "modern-pin"], key="global_marker_style")
-        marker_color = st.color_picker("MARKER PRIMARY HEX", "#003366", key="global_marker_color")
-
-    # WORKSPACE MODULE
+    # WORKSPACE MODULE (MOVED UP - BEFORE BASEMAP)
     st.markdown(f"""
         <div class="workspace-section">
             <div class="workspace-header">
@@ -894,7 +971,7 @@ with st.sidebar:
                     <div class="workspace-layer-header">
                         <span class="color-dot" style="background-color:{current_layer_color};"></span>
                         <span>{rec_type}</span>
-                        <span style='font-weight:500; color:#64748b; font-size:10px; margin-left:auto;'>({len(items)})</span>
+                        <span style='font-weight:500; color:#64748b; font-size:9px; margin-left:auto;'>({len(items)})</span>
                     </div>
             """, unsafe_allow_html=True)
             
@@ -907,13 +984,12 @@ with st.sidebar:
                     </div>
                 """, unsafe_allow_html=True)
             if len(items) > 12:
-                st.markdown(f"<div style='font-size:9px; color:#888780; padding:4px 14px;'>+ {len(items) - 12} additional features</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='font-size:8px; color:#888780; padding:4px 14px;'>+ {len(items) - 12} additional features</div>", unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="workspace-empty">No active vectors inside workspace.<br>Execute spatial search profile.</div>', unsafe_allow_html=True)
 
     # PERSISTENT STORAGE EXPORT INTERFACE
-    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         st.download_button("EXPORT", json.dumps([p for p in st.session_state.scanned_records]), "spatial_scan.json", "application/json", use_container_width=True)
@@ -924,6 +1000,16 @@ with st.sidebar:
             st.session_state.scan_active_loading = False
             clear_api_logs()
             st.rerun()
+
+    # BASEMAP CONTROLS (MOVED DOWN - AFTER WORKSPACE)
+    with st.expander("BASEMAP CONTROLS", expanded=False):
+        basemap_choice = st.selectbox("ACTIVE BASEMAP", ["osm", "satellite", "carto"], index=0, key="persistent_basemap")
+        show_labels = st.checkbox("Enable Overlay Typography", value=True, key="persistent_labels")
+        label_size = st.slider("Typography Size Bounds", min_value=6, max_value=20, value=10, key="label_size")
+        
+        st.markdown("<hr style='margin: 6px 0; border:0; border-top:1px solid rgba(0,0,0,0.05);'>", unsafe_allow_html=True)
+        marker_style = st.selectbox("MARKER ICON DESIGN", ["dots", "pin", "modern-pin"], key="global_marker_style")
+        marker_color = st.color_picker("MARKER PRIMARY HEX", "#003366", key="global_marker_color")
             
     with st.expander("PIPELINE LOGS", expanded=False):
         if st.session_state.api_logs:
@@ -988,6 +1074,11 @@ layer_meta_json = json.dumps(st.session_state.layer_meta)
 geojson_str = json.dumps(st.session_state.scanned_records)
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 
+# Get target coords if set
+target_lat = st.session_state.target_lat if st.session_state.target_lat is not None else render_lat
+target_lon = st.session_state.target_lon if st.session_state.target_lon is not None else render_lon
+target_coords_json = json.dumps({"lat": target_lat, "lon": target_lon})
+
 api_logs_html = "".join([f'<div class="api-log-entry"><span class="api-log-time">[{l["time"]}]</span> <span class="api-log-{l["level"].lower()}">{l["message"]}</span></div>' for l in st.session_state.api_logs[-10:]])
 api_log_panel = f'''
 <div class="api-log-container" id="apiLogPanel">
@@ -1010,10 +1101,66 @@ leaflet_template = """
         #map { height: 100vh; width: 100vw; z-index: 1; }
         .poi-text-label { background: #ffffff; border: 1px solid #003366; padding: 2px 4px; border-radius: 3px; font-size: __LABEL_SIZE__px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.15); color: #003366; }
         .hide-labels .poi-text-label { display: none !important; }
+        
+        /* Context Menu */
+        .map-context-menu {
+            position: fixed;
+            background: #ffffff;
+            border: 1px solid rgba(0, 51, 102, 0.15);
+            border-radius: 6px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            padding: 4px 0;
+            z-index: 100000;
+            min-width: 220px;
+            display: none;
+            font-family: 'Montserrat', sans-serif;
+        }
+        .map-context-menu-item {
+            padding: 8px 16px;
+            font-size: 11px;
+            color: #003366;
+            cursor: pointer;
+            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid rgba(0, 51, 102, 0.04);
+        }
+        .map-context-menu-item:hover {
+            background: rgba(0, 51, 102, 0.05);
+        }
+        .map-context-menu-item:last-child {
+            border-bottom: none;
+        }
+        .map-context-menu-item .icon {
+            font-size: 14px;
+            width: 20px;
+            text-align: center;
+        }
+        .map-context-menu-divider {
+            height: 1px;
+            background: rgba(0, 51, 102, 0.08);
+            margin: 2px 0;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <div class="map-context-menu" id="contextMenu">
+        <div class="map-context-menu-item" onclick="setTarget()">
+            <span class="icon">📍</span> Make as target coordinate
+        </div>
+        <div class="map-context-menu-item" onclick="copyCoordinates()">
+            <span class="icon">📋</span> Copy coordinates
+        </div>
+        <div class="map-context-menu-divider"></div>
+        <div class="map-context-menu-item" onclick="openGoogleMaps()">
+            <span class="icon">🗺️</span> Open in Google Maps
+        </div>
+        <div class="map-context-menu-item" onclick="openStreetView()">
+            <span class="icon">👁️</span> Open in Google Street View
+        </div>
+    </div>
     __API_LOG_PANEL__
     <script>
         const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
@@ -1027,6 +1174,105 @@ leaflet_template = """
         basemaps["__BASEMAP_CHOICE__"].addTo(map);
         
         if (!__LABELS_ACTIVE__) { document.getElementById('map').classList.add('hide-labels'); }
+
+        // Context menu state
+        let contextLat = 0;
+        let contextLon = 0;
+        const contextMenu = document.getElementById('contextMenu');
+
+        // Right-click handler
+        map.on('contextmenu', function(e) {
+            contextLat = e.latlng.lat;
+            contextLon = e.latlng.lng;
+            
+            // Position the context menu
+            const x = e.containerPoint.x;
+            const y = e.containerPoint.y;
+            
+            // Adjust to keep menu in viewport
+            let left = x;
+            let top = y;
+            
+            // Get menu dimensions
+            const menuWidth = 220;
+            const menuHeight = 180;
+            
+            if (left + menuWidth > window.innerWidth) {
+                left = window.innerWidth - menuWidth - 10;
+            }
+            if (top + menuHeight > window.innerHeight) {
+                top = window.innerHeight - menuHeight - 10;
+            }
+            
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = left + 'px';
+            contextMenu.style.top = top + 'px';
+            
+            e.originalEvent.preventDefault();
+        });
+
+        // Close context menu on click elsewhere
+        document.addEventListener('click', function(e) {
+            if (!contextMenu.contains(e.target)) {
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        // Context menu actions
+        function setTarget() {
+            const coords = contextLat.toFixed(6) + ', ' + contextLon.toFixed(6);
+            // Send to Streamlit via hidden input
+            const targetInput = document.getElementById('target_coords_input');
+            if (targetInput) {
+                targetInput.value = JSON.stringify({lat: contextLat, lon: contextLon});
+                targetInput.dispatchEvent(new Event('change'));
+            }
+            contextMenu.style.display = 'none';
+            alert('Target coordinate set: ' + coords);
+        }
+
+        function copyCoordinates() {
+            const coords = contextLat.toFixed(6) + ', ' + contextLon.toFixed(6);
+            navigator.clipboard.writeText(coords).then(function() {
+                alert('Coordinates copied: ' + coords);
+            }).catch(function() {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = coords;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('Coordinates copied: ' + coords);
+            });
+            contextMenu.style.display = 'none';
+        }
+
+        function openGoogleMaps() {
+            const url = 'https://www.google.com/maps?q=' + contextLat + ',' + contextLon;
+            window.open(url, '_blank');
+            contextMenu.style.display = 'none';
+        }
+
+        function openStreetView() {
+            const url = 'https://www.google.com/maps?q=' + contextLat + ',' + contextLon + '&layer=c&cbll=' + contextLat + ',' + contextLon;
+            window.open(url, '_blank');
+            contextMenu.style.display = 'none';
+        }
+
+        // Target marker
+        let targetMarker = null;
+        const targetCoords = __TARGET_COORDS__;
+        if (targetCoords) {
+            targetMarker = L.marker([targetCoords.lat, targetCoords.lon], {
+                icon: L.divIcon({
+                    html: '<div style="background-color: #C9AB4C; color: #ffffff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 3px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.4);">★</div>',
+                    className: '',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                })
+            }).addTo(map).bindPopup('Target Location');
+        }
 
         L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.05 }).addTo(map);
         L.marker([__LAT__, __LON__], { icon: L.divIcon({ html: '<div style="background-color: #003366; color: #ffffff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.3)">★</div>', className: '', iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(map);
@@ -1057,6 +1303,36 @@ leaflet_template = """
 </html>
 """
 
+# Hidden input for target coordinates
+target_input_html = f'''
+<input type="hidden" id="target_coords_input" value='{target_coords_json}' />
+<script>
+    document.getElementById('target_coords_input').addEventListener('change', function() {{
+        try {{
+            const data = JSON.parse(this.value);
+            // Send to Streamlit
+            const hiddenInput = document.getElementById('target_state_input');
+            if (hiddenInput) {{
+                hiddenInput.value = this.value;
+                hiddenInput.dispatchEvent(new Event('change'));
+            }}
+        }} catch(e) {{
+            console.error('Invalid target coords');
+        }}
+    }});
+</script>
+'''
+
+# Streamlit hidden input for target state
+target_state = st.text_input("", key="target_state_input", label_visibility="collapsed", placeholder="target_state")
+if target_state:
+    try:
+        target_data = json.loads(target_state)
+        st.session_state.target_lat = target_data.get('lat')
+        st.session_state.target_lon = target_data.get('lon')
+    except:
+        pass
+
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
@@ -1069,6 +1345,7 @@ leaflet_html = (leaflet_template
                 .replace("__LABEL_SIZE__", str(label_size))
                 .replace("__MARKER_STYLE__", marker_style)
                 .replace("__MARKER_COLOR__", marker_color)
-                .replace("__API_LOG_PANEL__", api_log_panel))
+                .replace("__API_LOG_PANEL__", api_log_panel)
+                .replace("__TARGET_COORDS__", target_coords_json))
 
-st.components.v1.html(leaflet_html, height=900, scrolling=False)
+st.components.v1.html(leaflet_html + target_input_html, height=900, scrolling=False)
