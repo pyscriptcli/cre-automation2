@@ -372,9 +372,13 @@ def render_isolated_map_editor():
             div[data-baseweb="input"], div[data-baseweb="select"], .stColorPicker div {
                 height: 38px !important;
             }
-            /* Adjust color picker alignment to prevent label spacing overflow */
-            .stColorPicker > label {
-                margin-bottom: 4px !important;
+            /* Clean formatting alignment for the manual color picker label */
+            .manual-picker-label {
+                font-family: 'Segoe UI', Arial, sans-serif !important;
+                font-size: 14px !important;
+                color: #1A1A1A !important;
+                margin-bottom: 8px !important;
+                line-height: 1.2;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -402,7 +406,8 @@ def render_isolated_map_editor():
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
-    if size_key not in st.session_state: st.session_state[size_key] = 32
+    # FIXED: Initial baseline size updated to 16
+    if size_key not in st.session_state: st.session_state[size_key] = 16
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
@@ -415,15 +420,15 @@ def render_isolated_map_editor():
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.6, 2.0, 0.8, 1.2, 3.4])
     
     with c_btn:
-        # Pushed slightly down using empty markdown space to stay flush with text-labeled inputs
-        st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
         export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
         
     with c_style:
         basemap_style = st.selectbox(label="Basemap Layer", options=["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
         
     with c_color:
-        pin_color = st.color_picker(label="Pin Color", key=color_key)
+        # FIXED: Injected explicit label with standard margin overrides to align perfectly with its neighbors
+        st.markdown('<div class="manual-picker-label">Pin Color</div>', unsafe_allow_html=True)
+        pin_color = st.color_picker(label="Pin Color", key=color_key, label_visibility="collapsed")
         
     with c_size:
         pin_size = st.number_input(
