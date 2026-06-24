@@ -16,6 +16,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
 import time
+import pickle
 
 # --- MAP SPECIFIC DEPENDENCIES ---
 import folium
@@ -73,82 +74,121 @@ MINIMAL_CRE_SYSTEM = """
     
     div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
     
-    /* Compact placeholder row with icon dropdown */
-    .placeholder-row {
-        display: flex !important;
-        align-items: center !important;
-        gap: 6px !important;
-        margin-bottom: 6px !important;
-        padding: 2px 0 !important;
+    /* Clean 2-column layout for placeholders */
+    .placeholder-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px 20px !important;
         width: 100% !important;
     }
+    
+    .placeholder-item {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 2px !important;
+        padding: 4px 0 !important;
+    }
+    
     .placeholder-label {
         font-weight: 600 !important;
         font-size: 12px !important;
         color: #1A1A1A !important;
-        white-space: nowrap !important;
-        min-width: 100px !important;
-        flex-shrink: 0 !important;
+        margin-bottom: 2px !important;
     }
+    
     .placeholder-input {
-        flex: 1 !important;
-        min-width: 0 !important;
+        width: 100% !important;
     }
     .placeholder-input input {
         font-size: 13px !important;
-        padding: 4px 8px !important;
-        height: 32px !important;
+        padding: 6px 10px !important;
+        height: 34px !important;
+        width: 100% !important;
     }
-    .type-icon-btn {
-        background: none !important;
-        border: none !important;
-        padding: 4px 6px !important;
-        cursor: pointer !important;
-        font-size: 16px !important;
-        min-width: 32px !important;
-        text-align: center !important;
-        color: #666 !important;
+    
+    /* Collapsible type mapping section */
+    .type-mapping-section {
+        background-color: #F8F9FA !important;
+        border: 1px solid #E0E0E0 !important;
+        border-radius: 6px !important;
+        padding: 12px !important;
+        margin: 8px 0 12px 0 !important;
     }
-    .type-icon-btn:hover {
-        background: #f0f0f0 !important;
-        border-radius: 4px !important;
-        color: #003366 !important;
+    .type-mapping-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr 1fr !important;
+        gap: 6px 16px !important;
+        margin-top: 8px !important;
     }
-    .type-dropdown-compact {
-        min-width: 80px !important;
-        max-width: 90px !important;
-        flex-shrink: 0 !important;
+    .type-mapping-item {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        font-size: 12px !important;
     }
-    .type-dropdown-compact select {
+    .type-mapping-item select {
         font-size: 11px !important;
         padding: 2px 4px !important;
         height: 28px !important;
         min-height: 28px !important;
+        flex: 1 !important;
     }
-    
-    /* 2-column layout for placeholders */
-    .placeholder-grid {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr !important;
-        gap: 8px 16px !important;
-        width: 100% !important;
+    .type-mapping-item label {
+        min-width: 80px !important;
+        font-weight: 500 !important;
+        color: #333 !important;
     }
     
     @media (max-width: 768px) {
         .placeholder-grid {
             grid-template-columns: 1fr !important;
         }
-        .placeholder-label {
-            min-width: 70px !important;
-            font-size: 11px !important;
-        }
-        .type-dropdown-compact {
-            min-width: 60px !important;
-            max-width: 70px !important;
+        .type-mapping-grid {
+            grid-template-columns: 1fr !important;
         }
     }
 </style>
 """
+
+# --- FORM DATA CACHE FUNCTIONS ---
+def get_cache_dir():
+    cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "form_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return cache_dir
+
+def save_form_data_to_cache(form_data, template_name):
+    """Save form data to local cache file"""
+    if not form_data:
+        return
+    cache_dir = get_cache_dir()
+    cache_file = os.path.join(cache_dir, f"{template_name}_form_data.pkl")
+    try:
+        with open(cache_file, 'wb') as f:
+            pickle.dump(form_data, f)
+    except Exception as e:
+        print(f"Error saving form cache: {e}")
+
+def load_form_data_from_cache(template_name):
+    """Load form data from local cache file"""
+    cache_dir = get_cache_dir()
+    cache_file = os.path.join(cache_dir, f"{template_name}_form_data.pkl")
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'rb') as f:
+                return pickle.load(f)
+        except Exception as e:
+            print(f"Error loading form cache: {e}")
+    return None
+
+def clear_form_cache(template_name):
+    """Clear cached form data for a template"""
+    cache_dir = get_cache_dir()
+    cache_file = os.path.join(cache_dir, f"{template_name}_form_data.pkl")
+    if os.path.exists(cache_file):
+        try:
+            os.remove(cache_file)
+        except Exception:
+            pass
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
@@ -258,6 +298,7 @@ def delete_template_file(template_name):
         config_path = os.path.join(storage_dir, config_name)
         if os.path.exists(config_path):
             os.remove(config_path)
+        clear_form_cache(template_name)
         return True
     return False
 
@@ -426,7 +467,7 @@ def render_isolated_map_editor():
     col_back, col_title = st.columns([1, 4])
     with col_back:
         if st.button("← Back to Document", key="back_from_map"):
-            # Signal to restore form data
+            # Signal to restore form data from cache
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
             st.rerun()
@@ -597,7 +638,7 @@ def render_isolated_map_editor():
             coord_value = f"{export_lat}, {export_lon}"
             st.session_state[f"coord_{token_key}"] = coord_value
             
-            # Signal to restore form data
+            # Signal to restore form data from cache
             st.session_state.restore_form_data = True
             
             st.session_state.active_map_editor_token = None
@@ -777,27 +818,29 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
-# --- Function to preserve form data ---
-def save_form_data():
-    """Save all form data to session state before rerun"""
-    if st.session_state.tokens:
+# --- Form Data Management Functions ---
+def save_current_form_data():
+    """Save all current form data to cache"""
+    if st.session_state.saved_template_name and st.session_state.tokens:
+        form_data = {}
         for token in st.session_state.tokens:
             key = f"val_{token}"
             if key in st.session_state:
-                if token not in st.session_state.form_data:
-                    st.session_state.form_data = {}
-                st.session_state.form_data[token] = st.session_state[key]
+                form_data[token] = st.session_state[key]
+        if form_data:
+            save_form_data_to_cache(form_data, st.session_state.saved_template_name)
 
-def restore_form_data():
-    """Restore form data from session state after rerun"""
-    if hasattr(st.session_state, 'restore_form_data') and st.session_state.restore_form_data:
-        if hasattr(st.session_state, 'form_data') and st.session_state.form_data:
-            for token, value in st.session_state.form_data.items():
+def restore_form_data_from_cache():
+    """Restore form data from cache"""
+    if st.session_state.saved_template_name:
+        cached_data = load_form_data_from_cache(st.session_state.saved_template_name)
+        if cached_data:
+            for token, value in cached_data.items():
                 key = f"val_{token}"
-                # Only restore if the widget exists
                 if key in st.session_state:
                     st.session_state[key] = value
-        st.session_state.restore_form_data = False
+            return True
+    return False
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -818,14 +861,17 @@ if "saved_file_name" not in st.session_state: st.session_state.saved_file_name =
 if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = False
 if "form_data" not in st.session_state: st.session_state.form_data = {}
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
+if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 
 
 # --- ISOLATED APP ROUTER ---
 if st.session_state.active_map_editor_token:
     render_isolated_map_editor()
 else:
-    # Restore form data if needed
-    restore_form_data()
+    # Restore form data from cache if needed
+    if st.session_state.restore_form_data:
+        restore_form_data_from_cache()
+        st.session_state.restore_form_data = False
     
     # --- MAIN DOCUMENT GENERATOR APP ---
     st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -881,6 +927,7 @@ else:
                         st.session_state.template_loaded = False
                         st.session_state.tokens = []
                         st.session_state.form_data = {}
+                        clear_form_cache(st.session_state.template_to_delete)
                         st.session_state.show_delete_confirm = False
                         st.session_state.template_to_delete = None
                         st.rerun()
@@ -908,6 +955,8 @@ else:
                         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
                         st.session_state.tokens = tokens
                         st.session_state.form_data = {}
+                        # Try to restore cached form data
+                        restore_form_data_from_cache()
                     break
 
     with col_template2:
@@ -967,81 +1016,86 @@ else:
             st.info("No placeholders found in the template.")
         else:
             st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
             
-            # Split into two columns for display
-            mid_point = len(tokens) // 2
-            col1, col2 = st.columns(2)
-            
-            def render_token_fields(token_list, col_target):
-                with col_target:
-                    for token in token_list:
+            # Type Mapping Section (Collapsible)
+            with st.expander("⚙️ Data Type Mapping", expanded=st.session_state.show_type_mapping):
+                st.markdown("Configure the data type for each placeholder field.")
+                
+                # Create a grid for type mappings
+                st.markdown('<div class="type-mapping-grid">', unsafe_allow_html=True)
+                
+                # Split into 3 columns for type mapping
+                cols = st.columns(3)
+                for idx, token in enumerate(tokens):
+                    col_idx = idx % 3
+                    with cols[col_idx]:
                         clean_label = token.replace("{", "").replace("}", "")
                         current_type = st.session_state.custom_mapping.get(token, "Text")
                         
-                        # Get the type icon
-                        type_icons = {
-                            "Text": "📝",
-                            "Image": "🖼️",
-                            "Map": "🗺️"
-                        }
-                        current_icon = type_icons.get(current_type, "📝")
-                        
-                        # Use HTML for compact layout with icon-based dropdown
-                        st.markdown(f"""
-                        <div class="placeholder-row">
-                            <span class="placeholder-label">{clean_label}</span>
-                            <div class="placeholder-input">
-                        """, unsafe_allow_html=True)
-                        
-                        # Render the appropriate input
-                        if current_type == "Image" and template_type == 'pptx':
-                            image_data[token] = simple_uploader_row("", ["png", "jpg", "jpeg"], token)
-                            field_types[token] = "Image"
-                        elif current_type == "Map" and template_type == 'pptx':
-                            st.markdown(f'<div class="field-label">{clean_label} (Map Mode)</div>', unsafe_allow_html=True)
-                            saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
-                            if saved_map_img:
-                                image_data[token] = saved_map_img
-                                st.caption("Map snapshot attached.")
-                            
-                            # Save form data before opening map editor
-                            if st.button("🗺️ Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
-                                save_form_data()
-                                st.session_state.active_map_editor_token = token
+                        col_label, col_select = st.columns([1, 1.5])
+                        with col_label:
+                            st.markdown(f'<span style="font-size:12px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
+                        with col_select:
+                            data_type = st.selectbox(
+                                "", 
+                                ["Text", "Image", "Map"], 
+                                index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
+                                key=f"type_mapping_{token}", 
+                                label_visibility="collapsed"
+                            )
+                            if data_type != current_type:
+                                st.session_state.custom_mapping[token] = data_type
+                                auto_save_config()
                                 st.rerun()
-                            field_types[token] = "Image"
-                        else:
-                            if current_type in ["Image", "Map"] and template_type != 'pptx':
-                                st.warning("Media and Map uploads are only supported in PPTX files.")
-                            input_key = f"val_{token}"
-                            text_data[token] = st.text_input("", key=input_key, label_visibility="collapsed", placeholder=clean_label)
-                            field_types[token] = "Text"
-                        
-                        st.markdown("</div>", unsafe_allow_html=True)
-                        
-                        # Type dropdown as compact select with icon
-                        st.markdown(f"""
-                            <div class="type-dropdown-compact">
-                        """, unsafe_allow_html=True)
-                        data_type = st.selectbox(
-                            "", 
-                            ["Text", "Image", "Map"], 
-                            index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
-                            key=f"type_{token}", 
-                            label_visibility="collapsed"
-                        )
-                        st.markdown("</div>", unsafe_allow_html=True)
-                        
-                        st.markdown("</div>", unsafe_allow_html=True)
-                        
-                        if data_type != current_type:
-                            st.session_state.custom_mapping[token] = data_type
-                            auto_save_config()
-                            st.rerun()
-
-            render_token_fields(tokens[:mid_point], col1)
-            render_token_fields(tokens[mid_point:], col2)
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
+            
+            # Split into two columns for the actual form inputs
+            st.markdown('<div class="placeholder-grid">', unsafe_allow_html=True)
+            
+            for token in tokens:
+                clean_label = token.replace("{", "").replace("}", "")
+                current_type = st.session_state.custom_mapping.get(token, "Text")
+                
+                st.markdown('<div class="placeholder-item">', unsafe_allow_html=True)
+                
+                # Label
+                st.markdown(f'<div class="placeholder-label">{clean_label}</div>', unsafe_allow_html=True)
+                
+                # Input field
+                if current_type == "Image" and template_type == 'pptx':
+                    image_data[token] = simple_uploader_row("", ["png", "jpg", "jpeg"], token)
+                    field_types[token] = "Image"
+                elif current_type == "Map" and template_type == 'pptx':
+                    saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
+                    if saved_map_img:
+                        image_data[token] = saved_map_img
+                        st.caption("Map snapshot attached.")
+                    
+                    # Save form data before opening map editor
+                    if st.button("🗺️ Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
+                        # Save current form data to cache
+                        save_current_form_data()
+                        st.session_state.active_map_editor_token = token
+                        st.rerun()
+                    field_types[token] = "Image"
+                else:
+                    if current_type in ["Image", "Map"] and template_type != 'pptx':
+                        st.warning("Media and Map uploads are only supported in PPTX files.")
+                    input_key = f"val_{token}"
+                    text_data[token] = st.text_input("", key=input_key, label_visibility="collapsed", placeholder="Enter value...")
+                    field_types[token] = "Text"
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Auto-save form data periodically
+            if st.session_state.saved_template_name:
+                save_current_form_data()
+            
             st.markdown('</div>', unsafe_allow_html=True)
 
     # --- DOWNLOAD SECTION ---
