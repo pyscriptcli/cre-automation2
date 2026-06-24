@@ -1256,7 +1256,7 @@ radius_val = st.session_state.geo_radius
 
 # Handle search from UI - using proper labels
 search_query = st.text_input("Search", key="search_bar_input", label_visibility="collapsed", placeholder="Search establishments...", max_chars=SearchGuardrails.MAX_QUERY_LENGTH)
-search_clicked = st.button("SEARCH", key="search_btn", use_container_width=False)
+search_clicked = st.button("SEARCH", key="search_btn")
 
 if search_clicked and search_query.strip():
     st.session_state.last_search_query = search_query
@@ -1273,9 +1273,8 @@ if search_clicked and search_query.strip():
             st.session_state.scan_active_loading = True
             st.rerun()
 
-# Clear button handler - use a different approach
-if st.button("✕", key="clear_search_btn", use_container_width=False):
-    # Use st.session_state with proper widget key
+# Clear button handler
+if st.button("✕", key="clear_search_btn"):
     st.session_state.search_bar_input = ""
     st.session_state.last_search_query = ""
     st.rerun()
@@ -1486,8 +1485,8 @@ leaflet_html = (leaflet_template
                 .replace("__MARKER_STYLE__", st.session_state.marker_style)
                 .replace("__MARKER_COLOR__", marker_color))
 
-# Use st.iframe instead of st.components.v1.html (deprecated)
-st.iframe(leaflet_html, height=900, scrolling=False)
+# Use st.iframe instead of st.components.v1.html (deprecated) - removed scrolling parameter
+st.iframe(leaflet_html, height=900)
 
 # Update sidebar via Streamlit (workspace content)
 # This runs after the HTML is rendered
