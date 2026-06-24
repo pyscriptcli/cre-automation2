@@ -220,7 +220,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
-    scale = (pin_size / 32.0) * 2.0
+    scale = (pin_size / 32.0) * 2.5
     w_px = 16 * scale
     h_px = 32 * scale
     
@@ -256,13 +256,19 @@ def render_isolated_map_editor():
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
     size_key = f"map_size_{token_key}"
+    dragged_key = f"map_dragged_{token_key}"
     
+    # CRITICAL INVERSION FIX: Apply map dragged state changes BEFORE rendering widgets
+    if dragged_key in st.session_state:
+        st.session_state[coord_key] = st.session_state[dragged_key]
+        del st.session_state[dragged_key]
+
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.3294, 120.9368"
     if color_key not in st.session_state: st.session_state[color_key] = "#DC3545"
     if size_key not in st.session_state: st.session_state[size_key] = 32
 
-    # Direct variable linkage inside layout columns reflects parameter sweeps immediately
+    # Layout inputs reflecting parameters natively
     c1, c2, c3, c4 = st.columns([1.5, 2, 1, 2])
     basemap_style = c1.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
     coord_input = c2.text_input("Coordinates (Lat, Lon)", key=coord_key)
@@ -313,7 +319,7 @@ def render_isolated_map_editor():
     
     st.info("Use the Rectangle tool (Square Icon) to frame your export area. Drag the pin to move it.")
     
-    # Direct returned_objects isolation prevents real-time panning loop flickering anomalies
+    # Restricted objects explicitly blocks FeatureGroup serialization errors
     map_data = st_folium(
         m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}",
         returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
@@ -321,16 +327,13 @@ def render_isolated_map_editor():
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # FINAL HIGH RES EXPORT TRIGGER
     if st.button("Export High-Res Image to Document", type="primary", use_container_width=True):
-        with st.spinner("Compiling Crisp High-Density API Asset..."):
-            
+        with st.spinner("Compiling High-Res Image..."):
             export_lat, export_lon = plat, plon
             if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
                 export_lat = map_data["last_marker_moved"]["lat"]
                 export_lon = map_data["last_marker_moved"]["lng"]
 
-            # Intercept Bounding Box
             n, s, e, w = None, None, None, None
             if isinstance(map_data, dict) and map_data.get("last_active_drawing"):
                 drawing = map_data["last_active_drawing"]
@@ -356,9 +359,16 @@ def render_isolated_map_editor():
             
             st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
             st.session_state[coord_key] = f"{export_lat}, {export_lon}"
-            
             st.session_state.active_map_editor_token = None
-            st.success("High-res map rendering attached successfully!")
+            st.success("High-res map asset created successfully!")
+            st.rerun()
+
+    # Silently pipe marker coordinates changes to step-ahead buffer frames
+    if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
+        moved = map_data["last_marker_moved"]
+        mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
+        if f"{mlat}, {mlon}" != st.session_state[coord_key]:
+            st.session_state[dragged_key] = f"{mlat}, {mlon}"
             st.rerun()
 
 # --- CORE UTILITIES ---
@@ -525,6 +535,9 @@ def simple_uploader_row(label_text, allowed_types, key):
 
 
 # --- INIT APP ---
+st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
+st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
+
 if "active_map_editor_token" not in st.session_state: st.session_state.active_map_editor_token = None
 if "custom_mapping" not in st.session_state: st.session_state.custom_mapping = {}
 if "tokens" not in st.session_state: st.session_state.tokens = []
