@@ -1,22 +1,17 @@
 import os
 import io
-import subprocess
-import tempfile
 import re
 import json
 import streamlit as st
 from pptx import Presentation
-from pptx.util import Pt
 from PIL import Image
 from datetime import datetime
 from docx import Document
-from docx.shared import Inches, Pt as DocxPt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-import base64
-import traceback
+import requests
 import folium
 from streamlit_folium import folium_static
-import requests
+import base64
+import tempfile
 import time
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
@@ -30,7 +25,6 @@ if not os.path.exists(_config_file):
 # --- MINIMAL UI CSS ---
 MINIMAL_CRE_SYSTEM = """
 <style>
-    /* Hide Streamlit top bar */
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     .stApp { margin-top: -50px; }
@@ -41,7 +35,6 @@ MINIMAL_CRE_SYSTEM = """
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
     
-    /* Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
         background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important;
         color: #1A1A1A !important;
@@ -49,20 +42,16 @@ MINIMAL_CRE_SYSTEM = """
     div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, textarea:focus { border-color: #003366 !important; box-shadow: none !important; }
     input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 14px !important; }
     
-    /* Make select boxes and dropdown icons smaller */
     div[data-baseweb="select"] { min-height: 32px !important; }
     div[data-baseweb="select"] > div { min-height: 32px !important; padding: 0 8px !important; }
     div[data-baseweb="select"] select { font-size: 13px !important; padding: 2px 8px !important; }
     svg[data-testid="stSelectbox"] { width: 16px !important; height: 16px !important; }
     div[data-baseweb="select"] svg { width: 16px !important; height: 16px !important; }
     
-    /* File Uploader */
     section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important; padding: 4px 12px !important; }
     
-    /* Cards */
     .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
     
-    /* Buttons - #003366 color - made smaller */
     div.stButton > button { 
         background-color: #003366 !important; 
         color: #FFFFFF !important; 
@@ -87,7 +76,6 @@ MINIMAL_CRE_SYSTEM = """
         cursor: not-allowed !important; 
     }
     
-    /* Download Buttons - #003366 color - made smaller */
     div[data-testid="stDownloadButton"] > button { 
         background-color: #003366 !important;
         color: #FFFFFF !important;
@@ -105,7 +93,6 @@ MINIMAL_CRE_SYSTEM = """
         box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
     }
     
-    /* Delete button - made smaller */
     div[data-testid="column"] button { 
         background-color: transparent !important; 
         color: #DC3545 !important; 
@@ -121,12 +108,10 @@ MINIMAL_CRE_SYSTEM = """
         color: white !important; 
     }
     
-    /* Labels */
     .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 6px; }
     .section-header { font-size: 15px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 10px; }
     .saved-indicator { background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 6px; }
     
-    /* Map container styling */
     .map-container { 
         border: 1px solid #E0E0E0; 
         border-radius: 4px; 
@@ -145,65 +130,27 @@ MINIMAL_CRE_SYSTEM = """
     }
     
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
-    
-    /* Expander */
     .streamlit-expanderHeader { font-size: 14px !important; font-weight: 600 !important; }
-    
-    /* Table row styling */
-    .table-row { 
-        background-color: #F8F9FA; 
-        padding: 8px; 
-        border-radius: 4px; 
-        margin-bottom: 8px; 
-        border: 1px solid #E0E0E0;
-    }
-    .row-number {
-        font-weight: 600;
-        color: #003366;
-        padding-right: 10px;
-        font-size: 13px;
-    }
-    
-    /* Map specific styles */
-    .map-input-wrapper {
-        border: 1px solid #E0E0E0;
-        border-radius: 4px;
-        padding: 12px;
-        margin: 8px 0;
-        background: #FAFAFA;
-    }
-    .map-coords-display {
-        font-family: monospace;
-        font-size: 12px;
-        color: #003366;
-        background: #F0F4F8;
-        padding: 4px 8px;
-        border-radius: 3px;
-    }
 </style>
 """
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
-    """Get the directory for storing templates and configs"""
     storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
     os.makedirs(storage_dir, exist_ok=True)
     return storage_dir
 
 def save_template_to_file(template_bytes, template_name):
-    """Save template to file system"""
     storage_dir = get_storage_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
     if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
         safe_name += '.docx'
-    
     filepath = os.path.join(storage_dir, safe_name)
     with open(filepath, 'wb') as f:
         f.write(template_bytes)
     return filepath
 
 def load_template_from_file(template_name):
-    """Load template from file system"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -212,7 +159,6 @@ def load_template_from_file(template_name):
     return None
 
 def get_saved_templates():
-    """Get list of saved templates"""
     storage_dir = get_storage_dir()
     templates = []
     if os.path.exists(storage_dir):
@@ -230,7 +176,6 @@ def get_saved_templates():
     return templates
 
 def delete_template_file(template_name):
-    """Delete a saved template"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -243,18 +188,16 @@ def delete_template_file(template_name):
     return False
 
 def save_config_to_file(config_data, config_name="template_config.json"):
-    """Save configuration to file"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
-    # Ensure map data is serializable (remove binary data)
     serializable_config = {}
     for key, value in config_data.items():
         if isinstance(value, dict) and 'screenshot' in value:
-            # Don't save screenshot binary data
             serializable_config[key] = {
                 'type': value.get('type', 'Map'),
                 'lat': value.get('lat'),
-                'lng': value.get('lng')
+                'lng': value.get('lng'),
+                'basemap': value.get('basemap', 'satellite')
             }
         else:
             serializable_config[key] = value
@@ -263,7 +206,6 @@ def save_config_to_file(config_data, config_name="template_config.json"):
     return filepath
 
 def load_config_from_file(config_name="template_config.json"):
-    """Load configuration from file"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
     if os.path.exists(filepath):
@@ -272,7 +214,6 @@ def load_config_from_file(config_name="template_config.json"):
     return None
 
 def auto_save_config():
-    """Automatically save the current configuration"""
     if st.session_state.saved_template_name and st.session_state.custom_mapping:
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
@@ -355,7 +296,6 @@ def extract_placeholders(template_bytes, template_type):
     return []
 
 def replace_text_in_paragraph(paragraph, text_inputs):
-    """Replace text in a paragraph while preserving formatting"""
     for run in paragraph.runs:
         for token, value in text_inputs.items():
             if token in run.text:
@@ -420,7 +360,6 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     return pptx_stream.getvalue()
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
-    """Generate DOCX with text replacements"""
     doc = Document(io.BytesIO(template_bytes))
     
     for paragraph in doc.paragraphs:
@@ -445,7 +384,6 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 def get_download_filename(template_name, file_type):
-    """Generate download filename based on template name"""
     if template_name:
         base_name = re.sub(r'\.(pptx|docx)$', '', template_name)
         base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
@@ -455,34 +393,52 @@ def get_download_filename(template_name, file_type):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"Generated_Document_{timestamp}.{file_type}"
 
-# --- MAP FUNCTIONALITY ---
-def capture_map_screenshot(lat, lng, zoom=15):
-    """Capture a screenshot of the map at the specified coordinates using static map API"""
+# --- SIMPLIFIED MAP FUNCTIONALITY ---
+def get_basemap_tiles(basemap_choice):
+    """Get the appropriate tile layer URL based on basemap choice"""
+    basemaps = {
+        'satellite': 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+        'openstreetmap': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'carto_light': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+    }
+    return basemaps.get(basemap_choice, basemaps['satellite'])
+
+def capture_map_screenshot_static(lat, lng, basemap='satellite', zoom=15):
+    """
+    SIMPLEST APPROACH: Use static map API or create a PNG directly from HTML
+    No Selenium required!
+    """
     try:
-        # Use OpenStreetMap static tile service
-        # Note: For production, consider using Google Maps Static API with your API key
-        map_url = f"https://maps.geoapify.com/v1/staticmap?style=osm-bright&width=600&height=400&center=lonlat:{lng},{lat}&zoom={zoom}&marker=lonlat:{lng},{lat};color:%23FF0000;size:medium&apiKey=YOUR_API_KEY"
-        
-        # Fallback to using a simpler method without API key
-        # Using static map from OpenStreetMap
+        # Use a free static map API (no API key needed for basic OSM)
+        # This is the simplest method - just a URL request
         map_url = f"https://staticmap.openstreetmap.de/staticmap.php?center={lat},{lng}&zoom={zoom}&size=600x400&maptype=mapnik&markers={lat},{lng},red"
         
-        response = requests.get(map_url, timeout=10)
+        response = requests.get(map_url, timeout=15)
         if response.status_code == 200:
             img = Image.open(io.BytesIO(response.content))
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
             img_byte_arr.seek(0)
             return img_byte_arr
-        else:
-            # Fallback: Create a simple placeholder image with coordinates
-            return create_placeholder_map(lat, lng)
+        
+        # Fallback: Try another free service
+        map_url = f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/{lng},{lat},{zoom},0/600x400?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw"
+        response = requests.get(map_url, timeout=15)
+        if response.status_code == 200:
+            img = Image.open(io.BytesIO(response.content))
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+            return img_byte_arr
+            
     except Exception as e:
-        st.error(f"Could not capture map: {str(e)}")
-        return create_placeholder_map(lat, lng)
+        pass
+    
+    # Ultimate fallback: Create a simple placeholder image
+    return create_placeholder_map(lat, lng)
 
 def create_placeholder_map(lat, lng):
-    """Create a placeholder image with coordinates when map capture fails"""
+    """Create a placeholder image with coordinates"""
     from PIL import Image, ImageDraw, ImageFont
     
     img = Image.new('RGB', (600, 400), color='#F0F4F8')
@@ -491,16 +447,28 @@ def create_placeholder_map(lat, lng):
     # Draw a simple map-like background
     draw.rectangle([50, 50, 550, 350], outline='#003366', width=2)
     draw.ellipse([280, 180, 320, 220], fill='#FF0000', outline='#FF0000')
-    draw.text((250, 230), f"📍 {lat:.6f}, {lng:.6f}", fill='#003366')
+    
+    coords_text = f"Lat: {lat:.6f}, Lng: {lng:.6f}"
+    draw.text((200, 230), coords_text, fill='#003366')
     draw.text((260, 250), "Location Pin", fill='#003366')
+    draw.rectangle([0, 0, 599, 399], outline='#CCCCCC', width=1)
     
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='PNG')
     img_byte_arr.seek(0)
     return img_byte_arr
 
+def parse_coordinates(coord_string):
+    """Parse coordinates from a string format: 'lat, lon'"""
+    match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$', coord_string.strip())
+    if match:
+        lat = float(match.group(1))
+        lon = float(match.group(2))
+        return lat, lon
+    return None, None
+
 def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120.9842):
-    """Interactive map input with pin placement"""
+    """Interactive map input with pin placement and basemap selection - SIMPLIFIED"""
     
     map_key = f"map_{token}"
     
@@ -510,117 +478,124 @@ def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120
             "lat": default_lat,
             "lng": default_lng,
             "screenshot": None,
-            "saved": False
+            "saved": False,
+            "basemap": "satellite"
         }
     
     st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
     
     # Display current saved status
     if st.session_state[map_key]["saved"]:
-        st.markdown(f'<div class="map-saved-indicator">✅ Location saved: {st.session_state[map_key]["lat"]:.6f}, {st.session_state[map_key]["lng"]:.6f}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="map-saved-indicator">Location saved: {st.session_state[map_key]["lat"]:.6f}, {st.session_state[map_key]["lng"]:.6f}</div>', 
+            unsafe_allow_html=True
+        )
     
-    # Coordinate input
-    col1, col2, col3 = st.columns([2, 2, 1])
-    with col1:
-        lat = st.number_input(
-            "Latitude",
-            value=float(st.session_state[map_key]["lat"]),
-            format="%.6f",
-            key=f"lat_{token}",
-            step=0.0001,
+    # Basemap selection
+    col_basemap, col_spacer = st.columns([2, 1])
+    with col_basemap:
+        basemap_choice = st.selectbox(
+            "Basemap",
+            ["satellite", "openstreetmap", "carto_light"],
+            index=["satellite", "openstreetmap", "carto_light"].index(
+                st.session_state[map_key].get("basemap", "satellite")
+            ),
+            key=f"basemap_{token}",
             label_visibility="collapsed"
         )
-    with col2:
-        lng = st.number_input(
-            "Longitude",
-            value=float(st.session_state[map_key]["lng"]),
-            format="%.6f",
-            key=f"lng_{token}",
-            step=0.0001,
-            label_visibility="collapsed"
-        )
-    with col3:
-        st.markdown('<div style="padding-top: 20px;"></div>', unsafe_allow_html=True)
-        if st.button("📍", key=f"map_btn_{token}", help="Save location"):
-            if lat and lng:
+        if basemap_choice != st.session_state[map_key].get("basemap", "satellite"):
+            st.session_state[map_key]["basemap"] = basemap_choice
+    
+    # Single coordinate field
+    default_coords = f"{st.session_state[map_key]['lat']:.6f}, {st.session_state[map_key]['lng']:.6f}"
+    coords_input = st.text_input(
+        "Coordinates (lat, lon)",
+        value=default_coords,
+        key=f"coords_{token}",
+        help="Enter coordinates in format: lat, lon",
+        placeholder="e.g., 14.5995, 120.9842"
+    )
+    
+    # Parse coordinates
+    lat, lng = parse_coordinates(coords_input)
+    if lat is not None and lng is not None:
+        st.session_state[map_key]["lat"] = lat
+        st.session_state[map_key]["lng"] = lng
+    
+    # Save button
+    col_save, col_clear = st.columns([1, 1])
+    with col_save:
+        if st.button("Save Location", key=f"save_map_{token}", use_container_width=True):
+            if lat is not None and lng is not None:
                 st.session_state[map_key]["lat"] = lat
                 st.session_state[map_key]["lng"] = lng
                 st.session_state[map_key]["saved"] = True
+                st.session_state[map_key]["basemap"] = basemap_choice
                 
-                # Capture screenshot
+                # Capture screenshot using simple static method (no Selenium!)
                 with st.spinner("Capturing map..."):
-                    screenshot = capture_map_screenshot(lat, lng)
+                    screenshot = capture_map_screenshot_static(
+                        lat, 
+                        lng, 
+                        basemap_choice,
+                        zoom=15
+                    )
                     st.session_state[map_key]["screenshot"] = screenshot
+                    st.success("Location saved successfully!")
                 
                 auto_save_config()
                 st.rerun()
+            else:
+                st.warning("Please enter valid coordinates")
     
-    # Interactive map
+    with col_clear:
+        if st.button("Clear", key=f"clear_map_{token}", use_container_width=True):
+            st.session_state[map_key]["saved"] = False
+            st.session_state[map_key]["screenshot"] = None
+            st.rerun()
+    
+    # Interactive map display (using Folium - lightweight)
     st.markdown('<div class="map-container">', unsafe_allow_html=True)
     
     try:
-        # Create map centered on current coordinates
+        current_lat = st.session_state[map_key]["lat"]
+        current_lng = st.session_state[map_key]["lng"]
+        
+        tile_url = get_basemap_tiles(basemap_choice)
+        
         m = folium.Map(
-            location=[float(lat), float(lng)],
+            location=[current_lat, current_lng],
             zoom_start=14,
             width='100%',
-            height=350
+            height=400,
+            tiles=tile_url,
+            attr='Map'
         )
         
-        # Add marker at current location
         folium.Marker(
-            [float(lat), float(lng)],
-            popup=f"{clean_label}<br>{lat:.6f}, {lng:.6f}",
+            [current_lat, current_lng],
+            popup=f"{clean_label}<br>{current_lat:.6f}, {current_lng:.6f}",
             icon=folium.Icon(color='red', icon='info-sign')
         ).add_to(m)
         
-        # Add circle to show area
         folium.Circle(
-            [float(lat), float(lng)],
+            [current_lat, current_lng],
             radius=100,
             color='#003366',
             fill=True,
-            fillOpacity=0.1,
-            popup="Location area"
+            fillOpacity=0.1
         ).add_to(m)
         
-        # Add click handler (using JavaScript)
-        click_js = f"""
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {{
-                setTimeout(function() {{
-                    var map = document.querySelector('.folium-map');
-                    if (map) {{
-                        map.addEventListener('click', function(e) {{
-                            var lat = e.latlng.lat;
-                            var lng = e.latlng.lng;
-                            var inputLat = document.querySelector('input[data-key="lat_{token}"]');
-                            var inputLng = document.querySelector('input[data-key="lng_{token}"]');
-                            if (inputLat && inputLng) {{
-                                inputLat.value = lat.toFixed(6);
-                                inputLng.value = lng.toFixed(6);
-                            }}
-                        }});
-                    }}
-                }}, 1000);
-            }});
-        </script>
-        """
-        
-        # Display the map
-        folium_static(m, width=700, height=350)
-        
-        # Add click handler note
-        st.caption("💡 Click on the map to set coordinates, then click the 📍 button to save")
+        folium_static(m, width=700, height=400)
+        st.caption("Click on the map to set coordinates, then click Save Location")
         
     except Exception as e:
-        st.warning(f"Map display limited: {str(e)}")
-        st.info(f"Enter coordinates manually and click 📍 to save")
+        st.warning(f"Map display limited. Enter coordinates manually.")
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Return the screenshot if saved
-    if st.session_state[map_key]["saved"]:
+    # Return screenshot if saved
+    if st.session_state[map_key]["saved"] and st.session_state[map_key]["screenshot"] is not None:
         return st.session_state[map_key]["screenshot"]
     return None
 
@@ -632,7 +607,7 @@ def simple_uploader_row(label_text, allowed_types, key):
 st.set_page_config(page_title="OpenFlux - Template Automation", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
-# Initialize all session state variables
+# Initialize session state
 if "custom_mapping" not in st.session_state:
     st.session_state.custom_mapping = {}
 if "tokens" not in st.session_state:
@@ -660,12 +635,12 @@ if "clear_uploader" not in st.session_state:
 if "map_data" not in st.session_state:
     st.session_state.map_data = {}
 
-# --- MAIN LAYOUT ---
+# --- MAIN UI ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
 
-# --- TEMPLATE MANAGEMENT SECTION ---
+# Template Management
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-header">📄 Template Management</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">Template Management</div>', unsafe_allow_html=True)
 
 col_template1, col_template2 = st.columns(2)
 
@@ -689,7 +664,7 @@ with col_template1:
     with delete_col:
         if selected_template and selected_template != "Select saved template":
             template_name = selected_template.split(' (')[0]
-            if st.button("🗑️", key="delete_template", help="Delete this template"):
+            if st.button("Delete", key="delete_template", help="Delete this template"):
                 st.session_state.show_delete_confirm = True
                 st.session_state.template_to_delete = template_name
                 st.rerun()
@@ -755,7 +730,7 @@ with col_template2:
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
         
-        if st.button("💾 Save Template", key="save_template_btn", use_container_width=True):
+        if st.button("Save Template", key="save_template_btn", use_container_width=True):
             saved_path = save_template_to_file(template_bytes, uploaded_template.name)
             st.session_state.saved_template_name = uploaded_template.name
             
@@ -769,17 +744,18 @@ with col_template2:
             st.rerun()
 
 if st.session_state.save_success:
-    st.success(f"✅ Template '{st.session_state.saved_file_name}' saved successfully!")
+    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully!")
     st.session_state.save_success = False
     st.session_state.saved_file_name = None
 
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
     template_type = st.session_state.template_type or "Unknown"
-    st.markdown(f'<div class="saved-indicator">📌 Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
+# Placeholder Values
 template_bytes = st.session_state.template_bytes
 template_type = st.session_state.template_type
 u_template = None
@@ -795,20 +771,18 @@ if u_template is not None and st.session_state.tokens:
     tokens = st.session_state.tokens
     
     if not tokens:
-        st.info("ℹ️ No placeholders found in the template.")
+        st.info("No placeholders found in the template.")
     else:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">🔧 Placeholder Values</div>', unsafe_allow_html=True)
-        st.info(f"Found {len(tokens)} placeholders. Select type for each: Text, Image, or Map")
+        st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
+        st.info(f"Found {len(tokens)} placeholders. Select type: Text, Image, or Map")
         
-        # Split tokens into two columns
         mid_point = len(tokens) // 2
         col1, col2 = st.columns(2)
         
         with col1:
             for token in tokens[:mid_point]:
                 clean_label = token.replace("{", "").replace("}", "")
-                
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 col_a, col_b = st.columns([3, 1])
                 
@@ -831,15 +805,14 @@ if u_template is not None and st.session_state.tokens:
                     if data_type == "Image" and template_type == 'pptx':
                         image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                         field_types[token] = "Image"
-                        st.caption("📷 Upload image (PNG, JPG)")
+                        st.caption("Upload image (PNG, JPG)")
                     elif data_type == "Map":
-                        # Map input component
                         st.session_state.map_data[token] = map_input_component(token, clean_label)
                         field_types[token] = "Map"
-                        st.caption("🗺️ Click map to set location, then save")
+                        st.caption("Select basemap, enter coordinates, click Save Location")
                     else:
                         if data_type == "Image" and template_type != 'pptx':
-                            st.warning("⚠️ Image replacement only supported in PPTX templates")
+                            st.warning("Image replacement only supported in PPTX templates")
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input(
                             clean_label, 
@@ -851,7 +824,6 @@ if u_template is not None and st.session_state.tokens:
         with col2:
             for token in tokens[mid_point:]:
                 clean_label = token.replace("{", "").replace("}", "")
-                
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 col_a, col_b = st.columns([3, 1])
                 
@@ -874,15 +846,14 @@ if u_template is not None and st.session_state.tokens:
                     if data_type == "Image" and template_type == 'pptx':
                         image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                         field_types[token] = "Image"
-                        st.caption("📷 Upload image (PNG, JPG)")
+                        st.caption("Upload image (PNG, JPG)")
                     elif data_type == "Map":
-                        # Map input component
                         st.session_state.map_data[token] = map_input_component(token, clean_label)
                         field_types[token] = "Map"
-                        st.caption("🗺️ Click map to set location, then save")
+                        st.caption("Select basemap, enter coordinates, click Save Location")
                     else:
                         if data_type == "Image" and template_type != 'pptx':
-                            st.warning("⚠️ Image replacement only supported in PPTX templates")
+                            st.warning("Image replacement only supported in PPTX templates")
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input(
                             clean_label, 
@@ -893,17 +864,16 @@ if u_template is not None and st.session_state.tokens:
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- DOWNLOAD SECTION ---
+# Download Section
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">📥 Download Document</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
     
-    # Merge map screenshots into image_data for document generation
+    # Merge map screenshots into image_data
     for token, map_screenshot in st.session_state.map_data.items():
         if map_screenshot is not None:
             image_data[token] = map_screenshot
     
-    # Get template name for file naming
     template_name = st.session_state.saved_template_name or "Generated_Document"
     base_template_name = re.sub(r'\.(pptx|docx)$', '', template_name)
     
@@ -912,13 +882,13 @@ if u_template is not None:
     with col1:
         pptx_disabled = template_type != 'pptx'
         if pptx_disabled:
-            st.button("📊 Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
+            st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
             try:
                 pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
                 pptx_filename = get_download_filename(base_template_name, "pptx")
                 st.download_button(
-                    label="📊 Download PPTX",
+                    label="Download PPTX",
                     data=pptx_data,
                     file_name=pptx_filename,
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -931,15 +901,14 @@ if u_template is not None:
     with col2:
         docx_disabled = template_type != 'docx'
         if docx_disabled:
-            st.button("📄 Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
+            st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
             try:
                 docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
-                
                 if docx_data:
                     docx_filename = get_download_filename(base_template_name, "docx")
                     st.download_button(
-                        label="📄 Download DOCX",
+                        label="Download DOCX",
                         data=docx_data,
                         file_name=docx_filename,
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -947,14 +916,13 @@ if u_template is not None:
                         key="download_docx"
                     )
                 else:
-                    st.error("Failed to generate document. Please check the template and try again.")
+                    st.error("Failed to generate document.")
             except Exception as e:
                 st.error(f"Error generating document: {str(e)}")
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("📌 Please upload or select a template to begin")
+    st.info("Please upload or select a template to begin")
 
-# --- FOOTER ---
 st.markdown("---")
 st.caption("OpenFlux v2.0 | Template Automation with Map Support")
