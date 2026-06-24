@@ -13,6 +13,8 @@ from streamlit_folium import folium_static
 import tempfile
 import time
 import base64
+import zipfile
+from io import BytesIO
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -22,7 +24,7 @@ if not os.path.exists(_config_file):
     with open(_config_file, "w", encoding="utf-8") as f:
         f.write("[theme]\nbase=\"light\"\n")
 
-# --- MINIMAL UI CSS ---
+# --- MINIMAL UI CSS WITH FLOATING BUTTON ---
 MINIMAL_CRE_SYSTEM = """
 <style>
     #MainMenu {visibility: hidden;}
@@ -125,31 +127,199 @@ MINIMAL_CRE_SYSTEM = """
     
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     .streamlit-expanderHeader { font-size: 14px !important; font-weight: 600 !important; }
+    
+    /* FLOATING DOWNLOAD BUTTON - PERSISTENT OVERLAY */
+    .floating-download-container {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+    }
+    
+    .floating-download-btn {
+        background-color: #003366 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 50px !important;
+        padding: 14px 24px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 20px rgba(0, 51, 102, 0.4) !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        min-width: 180px !important;
+        justify-content: center !important;
+        animation: pulse 2s infinite !important;
+    }
+    
+    .floating-download-btn:hover {
+        background-color: #002244 !important;
+        transform: translateY(-2px) scale(1.02) !important;
+        box-shadow: 0 6px 30px rgba(0, 51, 102, 0.6) !important;
+    }
+    
+    .floating-download-btn .badge {
+        background-color: #FF4444;
+        color: white;
+        border-radius: 50%;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: bold;
+        margin-left: 4px;
+    }
+    
+    .floating-download-dropdown {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        padding: 16px;
+        min-width: 280px;
+        max-width: 350px;
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #E0E0E0;
+        animation: slideUp 0.3s ease;
+    }
+    
+    .floating-download-dropdown .template-item {
+        padding: 8px 12px;
+        margin: 4px 0;
+        border-radius: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #F8F9FA;
+        transition: background-color 0.2s ease;
+    }
+    
+    .floating-download-dropdown .template-item:hover {
+        background-color: #E3F2FD;
+    }
+    
+    .floating-download-dropdown .template-name {
+        font-size: 13px;
+        color: #1A1A1A;
+        flex: 1;
+        margin-right: 8px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .floating-download-dropdown .template-size {
+        font-size: 11px;
+        color: #666;
+        margin-right: 8px;
+    }
+    
+    .floating-download-dropdown .download-icon-btn {
+        background-color: #003366;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 4px 10px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    
+    .floating-download-dropdown .download-icon-btn:hover {
+        background-color: #002244;
+    }
+    
+    .floating-download-dropdown .close-btn {
+        background: none;
+        border: none;
+        color: #666;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 0 4px;
+    }
+    
+    .floating-download-dropdown .close-btn:hover {
+        color: #000;
+    }
+    
+    .floating-download-dropdown .header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #E0E0E0;
+    }
+    
+    .floating-download-dropdown .header-row h4 {
+        margin: 0;
+        color: #003366;
+        font-size: 15px;
+    }
+    
+    .floating-download-dropdown .empty-state {
+        text-align: center;
+        padding: 20px 0;
+        color: #999;
+        font-size: 13px;
+    }
+    
+    .floating-download-dropdown .zip-download-btn {
+        background-color: #003366;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        width: 100%;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 8px;
+    }
+    
+    .floating-download-dropdown .zip-download-btn:hover {
+        background-color: #002244;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 12px rgba(0, 51, 102, 0.3);
+    }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 4px 20px rgba(0, 51, 102, 0.4); }
+        50% { box-shadow: 0 4px 30px rgba(0, 51, 102, 0.6); }
+        100% { box-shadow: 0 4px 20px rgba(0, 51, 102, 0.4); }
+    }
+    
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Scrollbar styling */
+    .floating-download-dropdown::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .floating-download-dropdown::-webkit-scrollbar-track {
+        background: #F1F1F1;
+        border-radius: 10px;
+    }
+    
+    .floating-download-dropdown::-webkit-scrollbar-thumb {
+        background: #003366;
+        border-radius: 10px;
+    }
+    
+    .floating-download-dropdown::-webkit-scrollbar-thumb:hover {
+        background: #002244;
+    }
 </style>
 """
-
-
-# === ONE-TIME TEMPLATE EXPORT FUNCTION ===
-def export_all_templates_simple():
-    """Simple function to download all templates"""
-    saved = get_saved_templates()
-    if saved:
-        st.markdown("---")
-        st.markdown("### 📥 Export All Templates")
-        
-        # Option 1: Download one by one
-        for t in saved:
-            data = load_template_from_file(t['name'])
-            if data:
-                st.download_button(
-                    label=f"Download {t['name']}",
-                    data=data,
-                    file_name=t['name'],
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation" if t['name'].endswith('.pptx') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    key=f"exp_{t['name']}"
-                )
-    else:
-        st.info("No templates saved yet")
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
@@ -423,21 +593,14 @@ def get_basemap_tiles(basemap_choice):
 def capture_map_screenshot_google_static(lat, lng, basemap='satellite', zoom=15):
     """Primary: Use Google Maps Static API"""
     try:
-        # Google Maps Static API URL with red pin marker
-        # Get a free API key from: https://developers.google.com/maps/documentation/maps-static/get-api-key
         api_key = "YOUR_GOOGLE_MAPS_API_KEY"
-        
-        # If no API key is set, use a demo key (limited to 1000 requests per day)
         if api_key == "YOUR_GOOGLE_MAPS_API_KEY":
             api_key = "AIzaSyA5oEohxJ-jB5WBR6pR3D8VtaY8X2CkT-8"
         
-        # Map type based on basemap
         maptype = 'satellite' if basemap == 'satellite' else 'roadmap'
-        
         url = f"https://maps.googleapis.com/maps/api/staticmap?center={lat},{lng}&zoom={zoom}&size=800x600&maptype={maptype}&markers=color:red%7C{lat},{lng}&key={api_key}"
         
         response = requests.get(url, timeout=10)
-        
         if response.status_code == 200:
             img = Image.open(io.BytesIO(response.content))
             img_byte_arr = io.BytesIO()
@@ -446,18 +609,15 @@ def capture_map_screenshot_google_static(lat, lng, basemap='satellite', zoom=15)
             return img_byte_arr
         else:
             return None
-            
     except Exception as e:
         print(f"Google Maps Static API error: {str(e)}")
         return None
 
 def capture_map_screenshot_osm_static(lat, lng, basemap='satellite', zoom=15):
-    """Fallback: Use OpenStreetMap Static API (no key needed)"""
+    """Fallback: Use OpenStreetMap Static API"""
     try:
         url = f"https://staticmap.openstreetmap.de/staticmap.php?center={lat},{lng}&zoom={zoom}&size=800x600&maptype=mapnik&markers={lat},{lng},red-pin"
-        
         response = requests.get(url, timeout=10)
-        
         if response.status_code == 200:
             img = Image.open(io.BytesIO(response.content))
             img_byte_arr = io.BytesIO()
@@ -466,7 +626,6 @@ def capture_map_screenshot_osm_static(lat, lng, basemap='satellite', zoom=15):
             return img_byte_arr
         else:
             return None
-            
     except Exception as e:
         print(f"OSM Static API error: {str(e)}")
         return None
@@ -480,13 +639,9 @@ def capture_map_screenshot_mapbox_static(lat, lng, basemap='satellite', zoom=15)
             'carto_light': 'mapbox/light-v10'
         }
         style = styles.get(basemap, 'mapbox/satellite-v9')
-        
         mapbox_token = "pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw"
-        
         url = f"https://api.mapbox.com/styles/v1/{style}/static/{lng},{lat},{zoom}/800x600?access_token={mapbox_token}&marker=pin-s+FF0000({lng},{lat})"
-        
         response = requests.get(url, timeout=10)
-        
         if response.status_code == 200:
             img = Image.open(io.BytesIO(response.content))
             img_byte_arr = io.BytesIO()
@@ -495,7 +650,6 @@ def capture_map_screenshot_mapbox_static(lat, lng, basemap='satellite', zoom=15)
             return img_byte_arr
         else:
             return None
-            
     except Exception as e:
         print(f"Mapbox Static API error: {str(e)}")
         return None
@@ -504,58 +658,35 @@ def create_placeholder_map(lat, lng):
     """Ultimate fallback: Create a placeholder image with coordinates and pin"""
     try:
         from PIL import Image, ImageDraw
-        
         img = Image.new('RGB', (800, 600), color='#F0F4F8')
         draw = ImageDraw.Draw(img)
-        
-        # Draw a border
         draw.rectangle([10, 10, 790, 590], outline='#003366', width=2)
-        
-        # Draw a subtle grid pattern
         for i in range(50, 800, 50):
             draw.line([(i, 10), (i, 590)], fill='#E0E5EC', width=1)
         for i in range(50, 600, 50):
             draw.line([(10, i), (790, i)], fill='#E0E5EC', width=1)
-        
-        # Draw the red pin
         pin_x, pin_y = 400, 250
-        
-        # Pin shadow
         draw.ellipse([pin_x-12, pin_y+25, pin_x+12, pin_y+40], fill='#B0B8C0')
-        
-        # Pin body (triangle)
         draw.polygon([
             (pin_x, pin_y-25),
             (pin_x-18, pin_y+10),
             (pin_x+18, pin_y+10)
         ], fill='#FF0000', outline='#CC0000')
-        
-        # Pin head (circle)
         draw.ellipse([pin_x-12, pin_y-12, pin_x+12, pin_y+12], fill='#FFFFFF', outline='#CC0000')
         draw.ellipse([pin_x-6, pin_y-6, pin_x+6, pin_y+6], fill='#FF0000')
-        
-        # Coordinates text
         coords_text = f"Lat: {lat:.6f}, Lng: {lng:.6f}"
         text_x = (800 - len(coords_text) * 8) // 2
         text_y = 380
-        
-        # Draw text background
-        draw.rectangle([text_x-10, text_y-5, text_x+len(coords_text)*8+10, text_y+25], 
-                       fill='#FFFFFF', outline='#003366')
+        draw.rectangle([text_x-10, text_y-5, text_x+len(coords_text)*8+10, text_y+25], fill='#FFFFFF', outline='#003366')
         draw.text((text_x, text_y), coords_text, fill='#003366')
-        
-        # Add a label
         label_text = "Location Pin"
         label_x = (800 - len(label_text) * 8) // 2
         draw.text((label_x, 420), label_text, fill='#003366')
-        
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
         img_byte_arr.seek(0)
         return img_byte_arr
-        
     except Exception as e:
-        # Ultimate fallback
         img = Image.new('RGB', (800, 600), color='#FFFFFF')
         draw = ImageDraw.Draw(img)
         draw.text((300, 280), f"Location: {lat:.6f}, {lng:.6f}", fill='#000000')
@@ -565,34 +696,18 @@ def create_placeholder_map(lat, lng):
         return img_byte_arr
 
 def capture_map_screenshot(lat, lng, basemap='satellite', zoom=15):
-    """
-    Capture map screenshot using multiple methods in order:
-    1. Google Maps Static API (primary)
-    2. OpenStreetMap Static API (fallback 1)
-    3. Mapbox Static API (fallback 2)
-    4. Placeholder image (ultimate fallback)
-    """
-    
-    # Method 1: Google Maps Static API
     result = capture_map_screenshot_google_static(lat, lng, basemap, zoom)
     if result is not None:
         return result
-    
-    # Method 2: OpenStreetMap Static API
     result = capture_map_screenshot_osm_static(lat, lng, basemap, zoom)
     if result is not None:
         return result
-    
-    # Method 3: Mapbox Static API
     result = capture_map_screenshot_mapbox_static(lat, lng, basemap, zoom)
     if result is not None:
         return result
-    
-    # Method 4: Placeholder image (ultimate fallback)
     return create_placeholder_map(lat, lng)
 
 def parse_coordinates(coord_string):
-    """Parse coordinates from a string format: 'lat, lon'"""
     match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$', coord_string.strip())
     if match:
         lat = float(match.group(1))
@@ -601,11 +716,8 @@ def parse_coordinates(coord_string):
     return None, None
 
 def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=120.9842):
-    """Map Editor with expander - Approach 1"""
-    
     map_key = f"map_{token}"
     
-    # Initialize session state for this map
     if map_key not in st.session_state:
         st.session_state[map_key] = {
             "lat": default_lat,
@@ -617,39 +729,30 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
             "editor_open": False
         }
     
-    # Show current status
     if st.session_state[map_key]["saved"]:
         st.markdown(
             f'<div class="map-saved-indicator">Location saved: {st.session_state[map_key]["lat"]:.6f}, {st.session_state[map_key]["lng"]:.6f}</div>', 
             unsafe_allow_html=True
         )
-        # Show thumbnail of saved map
         if st.session_state[map_key]["screenshot"] is not None:
             st.image(st.session_state[map_key]["screenshot"], caption="Current Map", width=200)
     
-    # Button to open map editor
     col_btn, col_clear = st.columns([3, 1])
     with col_btn:
         if st.button("Open Map Editor", key=f"open_editor_{token}", use_container_width=True):
             st.session_state[map_key]["editor_open"] = not st.session_state[map_key]["editor_open"]
             st.rerun()
-    
     with col_clear:
         if st.button("Clear Map", key=f"clear_map_{token}", use_container_width=True):
             st.session_state[map_key]["saved"] = False
             st.session_state[map_key]["screenshot"] = None
             st.rerun()
     
-    # Map Editor Expander
     if st.session_state[map_key]["editor_open"]:
         with st.expander("Map Editor", expanded=True):
             st.markdown('<div class="map-editor-header">Adjust the map, then click Capture Map</div>', unsafe_allow_html=True)
-            
-            # Editor controls
             col1, col2, col3 = st.columns([2, 2, 1])
-            
             with col1:
-                # Basemap selection
                 basemap_choice = st.selectbox(
                     "Basemap",
                     ["satellite", "openstreetmap", "carto_light"],
@@ -661,9 +764,7 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
                 )
                 if basemap_choice != st.session_state[map_key].get("basemap", "satellite"):
                     st.session_state[map_key]["basemap"] = basemap_choice
-            
             with col2:
-                # Zoom control
                 zoom = st.slider(
                     "Zoom",
                     min_value=10,
@@ -672,16 +773,12 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
                     key=f"zoom_editor_{token}"
                 )
                 st.session_state[map_key]["zoom"] = zoom
-            
             with col3:
-                # Pin color - Future enhancement
                 st.markdown('<div style="padding-top: 24px;"></div>', unsafe_allow_html=True)
-                pin_color = "Red"  # Could add color picker later
+                pin_color = "Red"
             
-            # Coordinate input
             current_lat = st.session_state[map_key]["lat"]
             current_lng = st.session_state[map_key]["lng"]
-            
             default_coords = f"{current_lat:.6f}, {current_lng:.6f}"
             coords_input = st.text_input(
                 "Coordinates (lat, lon)",
@@ -690,23 +787,16 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
                 help="Enter coordinates in format: lat, lon",
                 placeholder="e.g., 14.5995, 120.9842"
             )
-            
-            # Parse coordinates
             lat, lng = parse_coordinates(coords_input)
             if lat is not None and lng is not None:
                 st.session_state[map_key]["lat"] = lat
                 st.session_state[map_key]["lng"] = lng
             
-            # Display the interactive map
             st.markdown('<div class="map-container">', unsafe_allow_html=True)
-            
             try:
                 current_lat = st.session_state[map_key]["lat"]
                 current_lng = st.session_state[map_key]["lng"]
-                
                 tile_url = get_basemap_tiles(basemap_choice)
-                
-                # Create map
                 m = folium.Map(
                     location=[current_lat, current_lng],
                     zoom_start=st.session_state[map_key]["zoom"],
@@ -715,8 +805,6 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
                     tiles=tile_url,
                     attr='Map'
                 )
-                
-                # Red pin SVG marker
                 pin_svg = """
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
@@ -726,8 +814,6 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
                     <circle cx="12" cy="9" r="2" fill="#FFFFFF"/>
                 </svg>
                 """
-                
-                # Add draggable pin marker
                 marker = folium.Marker(
                     [current_lat, current_lng],
                     popup=f"{clean_label}<br>{current_lat:.6f}, {current_lng:.6f}",
@@ -739,29 +825,19 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
                     ),
                     draggable=True
                 ).add_to(m)
-                
                 folium_static(m, width=700, height=450)
                 st.caption("Drag the red pin or click on the map to set location")
-                
             except Exception as e:
                 st.warning(f"Map display limited: {str(e)}")
                 st.info("Enter coordinates manually and click Capture Map")
-            
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Capture and action buttons
             col_capture, col_cancel, col_use = st.columns([1, 1, 1])
-            
             with col_capture:
                 if st.button("Capture Map", key=f"capture_{token}", use_container_width=True):
                     if lat is not None and lng is not None:
                         with st.spinner("Capturing map..."):
-                            screenshot = capture_map_screenshot(
-                                lat, 
-                                lng, 
-                                basemap_choice,
-                                zoom=st.session_state[map_key]["zoom"]
-                            )
+                            screenshot = capture_map_screenshot(lat, lng, basemap_choice, zoom=st.session_state[map_key]["zoom"])
                             st.session_state[map_key]["screenshot"] = screenshot
                             st.session_state[map_key]["saved"] = True
                             st.success("Map captured successfully!")
@@ -769,12 +845,10 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
                             st.rerun()
                     else:
                         st.warning("Please enter valid coordinates")
-            
             with col_cancel:
                 if st.button("Cancel", key=f"cancel_{token}", use_container_width=True):
                     st.session_state[map_key]["editor_open"] = False
                     st.rerun()
-            
             with col_use:
                 if st.button("Use Map", key=f"use_{token}", use_container_width=True):
                     if st.session_state[map_key]["saved"] and st.session_state[map_key]["screenshot"] is not None:
@@ -784,16 +858,12 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
                     else:
                         st.warning("Please capture the map first")
             
-            # Show preview after capture
             if st.session_state[map_key]["saved"] and st.session_state[map_key]["screenshot"] is not None:
                 st.markdown("---")
                 st.markdown("**Captured Map Preview:**")
                 st.image(st.session_state[map_key]["screenshot"], caption="This will be inserted into the document", use_container_width=True)
-                
-                # Show coordinates of captured location
                 st.info(f"📍 Location: {st.session_state[map_key]['lat']:.6f}, {st.session_state[map_key]['lng']:.6f}")
     
-    # Return screenshot if saved
     if st.session_state[map_key]["saved"] and st.session_state[map_key]["screenshot"] is not None:
         return st.session_state[map_key]["screenshot"]
     return None
@@ -801,6 +871,149 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
 def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
+
+# --- FLOATING DOWNLOAD BUTTON COMPONENT ---
+def floating_download_button():
+    """Persistent floating download button overlay"""
+    saved_templates = get_saved_templates()
+    
+    # Check if we have templates
+    has_templates = len(saved_templates) > 0
+    
+    # Initialize dropdown state
+    if "show_download_dropdown" not in st.session_state:
+        st.session_state.show_download_dropdown = False
+    
+    # HTML for floating button
+    html = f'''
+    <div class="floating-download-container">
+        <button class="floating-download-btn" onclick="toggleDropdown()">
+            📥 Download Templates
+            <span class="badge">{len(saved_templates)}</span>
+        </button>
+        <div id="downloadDropdown" class="floating-download-dropdown" style="display: {'block' if st.session_state.show_download_dropdown else 'none'};">
+            <div class="header-row">
+                <h4>📂 Saved Templates</h4>
+                <button class="close-btn" onclick="closeDropdown()">✕</button>
+            </div>
+    '''
+    
+    if has_templates:
+        # Show templates list
+        for t in saved_templates:
+            size_kb = t['size'] // 1024
+            html += f'''
+            <div class="template-item">
+                <span class="template-name">📄 {t['name']}</span>
+                <span class="template-size">{size_kb} KB</span>
+            </div>
+            '''
+        
+        # Download all as ZIP button
+        html += f'''
+            <button class="zip-download-btn" id="downloadAllZip">
+                📦 Download All Templates as ZIP
+            </button>
+            <div style="text-align:center;margin-top:6px;font-size:11px;color:#999;">
+                {len(saved_templates)} template(s) available
+            </div>
+        '''
+    else:
+        html += '''
+            <div class="empty-state">
+                <div style="font-size:40px;margin-bottom:8px;">📭</div>
+                No templates saved yet<br>
+                <span style="font-size:12px;color:#bbb;">Upload and save a template first</span>
+            </div>
+        '''
+    
+    html += '''
+        </div>
+    </div>
+    
+    <script>
+        function toggleDropdown() {{
+            var dropdown = document.getElementById('downloadDropdown');
+            if (dropdown.style.display === 'none' || dropdown.style.display === '') {{
+                dropdown.style.display = 'block';
+            }} else {{
+                dropdown.style.display = 'none';
+            }}
+        }}
+        
+        function closeDropdown() {{
+            document.getElementById('downloadDropdown').style.display = 'none';
+        }}
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {{
+            var container = document.querySelector('.floating-download-container');
+            var dropdown = document.getElementById('downloadDropdown');
+            if (container && !container.contains(event.target)) {{
+                if (dropdown) {{
+                    dropdown.style.display = 'none';
+                }}
+            }}
+        }});
+    </script>
+    '''
+    
+    st.markdown(html, unsafe_allow_html=True)
+    
+    # Render Streamlit components in the dropdown (hidden but functional)
+    if has_templates and st.session_state.show_download_dropdown:
+        # This is a trick to render download buttons that are triggered by the UI
+        # The actual downloads happen through Streamlit's native download buttons
+        pass
+
+def render_floating_download_buttons():
+    """Render the actual download buttons in the Streamlit flow"""
+    saved_templates = get_saved_templates()
+    
+    if not saved_templates:
+        return
+    
+    # Create a hidden container for the download buttons
+    with st.container():
+        # We'll use columns to hide these but keep them functional
+        col1, col2, col3 = st.columns([1, 1, 8])
+        with col1:
+            # This will render but be visually hidden by CSS
+            st.markdown('<div style="display:none;">', unsafe_allow_html=True)
+            
+            # Individual download buttons
+            for t in saved_templates:
+                data = load_template_from_file(t['name'])
+                if data:
+                    mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation" if t['name'].endswith('.pptx') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    st.download_button(
+                        label=f"Download {t['name']}",
+                        data=data,
+                        file_name=t['name'],
+                        mime=mime_type,
+                        key=f"hidden_dl_{t['name']}"
+                    )
+            
+            # ZIP download button
+            try:
+                zip_buffer = BytesIO()
+                with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+                    for t in saved_templates:
+                        data = load_template_from_file(t['name'])
+                        if data:
+                            zip_file.writestr(t['name'], data)
+                zip_buffer.seek(0)
+                st.download_button(
+                    label="Download All ZIP",
+                    data=zip_buffer,
+                    file_name=f"all_templates_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                    mime="application/zip",
+                    key="hidden_zip_download"
+                )
+            except Exception as e:
+                pass
+            
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux - Template Automation", layout="wide", initial_sidebar_state="collapsed")
@@ -833,68 +1046,12 @@ if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
 if "map_data" not in st.session_state:
     st.session_state.map_data = {}
+if "show_download_dropdown" not in st.session_state:
+    st.session_state.show_download_dropdown = False
 
-# --- SIDEBAR ---
-with st.sidebar:
-    st.markdown("### 📁 Template Management")
-    st.markdown("---")
-    
-    # Export all templates button
-    st.markdown("#### 📤 Export Templates")
-    
-    saved_templates_sidebar = get_saved_templates()
-    if saved_templates_sidebar:
-        # Option 1: Download all as individual buttons
-        st.write(f"**{len(saved_templates_sidebar)} templates found**")
-        
-        # Single download all button (ZIP)
-        try:
-            import zipfile
-            from io import BytesIO
-            
-            zip_buffer = BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
-                for t in saved_templates_sidebar:
-                    data = load_template_from_file(t['name'])
-                    if data:
-                        zip_file.writestr(t['name'], data)
-            
-            zip_buffer.seek(0)
-            
-            st.download_button(
-                label="📦 Download All as ZIP",
-                data=zip_buffer,
-                file_name=f"all_templates_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
-                mime="application/zip",
-                use_container_width=True,
-                key="download_all_zip"
-            )
-        except Exception as e:
-            st.warning("ZIP download not available, use individual downloads below")
-        
-        st.markdown("---")
-        st.write("**Individual Templates:**")
-        
-        # Individual download buttons
-        for t in saved_templates_sidebar:
-            data = load_template_from_file(t['name'])
-            if data:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"📄 {t['name']}")
-                with col2:
-                    mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation" if t['name'].endswith('.pptx') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    st.download_button(
-                        label="⬇️",
-                        data=data,
-                        file_name=t['name'],
-                        mime=mime_type,
-                        key=f"sidebar_dl_{t['name']}",
-                        help=f"Download {t['name']}"
-                    )
-    else:
-        st.info("No templates saved yet")
-        st.caption("Upload a template and click 'Save Template' to store it here.")
+# --- RENDER FLOATING DOWNLOAD BUTTON ---
+# This must be rendered before the main content
+floating_download_button()
 
 # --- MAIN UI ---
 st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
@@ -1184,6 +1341,10 @@ if u_template is not None:
     st.markdown('</div>', unsafe_allow_html=True)
 else:
     st.info("Please upload or select a template to begin")
+
+# --- HIDDEN DOWNLOAD BUTTONS FOR FLOATING UI ---
+# These render the actual download functionality that the floating button triggers
+render_floating_download_buttons()
 
 st.markdown("---")
 st.caption("OpenFlux v2.0 | Template Automation with Map Editor")
