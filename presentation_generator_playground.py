@@ -15,6 +15,7 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
+import time
 
 # --- MAP SPECIFIC DEPENDENCIES ---
 import folium
@@ -63,6 +64,7 @@ MINIMAL_CRE_SYSTEM = """
         border: none !important; border-radius: 4px !important; padding: 6px 14px !important; width: 100% !important; min-height: 32px !important;
     }
     div.stButton > button:hover { background-color: #002244 !important; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0, 51, 102, 0.2); }
+    div.stButton > button:disabled { background-color: #666666 !important; opacity: 0.6; cursor: not-allowed; }
     
     .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 6px; }
     .section-header { font-size: 15px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 10px; }
@@ -70,6 +72,39 @@ MINIMAL_CRE_SYSTEM = """
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
     div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
+    
+    /* Loading overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        flex-direction: column;
+    }
+    .loading-spinner {
+        border: 8px solid #f3f3f3;
+        border-top: 8px solid #003366;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .loading-text {
+        color: white;
+        margin-top: 20px;
+        font-size: 18px;
+        font-weight: 600;
+    }
 </style>
 """
 
@@ -343,7 +378,7 @@ def render_isolated_map_editor():
     
     col_back, col_title = st.columns([1, 4])
     with col_back:
-        if st.button("Back to Document"):
+        if st.button("Back to Document", key="back_from_map"):
             st.session_state.active_map_editor_token = None
             st.rerun()
     with col_title:
@@ -458,7 +493,7 @@ def render_isolated_map_editor():
     st.markdown("<br>", unsafe_allow_html=True)
     
     # Export button
-    if st.button("Confirm and Export High-Res Image to Document", type="primary", use_container_width=True):
+    if st.button("Confirm and Export High-Res Image to Document", type="primary", use_container_width=True, key=f"export_map_{token_key}"):
         with st.spinner("Compiling High-Density Map Asset..."):
             
             # Get the latest marker position
@@ -514,6 +549,7 @@ def render_isolated_map_editor():
             
             st.session_state.active_map_editor_token = None
             st.success("High-res map rendering attached successfully!")
+            time.sleep(0.5)  # Brief pause to show success message
             st.rerun()
 
     # Handle marker movement
@@ -688,6 +724,24 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
+# --- Function to preserve form data ---
+def save_form_data():
+    """Save all form data to session state before rerun"""
+    if st.session_state.tokens:
+        for token in st.session_state.tokens:
+            key = f"val_{token}"
+            if key in st.session_state:
+                if token not in st.session_state.form_data:
+                    st.session_state.form_data = {}
+                st.session_state.form_data[token] = st.session_state[key]
+
+def restore_form_data():
+    """Restore form data from session state after rerun"""
+    if hasattr(st.session_state, 'form_data') and st.session_state.form_data:
+        for token, value in st.session_state.form_data.items():
+            key = f"val_{token}"
+            if key in st.session_state:
+                st.session_state[key] = value
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -706,12 +760,17 @@ if "template_to_delete" not in st.session_state: st.session_state.template_to_de
 if "save_success" not in st.session_state: st.session_state.save_success = False
 if "saved_file_name" not in st.session_state: st.session_state.saved_file_name = None
 if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = False
+if "form_data" not in st.session_state: st.session_state.form_data = {}
+if "is_loading" not in st.session_state: st.session_state.is_loading = False
 
 
 # --- ISOLATED APP ROUTER ---
 if st.session_state.active_map_editor_token:
     render_isolated_map_editor()
 else:
+    # Restore form data if it exists
+    restore_form_data()
+    
     # --- MAIN DOCUMENT GENERATOR APP ---
     st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
     
@@ -768,6 +827,7 @@ else:
                         st.session_state.saved_template_name = None
                         st.session_state.template_loaded = False
                         st.session_state.tokens = []
+                        st.session_state.form_data = {}  # Clear form data
                         st.session_state.show_delete_confirm = False
                         st.session_state.template_to_delete = None
                         st.rerun()
@@ -797,6 +857,7 @@ else:
                             st.session_state.custom_mapping = config_data
                         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
                         st.session_state.tokens = tokens
+                        st.session_state.form_data = {}  # Clear old form data when new template loads
                     break
 
     with col_template2:
@@ -812,6 +873,7 @@ else:
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
+            st.session_state.form_data = {}  # Clear old form data
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 saved_path = save_template_to_file(template_bytes, uploaded_template.name)
@@ -892,7 +954,10 @@ else:
                                     image_data[token] = saved_map_img
                                     st.caption("Map snapshot attached.")
                                 
+                                # Save current form data before opening map editor
                                 if st.button(f"Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
+                                    # Save all current form data
+                                    save_form_data()
                                     st.session_state.active_map_editor_token = token
                                     st.rerun()
                                 field_types[token] = "Image"
