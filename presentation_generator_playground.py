@@ -74,7 +74,7 @@ MINIMAL_CRE_SYSTEM = """
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
     /* Maximize Dialog Viewport Space */
-    div[role="dialog"] { max-width: 96vw !important; width: 96vw !important; padding: 1rem !important; }
+    div[role="dialog"] { max-width: 96vw !important; width: 96vw !important; padding: 0.8rem !important; }
 </style>
 """
 
@@ -151,7 +151,7 @@ def auto_save_config():
 
 
 # --- DYNAMIC HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=24):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
     """Dynamically scales zoom to construct a massive high-res stitch and drops styled vector pins"""
     target_tiles_span = 6  # High res density multiplier
     lon_span = e - w
@@ -170,7 +170,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     x_min, y_min = deg2num(n, w, zoom)
     x_max, y_max = deg2num(s, e, zoom)
     
-    # Memory safeguard down-res handling
     if (x_max - x_min + 1) * (y_max - y_min + 1) > 140:
         zoom -= 1
         x_min, y_min = deg2num(n, w, zoom)
@@ -187,7 +186,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
         "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        # Adding apistyle parameters to hide POI businesses to retain clean streets only
+        # apistyle parameters completely strip away business/establishment icons natively
         "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
     }
     url_template = styles.get(style, styles["Hybrid"])
@@ -223,15 +222,15 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # STAMP CUSTOMIZABLE VECTOR PIN AT EXACT PIXEL COORDINATES
+    # STAMP PROPORTIONALLY SCALED PIN AT EXACT PIXEL COORDINATES
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
-    scale = pin_size / 24.0
-    w_px = 12 * scale
-    h_px = 24 * scale
+    scale = pin_size / 32.0
+    w_px = 16 * scale
+    h_px = 32 * scale
     
     draw.polygon([
         (pin_local_x, pin_local_y), 
@@ -243,7 +242,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         pin_local_x + w_px, pin_local_y - h_px + w_px
     ], fill="#ffffff")
     draw.polygon([
-        (pin_local_x, pin_local_y - (3 * scale)), 
+        (pin_local_x, pin_local_y - (4 * scale)), 
         (pin_local_x - (w_px * 0.75), pin_local_y - h_px), 
         (pin_local_x + (w_px * 0.75), pin_local_y - h_px)
     ], fill=pin_color)
@@ -273,68 +272,41 @@ def map_editor_modal(token_key):
         div[role="dialog"] .stMarkdown p { font-size: 11px !important; margin-bottom: 0px !important; }
         div[role="dialog"] label { font-size: 11px !important; padding-bottom: 2px !important; }
         div[role="dialog"] .stColorPicker > div { min-height: 20px !important; }
-        iframe { border-radius: 4px; border: 1px solid #CCC; }
+        iframe { border-radius: 4px; border: 1px solid #E0E0E0; }
         div[role="dialog"] .stVerticalBlock { gap: 0.1rem !important; }
     </style>
     """, unsafe_allow_html=True)
     
-    map_state_key = f"map_state_{token_key}"
-    if map_state_key not in st.session_state:
-        # Separate mapping center memory from pin anchor to eliminate flickering loops
-        st.session_state[map_state_key] = {
-            "pin_lat": 14.3294, "pin_lon": 120.9368,
-            "map_lat": 14.3294, "map_lon": 120.9368,
-            "style": "Hybrid", "zoom": 15,
-            "pin_color": "#DC3545", "pin_size": 32
-        }
-        
-    current_config = st.session_state[map_state_key]
+    # Initialize keys directly into session state to avoid refresh updates breaking context
+    style_key = f"map_style_{token_key}"
+    coord_key = f"map_coord_{token_key}"
+    color_key = f"map_color_{token_key}"
+    size_key = f"map_size_{token_key}"
+    zoom_key = f"map_zoom_{token_key}"
     
-    # Tiny Configuration Bar
-    c1, c2, c3, c4 = st.columns([1.2, 1.5, 0.7, 1])
+    if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
+    if coord_key not in st.session_state: st.session_state[coord_key] = "14.3294, 120.9368"
+    if color_key not in st.session_state: st.session_state[color_key] = "#DC3545"
+    if size_key not in st.session_state: st.session_state[size_key] = 32
+    if zoom_key not in st.session_state: st.session_state[zoom_key] = 15
+
+    # Tiny Horizontally Packed Controls
+    c1, c2, c3, c4 = st.columns([1.2, 1.6, 0.6, 1.2])
     with c1:
-        basemap_style = st.selectbox(
-            "Map Style", ["Hybrid", "Satellite", "Carto Light", "OSM"], 
-            index=["Hybrid", "Satellite", "Carto Light", "OSM"].index(current_config["style"]),
-            key=f"style_sel_{token_key}"
-        )
+        basemap_style = st.selectbox("Map Style", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
     with c2:
-        coord_input = st.text_input("Center Pin Coordinates", f"{current_config['pin_lat']}, {current_config['pin_lon']}", key=f"coord_in_{token_key}")
+        coord_input = st.text_input("Center Pin Coordinates", key=coord_key)
     with c3:
-        pin_color = st.color_picker("Pin Color", current_config["pin_color"], key=f"color_{token_key}")
+        pin_color = st.color_picker("Pin Color", key=color_key)
     with c4:
-        pin_size = st.slider("Pin Size", 16, 64, current_config["pin_size"], key=f"size_{token_key}")
+        pin_size = st.slider("Pin Size", 16, 64, key=size_key)
     
-    needs_hard_rerun = False
-    
-    # Process Manual Coordinate Jumps
+    # Safe Coordinate Calculation Handling
     try:
         plat, plon = map(float, coord_input.split(","))
-        if plat != current_config["pin_lat"] or plon != current_config["pin_lon"]:
-            current_config["pin_lat"] = plat
-            current_config["pin_lon"] = plon
-            current_config["map_lat"] = plat
-            current_config["map_lon"] = plon
-            needs_hard_rerun = True
     except ValueError:
-        pass
+        plat, plon = 14.3294, 120.9368
 
-    # Record parameter changes silently
-    if basemap_style != current_config["style"]:
-        current_config["style"] = basemap_style
-        needs_hard_rerun = True
-    if pin_color != current_config["pin_color"]:
-        current_config["pin_color"] = pin_color
-        needs_hard_rerun = True
-    if pin_size != current_config["pin_size"]:
-        current_config["pin_size"] = pin_size
-        needs_hard_rerun = True
-        
-    if needs_hard_rerun:
-        st.session_state[map_state_key] = current_config
-        st.rerun()
-
-    # Load Tiles including Custom Hybrid ruleset
     tiles_dict = {
         "OSM": "OpenStreetMap",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
@@ -345,29 +317,27 @@ def map_editor_modal(token_key):
         "OSM": "OpenStreetMap",
         "Carto Light": "&copy; CartoDB",
         "Satellite": "Google Maps",
-        "Hybrid": "Google Maps Hybrid (Streets + Sat)"
+        "Hybrid": "Google Maps Hybrid (Clean Streets)"
     }
     
-    # Initialize robust decoupled map entity
     m = folium.Map(
-        location=[current_config["map_lat"], current_config["map_lon"]], 
-        zoom_start=current_config["zoom"],
+        location=[plat, plon], 
+        zoom_start=st.session_state[zoom_key],
         tiles=tiles_dict[basemap_style],
         attr=attr_dict[basemap_style],
         zoom_control=True
     )
 
-    # Inject fully parameterized variable pin marker styles dynamically 
+    # Injecting parameterized pin asset sizes cleanly
     icon_html = f"""
     <div style="position: relative;">
-        <span style="position: absolute; left: -{pin_size//2}px; top: -{pin_size}px; width: {pin_size}px; height: {pin_size}px; background-color: {current_config['pin_color']}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></span>
-        <span style="position: absolute; left: -{int(pin_size/6)}px; top: -{int(pin_size * 0.66)}px; width: {int(pin_size/3)}px; height: {int(pin_size/3)}px; background-color: white; border-radius: 50%;"></span>
+        <span style="position: absolute; left: -{pin_size//2}px; top: -{pin_size}px; width: {pin_size}px; height: {pin_size}px; background-color: {pin_color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></span>
+        <span style="position: absolute; left: -{max(2, int(pin_size/6))}px; top: -{int(pin_size * 0.66)}px; width: {max(4, int(pin_size/3))}px; height: {max(4, int(pin_size/3))}px; background-color: white; border-radius: 50%;"></span>
     </div>
     """
     
-    folium.Marker([current_config["pin_lat"], current_config["pin_lon"]], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
+    folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
     
-    # Native Leaflet drawing bounds overlay framework
     draw = Draw(
         export=False, position='topleft',
         draw_options={'polyline':False, 'polygon':False, 'circle':False, 'marker':False, 'circlemarker':False, 'rectangle':True},
@@ -375,71 +345,55 @@ def map_editor_modal(token_key):
     )
     draw.add_to(m)
     
-    st.caption("✏️ **Use the Rectangle tool (⬛) on the left to draw and drag your crop box.** If no box is explicitly drawn, the current map screen view boundaries will be exported.")
+    st.caption("✏️ **Use the Rectangle tool (⬛) on the left to draw your crop box.** If no box is explicitly drawn, the current map view boundaries will be exported.")
     
-    # Large Canvas execution. Narrow returned bounds significantly reduces refresh flickering loops
-    map_data = st_folium(m, height=650, width=1150, use_container_width=True, key=f"int_map_{token_key}", returned_objects=["last_marker_moved", "all_drawings", "center", "zoom", "bounds"])
+    # Large Viewport Canvas Map
+    map_data = st_folium(
+        m, height=680, width=1150, use_container_width=True, key=f"int_map_{token_key}",
+        returned_objects=["last_marker_moved", "all_drawings", "center", "zoom", "bounds"]
+    )
     
-    # Safe object parsing loop fixes the "NoneType dict" tracing crash logs completely
+    # Decoupled Non-refresh State Synchronization Logic Box
     if isinstance(map_data, dict):
-        state_changed = False
-        
-        # Check active tracking events silently
         if map_data.get("last_marker_moved"):
             moved = map_data["last_marker_moved"]
             mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
-            if mlat != current_config["pin_lat"] or mlon != current_config["pin_lon"]:
-                current_config["pin_lat"], current_config["pin_lon"] = mlat, mlon
-                state_changed = True
+            # Silent check to only adjust string representations if values meaningfully split
+            if f"{mlat}, {mlon}" != st.session_state[coord_key]:
+                st.session_state[coord_key] = f"{mlat}, {mlon}"
                 
-        if map_data.get("center"):
-            clat, clon = round(map_data["center"]["lat"], 5), round(map_data["center"]["lng"], 5)
-            if clat != current_config["map_lat"] or clon != current_config["map_lon"]:
-                current_config["map_lat"], current_config["map_lon"] = clat, clon
-                state_changed = True
-                
-        if map_data.get("zoom") and map_data["zoom"] != current_config["zoom"]:
-            current_config["zoom"] = map_data["zoom"]
-            state_changed = True
+        if map_data.get("zoom"):
+            st.session_state[zoom_key] = map_data["zoom"]
+
+    # Export & Output Rendering Pipeline Action Triggers
+    if st.button("🚀 Confirm & Export Map Snapshot", key=f"exp_{token_key}", use_container_width=True):
+        with st.spinner("Compiling Crisp High-Density Image Assets..."):
+            n, s, e, w = None, None, None, None
+            if isinstance(map_data, dict) and map_data.get("all_drawings"):
+                last_draw = map_data["all_drawings"][-1]
+                if last_draw["geometry"]["type"] == "Polygon":
+                    coords = last_draw["geometry"]["coordinates"][0]
+                    lats = [c[1] for c in coords]
+                    lons = [c[0] for c in coords]
+                    n, s = max(lats), min(lats)
+                    e, w = max(lons), min(lons)
             
-        if state_changed:
-            st.session_state[map_state_key] = current_config
-    
-    # Execution Triggers
-    c_btn1, c_btn2 = st.columns(2)
-    with c_btn1:
-        if st.button("Apply Parameters", key=f"apply_{token_key}", use_container_width=True):
+            if n is None and isinstance(map_data, dict) and map_data.get("bounds"):
+                b = map_data["bounds"]
+                n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
+                e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+            
+            # Absolute processing safe fallbacks
+            if n is None:
+                n, s, e, w = plat + 0.01, plat - 0.01, plon + 0.01, plon - 0.01
+
+            map_img_bytes = generate_static_map_bounds(
+                n, s, e, w, plat, plon, 
+                style=basemap_style, pin_color=pin_color, pin_size=pin_size
+            )
+            st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
+            st.success("High-res map snap generated inside context pipelines!")
             st.rerun()
-    with c_btn2:
-        if st.button("🚀 Export Map Snapshot", key=f"exp_{token_key}", use_container_width=True):
-            with st.spinner("Compiling High-Density Image View..."):
-                
-                n, s, e, w = None, None, None, None
-                if isinstance(map_data, dict) and map_data.get("all_drawings"):
-                    last_draw = map_data["all_drawings"][-1]
-                    if last_draw["geometry"]["type"] == "Polygon":
-                        coords = last_draw["geometry"]["coordinates"][0]
-                        lats = [c[1] for c in coords]
-                        lons = [c[0] for c in coords]
-                        n, s = max(lats), min(lats)
-                        e, w = max(lons), min(lons)
-                
-                # Failsafe frame bound capture handling
-                if n is None and isinstance(map_data, dict) and map_data.get("bounds"):
-                    b = map_data["bounds"]
-                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
-                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
-                
-                map_img_bytes = generate_static_map_bounds(
-                    n, s, e, w, 
-                    current_config["pin_lat"], current_config["pin_lon"], 
-                    style=current_config["style"],
-                    pin_color=current_config["pin_color"],
-                    pin_size=current_config["pin_size"]
-                )
-                st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
-                st.success("High-res asset linked successfully!")
-                st.rerun()
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
