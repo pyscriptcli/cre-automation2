@@ -79,6 +79,34 @@ def get_storage_dir():
     os.makedirs(storage_dir, exist_ok=True)
     return storage_dir
 
+def get_github_templates():
+    """
+    Detect all templates from the GitHub root folder (same directory as source code)
+    that start with 'template_' and end with .pptx or .docx
+    """
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    templates = []
+    
+    if os.path.exists(root_dir):
+        for file in os.listdir(root_dir):
+            # Check if file starts with 'template_' and ends with .pptx or .docx
+            if file.startswith('template_') and (file.endswith('.pptx') or file.endswith('.docx')):
+                filepath = os.path.join(root_dir, file)
+                stat = os.stat(filepath)
+                # Extract display name (remove 'template_' prefix and extension)
+                display_name = file.replace('template_', '').replace('.pptx', '').replace('.docx', '')
+                templates.append({
+                    'name': file,
+                    'display_name': display_name,
+                    'path': filepath,
+                    'size': stat.st_size,
+                    'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
+                    'source': 'github'
+                })
+    
+    return templates
+
 def save_template_to_file(template_bytes, template_name):
     storage_dir = get_storage_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
@@ -90,6 +118,14 @@ def save_template_to_file(template_bytes, template_name):
     return filepath
 
 def load_template_from_file(template_name):
+    # First check if it's a GitHub template (in root directory)
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    root_filepath = os.path.join(root_dir, template_name)
+    if os.path.exists(root_filepath):
+        with open(root_filepath, 'rb') as f:
+            return f.read()
+    
+    # Then check stored templates
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -98,21 +134,42 @@ def load_template_from_file(template_name):
     return None
 
 def get_saved_templates():
+    """
+    Get all templates from both stored_templates folder and GitHub root folder
+    """
     storage_dir = get_storage_dir()
     templates = []
+    
+    # Get templates from stored_templates folder
     if os.path.exists(storage_dir):
         for file in os.listdir(storage_dir):
             if file.endswith('.pptx') or file.endswith('.docx'):
                 filepath = os.path.join(storage_dir, file)
                 stat = os.stat(filepath)
                 templates.append({
-                    'name': file, 'path': filepath, 'size': stat.st_size,
+                    'name': file,
+                    'display_name': file.replace('.pptx', '').replace('.docx', ''),
+                    'path': filepath,
+                    'size': stat.st_size,
                     'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX'
+                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
+                    'source': 'stored'
                 })
+    
+    # Get templates from GitHub root folder
+    github_templates = get_github_templates()
+    templates.extend(github_templates)
+    
     return templates
 
 def delete_template_file(template_name):
+    # Check if it's a GitHub template (in root directory) - don't allow deletion
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    root_filepath = os.path.join(root_dir, template_name)
+    if os.path.exists(root_filepath):
+        st.warning("Cannot delete GitHub repository templates")
+        return False
+    
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -304,7 +361,7 @@ def render_isolated_map_editor():
     # Initialize all keys with Manila coordinates
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
-    if color_key not in st.session_state: st.session_state[color_key] = "#003366"  # Blue
+    if color_key not in st.session_state: st.session_state[color_key] = "#0033A0"  # Blue
     if size_key not in st.session_state: st.session_state[size_key] = 32
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
@@ -663,19 +720,42 @@ else:
     with col_template1:
         saved_templates = get_saved_templates()
         template_options = ["Select saved template"]
-        if saved_templates:
-            for t in saved_templates:
-                template_options.append(f"{t['name']} ({t['type']})")
+        
+        # Group templates by source for display
+        github_templates = [t for t in saved_templates if t['source'] == 'github']
+        stored_templates = [t for t in saved_templates if t['source'] == 'stored']
+        
+        if github_templates:
+            template_options.append("--- GitHub Templates ---")
+            for t in github_templates:
+                template_options.append(f"📁 {t['display_name']} ({t['type']})")
+        
+        if stored_templates:
+            template_options.append("--- Stored Templates ---")
+            for t in stored_templates:
+                template_options.append(f"💾 {t['display_name']} ({t['type']})")
+        
         dropdown_col, delete_col = st.columns([4, 1])
         with dropdown_col:
             selected_template = st.selectbox("Load Template", template_options, key="saved_template_select", label_visibility="collapsed")
         with delete_col:
-            if selected_template and selected_template != "Select saved template":
-                template_name = selected_template.split(' (')[0]
-                if st.button("Delete", key="delete_template", help="Delete this template"):
-                    st.session_state.show_delete_confirm = True
-                    st.session_state.template_to_delete = template_name
-                    st.rerun()
+            if selected_template and selected_template != "Select saved template" and not selected_template.startswith("---"):
+                # Extract template name (remove icon and type)
+                template_display = selected_template.split(' (')[0].strip()
+                # Remove icon if present
+                if template_display.startswith('📁 ') or template_display.startswith('💾 '):
+                    template_display = template_display[2:].strip()
+                
+                # Find the actual template name
+                for t in saved_templates:
+                    if t['display_name'] == template_display:
+                        template_name = t['name']
+                        if t['source'] == 'stored':  # Only allow deletion for stored templates
+                            if st.button("Delete", key="delete_template", help="Delete this template"):
+                                st.session_state.show_delete_confirm = True
+                                st.session_state.template_to_delete = template_name
+                                st.rerun()
+                        break
                     
         if st.session_state.show_delete_confirm:
             st.warning(f"Are you sure you want to delete '{st.session_state.template_to_delete}'?")
@@ -697,20 +777,30 @@ else:
                     st.session_state.template_to_delete = None
                     st.rerun()
                     
-        if selected_template and selected_template != "Select saved template" and not st.session_state.delete_trigger:
-            template_name = selected_template.split(' (')[0]
-            template_bytes = load_template_from_file(template_name)
-            if template_bytes:
-                st.session_state.template_bytes = template_bytes
-                st.session_state.saved_template_name = template_name
-                st.session_state.template_loaded = True
-                st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
-                config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-                config_data = load_config_from_file(config_name)
-                if config_data:
-                    st.session_state.custom_mapping = config_data
-                tokens = extract_placeholders(template_bytes, st.session_state.template_type)
-                st.session_state.tokens = tokens
+        if selected_template and selected_template != "Select saved template" and not selected_template.startswith("---"):
+            # Extract template name
+            template_display = selected_template.split(' (')[0].strip()
+            # Remove icon if present
+            if template_display.startswith('📁 ') or template_display.startswith('💾 '):
+                template_display = template_display[2:].strip()
+            
+            # Find the actual template
+            for t in saved_templates:
+                if t['display_name'] == template_display:
+                    template_name = t['name']
+                    template_bytes = load_template_from_file(template_name)
+                    if template_bytes:
+                        st.session_state.template_bytes = template_bytes
+                        st.session_state.saved_template_name = template_name
+                        st.session_state.template_loaded = True
+                        st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+                        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                        config_data = load_config_from_file(config_name)
+                        if config_data:
+                            st.session_state.custom_mapping = config_data
+                        tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+                        st.session_state.tokens = tokens
+                    break
 
     with col_template2:
         uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
@@ -745,7 +835,11 @@ else:
     if st.session_state.template_bytes is not None:
         template_name = st.session_state.saved_template_name or "Unsaved Template"
         template_type = st.session_state.template_type or "Unknown"
-        st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
+        # Check if it's a GitHub template
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        is_github = os.path.exists(os.path.join(root_dir, template_name))
+        source_label = " (GitHub)" if is_github else " (Stored)"
+        st.markdown(f'<div class="saved-indicator">Active: {template_name}{source_label} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
