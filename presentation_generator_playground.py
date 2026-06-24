@@ -79,52 +79,6 @@ def get_storage_dir():
     os.makedirs(storage_dir, exist_ok=True)
     return storage_dir
 
-def load_github_pptx(filepath):
-    """
-    Special function to load PPTX files from GitHub repository
-    This mimics how Streamlit handles uploaded files
-    """
-    try:
-        # Read the file as binary
-        with open(filepath, 'rb') as f:
-            file_bytes = f.read()
-        
-        # Test if we can open it with Presentation (like user upload)
-        try:
-            prs = Presentation(io.BytesIO(file_bytes))
-            # If we get here, the file is valid
-            return file_bytes
-        except Exception as e:
-            # If it fails, it might be a different issue
-            st.error(f"Error opening GitHub PPTX file: {str(e)}")
-            return None
-    except Exception as e:
-        st.error(f"Error reading GitHub file: {str(e)}")
-        return None
-
-def load_github_docx(filepath):
-    """
-    Special function to load DOCX files from GitHub repository
-    This mimics how Streamlit handles uploaded files
-    """
-    try:
-        # Read the file as binary
-        with open(filepath, 'rb') as f:
-            file_bytes = f.read()
-        
-        # Test if we can open it with Document (like user upload)
-        try:
-            doc = Document(io.BytesIO(file_bytes))
-            # If we get here, the file is valid
-            return file_bytes
-        except Exception as e:
-            # If it fails, it might be a different issue
-            st.error(f"Error opening GitHub DOCX file: {str(e)}")
-            return None
-    except Exception as e:
-        st.error(f"Error reading GitHub file: {str(e)}")
-        return None
-
 def get_github_templates():
     """
     Detect all templates from the GitHub root folder (same directory as source code)
@@ -141,16 +95,6 @@ def get_github_templates():
                 stat = os.stat(filepath)
                 # Extract display name (remove 'template_' prefix and extension)
                 display_name = file.replace('template_', '').replace('.pptx', '').replace('.docx', '')
-                
-                # Test if the file is valid by trying to open it
-                is_valid = False
-                if file.endswith('.pptx'):
-                    test_bytes = load_github_pptx(filepath)
-                    is_valid = test_bytes is not None
-                elif file.endswith('.docx'):
-                    test_bytes = load_github_docx(filepath)
-                    is_valid = test_bytes is not None
-                
                 templates.append({
                     'name': file,
                     'display_name': display_name,
@@ -158,8 +102,7 @@ def get_github_templates():
                     'size': stat.st_size,
                     'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
                     'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
-                    'source': 'github',
-                    'valid': is_valid
+                    'source': 'github'
                 })
     
     return templates
@@ -180,13 +123,10 @@ def load_template_from_file(template_name):
     root_filepath = os.path.join(root_dir, template_name)
     
     if os.path.exists(root_filepath):
-        # Use the special loader functions for GitHub files
-        if template_name.endswith('.pptx'):
-            return load_github_pptx(root_filepath)
-        elif template_name.endswith('.docx'):
-            return load_github_docx(root_filepath)
-        else:
-            return None
+        # Read the file exactly like how Streamlit handles uploads
+        with open(root_filepath, 'rb') as f:
+            file_bytes = f.read()
+        return file_bytes
     
     # Then check stored templates
     storage_dir = get_storage_dir()
@@ -216,8 +156,7 @@ def get_saved_templates():
                     'size': stat.st_size,
                     'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
                     'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
-                    'source': 'stored',
-                    'valid': True
+                    'source': 'stored'
                 })
     
     # Get templates from GitHub root folder
