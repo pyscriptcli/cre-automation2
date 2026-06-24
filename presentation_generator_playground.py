@@ -150,18 +150,21 @@ def get_root_templates():
     root_dir = os.path.dirname(os.path.abspath(__file__))
     templates = []
     
-    for file in os.listdir(root_dir):
-        if file.startswith('template_') and (file.endswith('.pptx') or file.endswith('.docx')):
-            # Extract display name (remove 'template_' prefix and extension)
-            display_name = file.replace('template_', '')
-            display_name = re.sub(r'\.(pptx|docx)$', '', display_name)
-            templates.append({
-                'name': display_name,
-                'file': file,
-                'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
-                'source': 'root',
-                'path': os.path.join(root_dir, file)
-            })
+    try:
+        for file in os.listdir(root_dir):
+            if file.startswith('template_') and (file.endswith('.pptx') or file.endswith('.docx')):
+                # Extract display name (remove 'template_' prefix and extension)
+                display_name = file.replace('template_', '')
+                display_name = re.sub(r'\.(pptx|docx)$', '', display_name)
+                templates.append({
+                    'name': display_name,
+                    'file': file,
+                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
+                    'source': 'root',
+                    'path': os.path.join(root_dir, file)
+                })
+    except Exception as e:
+        st.warning(f"Error scanning root templates: {str(e)}")
     
     return templates
 
@@ -170,8 +173,12 @@ def load_template_from_root(template_file):
     root_dir = os.path.dirname(os.path.abspath(__file__))
     filepath = os.path.join(root_dir, template_file)
     if os.path.exists(filepath):
-        with open(filepath, 'rb') as f:
-            return f.read()
+        try:
+            with open(filepath, 'rb') as f:
+                return f.read()
+        except Exception as e:
+            st.error(f"Error loading template from root: {str(e)}")
+            return None
     return None
 
 def get_storage_dir():
@@ -197,8 +204,12 @@ def load_template_from_file(template_name):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
-        with open(filepath, 'rb') as f:
-            return f.read()
+        try:
+            with open(filepath, 'rb') as f:
+                return f.read()
+        except Exception as e:
+            st.error(f"Error loading template from file: {str(e)}")
+            return None
     return None
 
 def get_saved_templates():
@@ -219,19 +230,22 @@ def get_saved_templates():
     # Get user uploaded templates
     storage_dir = get_storage_dir()
     if os.path.exists(storage_dir):
-        for file in os.listdir(storage_dir):
-            if file.endswith('.pptx') or file.endswith('.docx'):
-                filepath = os.path.join(storage_dir, file)
-                stat = os.stat(filepath)
-                templates.append({
-                    'name': file,
-                    'path': filepath,
-                    'size': stat.st_size,
-                    'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
-                    'source': 'user',
-                    'display': f"{file} (uploaded)"
-                })
+        try:
+            for file in os.listdir(storage_dir):
+                if file.endswith('.pptx') or file.endswith('.docx'):
+                    filepath = os.path.join(storage_dir, file)
+                    stat = os.stat(filepath)
+                    templates.append({
+                        'name': file,
+                        'path': filepath,
+                        'size': stat.st_size,
+                        'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                        'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
+                        'source': 'user',
+                        'display': f"{file} (uploaded)"
+                    })
+        except Exception as e:
+            st.warning(f"Error reading user templates: {str(e)}")
     
     return templates
 
@@ -240,12 +254,16 @@ def delete_template_file(template_name):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
-        os.remove(filepath)
-        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-        config_path = os.path.join(storage_dir, config_name)
-        if os.path.exists(config_path):
-            os.remove(config_path)
-        return True
+        try:
+            os.remove(filepath)
+            config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+            config_path = os.path.join(storage_dir, config_name)
+            if os.path.exists(config_path):
+                os.remove(config_path)
+            return True
+        except Exception as e:
+            st.error(f"Error deleting template: {str(e)}")
+            return False
     return False
 
 def save_config_to_file(config_data, config_name="template_config.json"):
@@ -261,8 +279,12 @@ def load_config_from_file(config_name="template_config.json"):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, config_name)
     if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            st.warning(f"Error loading config: {str(e)}")
+            return None
     return None
 
 def auto_save_config():
@@ -271,35 +293,42 @@ def auto_save_config():
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
-def detect_file_type(file_bytes):
-    """Detect if file is PPTX or DOCX based on file signature"""
-    # Check for PPTX (ZIP file with [Content_Types].xml containing pptx)
+def validate_office_file(file_bytes):
+    """Validate if the file is a valid Office file (PPTX or DOCX)"""
+    if not file_bytes or len(file_bytes) < 4:
+        return False, "File is empty or too small"
+    
+    # Check for ZIP signature (PK)
+    if file_bytes[:2] != b'PK':
+        return False, "File is not a valid ZIP archive (not a valid Office file)"
+    
+    # Try to read the ZIP contents
     try:
         import zipfile
         with zipfile.ZipFile(io.BytesIO(file_bytes), 'r') as z:
-            if '[Content_Types].xml' in z.namelist():
-                content_types = z.read('[Content_Types].xml').decode('utf-8', errors='ignore')
-                if 'pptx' in content_types.lower() or 'presentation' in content_types.lower():
-                    return 'pptx'
-                elif 'docx' in content_types.lower() or 'document' in content_types.lower():
-                    return 'docx'
-    except:
-        pass
-    
-    # Fallback: try to open with pptx
-    try:
-        Presentation(io.BytesIO(file_bytes))
-        return 'pptx'
-    except:
-        pass
-    
-    # Fallback: try to open with docx
-    try:
-        Document(io.BytesIO(file_bytes))
-        return 'docx'
-    except:
-        pass
-    
+            # Check for [Content_Types].xml
+            if '[Content_Types].xml' not in z.namelist():
+                return False, "File is missing [Content_Types].xml"
+            
+            # Read content types to determine file type
+            content_types = z.read('[Content_Types].xml').decode('utf-8', errors='ignore')
+            
+            if 'pptx' in content_types.lower() or 'presentation' in content_types.lower():
+                return True, 'pptx'
+            elif 'docx' in content_types.lower() or 'document' in content_types.lower():
+                return True, 'docx'
+            else:
+                return False, "File type could not be determined"
+    except zipfile.BadZipFile:
+        return False, "File is not a valid ZIP archive"
+    except Exception as e:
+        return False, f"Error validating file: {str(e)}"
+
+def detect_file_type(file_bytes):
+    """Detect if file is PPTX or DOCX based on file signature"""
+    valid, result = validate_office_file(file_bytes)
+    if valid:
+        return result
     return None
 
 # --- CORE UTILITIES ---
@@ -612,14 +641,13 @@ with col_template1:
         else:
             # Load from user storage
             template_bytes = load_template_from_file(template_name)
-            # Detect type from file extension
-            if template_name.endswith('.pptx'):
-                template_type = 'pptx'
-            elif template_name.endswith('.docx'):
-                template_type = 'docx'
-            else:
-                # Auto-detect
-                template_type = detect_file_type(template_bytes)
+            if template_bytes:
+                # Validate and detect type
+                valid, result = validate_office_file(template_bytes)
+                if valid:
+                    template_type = result
+                else:
+                    st.error(f"Invalid file: {result}")
         
         if template_bytes and template_type:
             st.session_state.template_bytes = template_bytes
@@ -632,7 +660,7 @@ with col_template1:
             if config_data:
                 st.session_state.custom_mapping = config_data
             
-            # Simply extract all placeholders - no auto-detection
+            # Extract placeholders
             tokens = extract_placeholders(template_bytes, template_type)
             st.session_state.tokens = tokens
         elif template_bytes and not template_type:
@@ -655,21 +683,17 @@ with col_template2:
         template_bytes = uploaded_template.getvalue()
         template_name = uploaded_template.name
         
-        # Detect file type
-        if template_name.endswith('.pptx'):
-            template_type = 'pptx'
-        elif template_name.endswith('.docx'):
-            template_type = 'docx'
-        else:
-            template_type = detect_file_type(template_bytes)
+        # Validate the file
+        valid, result = validate_office_file(template_bytes)
         
-        if template_type:
+        if valid:
+            template_type = result
             st.session_state.template_bytes = template_bytes
             st.session_state.saved_template_name = None
             st.session_state.template_loaded = True
             st.session_state.template_type = template_type
             
-            # Simply extract all placeholders - no auto-detection
+            # Extract placeholders
             tokens = extract_placeholders(template_bytes, template_type)
             st.session_state.tokens = tokens
             
@@ -686,7 +710,8 @@ with col_template2:
                 st.session_state.clear_uploader = True
                 st.rerun()
         else:
-            st.error("Could not detect file type. Please upload a valid PPTX or DOCX file.")
+            st.error(f"Invalid file: {result}")
+            st.info("Please upload a valid PPTX or DOCX file.")
 
 if st.session_state.save_success:
     st.success(f"Template '{st.session_state.saved_file_name}' saved successfully! Refresh the page to see it in the dropdown.")
