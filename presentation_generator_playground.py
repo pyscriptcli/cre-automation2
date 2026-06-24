@@ -402,15 +402,16 @@ def render_isolated_map_editor():
     image_key = f"map_bytes_holder_{token_key}"
     marker_key = f"map_marker_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
+    export_trigger_key = f"map_export_active_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
-    # FIXED: Initial baseline size updated to 16
     if size_key not in st.session_state: st.session_state[size_key] = 32
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
+    if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -420,13 +421,15 @@ def render_isolated_map_editor():
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.6, 2.0, 0.8, 1.2, 3.4])
     
     with c_btn:
-        export_clicked = st.button("Export Map", type="primary", key=f"export_map_{token_key}", use_container_width=True)
+        st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
+        export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
+        if export_clicked:
+            st.session_state[export_trigger_key] = True
         
     with c_style:
         basemap_style = st.selectbox(label="Basemap Layer", options=["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
         
     with c_color:
-        # FIXED: Injected explicit label with standard margin overrides to align perfectly with its neighbors
         st.markdown('<div class="manual-picker-label">Pin Color</div>', unsafe_allow_html=True)
         pin_color = st.color_picker(label="Pin Color", key=color_key, label_visibility="collapsed")
         
@@ -448,6 +451,42 @@ def render_isolated_map_editor():
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
         plat, plon = 14.5995, 120.9842
+
+    # --- LOADING & COMPILING WORKFLOW EXPLICIT CHECK ---
+    if st.session_state[export_trigger_key]:
+        with st.spinner("Compiling ultra high-resolution map asset... Please wait"):
+            n, s, e, w = None, None, None, None
+            if st.session_state.get(bounds_key):
+                b = st.session_state[bounds_key]
+                if b and "_northEast" in b and "_southWest" in b:
+                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
+                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+            if n is None:
+                n, s = plat + 0.005, plat - 0.005
+                e, w = plon + 0.005, plon - 0.005
+            
+            # Explicitly route parameters to fix the disappearing placeholder canvas bug
+            map_img_bytes = generate_static_map_bounds(
+                n=n, s=s, e=e, w=w, 
+                pin_lat=plat, pin_lon=plon, 
+                style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
+            )
+            
+            st.session_state[image_key] = map_img_bytes
+            st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
+            
+            if st.session_state.temp_form_data:
+                st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
+                temp_path = get_temp_config_path(st.session_state.saved_template_name)
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(st.session_state.temp_form_data, f, indent=4)
+            
+            st.session_state[export_trigger_key] = False
+            st.session_state.restore_form_data = True
+            st.session_state.active_map_editor_token = None
+            st.success("Map attached successfully!")
+            time.sleep(0.5)
+            st.rerun()
 
     tiles_dict = {
         "OSM": "OpenStreetMap",
@@ -482,34 +521,6 @@ def render_isolated_map_editor():
 
     if isinstance(map_data, dict) and map_data.get("bounds"):
         st.session_state[bounds_key] = map_data["bounds"]
-
-    if export_clicked:
-        with st.spinner("Compiling map asset..."):
-            n, s, e, w = None, None, None, None
-            if st.session_state.get(bounds_key):
-                b = st.session_state[bounds_key]
-                if b and "_northEast" in b and "_southWest" in b:
-                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
-                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
-            if n is None:
-                n, s = plat + 0.005, plat - 0.005
-                e, w = plon + 0.005, plon - 0.005
-            
-            map_img_bytes = generate_static_map_bounds(n, s, e, w, plat, plon, style=basemap_style, pin_color=pin_color, pin_size=pin_size)
-            st.session_state[image_key] = map_img_bytes
-            st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
-            
-            if st.session_state.temp_form_data:
-                st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
-                temp_path = get_temp_config_path(st.session_state.saved_template_name)
-                with open(temp_path, 'w', encoding='utf-8') as f:
-                    json.dump(st.session_state.temp_form_data, f, indent=4)
-                    
-            st.session_state.restore_form_data = True
-            st.session_state.active_map_editor_token = None
-            st.success("Map attached successfully!")
-            time.sleep(0.3)
-            st.rerun()
 
     if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
         moved = map_data["last_marker_moved"]
