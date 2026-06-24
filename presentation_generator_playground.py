@@ -74,50 +74,36 @@ MINIMAL_CRE_SYSTEM = """
     
     div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
     
-    /* Compressed 2-column layout for placeholders */
-    .placeholder-grid-compressed {
+    /* Clean 2-column layout for placeholders */
+    .placeholder-grid-2col {
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
-        gap: 4px 12px !important;
+        gap: 12px 24px !important;
         width: 100% !important;
+        padding: 8px 0 !important;
     }
     
-    .placeholder-item-compressed {
+    .placeholder-item {
         display: flex !important;
-        align-items: center !important;
+        flex-direction: column !important;
         gap: 4px !important;
-        padding: 2px 0 !important;
-        border-bottom: 1px solid #f0f0f0 !important;
+        padding: 6px 0 !important;
     }
     
-    .placeholder-label-compressed {
+    .placeholder-label {
         font-weight: 600 !important;
-        font-size: 11px !important;
+        font-size: 13px !important;
         color: #1A1A1A !important;
-        min-width: 80px !important;
-        max-width: 80px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        flex-shrink: 0 !important;
     }
     
-    .placeholder-input-compressed {
-        flex: 1 !important;
-        min-width: 0 !important;
-    }
-    .placeholder-input-compressed input {
-        font-size: 12px !important;
-        padding: 3px 6px !important;
-        height: 28px !important;
+    .placeholder-input {
         width: 100% !important;
     }
-    
-    .placeholder-map-btn {
-        font-size: 11px !important;
-        padding: 2px 8px !important;
-        height: 28px !important;
-        min-height: 28px !important;
+    .placeholder-input input {
+        font-size: 13px !important;
+        padding: 6px 10px !important;
+        height: 36px !important;
+        width: 100% !important;
     }
     
     /* Type mapping section */
@@ -125,101 +111,102 @@ MINIMAL_CRE_SYSTEM = """
         background-color: #F8F9FA !important;
         border: 1px solid #E0E0E0 !important;
         border-radius: 6px !important;
-        padding: 10px !important;
-        margin: 6px 0 10px 0 !important;
+        padding: 12px !important;
+        margin: 8px 0 12px 0 !important;
     }
     .type-mapping-grid {
         display: grid !important;
         grid-template-columns: 1fr 1fr 1fr !important;
-        gap: 4px 10px !important;
-        margin-top: 4px !important;
+        gap: 6px 16px !important;
+        margin-top: 8px !important;
     }
     .type-mapping-item {
         display: flex !important;
         align-items: center !important;
-        gap: 4px !important;
-        font-size: 11px !important;
+        gap: 6px !important;
+        font-size: 12px !important;
     }
     .type-mapping-item select {
-        font-size: 10px !important;
-        padding: 1px 3px !important;
-        height: 24px !important;
-        min-height: 24px !important;
+        font-size: 11px !important;
+        padding: 2px 4px !important;
+        height: 28px !important;
+        min-height: 28px !important;
         flex: 1 !important;
     }
     .type-mapping-item label {
-        min-width: 60px !important;
+        min-width: 80px !important;
         font-weight: 500 !important;
         color: #333 !important;
-        font-size: 11px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
     }
     
     @media (max-width: 768px) {
-        .placeholder-grid-compressed {
+        .placeholder-grid-2col {
             grid-template-columns: 1fr !important;
         }
         .type-mapping-grid {
             grid-template-columns: 1fr !important;
         }
-        .placeholder-label-compressed {
-            min-width: 60px !important;
-            max-width: 60px !important;
-            font-size: 10px !important;
-        }
     }
 </style>
 """
 
-# --- FORM DATA CACHE FUNCTIONS ---
-def get_cache_dir():
-    cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "form_cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    return cache_dir
+# --- TEMP DATA STORAGE FUNCTIONS ---
+def get_temp_dir():
+    temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp_data")
+    os.makedirs(temp_dir, exist_ok=True)
+    return temp_dir
 
-def save_form_data_to_cache(form_data, template_name):
-    """Save form data to local cache file"""
+def save_temp_form_data(form_data, template_name):
+    """Save temporary form data"""
     if not form_data or not template_name:
         return
-    cache_dir = get_cache_dir()
-    # Sanitize template name for filename
+    temp_dir = get_temp_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
-    cache_file = os.path.join(cache_dir, f"{safe_name}_form_data.pkl")
+    temp_file = os.path.join(temp_dir, f"{safe_name}_temp.pkl")
     try:
-        with open(cache_file, 'wb') as f:
+        with open(temp_file, 'wb') as f:
             pickle.dump(form_data, f)
     except Exception as e:
-        print(f"Error saving form cache: {e}")
+        print(f"Error saving temp data: {e}")
 
-def load_form_data_from_cache(template_name):
-    """Load form data from local cache file"""
+def load_temp_form_data(template_name):
+    """Load temporary form data"""
     if not template_name:
         return None
-    cache_dir = get_cache_dir()
+    temp_dir = get_temp_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
-    cache_file = os.path.join(cache_dir, f"{safe_name}_form_data.pkl")
-    if os.path.exists(cache_file):
+    temp_file = os.path.join(temp_dir, f"{safe_name}_temp.pkl")
+    if os.path.exists(temp_file):
         try:
-            with open(cache_file, 'rb') as f:
+            with open(temp_file, 'rb') as f:
                 return pickle.load(f)
         except Exception as e:
-            print(f"Error loading form cache: {e}")
+            print(f"Error loading temp data: {e}")
     return None
 
-def clear_form_cache(template_name):
-    """Clear cached form data for a template"""
+def clear_temp_form_data(template_name):
+    """Clear temporary form data"""
     if not template_name:
         return
-    cache_dir = get_cache_dir()
+    temp_dir = get_temp_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
-    cache_file = os.path.join(cache_dir, f"{safe_name}_form_data.pkl")
-    if os.path.exists(cache_file):
+    temp_file = os.path.join(temp_dir, f"{safe_name}_temp.pkl")
+    if os.path.exists(temp_file):
         try:
-            os.remove(cache_file)
+            os.remove(temp_file)
         except Exception:
             pass
+
+def clear_all_temp_data():
+    """Clear all temporary data files"""
+    temp_dir = get_temp_dir()
+    if os.path.exists(temp_dir):
+        for file in os.listdir(temp_dir):
+            if file.endswith('_temp.pkl'):
+                try:
+                    os.remove(os.path.join(temp_dir, file))
+                except Exception:
+                    pass
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
@@ -329,7 +316,7 @@ def delete_template_file(template_name):
         config_path = os.path.join(storage_dir, config_name)
         if os.path.exists(config_path):
             os.remove(config_path)
-        clear_form_cache(template_name)
+        clear_temp_form_data(template_name)
         return True
     return False
 
@@ -498,7 +485,7 @@ def render_isolated_map_editor():
     col_back, col_title = st.columns([1, 4])
     with col_back:
         if st.button("Back to Document", key="back_from_map"):
-            # Signal to restore form data from cache
+            # Signal to restore form data from temp
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
             st.rerun()
@@ -830,7 +817,7 @@ def simple_uploader_row(label_text, allowed_types, key):
 
 # --- Form Data Management Functions ---
 def save_current_form_data():
-    """Save all current form data to cache"""
+    """Save all current form data to temp storage"""
     if st.session_state.saved_template_name and st.session_state.tokens:
         form_data = {}
         for token in st.session_state.tokens:
@@ -838,19 +825,24 @@ def save_current_form_data():
             if key in st.session_state:
                 form_data[token] = st.session_state[key]
         if form_data:
-            save_form_data_to_cache(form_data, st.session_state.saved_template_name)
+            save_temp_form_data(form_data, st.session_state.saved_template_name)
 
-def restore_form_data_from_cache():
-    """Restore form data from cache"""
+def restore_form_data_from_temp():
+    """Restore form data from temp storage"""
     if st.session_state.saved_template_name:
-        cached_data = load_form_data_from_cache(st.session_state.saved_template_name)
-        if cached_data:
-            for token, value in cached_data.items():
+        temp_data = load_temp_form_data(st.session_state.saved_template_name)
+        if temp_data:
+            for token, value in temp_data.items():
                 key = f"val_{token}"
                 if key in st.session_state:
                     st.session_state[key] = value
             return True
     return False
+
+def clear_form_data_after_download():
+    """Clear temp data after download"""
+    if st.session_state.saved_template_name:
+        clear_temp_form_data(st.session_state.saved_template_name)
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -869,7 +861,6 @@ if "template_to_delete" not in st.session_state: st.session_state.template_to_de
 if "save_success" not in st.session_state: st.session_state.save_success = False
 if "saved_file_name" not in st.session_state: st.session_state.saved_file_name = None
 if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = False
-if "form_data" not in st.session_state: st.session_state.form_data = {}
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 
@@ -878,9 +869,9 @@ if "show_type_mapping" not in st.session_state: st.session_state.show_type_mappi
 if st.session_state.active_map_editor_token:
     render_isolated_map_editor()
 else:
-    # Restore form data from cache if needed
+    # Restore form data from temp if needed
     if st.session_state.restore_form_data:
-        restore_form_data_from_cache()
+        restore_form_data_from_temp()
         st.session_state.restore_form_data = False
     
     # --- MAIN DOCUMENT GENERATOR APP ---
@@ -936,8 +927,7 @@ else:
                         st.session_state.saved_template_name = None
                         st.session_state.template_loaded = False
                         st.session_state.tokens = []
-                        st.session_state.form_data = {}
-                        clear_form_cache(st.session_state.template_to_delete)
+                        clear_temp_form_data(st.session_state.template_to_delete)
                         st.session_state.show_delete_confirm = False
                         st.session_state.template_to_delete = None
                         st.rerun()
@@ -954,9 +944,9 @@ else:
                     template_name = t['name']
                     template_bytes = load_template_from_file(template_name)
                     if template_bytes:
-                        # Clear old form cache when template changes
+                        # Clear old temp data when template changes
                         if st.session_state.saved_template_name and st.session_state.saved_template_name != template_name:
-                            clear_form_cache(st.session_state.saved_template_name)
+                            clear_temp_form_data(st.session_state.saved_template_name)
                         
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
@@ -968,9 +958,8 @@ else:
                             st.session_state.custom_mapping = config_data
                         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
                         st.session_state.tokens = tokens
-                        st.session_state.form_data = {}
-                        # Try to restore cached form data for the new template
-                        restore_form_data_from_cache()
+                        # Try to restore temp data for the new template
+                        restore_form_data_from_temp()
                     break
 
     with col_template2:
@@ -986,7 +975,6 @@ else:
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
-            st.session_state.form_data = {}
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 saved_path = save_template_to_file(template_bytes, uploaded_template.name)
@@ -1048,7 +1036,7 @@ else:
                         
                         col_label, col_select = st.columns([1, 1.5])
                         with col_label:
-                            st.markdown(f'<span style="font-size:11px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
+                            st.markdown(f'<span style="font-size:12px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
                         with col_select:
                             data_type = st.selectbox(
                                 "", 
@@ -1066,23 +1054,21 @@ else:
             
             st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
             
-            # Split into two columns for the actual form inputs - compressed layout
-            st.markdown('<div class="placeholder-grid-compressed">', unsafe_allow_html=True)
+            # Split into two columns for the actual form inputs
+            st.markdown('<div class="placeholder-grid-2col">', unsafe_allow_html=True)
             
             for token in tokens:
                 clean_label = token.replace("{", "").replace("}", "")
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                st.markdown('<div class="placeholder-item-compressed">', unsafe_allow_html=True)
+                st.markdown('<div class="placeholder-item">', unsafe_allow_html=True)
                 
                 # Label
-                st.markdown(f'<div class="placeholder-label-compressed" title="{clean_label}">{clean_label}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="placeholder-label">{clean_label}</div>', unsafe_allow_html=True)
                 
                 # Input field
                 if current_type == "Image" and template_type == 'pptx':
-                    st.markdown('<div class="placeholder-input-compressed">', unsafe_allow_html=True)
                     image_data[token] = simple_uploader_row("", ["png", "jpg", "jpeg"], token)
-                    st.markdown('</div>', unsafe_allow_html=True)
                     field_types[token] = "Image"
                 elif current_type == "Map" and template_type == 'pptx':
                     saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
@@ -1092,7 +1078,7 @@ else:
                     
                     # Save form data before opening map editor
                     if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
-                        # Save current form data to cache
+                        # Save current form data to temp storage
                         save_current_form_data()
                         st.session_state.active_map_editor_token = token
                         st.rerun()
@@ -1100,9 +1086,9 @@ else:
                 else:
                     if current_type in ["Image", "Map"] and template_type != 'pptx':
                         st.warning("Media and Map uploads are only supported in PPTX files.")
-                    st.markdown('<div class="placeholder-input-compressed">', unsafe_allow_html=True)
+                    st.markdown('<div class="placeholder-input">', unsafe_allow_html=True)
                     input_key = f"val_{token}"
-                    text_data[token] = st.text_input("", key=input_key, label_visibility="collapsed", placeholder="...")
+                    text_data[token] = st.text_input("", key=input_key, label_visibility="collapsed", placeholder="Enter value...")
                     st.markdown('</div>', unsafe_allow_html=True)
                     field_types[token] = "Text"
                 
@@ -1110,7 +1096,7 @@ else:
             
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Auto-save form data periodically
+            # Auto-save form data to temp storage
             if st.session_state.saved_template_name:
                 save_current_form_data()
             
@@ -1135,7 +1121,8 @@ else:
                         label="Download PPTX", data=pptx_data,
                         file_name=get_download_filename(base_template_name, "pptx"),
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        use_container_width=True, key="download_pptx"
+                        use_container_width=True, key="download_pptx",
+                        on_click=clear_form_data_after_download
                     )
                 except Exception as e:
                     st.error(f"Error generating PPTX: {str(e)}")
@@ -1151,7 +1138,8 @@ else:
                             label="Download DOCX", data=docx_data,
                             file_name=get_download_filename(base_template_name, "docx"),
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            use_container_width=True, key="download_docx"
+                            use_container_width=True, key="download_docx",
+                            on_click=clear_form_data_after_download
                         )
                 except Exception as e:
                     st.error(f"Error generating document: {str(e)}")
