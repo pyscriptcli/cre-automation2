@@ -175,7 +175,7 @@ MINIMAL_CRE_SYSTEM = """
 def get_github_token():
     """Get GitHub token - HARDCODED FOR TESTING"""
     # WARNING: Remove this after testing!
-    return "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"
+    return "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"
 
 def get_github_repo():
     """Get GitHub repository object"""
