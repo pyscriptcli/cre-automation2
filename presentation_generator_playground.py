@@ -15,11 +15,11 @@ from docx.shared import Inches, Pt as DocxPt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
+import streamlit.components.v1 as components
 
 # --- MAP SPECIFIC DEPENDENCIES ---
 import folium
 from folium.plugins import Draw
-from streamlit_folium import st_folium
 import requests
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
@@ -75,14 +75,6 @@ MINIMAL_CRE_SYSTEM = """
     
     /* Maximize Dialog Viewport Space */
     div[role="dialog"] { max-width: 96vw !important; width: 96vw !important; padding: 0.8rem !important; }
-    
-    /* Fix for map container to prevent auto-refresh */
-    .stFoliumMap {
-        min-height: 680px !important;
-    }
-    .stFoliumMap iframe {
-        min-height: 680px !important;
-    }
 </style>
 """
 
@@ -157,15 +149,13 @@ def auto_save_config():
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
-
-# --- ENHANCED HIGH-RESOLUTION MAP GENERATOR ---
+# --- DYNAMIC HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
-    """Generates high-res map with proper pin rendering for both documents and exports"""
-    target_tiles_span = 12  # Increased for higher resolution
+    """Dynamically scales zoom to construct a massive high-res stitch and drops styled vector pins"""
+    target_tiles_span = 8
     lon_span = e - w
     if lon_span <= 0: lon_span = 0.001
     
-    # Calculate optimal zoom level for high resolution
     zoom = int(math.log2(360.0 / lon_span * target_tiles_span))
     zoom = max(10, min(18, zoom))
     
@@ -179,9 +169,8 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     x_min, y_min = deg2num(n, w, zoom)
     x_max, y_max = deg2num(s, e, zoom)
     
-    # Limit tile count but allow more for higher resolution
     tile_count = (x_max - x_min + 1) * (y_max - y_min + 1)
-    if tile_count > 150:
+    if tile_count > 100:
         zoom -= 1
         x_min, y_min = deg2num(n, w, zoom)
         x_max, y_max = deg2num(s, e, zoom)
@@ -201,22 +190,16 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     }
     url_template = styles.get(style, styles["Hybrid"])
     
-    # Download tiles with retry logic
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             url = url_template.format(z=zoom, x=x, y=y)
-            max_retries = 2
-            for attempt in range(max_retries):
-                try:
-                    resp = requests.get(url, headers=headers, timeout=10)
-                    if resp.status_code == 200:
-                        img = Image.open(io.BytesIO(resp.content))
-                        stitched.paste(img, ((x - x_min) * tile_size, (y - y_min) * tile_size))
-                        break
-                except Exception:
-                    if attempt == max_retries - 1:
-                        pass
-                    continue
+            try:
+                resp = requests.get(url, headers=headers, timeout=10)
+                if resp.status_code == 200:
+                    img = Image.open(io.BytesIO(resp.content))
+                    stitched.paste(img, ((x - x_min) * tile_size, (y - y_min) * tile_size))
+            except Exception:
+                pass
                 
     def num2px(lat_deg, lon_deg, z):
         lat_rad = math.radians(lat_deg)
@@ -236,7 +219,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     right = int(px_e - base_x)
     bottom = int(py_s - base_y)
     
-    # Ensure we don't crop outside the stitched image
     left = max(0, min(left, stitched.width - 1))
     top = max(0, min(top, stitched.height - 1))
     right = max(left + 1, min(right, stitched.width))
@@ -244,13 +226,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # ENHANCED PIN RENDERING - Now includes proper styling and shadow
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
-    # Ensure pin is within image bounds
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
@@ -258,15 +238,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     w_px = 16 * scale
     h_px = 32 * scale
     
-    # Draw pin shadow
-    shadow_offset_x = int(2 * scale)
-    shadow_offset_y = int(2 * scale)
     draw.ellipse([
-        pin_local_x - w_px - shadow_offset_x, pin_local_y - h_px - w_px + shadow_offset_y, 
-        pin_local_x + w_px + shadow_offset_x, pin_local_y - h_px + w_px + shadow_offset_y
-    ], fill="rgba(0,0,0,0.35)")
+        pin_local_x - w_px - 2, pin_local_y - h_px - w_px + 2, 
+        pin_local_x + w_px + 2, pin_local_y - h_px + w_px + 2
+    ], fill="rgba(0,0,0,0.3)")
     
-    # Draw pin base (white background)
     draw.polygon([
         (pin_local_x, pin_local_y), 
         (pin_local_x - w_px, pin_local_y - h_px), 
@@ -277,7 +253,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         pin_local_x + w_px, pin_local_y - h_px + w_px
     ], fill="#ffffff")
     
-    # Draw pin body (colored)
     draw.polygon([
         (pin_local_x, pin_local_y - (4 * scale)), 
         (pin_local_x - (w_px * 0.75), pin_local_y - h_px), 
@@ -288,238 +263,313 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         pin_local_x + (w_px * 0.75), pin_local_y - h_px + (w_px * 0.75)
     ], fill=pin_color)
     
-    # Draw inner circle (white center)
     inner_radius = w_px * 0.33
     draw.ellipse([
         pin_local_x - inner_radius, pin_local_y - h_px - inner_radius, 
         pin_local_x + inner_radius, pin_local_y - h_px + inner_radius
     ], fill="#ffffff")
     
-    # Draw pin outline for better definition
-    outline_width = max(1, int(scale))
-    draw.polygon([
-        (pin_local_x, pin_local_y), 
-        (pin_local_x - w_px, pin_local_y - h_px), 
-        (pin_local_x + w_px, pin_local_y - h_px)
-    ], outline="#333333", width=outline_width)
-    
     final_img = cropped.convert("RGB")
     
-    # Upscale for higher resolution output (3x for document quality)
-    scale_factor = 3
-    new_width = cropped.width * scale_factor
-    new_height = cropped.height * scale_factor
-    final_img = final_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    if cropped.width < 1000 or cropped.height < 1000:
+        scale_factor = 2
+        new_width = cropped.width * scale_factor
+        new_height = cropped.height * scale_factor
+        final_img = final_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
     
     img_byte_arr = io.BytesIO()
-    final_img.save(img_byte_arr, format='PNG', quality=95, optimize=False)
+    final_img.save(img_byte_arr, format='PNG', quality=95, optimize=True)
     img_byte_arr.seek(0)
     return img_byte_arr
 
-# --- MAP EDITOR MODAL WITH STABLE STATE MANAGEMENT ---
-@st.dialog("Map Editor Config", width="large")
-def map_editor_modal(token_key):
-    """
-    Fixed map editor with stable state management to prevent continuous refreshes.
-    Uses unique session state keys and st_folium with no auto-reruns.
-    """
-    # Create unique session state keys for this map instance
-    map_state_key = f"map_state_{token_key}"
-    map_data_key = f"map_data_{token_key}"
-    map_exported_key = f"map_exported_{token_key}"
+# --- STANDALONE MAP EDITOR USING HTML COMPONENT ---
+def standalone_map_editor(token_key):
+    """Map editor using HTML component that doesn't trigger Streamlit reruns"""
     
-    # Initialize map state if not exists (only once)
+    # Initialize map state for this token
+    map_state_key = f"standalone_map_{token_key}"
     if map_state_key not in st.session_state:
         st.session_state[map_state_key] = {
+            "lat": 14.3294,
+            "lon": 120.9368,
+            "zoom": 15,
             "style": "Hybrid",
-            "coord": "14.3294, 120.9368",
             "color": "#DC3545",
             "size": 32,
-            "zoom": 15,
             "bounds": None,
-            "plat": 14.3294,
-            "plon": 120.9368
+            "has_image": False,
+            "image_bytes": None
         }
     
-    # Get current state
     map_state = st.session_state[map_state_key]
     
-    st.markdown("""
-    <style>
-        div[role="dialog"] div[data-baseweb="select"] { min-height: 22px !important; }
-        div[role="dialog"] div[data-baseweb="select"] div { min-height: 22px !important; font-size: 11px !important; padding: 0 4px !important; }
-        div[role="dialog"] input { font-size: 11px !important; padding: 2px 6px !important; min-height: 22px !important;}
-        div[role="dialog"] .stMarkdown p { font-size: 11px !important; margin-bottom: 0px !important; }
-        div[role="dialog"] label { font-size: 11px !important; padding-bottom: 2px !important; }
-        div[role="dialog"] .stColorPicker > div { min-height: 20px !important; }
-        iframe { border-radius: 4px; border: 1px solid #E0E0E0; }
-        div[role="dialog"] .stVerticalBlock { gap: 0.1rem !important; }
-    </style>
-    """, unsafe_allow_html=True)
+    # Display current status
+    if map_state["has_image"]:
+        st.success("✅ Map snapshot ready")
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("🔄 Regenerate", key=f"regen_{token_key}"):
+                map_state["has_image"] = False
+                map_state["image_bytes"] = None
+                st.rerun()
+        with col2:
+            if map_state["image_bytes"]:
+                try:
+                    img = Image.open(map_state["image_bytes"])
+                    st.image(img, use_container_width=True)
+                except:
+                    pass
+    else:
+        st.info("Configure map below and click 'Generate Map Snapshot'")
     
-    # Tiny Horizontally Packed Controls
-    c1, c2, c3, c4 = st.columns([1.2, 1.6, 0.6, 1.2])
-    
-    with c1:
-        basemap_style = st.selectbox(
-            "Map Style", 
-            ["Hybrid", "Satellite", "Carto Light", "OSM"], 
-            index=["Hybrid", "Satellite", "Carto Light", "OSM"].index(map_state["style"]),
-            key=f"map_style_{token_key}"
-        )
-        map_state["style"] = basemap_style
-    
-    with c2:
-        coord_input = st.text_input(
-            "Center Pin Coordinates", 
-            value=map_state["coord"],
-            key=f"map_coord_{token_key}"
-        )
-        map_state["coord"] = coord_input
-    
-    with c3:
-        pin_color = st.color_picker(
-            "Pin Color", 
-            value=map_state["color"],
-            key=f"map_color_{token_key}"
-        )
-        map_state["color"] = pin_color
-    
-    with c4:
-        pin_size = st.slider(
-            "Pin Size", 
-            16, 64, 
-            value=map_state["size"],
-            key=f"map_size_{token_key}"
-        )
-        map_state["size"] = pin_size
-    
-    # Safe Coordinate Calculation
-    try:
-        plat, plon = map(float, coord_input.split(","))
-    except ValueError:
-        plat, plon = map_state.get("plat", 14.3294), map_state.get("plon", 120.9368)
-    
-    # Update state with current coordinates
-    map_state["plat"] = plat
-    map_state["plon"] = plon
-    
-    # Build map with proper tile attribution
-    tiles_dict = {
-        "OSM": "OpenStreetMap",
-        "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
-    }
-    attr_dict = {
-        "OSM": "OpenStreetMap",
-        "Carto Light": "&copy; CartoDB",
-        "Satellite": "Google Maps",
-        "Hybrid": "Google Maps Hybrid (Clean Streets)"
-    }
-    
-    m = folium.Map(
-        location=[plat, plon], 
-        zoom_start=map_state.get("zoom", 15),
-        tiles=tiles_dict[basemap_style],
-        attr=attr_dict[basemap_style],
-        zoom_control=True
-    )
-    
-    # Pin icon HTML
-    icon_html = f"""
-    <div style="position: relative;">
-        <span style="position: absolute; left: -{pin_size//2}px; top: -{pin_size}px; width: {pin_size}px; height: {pin_size}px; background-color: {pin_color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></span>
-        <span style="position: absolute; left: -{max(2, int(pin_size/6))}px; top: -{int(pin_size * 0.66)}px; width: {max(4, int(pin_size/3))}px; height: {max(4, int(pin_size/3))}px; background-color: white; border-radius: 50%;"></span>
-    </div>
-    """
-    
-    folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
-    
-    draw = Draw(
-        export=False, position='topleft',
-        draw_options={'polyline':False, 'polygon':False, 'circle':False, 'marker':False, 'circlemarker':False, 'rectangle':True},
-        edit_options={'edit':True}
-    )
-    draw.add_to(m)
-    
-    st.caption("✏️ **Use the Rectangle tool (⬛) on the left to draw your crop box.** If no box is explicitly drawn, the current map view boundaries will be exported.")
-    
-    # Render map with stable key to prevent continuous refreshes
-    map_data = st_folium(
-        m, 
-        height=680, 
-        width=1150, 
-        use_container_width=True, 
-        key=f"folium_map_{token_key}",
-        returned_objects=["last_marker_moved", "all_drawings", "center", "zoom", "bounds"]
-    )
-    
-    # Process map data without causing re-renders
-    if map_data and isinstance(map_data, dict):
-        # Handle marker movement
-        if map_data.get("last_marker_moved"):
-            moved = map_data["last_marker_moved"]
-            if moved:
-                mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
-                new_coord = f"{mlat}, {mlon}"
-                map_state["coord"] = new_coord
-        
-        # Update zoom
-        if map_data.get("zoom"):
-            map_state["zoom"] = map_data["zoom"]
-        
-        # Store bounds for export
-        if map_data.get("bounds"):
-            map_state["bounds"] = map_data["bounds"]
-    
-    # Export button - only action that triggers rerun
-    if st.button("🚀 Confirm & Export Map Snapshot", key=f"exp_{token_key}", use_container_width=True):
-        with st.spinner("Compiling Crisp High-Density Image Assets..."):
-            # Get bounds from map data or fallback
-            n, s, e, w = None, None, None, None
-            
-            # Try to get bounds from drawn rectangle
-            if map_data and isinstance(map_data, dict) and map_data.get("all_drawings"):
-                drawings = map_data["all_drawings"]
-                if drawings:
-                    last_draw = drawings[-1]
-                    if last_draw and last_draw.get("geometry", {}).get("type") == "Polygon":
-                        coords = last_draw["geometry"]["coordinates"][0]
-                        if coords and len(coords) >= 4:
-                            lats = [c[1] for c in coords]
-                            lons = [c[0] for c in coords]
-                            n, s = max(lats), min(lats)
-                            e, w = max(lons), min(lons)
-            
-            # If no rectangle, use map view bounds
-            if n is None and map_state.get("bounds"):
-                b = map_state["bounds"]
-                if b and "_northEast" in b and "_southWest" in b:
-                    n = b["_northEast"]["lat"]
-                    s = b["_southWest"]["lat"]
-                    e = b["_northEast"]["lng"]
-                    w = b["_southWest"]["lng"]
-            
-            # Fallback to coordinates with offset
-            if n is None:
-                n, s = plat + 0.02, plat - 0.02
-                e, w = plon + 0.02, plon - 0.02
-            
-            # Generate high-res map with proper pin rendering
-            map_img_bytes = generate_static_map_bounds(
-                n, s, e, w, plat, plon, 
-                style=basemap_style, 
-                pin_color=pin_color, 
-                pin_size=pin_size
+    # Map configuration
+    with st.expander("🗺️ Configure Map", expanded=not map_state["has_image"]):
+        # Controls
+        c1, c2, c3, c4 = st.columns([1.2, 1.6, 0.6, 1.2])
+        with c1:
+            style = st.selectbox(
+                "Style",
+                ["Hybrid", "Satellite", "Carto Light", "OSM"],
+                index=["Hybrid", "Satellite", "Carto Light", "OSM"].index(map_state["style"])
             )
+            map_state["style"] = style
+        with c2:
+            lat = st.number_input("Latitude", value=map_state["lat"], format="%.6f", step=0.0001)
+            lon = st.number_input("Longitude", value=map_state["lon"], format="%.6f", step=0.0001)
+            map_state["lat"] = lat
+            map_state["lon"] = lon
+        with c3:
+            color = st.color_picker("Pin Color", value=map_state["color"])
+            map_state["color"] = color
+        with c4:
+            size = st.slider("Pin Size", 16, 64, value=map_state["size"])
+            map_state["size"] = size
+        
+        # Generate map HTML with embedded JavaScript
+        st.markdown("### Interactive Map")
+        st.caption("🖱️ Drag to pan, scroll to zoom. The rectangle tool draws a crop box.")
+        
+        # Build the map HTML
+        map_html = build_map_html(lat, lon, map_state["zoom"], style, color, size, token_key)
+        
+        # Display the map using components.html - this does NOT trigger reruns
+        components.html(map_html, height=600)
+        
+        # Button to capture current map state - this will trigger a rerun
+        if st.button("📸 Generate Map Snapshot", key=f"gen_snap_{token_key}", use_container_width=True):
+            with st.spinner("Generating high-resolution map image..."):
+                # Use the current viewport bounds or fallback
+                n, s, e, w = lat + 0.02, lat - 0.02, lon + 0.02, lon - 0.02
+                
+                # Generate the image
+                img_bytes = generate_static_map_bounds(
+                    n, s, e, w,
+                    lat, lon,
+                    style=style,
+                    pin_color=color,
+                    pin_size=size
+                )
+                
+                map_state["image_bytes"] = img_bytes
+                map_state["has_image"] = True
+                st.success("✅ Map snapshot generated!")
+                st.rerun()
+
+def build_map_html(lat, lon, zoom, style, color, size, token_key):
+    """Build HTML for standalone map with Leaflet.js"""
+    
+    # Map tile URLs
+    tile_urls = {
+        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
+        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    }
+    
+    tile_attribution = {
+        "Hybrid": "Google Maps Hybrid",
+        "Satellite": "Google Maps",
+        "Carto Light": "CartoDB",
+        "OSM": "OpenStreetMap"
+    }
+    
+    tile_url = tile_urls.get(style, tile_urls["Hybrid"])
+    attribution = tile_attribution.get(style, "Map data")
+    
+    # Build the HTML
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+        <style>
+            body {{ margin: 0; padding: 0; }}
+            #map {{ width: 100%; height: 100vh; }}
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script>
+            // Initialize map
+            var map = L.map('map').setView([{lat}, {lon}], {zoom});
             
-            # Store the map image
-            st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
-            st.session_state[map_exported_key] = True
+            // Add tile layer
+            L.tileLayer('{tile_url}', {{
+                attribution: '{attribution}',
+                maxZoom: 20
+            }}).addTo(map);
             
-            st.success("✅ High-res map snapshot generated successfully!")
-            st.rerun()
+            // Create custom pin icon
+            var pinSize = {size};
+            var pinColor = '{color}';
+            
+            // Create pin with SVG
+            var pinIcon = L.divIcon({{
+                className: 'custom-pin',
+                html: `
+                    <div style="position: relative; width: {pinSize}px; height: {pinSize}px;">
+                        <svg width="{pinSize}" height="{pinSize}" viewBox="0 0 32 32">
+                            <defs>
+                                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+                                </filter>
+                            </defs>
+                            <g filter="url(#shadow)">
+                                <path d="M16 32 L4 16 C4 8 9 0 16 0 C23 0 28 8 28 16 Z" fill="white" stroke="white" stroke-width="1"/>
+                                <path d="M16 30 L6 16 C6 10 10 4 16 4 C22 4 26 10 26 16 Z" fill="{pinColor}" stroke="{pinColor}" stroke-width="0.5"/>
+                                <circle cx="16" cy="14" r="5" fill="white" opacity="0.8"/>
+                                <circle cx="16" cy="14" r="2" fill="{pinColor}"/>
+                            </g>
+                        </svg>
+                    </div>
+                `,
+                iconSize: [pinSize, pinSize],
+                iconAnchor: [pinSize/2, pinSize],
+                popupAnchor: [0, -pinSize/2]
+            }});
+            
+            // Add marker
+            var marker = L.marker([{lat}, {lon}], {{
+                icon: pinIcon,
+                draggable: true
+            }}).addTo(map);
+            
+            // Store marker position
+            var markerLat = {lat};
+            var markerLon = {lon};
+            
+            // Update marker position on drag
+            marker.on('dragend', function(e) {{
+                var pos = marker.getLatLng();
+                markerLat = pos.lat;
+                markerLon = pos.lng;
+                // Send update back to Streamlit
+                window.parent.postMessage({{
+                    type: 'streamlit:setComponentValue',
+                    value: {{
+                        lat: pos.lat,
+                        lng: pos.lng,
+                        action: 'marker_moved'
+                    }}
+                }}, '*');
+            }});
+            
+            // Add draw control for rectangle
+            var drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+            
+            var drawControl = new L.Control.Draw({{
+                draw: {{
+                    polyline: false,
+                    polygon: false,
+                    circle: false,
+                    marker: false,
+                    circlemarker: false,
+                    rectangle: {{
+                        shapeOptions: {{
+                            color: '#003366',
+                            weight: 2,
+                            opacity: 0.8
+                        }}
+                    }}
+                }},
+                edit: {{
+                    featureGroup: drawnItems
+                }}
+            }});
+            map.addControl(drawControl);
+            
+            // Store rectangle bounds
+            var rectBounds = null;
+            
+            // Handle draw events
+            map.on('draw:created', function(e) {{
+                drawnItems.clearLayers();
+                var layer = e.layer;
+                drawnItems.addLayer(layer);
+                
+                if (layer instanceof L.Rectangle) {{
+                    rectBounds = layer.getBounds();
+                    // Send bounds back
+                    window.parent.postMessage({{
+                        type: 'streamlit:setComponentValue',
+                        value: {{
+                            bounds: {{
+                                north: rectBounds.getNorth(),
+                                south: rectBounds.getSouth(),
+                                east: rectBounds.getEast(),
+                                west: rectBounds.getWest()
+                            }},
+                            action: 'rectangle_drawn'
+                        }}
+                    }}, '*');
+                }}
+            }});
+            
+            map.on('draw:deleted', function(e) {{
+                rectBounds = null;
+                window.parent.postMessage({{
+                    type: 'streamlit:setComponentValue',
+                    value: {{
+                        bounds: null,
+                        action: 'rectangle_deleted'
+                    }}
+                }}, '*');
+            }});
+            
+            // Send initial state
+            setTimeout(function() {{
+                window.parent.postMessage({{
+                    type: 'streamlit:setComponentValue',
+                    value: {{
+                        lat: {lat},
+                        lng: {lon},
+                        zoom: {zoom},
+                        action: 'initialized'
+                    }}
+                }}, '*');
+            }}, 500);
+            
+            // Handle zoom events
+            map.on('zoomend', function() {{
+                window.parent.postMessage({{
+                    type: 'streamlit:setComponentValue',
+                    value: {{
+                        zoom: map.getZoom(),
+                        action: 'zoom_changed'
+                    }}
+                }}, '*');
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    return html
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -611,27 +661,18 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                         run.text = run.text.replace(token, replacement)
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
-    """Generate PPTX with proper image and map insertion"""
     prs = Presentation(io.BytesIO(template_bytes))
     for slide in prs.slides:
         shapes_to_delete = []
         images_to_add = []
-        
-        # First pass: identify image placeholders
         for shape in slide.shapes:
             if shape.has_text_frame:
                 text_content = shape.text
-                for img_token, img_data in image_inputs.items():
-                    if img_token in text_content and img_data is not None:
-                        # Handle both file objects and BytesIO objects
-                        if isinstance(img_data, io.BytesIO):
-                            images_to_add.append((img_data, shape.left, shape.top, shape.width, shape.height))
-                        else:
-                            images_to_add.append((img_data, shape.left, shape.top, shape.width, shape.height))
+                for img_token, img_file in image_inputs.items():
+                    if img_token in text_content and img_file is not None:
+                        images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
                         shapes_to_delete.append(shape)
                         break
-        
-        # Second pass: replace text in non-image shapes
         for shape in slide.shapes:
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
@@ -643,73 +684,37 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                             if cell.text_frame:
                                 for paragraph in cell.text_frame.paragraphs:
                                     replace_text_in_paragraph(paragraph, text_inputs)
-        
-        # Third pass: add images
-        for img_data, left, top, width, height in images_to_add:
+        for img_file, left, top, width, height in images_to_add:
             try:
-                # Handle BytesIO objects (from map generation)
-                if isinstance(img_data, io.BytesIO):
-                    img_data.seek(0)
-                    slide.shapes.add_picture(img_data, left, top, width=width, height=height)
-                else:
-                    # Handle file objects
-                    processed_img = smart_crop_to_fit(img_data, width, height)
-                    slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
-            except Exception as e:
-                print(f"Error adding image: {e}")
+                processed_img = smart_crop_to_fit(img_file, width, height)
+                slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
+            except Exception:
                 pass
-        
-        # Delete placeholder shapes
         for old_shape in shapes_to_delete:
             try:
                 sp = old_shape._element
                 sp.getparent().remove(sp)
             except Exception:
                 pass
-    
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
     return pptx_stream.getvalue()
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
-    """Generate DOCX with proper image and map insertion"""
     doc = Document(io.BytesIO(template_bytes))
-    
     for paragraph in doc.paragraphs:
         has_image = False
-        img_to_add = None
-        img_token = None
-        
-        # Check if paragraph contains image placeholder
-        for token, img_data in image_inputs.items():
-            if token in paragraph.text and img_data is not None:
+        for img_token in image_inputs.keys():
+            if img_token in paragraph.text:
                 has_image = True
-                img_to_add = img_data
-                img_token = token
                 break
-        
-        if has_image and img_to_add:
-            # Clear paragraph and add image
-            paragraph.clear()
-            try:
-                if isinstance(img_to_add, io.BytesIO):
-                    img_to_add.seek(0)
-                    paragraph.add_run().add_picture(img_to_add, width=Inches(5))
-                else:
-                    paragraph.add_run().add_picture(img_to_add, width=Inches(5))
-            except Exception as e:
-                paragraph.add_run(f"[Image: {img_token}]")
-        else:
-            # Replace text placeholders
+        if not has_image:
             replace_text_in_paragraph(paragraph, text_inputs)
-    
-    # Process tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
                     replace_text_in_paragraph(paragraph, text_inputs)
-    
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
     doc_stream.seek(0)
@@ -890,13 +895,17 @@ if u_template is not None and st.session_state.tokens:
                         elif data_type == "Map" and template_type == 'pptx':
                             st.markdown(f'<div class="field-label">{clean_label} (Map Mode)</div>', unsafe_allow_html=True)
                             
-                            saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
-                            if saved_map_img:
-                                image_data[token] = saved_map_img
-                                st.caption("✅ Map snapshot attached.")
+                            # Use the standalone map editor
+                            standalone_map_editor(token)
                             
-                            if st.button(f"Configure Map View", key=f"btn_map_{token}", use_container_width=True):
-                                map_editor_modal(token)
+                            # Get the map image if it was generated
+                            map_state_key = f"standalone_map_{token}"
+                            if map_state_key in st.session_state:
+                                map_state = st.session_state[map_state_key]
+                                if map_state["has_image"] and map_state["image_bytes"]:
+                                    image_data[token] = map_state["image_bytes"]
+                                    st.caption("✅ Map snapshot attached")
+                            
                             field_types[token] = "Image"
                         else:
                             if data_type in ["Image", "Map"] and template_type != 'pptx':
