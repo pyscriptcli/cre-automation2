@@ -734,7 +734,7 @@ else:
                 template_options.append(f"{t['display_name']} ({t['type']})")
         
         if stored_templates:
-            template_options.append("--- User Templates ---")
+            template_options.append("--- User Uploaded Templates ---")
             for t in stored_templates:
                 template_options.append(f"{t['display_name']} ({t['type']})")
         
