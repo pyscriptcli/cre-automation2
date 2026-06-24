@@ -27,53 +27,37 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-        :root {
-            --brand-midnight: #003366 !important;
-            --brand-gold: #C9AB4C !important;
-            --white-clean: #ffffff !important;
-            --bg-offwhite: #f8fafc !important;
-            --text-muted: #888780 !important;
-            --soft-shadow: 0 4px 20px rgba(0, 51, 102, 0.12) !important;
+        /* Reset & Base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        
+
         html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main, .block-container {
-            background-color: var(--white-clean) !important;
-            color: var(--brand-midnight) !important;
-            font-family: 'Montserrat', sans-serif !important;
-        }
-        
-        /* FLOATING SIDEBAR ENGINE */
-        [data-testid="stSidebar"] {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            font-family: 'Inter', sans-serif !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
             height: 100vh !important;
-            background-color: rgba(248, 250, 252, 0.95) !important;
-            backdrop-filter: blur(12px) !important;
-            color: var(--brand-midnight) !important;
-            border-right: 1px solid rgba(0, 51, 102, 0.08) !important;
-            width: 320px !important;
-            min-width: 320px !important;
-            max-width: 320px !important;
-            transform: none !important;
-            visibility: visible !important;
-            overflow-y: auto !important;
-            overflow-x: hidden !important;
-            box-shadow: 4px 0 25px rgba(0, 31, 63, 0.08) !important;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            z-index: 99999 !important;
-            display: flex !important;
-            flex-direction: column !important;
+            width: 100vw !important;
         }
-        
-        /* Sidebar collapsed state via dynamic classes */
-        .sidebar-collapsed [data-testid="stSidebar"] {
-            transform: translateX(-320px) !important;
+
+        /* Hide Streamlit default elements */
+        [data-testid="stSidebarCollapseButton"], 
+        [data-testid="collapsedControl"],
+        .st-emotion-cache-1cypcdb,
+        .st-emotion-cache-6qob1r,
+        [data-testid="stHeader"], header, #stDecoration,
+        .stAppHeader, .st-emotion-cache-12fmjuu {
+            display: none !important;
         }
-        
-        /* MAIN CANVAS OVERLAY COMPLIANCE */
+
+        /* Main canvas full screen */
         [data-testid="stMain"] { 
             width: 100vw !important;
             min-width: 100vw !important;
@@ -97,246 +81,376 @@ st.markdown("""
             border: none !important; 
             display: block !important; 
         }
-        
-        /* FLOATING SIDEBAR TOGGLE MECHANICS - FIXED POSITIONING */
-        .sidebar-toggle-btn {
+
+        /* Utility Classes */
+        .panel-shadow { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .bg-navy { background-color: #003366; }
+        .text-navy { color: #003366; }
+        .border-navy { border-color: #003366; }
+        .hover\\:bg-navy-dark:hover { background-color: #002244; }
+        .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        /* Floating Controls Container */
+        .floating-controls {
             position: fixed;
+            top: 16px;
             left: 16px;
-            top: 24px;
-            z-index: 999999;
-            background: var(--brand-midnight);
-            color: #ffffff;
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 4px;
-            padding: 8px 14px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transition: all 0.2s ease;
+            right: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            z-index: 99999;
+            pointer-events: none;
+        }
+        .floating-controls > * {
             pointer-events: auto;
         }
-        .sidebar-toggle-btn:hover {
-            background: var(--brand-gold);
-            transform: scale(1.03);
-        }
-        
-        /* When sidebar is collapsed, move button to visible position */
-        .sidebar-collapsed .sidebar-toggle-btn {
-            left: 16px !important;
-            background: var(--brand-midnight);
-        }
-        
-        /* Hide default elements */
-        [data-testid="stSidebarCollapseButton"], 
-        [data-testid="collapsedControl"],
-        .st-emotion-cache-1cypcdb,
-        .st-emotion-cache-6qob1r,
-        [data-testid="stHeader"], header, #stDecoration { 
-            display: none !important; 
-        }
-        
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-thumb { background: rgba(0, 51, 102, 0.15); border-radius: 2px; }
-        * { scrollbar-width: thin !important; }
-        
-        p, label, h1, h2, h3, h4, h5, h6, .stMarkdown, [data-testid="stExpander"] summary p {
-            color: var(--brand-midnight) !important;
-            font-family: 'Montserrat', sans-serif !important;
-        }
-        
-        /* UNIFIED SIDEBAR INPUT STYLES */
-        [data-testid="stSidebar"] div[data-baseweb="input"], 
-        [data-testid="stSidebar"] div[data-baseweb="select"],
-        [data-testid="stSidebar"] .stTextInput,
-        [data-testid="stSidebar"] .stNumberInput,
-        [data-testid="stSidebar"] .stSelectbox {
-            background-color: transparent !important;
-            border: none !important;
-            border-bottom: 1px solid rgba(201, 171, 76, 0.5) !important;
-            border-radius: 0px !important;
-            box-shadow: none !important;
-            margin-bottom: 12px !important;
-            padding: 4px 0 !important;
-        }
-        
-        [data-testid="stSidebar"] .stTextInput > div,
-        [data-testid="stSidebar"] .stNumberInput > div,
-        [data-testid="stSidebar"] .stSelectbox > div {
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-        
-        [data-testid="stSidebar"] .stTextInput input,
-        [data-testid="stSidebar"] .stNumberInput input,
-        [data-testid="stSidebar"] .stSelectbox select {
-            padding: 6px 0 !important;
-            font-size: 12px !important;
-        }
-        
-        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button { 
-            background-color: var(--brand-midnight) !important; 
-            border: 1px solid var(--brand-midnight) !important; 
-            border-radius: 4px !important; 
-            width: 100% !important; 
-            padding: 6px !important; 
-            box-shadow: var(--soft-shadow) !important; 
-            height: 32px !important;
-            font-size: 10px !important;
-        }
-        div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover { 
-            background-color: var(--brand-gold) !important; 
-            border-color: var(--brand-gold) !important; 
-        }
-        div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p { 
-            color: var(--white-clean) !important; 
-            font-weight: 700 !important; 
-            font-size: 10px !important; 
-            text-transform: uppercase !important; 
-            letter-spacing: 0.5px; 
-        }
-        
-        div.stDownloadButton > button { 
-            background-color: var(--brand-midnight) !important; 
-            border: none !important; 
-            border-radius: 4px !important; 
-            width: 100% !important; 
-            padding: 6px !important;
-            height: 32px !important;
-        }
-        div.stDownloadButton > button:hover { background-color: var(--brand-gold) !important; }
-        
-        div.stButton > button[kind="primary"] { 
-            background: transparent !important; 
-            border: 1px solid rgba(170, 46, 32, 0.2) !important; 
-            color: #AA2E20 !important; 
-            padding: 4px !important; 
-            border-radius: 4px;
-            height: 32px !important;
-        }
-        div.stButton > button[kind="primary"]:hover {
-            background: rgba(170, 46, 32, 0.05) !important;
-        }
-        div.stButton > button[kind="primary"] p { 
-            color: #AA2E20 !important; 
-            font-size: 10px !important; 
-            font-weight: 600; 
-            text-transform: uppercase; 
-        }
-        
-        [data-testid="stSidebar"] .st-expander { 
-            border: 1px solid rgba(0, 51, 102, 0.08) !important; 
-            background-color: var(--white-clean) !important; 
-            border-radius: 6px !important; 
-            margin-bottom: 8px !important; 
-            box-shadow: 0 2px 6px rgba(0,0,0,0.01) !important;
-        }
-        
-        [data-testid="stSidebar"] .st-expander summary {
-            padding: 6px 8px !important;
-            font-size: 10px !important;
-            font-weight: 700 !important;
-            letter-spacing: 0.5px !important;
-        }
-        
-        [data-testid="stSidebar"] .st-expander .streamlit-expanderContent {
-            padding: 4px 8px 8px 8px !important;
-        }
-        
-        .brand-title { 
-            font-family: 'Cormorant Garamond', serif !important; 
-            font-style: italic; 
-            color: var(--brand-midnight); 
-            font-size: 28px !important; 
-            text-align: center; 
-            border-bottom: 1px solid var(--brand-gold); 
-            padding-bottom: 6px !important; 
-            margin-bottom: 12px !important; 
-            margin-top: 40px !important;
-        }
-        
-        .stTextInput label p, .stNumberInput label p, .stSelectbox label p { 
-            font-size: 9px !important; 
-            font-weight: 600 !important; 
-            color: var(--brand-midnight) !important; 
-            letter-spacing: 0.3px;
-            margin-bottom: 2px !important;
+
+        /* Search Container */
+        .search-container {
+            display: flex;
+            flex: 1;
+            max-width: 560px;
+            align-items: center;
+            gap: 8px;
         }
 
-        /* WORKSPACE MODERN ARCHITECTURE */
-        .workspace-section {
-            margin-top: 8px;
-            border-top: 1px solid rgba(0, 51, 102, 0.08);
-            padding-top: 8px;
+        .search-wrapper {
+            position: relative;
             flex: 1;
+        }
+        .search-wrapper .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            font-size: 18px;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+        .search-wrapper:focus-within .search-icon {
+            color: #000000;
+        }
+
+        #search-input {
+            width: 100%;
+            padding: 10px 16px 10px 40px;
+            border: 1.5px solid #000000;
+            background: #ffffff;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            outline: none;
+            transition: box-shadow 0.2s;
+            border-radius: 8px;
+        }
+        #search-input:focus {
+            box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.15);
+        }
+        #search-input::placeholder {
+            color: #9ca3af;
+        }
+
+        #search-btn {
+            background: #003366;
+            color: #ffffff;
+            padding: 10px 24px;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1.5px solid #000000;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+            border-radius: 8px;
+        }
+        #search-btn:hover {
+            background: #002244;
+        }
+
+        /* Menu Button */
+        #toggle-sidebar {
+            background: #ffffff;
+            border: 1.5px solid #000000;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: #003366;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+        #toggle-sidebar:hover {
+            background: #f3f4f6;
+        }
+        #toggle-sidebar .menu-icon {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        /* Edit Button */
+        #toggle-styling {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 16px;
+            background: #ffffff;
+            border: 1.5px solid #000000;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            color: #003366;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+        #toggle-styling:hover {
+            background: #f3f4f6;
+        }
+        #toggle-styling .edit-icon {
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        /* Styling Panel */
+        #styling-panel {
+            position: fixed;
+            right: 16px;
+            top: 76px;
+            width: 288px;
+            background: #ffffff;
+            border: 1.5px solid #000000;
+            padding: 20px;
+            z-index: 99998;
+            display: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+        }
+        #styling-panel.open {
+            display: block;
+        }
+        #styling-panel section {
+            margin-bottom: 16px;
+        }
+        #styling-panel section:last-child {
+            margin-bottom: 0;
+        }
+        #styling-panel h2 {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #9ca3af;
+            margin-bottom: 12px;
+        }
+        #styling-panel label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #000000;
+        }
+        #styling-panel .color-options {
+            display: flex;
+            gap: 8px;
+        }
+        #styling-panel .color-options button {
+            width: 24px;
+            height: 24px;
+            border: 1.5px solid #d1d5db;
+            cursor: pointer;
+            transition: ring 0.2s;
+            border-radius: 4px;
+            padding: 0;
+        }
+        #styling-panel .color-options button.active {
+            ring: 2px solid #000000;
+            ring-offset: 2px;
+        }
+        #styling-panel .color-options button:hover {
+            ring: 2px solid #000000;
+            ring-offset: 2px;
+        }
+        #styling-panel select {
+            width: 100%;
+            border: 1.5px solid #d1d5db;
+            padding: 6px 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+            border-radius: 4px;
+            background: #ffffff;
+        }
+        #styling-panel select:focus {
+            border-color: #000000;
+        }
+        #styling-panel .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #styling-panel .toggle-row span {
+            font-size: 12px;
+            color: #000000;
+        }
+        #styling-panel .toggle-row input[type="checkbox"] {
+            accent-color: #003366;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        #styling-panel hr {
+            border: none;
+            border-top: 1px solid #f3f4f6;
+            margin: 16px 0;
+        }
+        #styling-panel .basemap-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            border: 1px solid #f3f4f6;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-radius: 4px;
+        }
+        #styling-panel .basemap-option:hover {
+            background: #f9fafb;
+        }
+        #styling-panel .basemap-option input[type="radio"] {
+            accent-color: #003366;
+            cursor: pointer;
+        }
+        #styling-panel .basemap-option span {
+            font-size: 12px;
+            color: #000000;
+        }
+
+        /* Footer Bar */
+        .map-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 32px;
+            border-top: 1.5px solid #000000;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            justify-content: space-between;
+            z-index: 99998;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: #6b7280;
+            text-transform: uppercase;
+        }
+        .map-footer .footer-left {
+            display: flex;
+            gap: 16px;
+        }
+        .map-footer .footer-right .status {
+            color: #000000;
+            font-weight: 700;
+        }
+
+        /* Sidebar */
+        #sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 320px;
+            background: #ffffff;
+            border-right: 1.5px solid #000000;
+            z-index: 999999;
+            transform: translateX(0);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 16px;
             display: flex;
             flex-direction: column;
         }
-        .workspace-header {
+        #sidebar.collapsed {
+            transform: translateX(-320px);
+        }
+
+        #sidebar .brand-title {
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #003366;
+            padding-bottom: 12px;
+            border-bottom: 1.5px solid #000000;
+            margin-bottom: 16px;
+        }
+
+        #sidebar .sidebar-section {
+            margin-bottom: 16px;
+        }
+        #sidebar .sidebar-section:last-child {
+            margin-bottom: 0;
+        }
+        #sidebar .sidebar-section-title {
             font-size: 10px;
             font-weight: 700;
-            color: #003366;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.05em;
+            color: #9ca3af;
+            margin-bottom: 8px;
+        }
+
+        #sidebar .workspace-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 8px;
         }
-        .workspace-count {
-            background: rgba(0, 51, 102, 0.08);
-            padding: 2px 8px;
+        #sidebar .workspace-header span {
+            font-size: 11px;
+            font-weight: 700;
+            color: #000000;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        #sidebar .workspace-header .count {
+            background: #f3f4f6;
+            padding: 2px 10px;
             border-radius: 12px;
-            font-size: 9px;
-            font-weight: 700;
-        }
-        .workspace-layer {
-            margin-bottom: 6px;
-            background: #ffffff;
-            border: 1px solid rgba(0, 51, 102, 0.04);
-            border-radius: 4px;
-            padding: 4px;
-        }
-        .workspace-layer-header {
-            display: flex;
-            align-items: center;
-            gap: 6px;
             font-size: 10px;
             font-weight: 700;
-            color: #003366;
-            padding: 3px 2px;
-            border-bottom: 1px solid rgba(0, 51, 102, 0.03);
+            color: #000000;
         }
-        .workspace-item {
-            font-size: 10px;
-            padding: 4px 6px 4px 14px;
-            border-bottom: 1px solid rgba(0, 51, 102, 0.02);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #475569;
-        }
-        .workspace-item:hover {
-            background: rgba(0, 51, 102, 0.02);
-            color: #003366;
-        }
-        .workspace-item-name {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 170px;
-        }
-        .workspace-item-type {
-            font-size: 8px;
-            color: #64748b;
-            background: #f1f5f9;
-            padding: 1px 6px;
+
+        #sidebar .workspace-layer {
+            margin-bottom: 8px;
+            border: 1px solid #f3f4f6;
+            padding: 8px;
             border-radius: 4px;
         }
-        .color-dot {
+        #sidebar .workspace-layer-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #000000;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #f3f4f6;
+            margin-bottom: 4px;
+        }
+        #sidebar .workspace-layer-header .color-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
@@ -344,102 +458,189 @@ st.markdown("""
             border: 1px solid rgba(0,0,0,0.08);
             flex-shrink: 0;
         }
-        .workspace-empty {
+        #sidebar .workspace-layer-header .layer-count {
+            font-weight: 500;
+            color: #6b7280;
             font-size: 10px;
-            color: var(--text-muted);
-            padding: 20px 8px;
+            margin-left: auto;
+        }
+        #sidebar .workspace-item {
+            font-size: 11px;
+            padding: 4px 6px 4px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #374151;
+        }
+        #sidebar .workspace-item:hover {
+            background: #f9fafb;
+        }
+        #sidebar .workspace-item .item-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 170px;
+        }
+        #sidebar .workspace-item .item-type {
+            font-size: 9px;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 1px 8px;
+            border-radius: 4px;
+        }
+        #sidebar .workspace-empty {
+            font-size: 12px;
+            color: #6b7280;
+            padding: 24px 8px;
             text-align: center;
-            border: 1px dashed rgba(0, 51, 102, 0.1);
+            border: 1px dashed #e5e7eb;
             border-radius: 6px;
         }
 
-        /* LOADING SPINNER OVERLAYS */
-        .py-loading-container {
-            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            width: 340px; background: #ffffff; padding: 24px; border-radius: 6px;
-            border: 1px solid rgba(0, 51, 102, 0.15); box-shadow: 0 10px 30px rgba(0, 51, 102, 0.15);
-            text-align: center; z-index: 999999; font-family: 'Montserrat', sans-serif;
-        }
-        .py-spinner {
-            width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1);
-            border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
-            margin: 0 auto 16px auto;
-        }
-        .py-loading-title { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
-        .py-loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* TIMEOUT HINT HUD PANEL OVERLAY */
-        .api-log-container {
-            position: absolute; bottom: 24px; right: 24px; width: 340px; max-height: 220px;
-            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border-radius: 6px;
-            border-left: 3px solid #C9AB4C; z-index: 10000; font-family: monospace;
-            font-size: 10px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            transition: all 0.2s ease; color: #e2e8f0;
-        }
-        .api-log-header {
-            padding: 6px 12px; background: rgba(0,0,0,0.2); border-radius: 6px 6px 0 0;
-            font-weight: 700; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase;
-            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-            color: #C9AB4C; border-bottom: 1px solid rgba(201, 171, 76, 0.15);
-        }
-        .api-log-content { overflow-y: auto; padding: 6px 12px; flex-grow: 1; max-height: 170px; }
-        .api-log-entry { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0; font-size: 9px; }
-        .api-log-time { color: #C9AB4C; font-weight: 600; margin-right: 6px; }
-        .api-log-info { color: #34d399; }
-        .api-log-error { color: #f87171; }
-        .api-log-warning { color: #fb923c; }
-        
-        /* MAP CONTEXT MENU */
-        .map-context-menu {
-            position: fixed;
-            background: #ffffff;
-            border: 1px solid rgba(0, 51, 102, 0.15);
-            border-radius: 6px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-            padding: 4px 0;
-            z-index: 100000;
-            min-width: 200px;
-            display: none;
-            font-family: 'Montserrat', sans-serif;
-        }
-        .map-context-menu-item {
-            padding: 8px 16px;
-            font-size: 11px;
-            color: #003366;
-            cursor: pointer;
-            transition: background 0.15s;
-            display: flex;
-            align-items: center;
+        #sidebar .sidebar-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 8px;
-            border-bottom: 1px solid rgba(0, 51, 102, 0.04);
+            margin-top: 8px;
         }
-        .map-context-menu-item:hover {
-            background: rgba(0, 51, 102, 0.05);
+        #sidebar .sidebar-actions button {
+            padding: 8px 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1.5px solid #000000;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-radius: 4px;
         }
-        .map-context-menu-item:last-child {
+        #sidebar .sidebar-actions .btn-export {
+            background: #003366;
+            color: #ffffff;
+        }
+        #sidebar .sidebar-actions .btn-export:hover {
+            background: #002244;
+        }
+        #sidebar .sidebar-actions .btn-clear {
+            background: #ffffff;
+            color: #000000;
+        }
+        #sidebar .sidebar-actions .btn-clear:hover {
+            background: #f3f4f6;
+        }
+
+        #sidebar .log-section {
+            margin-top: 12px;
+            border-top: 1px solid #f3f4f6;
+            padding-top: 12px;
+        }
+        #sidebar .log-section .log-toggle {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: 'Inter', sans-serif;
+        }
+        #sidebar .log-section .log-toggle:hover {
+            color: #000000;
+        }
+        #sidebar .log-section .log-content {
+            margin-top: 8px;
+            background: #f9fafb;
+            padding: 8px 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: #374151;
+            max-height: 120px;
+            overflow-y: auto;
+            border-radius: 4px;
+            border: 1px solid #f3f4f6;
+        }
+        #sidebar .log-section .log-content .log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        #sidebar .log-section .log-content .log-entry:last-child {
             border-bottom: none;
         }
-        .map-context-menu-item .icon {
-            font-size: 14px;
-            width: 20px;
-            text-align: center;
+        #sidebar .log-section .log-content .log-time {
+            color: #6b7280;
+            margin-right: 6px;
         }
-        .map-context-menu-divider {
-            height: 1px;
-            background: rgba(0, 51, 102, 0.08);
-            margin: 2px 0;
+        #sidebar .log-section .log-content .log-info {
+            color: #059669;
         }
-        
-        /* SECTION HEADERS */
-        .section-header {
-            font-size: 9px;
+        #sidebar .log-section .log-content .log-warning {
+            color: #d97706;
+        }
+        #sidebar .log-section .log-content .log-error {
+            color: #dc2626;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.9);
+            z-index: 9999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            backdrop-filter: blur(4px);
+        }
+        .loading-overlay .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f4f6;
+            border-top-color: #003366;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .loading-overlay .loading-text {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
             font-weight: 700;
-            color: #003366;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin: 8px 0 4px 0;
-            padding: 0;
+            letter-spacing: 0.05em;
+            color: #003366;
+        }
+        .loading-overlay .loading-sub {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #6b7280;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        * { scrollbar-width: thin !important; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .search-container { max-width: 100%; }
+            #search-input { font-size: 13px; padding: 8px 12px 8px 36px; }
+            #search-btn { padding: 8px 16px; font-size: 10px; }
+            #toggle-styling span { display: none; }
+            #styling-panel { right: 8px; width: 260px; }
+            #sidebar { width: 280px; }
+            #sidebar.collapsed { transform: translateX(-280px); }
+            .map-footer { font-size: 8px; padding: 0 8px; }
+            .map-footer .footer-left { gap: 8px; }
         }
     </style>
 """, unsafe_allow_html=True)
@@ -457,19 +658,18 @@ if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.
 if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 121.05804
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
-if 'sidebar_collapsed' not in st.session_state: st.session_state.sidebar_collapsed = False
+if 'sidebar_collapsed' not in st.session_state: st.session_state.sidebar_collapsed = True
 if 'api_logs' not in st.session_state: st.session_state.api_logs = []
 if 'search_cooldown_until' not in st.session_state: st.session_state.search_cooldown_until = 0
 if 'search_count' not in st.session_state: st.session_state.search_count = 0
 if 'search_reset_time' not in st.session_state: st.session_state.search_reset_time = time.time()
 if 'last_search_query' not in st.session_state: st.session_state.last_search_query = ""
-if 'target_lat' not in st.session_state: st.session_state.target_lat = None
-if 'target_lon' not in st.session_state: st.session_state.target_lon = None
-
-if 'target_config' not in st.session_state:
-    st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
-if 'radius_config' not in st.session_state:
-    st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
+if 'styling_panel_open' not in st.session_state: st.session_state.styling_panel_open = False
+if 'basemap_choice' not in st.session_state: st.session_state.basemap_choice = "osm"
+if 'show_labels' not in st.session_state: st.session_state.show_labels = True
+if 'label_size' not in st.session_state: st.session_state.label_size = 10
+if 'marker_style' not in st.session_state: st.session_state.marker_style = "pin"
+if 'marker_color' not in st.session_state: st.session_state.marker_color = "#003366"
 
 # -----------------------------------------------------------------------------
 # 3. INTERACTIVE LOG PANEL DEFINITION
@@ -484,7 +684,7 @@ def clear_api_logs():
     st.session_state.api_logs = []
 
 # -----------------------------------------------------------------------------
-# 4. SEARCH PROTECTION GUARDRAILS - IMPROVED FUZZY SEARCH
+# 4. SEARCH PROTECTION GUARDRAILS
 # -----------------------------------------------------------------------------
 class SearchGuardrails:
     MAX_QUERY_LENGTH = 100
@@ -499,7 +699,6 @@ class SearchGuardrails:
         r'\b(select|insert|update|delete|drop|union|exec|script|javascript)\b',
     ]
     
-    # EXPANDED BRAND VARIATIONS WITH PRIORITY
     BRAND_VARIATIONS = {
         'jollibee': ['jolibee', 'jbee', 'jfc', 'jollibee foods', 'jollibee food corporation'],
         'mcdonalds': ['mcdonald', 'mcdo', 'mcd', 'golden arches', 'mickey d'],
@@ -517,7 +716,6 @@ class SearchGuardrails:
         'caltex': ['caltex gas', 'caltex'],
     }
     
-    # CATEGORY MAPPINGS WITH WEIGHTS
     CATEGORY_MAPPINGS = {
         'veterinary': ['vet', 'veterinary', 'animal clinic', 'pet clinic', 'animal hospital'],
         'clinic': ['clinic', 'medical clinic', 'health clinic', 'doctor'],
@@ -587,18 +785,14 @@ class SearchGuardrails:
     
     @classmethod
     def get_brand_variations(cls, query):
-        """Get brand variations with exact matching priority"""
         query_lower = query.lower().strip()
         variations = []
         
-        # Check exact brand matches first (highest priority)
         for brand, variants in cls.BRAND_VARIATIONS.items():
-            # Check if query exactly matches brand or any variant
             if query_lower == brand or query_lower in variants:
                 variations = [brand] + variants
                 break
         
-        # If no exact match, check for partial matches
         if not variations:
             for brand, variants in cls.BRAND_VARIATIONS.items():
                 for variant in variants:
@@ -608,7 +802,6 @@ class SearchGuardrails:
                 if variations:
                     break
         
-        # If still no variations, just use the original query
         if not variations:
             variations = [query_lower]
         
@@ -616,33 +809,27 @@ class SearchGuardrails:
     
     @classmethod
     def get_category_match(cls, query):
-        """Get category match from query with fuzzy matching"""
         query_lower = query.lower().strip()
         
-        # Check exact category matches first
         for category, terms in cls.CATEGORY_MAPPINGS.items():
             if query_lower == category or query_lower in terms:
                 return category
         
-        # Check partial matches with SequenceMatcher
         best_match = None
         best_score = 0.0
         
         for category, terms in cls.CATEGORY_MAPPINGS.items():
-            # Check against category name
             score = SequenceMatcher(None, query_lower, category).ratio()
             if score > best_score:
                 best_score = score
                 best_match = category
             
-            # Check against terms
             for term in terms:
                 score = SequenceMatcher(None, query_lower, term).ratio()
                 if score > best_score:
                     best_score = score
                     best_match = category
         
-        # Return match if score is above threshold
         if best_score >= 0.6:
             return best_match
         
@@ -656,7 +843,7 @@ class SearchGuardrails:
         return sanitized
 
 # -----------------------------------------------------------------------------
-# 5. OVERPASS QUERY PIPELINE MODULE - IMPROVED
+# 5. OVERPASS QUERY PIPELINE MODULE
 # -----------------------------------------------------------------------------
 OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
@@ -665,14 +852,11 @@ OVERPASS_ENDPOINTS = [
 ]
 
 def build_overpass_query(lat, lon, radius, search_terms):
-    """Build Overpass QL with improved brand and category matching"""
     add_api_log(f"Building query for: '{search_terms}'", "INFO")
     
-    # Get brand variations (high priority)
     brand_variations = SearchGuardrails.get_brand_variations(search_terms)
     add_api_log(f"Brand variations: {brand_variations}", "INFO")
     
-    # Get category match
     category_match = SearchGuardrails.get_category_match(search_terms)
     if category_match:
         add_api_log(f"Category match: {category_match}", "INFO")
@@ -681,7 +865,6 @@ def build_overpass_query(lat, lon, radius, search_terms):
     statements = []
     seen_statements = set()
     
-    # TAG MAPPINGS FOR CATEGORIES
     tag_mappings = {
         'restaurant': 'amenity=restaurant',
         'cafe': 'amenity=cafe',
@@ -722,36 +905,29 @@ def build_overpass_query(lat, lon, radius, search_terms):
         'grooming': 'shop=pet_grooming',
     }
     
-    # 1. BRAND SEARCH (Highest Priority)
-    # Search for brand tags with exact and partial matching
     for variation in brand_variations:
         if len(variation) >= 2:
             escaped = re.escape(variation)
-            # Brand tag (primary)
             stmt = f'nwr[~"brand"~"^{escaped}$",i](around:{radius},{lat},{lon});'
             if stmt not in seen_statements:
                 seen_statements.add(stmt)
                 statements.append(stmt)
             
-            # Name tag with exact match
             stmt = f'nwr[~"name"~"^{escaped}$",i](around:{radius},{lat},{lon});'
             if stmt not in seen_statements:
                 seen_statements.add(stmt)
                 statements.append(stmt)
             
-            # Name tag with partial match (for cases like "Jollibee Restaurant")
             stmt = f'nwr[~"name"~"{escaped}",i](around:{radius},{lat},{lon});'
             if stmt not in seen_statements:
                 seen_statements.add(stmt)
                 statements.append(stmt)
             
-            # Operator tag
             stmt = f'nwr[~"operator"~"{escaped}",i](around:{radius},{lat},{lon});'
             if stmt not in seen_statements:
                 seen_statements.add(stmt)
                 statements.append(stmt)
     
-    # 2. CATEGORY SEARCH (if no brand matches found or as fallback)
     if len(statements) < 2:
         if category_match and category_match in tag_mappings:
             stmt = f"nwr[{tag_mappings[category_match]}](around:{radius},{lat},{lon});"
@@ -759,18 +935,15 @@ def build_overpass_query(lat, lon, radius, search_terms):
                 seen_statements.add(stmt)
                 statements.append(stmt)
     
-    # 3. FUZZY TAG MATCHING
     if len(statements) < 3:
         for term in terms:
             term_lower = term.lower()
-            # Check exact tag mappings
             if term_lower in tag_mappings:
                 stmt = f"nwr[{tag_mappings[term_lower]}](around:{radius},{lat},{lon});"
                 if stmt not in seen_statements:
                     seen_statements.add(stmt)
                     statements.append(stmt)
             
-            # Fuzzy match against tag keys
             for key, tag in tag_mappings.items():
                 if SequenceMatcher(None, term_lower, key).ratio() > 0.65:
                     stmt = f"nwr[{tag}](around:{radius},{lat},{lon});"
@@ -778,7 +951,6 @@ def build_overpass_query(lat, lon, radius, search_terms):
                         seen_statements.add(stmt)
                         statements.append(stmt)
     
-    # 4. NAME SEARCH FALLBACK
     if len(statements) < 3:
         for term in terms:
             if len(term) >= 3:
@@ -788,7 +960,6 @@ def build_overpass_query(lat, lon, radius, search_terms):
                     seen_statements.add(stmt)
                     statements.append(stmt)
     
-    # 5. GENERIC FALLBACK (only if absolutely no statements)
     if not statements:
         for term in terms:
             if len(term) >= 3:
@@ -798,12 +969,10 @@ def build_overpass_query(lat, lon, radius, search_terms):
                     seen_statements.add(stmt)
                     statements.append(stmt)
     
-    # Limit to 25 statements
     statements = statements[:25]
     
     ql = f'[out:json][timeout:90];(\n' + '\n'.join(statements) + '\n);out center;'
     
-    # Log the query for debugging
     add_api_log(f"Generated query with {len(statements)} statements", "INFO")
     if len(statements) > 0:
         add_api_log(f"First statement: {statements[0][:50]}", "INFO")
@@ -845,178 +1014,264 @@ def process_overpass_results(elements):
     return records
 
 # -----------------------------------------------------------------------------
-# 6. STREAMLIT DYNAMIC INTERACTION INJECTION LAYER - FIXED
+# 6. STREAMLIT DYNAMIC INTERACTION INJECTION LAYER
 # -----------------------------------------------------------------------------
+# Inject HTML for floating UI
 st.markdown("""
-    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebarDynamic()">CLOSE</button>
+    <!-- Floating Controls -->
+    <div class="floating-controls">
+        <!-- Menu Button -->
+        <button id="toggle-sidebar" onclick="toggleSidebar()">
+            <span class="menu-icon">☰</span>
+        </button>
+
+        <!-- Search Container -->
+        <div class="search-container">
+            <div class="search-wrapper">
+                <span class="search-icon">🔍</span>
+                <input id="search-input" type="text" placeholder="Search establishments..." 
+                       onkeydown="if(event.key==='Enter'){document.getElementById('search-btn').click()}">
+            </div>
+            <button id="search-btn">Search</button>
+        </div>
+
+        <!-- Edit Button -->
+        <button id="toggle-styling" onclick="toggleStylingPanel()">
+            <span class="edit-icon">⚙</span>
+            <span>EDIT</span>
+        </button>
+    </div>
+
+    <!-- Styling Panel -->
+    <div id="styling-panel">
+        <section>
+            <h2>Pin Aesthetics</h2>
+            <div style="margin-bottom: 12px;">
+                <label>Marker Color</label>
+                <div class="color-options">
+                    <button class="active" style="background-color:#003366;" data-color="#003366" onclick="setMarkerColor('#003366', this)"></button>
+                    <button style="background-color:#6b7280;" data-color="#6b7280" onclick="setMarkerColor('#6b7280', this)"></button>
+                    <button style="background-color:#dc2626;" data-color="#dc2626" onclick="setMarkerColor('#dc2626', this)"></button>
+                    <button style="background-color:#2563eb;" data-color="#2563eb" onclick="setMarkerColor('#2563eb', this)"></button>
+                    <button style="background-color:#059669;" data-color="#059669" onclick="setMarkerColor('#059669', this)"></button>
+                </div>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label>Icon Type</label>
+                <select id="marker-style-select" onchange="setMarkerStyle(this.value)">
+                    <option value="pin">Standard Pin</option>
+                    <option value="dot" selected>Circle Dot</option>
+                    <option value="square">Square Box</option>
+                    <option value="diamond">Diamond</option>
+                </select>
+            </div>
+            <div class="toggle-row">
+                <span>Show Labels</span>
+                <input type="checkbox" id="labels-toggle" checked onchange="setLabels(this.checked)">
+            </div>
+        </section>
+
+        <hr>
+
+        <section>
+            <h2>Base Map</h2>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <label class="basemap-option">
+                    <input type="radio" name="basemap" value="osm" checked onchange="setBasemap('osm')">
+                    <span>OpenStreetMap</span>
+                </label>
+                <label class="basemap-option">
+                    <input type="radio" name="basemap" value="carto" onchange="setBasemap('carto')">
+                    <span>Carto Light</span>
+                </label>
+                <label class="basemap-option">
+                    <input type="radio" name="basemap" value="satellite" onchange="setBasemap('satellite')">
+                    <span>Satellite</span>
+                </label>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="map-footer" id="map-footer">
+        <div class="footer-left">
+            <span id="footer-lat">LAT: --</span>
+            <span id="footer-lng">LNG: --</span>
+            <span id="footer-zoom">ZOOM: --</span>
+        </div>
+        <div class="footer-right">
+            API ENDPOINT: <span class="status" id="api-status">CONNECTED</span>
+        </div>
+    </footer>
+
+    <!-- Sidebar -->
+    <div id="sidebar" class="collapsed">
+        <div class="brand-title">Open Node</div>
+        
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Location</div>
+            <input id="sidebar-coords" type="text" value="14.64650, 121.05804" 
+                   style="width:100%; padding:6px 10px; border:1.5px solid #000; font-family:'JetBrains Mono',monospace; font-size:12px; border-radius:4px; margin-bottom:8px;">
+            <input id="sidebar-radius" type="number" value="1000" min="100" max="50000" step="100"
+                   style="width:100%; padding:6px 10px; border:1.5px solid #000; font-family:'Inter',sans-serif; font-size:12px; border-radius:4px;">
+        </div>
+
+        <div class="sidebar-section" style="flex:1; overflow-y:auto;">
+            <div class="workspace-header">
+                <span>Workspace Assets</span>
+                <span class="count" id="asset-count">0</span>
+            </div>
+            <div id="workspace-content">
+                <div class="workspace-empty">No active vectors inside workspace.<br>Execute spatial search profile.</div>
+            </div>
+        </div>
+
+        <div class="sidebar-actions">
+            <button class="btn-export" id="export-btn">Export</button>
+            <button class="btn-clear" id="clear-btn">Clear</button>
+        </div>
+
+        <div class="log-section">
+            <button class="log-toggle" id="log-toggle" onclick="toggleLogs()">▼ Pipeline Logs</button>
+            <div class="log-content" id="log-content" style="display:none;">
+                <div class="log-entry">Engine state clear.</div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        function toggleSidebarDynamic() {
-            const container = document.querySelector('[data-testid="stAppViewContainer"]');
-            const btn = document.getElementById('sidebarToggleBtn');
-            container.classList.toggle('sidebar-collapsed');
-            
-            const isCollapsed = container.classList.contains('sidebar-collapsed');
-            btn.textContent = isCollapsed ? 'OPEN' : 'CLOSE';
-            
-            // Send state to Streamlit
+        // Sidebar toggle
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
             const hiddenInput = document.getElementById('sidebar_state_input');
             if (hiddenInput) {
-                hiddenInput.value = isCollapsed ? 'collapsed' : 'expanded';
+                hiddenInput.value = sidebar.classList.contains('collapsed') ? 'collapsed' : 'expanded';
                 hiddenInput.dispatchEvent(new Event('change'));
             }
         }
-        
-        // Initialize button text based on current state
+
+        // Styling panel toggle
+        function toggleStylingPanel() {
+            const panel = document.getElementById('styling-panel');
+            panel.classList.toggle('open');
+        }
+
+        // Styling functions
+        function setMarkerColor(color, btn) {
+            document.querySelectorAll('.color-options button').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            const input = document.getElementById('marker_color_input');
+            if (input) { input.value = color; input.dispatchEvent(new Event('change')); }
+        }
+
+        function setMarkerStyle(value) {
+            const input = document.getElementById('marker_style_input');
+            if (input) { input.value = value; input.dispatchEvent(new Event('change')); }
+        }
+
+        function setLabels(checked) {
+            const input = document.getElementById('labels_input');
+            if (input) { input.value = checked ? 'true' : 'false'; input.dispatchEvent(new Event('change')); }
+        }
+
+        function setBasemap(value) {
+            const input = document.getElementById('basemap_input');
+            if (input) { input.value = value; input.dispatchEvent(new Event('change')); }
+        }
+
+        function toggleLogs() {
+            const content = document.getElementById('log-content');
+            const toggle = document.getElementById('log-toggle');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                toggle.textContent = '▲ Pipeline Logs';
+            } else {
+                content.style.display = 'none';
+                toggle.textContent = '▼ Pipeline Logs';
+            }
+        }
+
+        // Footer update function
+        function updateFooter(lat, lng, zoom) {
+            document.getElementById('footer-lat').textContent = 'LAT: ' + (lat ? lat.toFixed(5) : '--');
+            document.getElementById('footer-lng').textContent = 'LNG: ' + (lng ? lng.toFixed(5) : '--');
+            document.getElementById('footer-zoom').textContent = 'ZOOM: ' + (zoom || '--');
+        }
+
+        // Initial sidebar state
         document.addEventListener('DOMContentLoaded', function() {
-            const container = document.querySelector('[data-testid="stAppViewContainer"]');
-            const btn = document.getElementById('sidebarToggleBtn');
-            if (container && btn) {
-                const isCollapsed = container.classList.contains('sidebar-collapsed');
-                btn.textContent = isCollapsed ? 'OPEN' : 'CLOSE';
+            const sidebar = document.getElementById('sidebar');
+            const hiddenInput = document.getElementById('sidebar_state_input');
+            if (hiddenInput && hiddenInput.value === 'collapsed') {
+                sidebar.classList.add('collapsed');
+            }
+        });
+
+        // Close styling panel on outside click
+        document.addEventListener('click', function(e) {
+            const panel = document.getElementById('styling-panel');
+            const btn = document.getElementById('toggle-styling');
+            if (panel && !panel.contains(e.target) && !btn.contains(e.target)) {
+                panel.classList.remove('open');
             }
         });
     </script>
 """, unsafe_allow_html=True)
 
-sidebar_state = st.text_input("", key="sidebar_state_input", label_visibility="collapsed", placeholder="sidebar_state")
-if sidebar_state == "collapsed":
+# Hidden inputs for Streamlit state
+st.text_input("", key="sidebar_state_input", label_visibility="collapsed", placeholder="sidebar_state")
+st.text_input("", key="marker_color_input", label_visibility="collapsed", placeholder="marker_color")
+st.text_input("", key="marker_style_input", label_visibility="collapsed", placeholder="marker_style")
+st.text_input("", key="labels_input", label_visibility="collapsed", placeholder="labels")
+st.text_input("", key="basemap_input", label_visibility="collapsed", placeholder="basemap")
+
+# Update state from hidden inputs
+if st.session_state.get('sidebar_state_input') == "collapsed":
     st.session_state.sidebar_collapsed = True
-elif sidebar_state == "expanded":
+elif st.session_state.get('sidebar_state_input') == "expanded":
     st.session_state.sidebar_collapsed = False
 
-# Apply collapsed state with JavaScript
-if st.session_state.sidebar_collapsed:
-    st.markdown("""
-        <script>
-            (function() {
-                const container = document.querySelector('[data-testid="stAppViewContainer"]');
-                const btn = document.getElementById('sidebarToggleBtn');
-                if (container && !container.classList.contains('sidebar-collapsed')) {
-                    container.classList.add('sidebar-collapsed');
-                }
-                if (btn) {
-                    btn.textContent = 'OPEN';
-                }
-            })();
-        </script>
-    """, unsafe_allow_html=True)
+if st.session_state.get('marker_color_input'):
+    st.session_state.marker_color = st.session_state.marker_color_input
+
+if st.session_state.get('marker_style_input'):
+    st.session_state.marker_style = st.session_state.marker_style_input
+
+if st.session_state.get('labels_input') == 'false':
+    st.session_state.show_labels = False
+elif st.session_state.get('labels_input') == 'true':
+    st.session_state.show_labels = True
+
+if st.session_state.get('basemap_input'):
+    st.session_state.basemap_choice = st.session_state.basemap_input
 
 # -----------------------------------------------------------------------------
-# 7. HIGH-LEVEL CONFIGURATION DRAWER
+# 7. HIGH-LEVEL CONFIGURATION (Hidden - controlled by UI)
 # -----------------------------------------------------------------------------
-with st.sidebar:
-    st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
-    
-    # SEARCH ENGINE COMPONENT BLOCK
-    st.markdown('<div class="section-header">Discovery Engine</div>', unsafe_allow_html=True)
-    search_query = st.text_input("", placeholder="e.g., jollibee, veterinary, 7-eleven", key="search_bar_input", label_visibility="collapsed", max_chars=SearchGuardrails.MAX_QUERY_LENGTH)
-    
-    col_search = st.columns([1])
-    with col_search[0]:
-        search_clicked = st.button("SEARCH", use_container_width=True, type="secondary", key="search_btn")
-            
-    if search_clicked and search_query.strip():
-        st.session_state.last_search_query = search_query
-        is_valid, error_msg = SearchGuardrails.validate_query(search_query)
-        if not is_valid:
-            st.error(error_msg)
+# Get coords and radius from sidebar inputs via JavaScript will update these
+coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
+lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.64650, 121.05804)
+radius_val = st.session_state.geo_radius
+
+# Handle search from UI
+search_query = st.text_input("", key="search_bar_input", label_visibility="collapsed", placeholder="Search establishments...")
+search_clicked = st.button("SEARCH", key="search_btn", label_visibility="collapsed")
+
+if search_clicked and search_query.strip():
+    st.session_state.last_search_query = search_query
+    is_valid, error_msg = SearchGuardrails.validate_query(search_query)
+    if not is_valid:
+        st.error(error_msg)
+    else:
+        is_allowed, rate_msg = SearchGuardrails.check_rate_limit()
+        if not is_allowed:
+            st.error(rate_msg)
         else:
-            is_allowed, rate_msg = SearchGuardrails.check_rate_limit()
-            if not is_allowed:
-                st.error(rate_msg)
-            else:
-                st.session_state.search_count += 1
-                st.session_state.search_cooldown_until = time.time() + SearchGuardrails.COOLDOWN_SECONDS
-                st.session_state.scan_active_loading = True
-                st.rerun()
-
-    # LOCATION BOUNDARY PARAMETERS
-    st.markdown('<div class="section-header">Location Parameters</div>', unsafe_allow_html=True)
-    location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
-    radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
-    st.session_state.geo_radius = radius_val
-
-    coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
-    if coord_match:
-        lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
-        st.session_state.geo_coords = location_input
-    else:
-        fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-        lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.64650, 121.05804)
-
-    # WORKSPACE MODULE (MOVED UP - BEFORE BASEMAP)
-    st.markdown(f"""
-        <div class="workspace-section">
-            <div class="workspace-header">
-                <span>Workspace Assets</span>
-                <span class="workspace-count">{len(st.session_state.scanned_records)}</span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    if st.session_state.scanned_records:
-        grouped = {}
-        for record in st.session_state.scanned_records:
-            rec_type = record.get('type', 'Unclassified')
-            if rec_type not in grouped: grouped[rec_type] = []
-            grouped[rec_type].append(record)
-            
-        for rec_type, items in grouped.items():
-            if rec_type not in st.session_state.layer_meta:
-                st.session_state.layer_meta[rec_type] = {"color": marker_color, "style": marker_style, "size": 12}
-            current_layer_color = st.session_state.layer_meta[rec_type].get('color', marker_color)
-            
-            st.markdown(f"""
-                <div class="workspace-layer">
-                    <div class="workspace-layer-header">
-                        <span class="color-dot" style="background-color:{current_layer_color};"></span>
-                        <span>{rec_type}</span>
-                        <span style='font-weight:500; color:#64748b; font-size:9px; margin-left:auto;'>({len(items)})</span>
-                    </div>
-            """, unsafe_allow_html=True)
-            
-            for item in items[:12]:
-                name = item.get('name', 'Unknown Target')[:26]
-                st.markdown(f"""
-                    <div class="workspace-item">
-                        <span class="workspace-item-name">{name}</span>
-                        <span class="workspace-item-type">{item.get('type', '')[:12]}</span>
-                    </div>
-                """, unsafe_allow_html=True)
-            if len(items) > 12:
-                st.markdown(f"<div style='font-size:8px; color:#888780; padding:4px 14px;'>+ {len(items) - 12} additional features</div>", unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="workspace-empty">No active vectors inside workspace.<br>Execute spatial search profile.</div>', unsafe_allow_html=True)
-
-    # PERSISTENT STORAGE EXPORT INTERFACE
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button("EXPORT", json.dumps([p for p in st.session_state.scanned_records]), "spatial_scan.json", "application/json", use_container_width=True)
-    with col2:
-        if st.button("CLEAR", type="primary", use_container_width=True):
-            st.session_state.scanned_records = []
-            st.session_state.layer_meta = {}
-            st.session_state.scan_active_loading = False
-            clear_api_logs()
+            st.session_state.search_count += 1
+            st.session_state.search_cooldown_until = time.time() + SearchGuardrails.COOLDOWN_SECONDS
+            st.session_state.scan_active_loading = True
             st.rerun()
-
-    # BASEMAP CONTROLS (MOVED DOWN - AFTER WORKSPACE)
-    with st.expander("BASEMAP CONTROLS", expanded=False):
-        basemap_choice = st.selectbox("ACTIVE BASEMAP", ["osm", "satellite", "carto"], index=0, key="persistent_basemap")
-        show_labels = st.checkbox("Enable Overlay Typography", value=True, key="persistent_labels")
-        label_size = st.slider("Typography Size Bounds", min_value=6, max_value=20, value=10, key="label_size")
-        
-        st.markdown("<hr style='margin: 6px 0; border:0; border-top:1px solid rgba(0,0,0,0.05);'>", unsafe_allow_html=True)
-        marker_style = st.selectbox("MARKER ICON DESIGN", ["dots", "pin", "modern-pin"], key="global_marker_style")
-        marker_color = st.color_picker("MARKER PRIMARY HEX", "#003366", key="global_marker_color")
-            
-    with st.expander("PIPELINE LOGS", expanded=False):
-        if st.session_state.api_logs:
-            log_text = "".join([f"[{l['level']}] [{l['time']}] {l['message']}\n" for l in st.session_state.api_logs[-15:]])
-            st.code(log_text, language="text")
-        else:
-            st.caption("Pipeline diagnostics clear.")
 
 # -----------------------------------------------------------------------------
 # 8. PIPELINE RUNTIME EVALUATION LOOP
@@ -1025,10 +1280,10 @@ main_canvas = st.empty()
 
 if st.session_state.scan_active_loading:
     main_canvas.markdown(f'''
-        <div class="py-loading-container">
-            <div class="py-spinner"></div>
-            <div class="py-loading-title">Scanning Node Cluster</div>
-            <div class="py-loading-subtitle">Radius: {radius_val}m | Profile: "{st.session_state.last_search_query[:25]}"</div>
+        <div class="loading-overlay">
+            <div class="spinner"></div>
+            <div class="loading-text">Scanning Node Cluster</div>
+            <div class="loading-sub">Radius: {radius_val}m | Profile: "{st.session_state.last_search_query[:25]}"</div>
         </div>
     ''', unsafe_allow_html=True)
     
@@ -1051,7 +1306,7 @@ if st.session_state.scan_active_loading:
             for idx, layer in enumerate(unique_layers):
                 st.session_state.layer_meta[layer] = {
                     "color": palette[idx % len(palette)],
-                    "style": marker_style,
+                    "style": st.session_state.marker_style,
                     "size": 12
                 }
             add_api_log(f"Successfully integrated {len(records)} map records", "INFO")
@@ -1066,7 +1321,6 @@ if st.session_state.scan_active_loading:
 # -----------------------------------------------------------------------------
 # 9. ENGINE TEMPLATE COMPILER & RENDER
 # -----------------------------------------------------------------------------
-# Fix: Define render_lat and render_lon before using them
 fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
 render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.64650, 121.05804)
 
@@ -1074,20 +1328,8 @@ layer_meta_json = json.dumps(st.session_state.layer_meta)
 geojson_str = json.dumps(st.session_state.scanned_records)
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 
-# Get target coords if set
-target_lat = st.session_state.target_lat if st.session_state.target_lat is not None else render_lat
-target_lon = st.session_state.target_lon if st.session_state.target_lon is not None else render_lon
-target_coords_json = json.dumps({"lat": target_lat, "lon": target_lon})
-
-api_logs_html = "".join([f'<div class="api-log-entry"><span class="api-log-time">[{l["time"]}]</span> <span class="api-log-{l["level"].lower()}">{l["message"]}</span></div>' for l in st.session_state.api_logs[-10:]])
-api_log_panel = f'''
-<div class="api-log-container" id="apiLogPanel">
-    <div class="api-log-header" onclick="document.getElementById('apiLogContent').style.display = document.getElementById('apiLogContent').style.display === 'none' ? 'block' : 'none'">
-        <span>Diagnostics Payload</span>
-    </div>
-    <div class="api-log-content" id="apiLogContent">{api_logs_html if api_logs_html else '<div class="api-log-entry">Engine state clear.</div>'}</div>
-</div>
-'''
+# Build log content for sidebar
+log_entries = "".join([f'<div class="log-entry"><span class="log-time">[{l["time"]}]</span> <span class="log-{l["level"].lower()}">{l["message"]}</span></div>' for l in st.session_state.api_logs[-15:]])
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -1095,73 +1337,35 @@ leaflet_template = """
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link href="https://fonts.googleapis.com/css2 family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
-        .poi-text-label { background: #ffffff; border: 1px solid #003366; padding: 2px 4px; border-radius: 3px; font-size: __LABEL_SIZE__px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.15); color: #003366; }
+        .poi-text-label { 
+            background: #ffffff; 
+            border: 1px solid #000000; 
+            padding: 2px 6px; 
+            font-family: 'Inter', sans-serif; 
+            font-size: __LABEL_SIZE__px; 
+            font-weight: 700; 
+            white-space: nowrap; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15); 
+            color: #000000;
+            border-radius: 3px;
+        }
         .hide-labels .poi-text-label { display: none !important; }
-        
-        /* Context Menu */
-        .map-context-menu {
-            position: fixed;
-            background: #ffffff;
-            border: 1px solid rgba(0, 51, 102, 0.15);
-            border-radius: 6px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-            padding: 4px 0;
-            z-index: 100000;
-            min-width: 220px;
-            display: none;
-            font-family: 'Montserrat', sans-serif;
+        .leaflet-control-zoom a { 
+            background: #ffffff !important; 
+            color: #000000 !important; 
+            border: 1.5px solid #000000 !important;
+            border-radius: 0 !important;
         }
-        .map-context-menu-item {
-            padding: 8px 16px;
-            font-size: 11px;
-            color: #003366;
-            cursor: pointer;
-            transition: background 0.15s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 1px solid rgba(0, 51, 102, 0.04);
-        }
-        .map-context-menu-item:hover {
-            background: rgba(0, 51, 102, 0.05);
-        }
-        .map-context-menu-item:last-child {
-            border-bottom: none;
-        }
-        .map-context-menu-item .icon {
-            font-size: 14px;
-            width: 20px;
-            text-align: center;
-        }
-        .map-context-menu-divider {
-            height: 1px;
-            background: rgba(0, 51, 102, 0.08);
-            margin: 2px 0;
-        }
+        .leaflet-control-zoom a:hover { background: #f3f4f6 !important; }
+        .leaflet-control-zoom { border-radius: 4px !important; overflow: hidden; }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    <div class="map-context-menu" id="contextMenu">
-        <div class="map-context-menu-item" onclick="setTarget()">
-            <span class="icon">📍</span> Make as target coordinate
-        </div>
-        <div class="map-context-menu-item" onclick="copyCoordinates()">
-            <span class="icon">📋</span> Copy coordinates
-        </div>
-        <div class="map-context-menu-divider"></div>
-        <div class="map-context-menu-item" onclick="openGoogleMaps()">
-            <span class="icon">🗺️</span> Open in Google Maps
-        </div>
-        <div class="map-context-menu-item" onclick="openStreetView()">
-            <span class="icon">👁️</span> Open in Google Street View
-        </div>
-    </div>
-    __API_LOG_PANEL__
     <script>
         const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
         L.control.zoom({ position: 'topright' }).addTo(map);
@@ -1175,125 +1379,84 @@ leaflet_template = """
         
         if (!__LABELS_ACTIVE__) { document.getElementById('map').classList.add('hide-labels'); }
 
-        // Context menu state
-        let contextLat = 0;
-        let contextLon = 0;
-        const contextMenu = document.getElementById('contextMenu');
-
-        // Right-click handler
-        map.on('contextmenu', function(e) {
-            contextLat = e.latlng.lat;
-            contextLon = e.latlng.lng;
-            
-            // Position the context menu
-            const x = e.containerPoint.x;
-            const y = e.containerPoint.y;
-            
-            // Adjust to keep menu in viewport
-            let left = x;
-            let top = y;
-            
-            // Get menu dimensions
-            const menuWidth = 220;
-            const menuHeight = 180;
-            
-            if (left + menuWidth > window.innerWidth) {
-                left = window.innerWidth - menuWidth - 10;
-            }
-            if (top + menuHeight > window.innerHeight) {
-                top = window.innerHeight - menuHeight - 10;
-            }
-            
-            contextMenu.style.display = 'block';
-            contextMenu.style.left = left + 'px';
-            contextMenu.style.top = top + 'px';
-            
-            e.originalEvent.preventDefault();
-        });
-
-        // Close context menu on click elsewhere
-        document.addEventListener('click', function(e) {
-            if (!contextMenu.contains(e.target)) {
-                contextMenu.style.display = 'none';
-            }
-        });
-
-        // Context menu actions
-        function setTarget() {
-            const coords = contextLat.toFixed(6) + ', ' + contextLon.toFixed(6);
-            // Send to Streamlit via hidden input
-            const targetInput = document.getElementById('target_coords_input');
-            if (targetInput) {
-                targetInput.value = JSON.stringify({lat: contextLat, lon: contextLon});
-                targetInput.dispatchEvent(new Event('change'));
-            }
-            contextMenu.style.display = 'none';
-            alert('Target coordinate set: ' + coords);
-        }
-
-        function copyCoordinates() {
-            const coords = contextLat.toFixed(6) + ', ' + contextLon.toFixed(6);
-            navigator.clipboard.writeText(coords).then(function() {
-                alert('Coordinates copied: ' + coords);
-            }).catch(function() {
-                // Fallback
-                const textarea = document.createElement('textarea');
-                textarea.value = coords;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                alert('Coordinates copied: ' + coords);
-            });
-            contextMenu.style.display = 'none';
-        }
-
-        function openGoogleMaps() {
-            const url = 'https://www.google.com/maps?q=' + contextLat + ',' + contextLon;
-            window.open(url, '_blank');
-            contextMenu.style.display = 'none';
-        }
-
-        function openStreetView() {
-            const url = 'https://www.google.com/maps?q=' + contextLat + ',' + contextLon + '&layer=c&cbll=' + contextLat + ',' + contextLon;
-            window.open(url, '_blank');
-            contextMenu.style.display = 'none';
-        }
-
-        // Target marker
-        let targetMarker = null;
-        const targetCoords = __TARGET_COORDS__;
-        if (targetCoords) {
-            targetMarker = L.marker([targetCoords.lat, targetCoords.lon], {
-                icon: L.divIcon({
-                    html: '<div style="background-color: #C9AB4C; color: #ffffff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 3px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.4);">★</div>',
-                    className: '',
-                    iconSize: [28, 28],
-                    iconAnchor: [14, 14]
-                })
-            }).addTo(map).bindPopup('Target Location');
-        }
-
-        L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: "#003366", weight: 1.5, fillColor: "#003366", fillOpacity: 0.05 }).addTo(map);
-        L.marker([__LAT__, __LON__], { icon: L.divIcon({ html: '<div style="background-color: #003366; color: #ffffff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.3)">★</div>', className: '', iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(map);
+        L.circle([__LAT__, __LON__], { 
+            radius: __RADIUS__, 
+            color: "#003366", 
+            weight: 1.5, 
+            fillColor: "#003366", 
+            fillOpacity: 0.05,
+            opacity: 0.3
+        }).addTo(map);
+        
+        L.marker([__LAT__, __LON__], { 
+            icon: L.divIcon({ 
+                html: '<div style="background-color: #003366; color: #ffffff; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 2px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.3)">★</div>', 
+                className: '', 
+                iconSize: [20, 20], 
+                iconAnchor: [10, 10] 
+            }) 
+        }).addTo(map);
 
         const generateMarker = (color, mode, size) => {
-            if (mode === "pin" || mode === "modern-pin") {
-                return L.divIcon({ html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size*1.5}" height="${size*1.5}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`, className: '', iconSize: [size*1.5, size*1.5], iconAnchor: [size*0.75, size*1.5] });
+            const s = size || 12;
+            if (mode === "pin") {
+                return L.divIcon({ 
+                    html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${s*1.5}" height="${s*1.5}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg>`, 
+                    className: '', 
+                    iconSize: [s*1.5, s*1.5], 
+                    iconAnchor: [s*0.75, s*1.5] 
+                });
+            } else if (mode === "square") {
+                return L.divIcon({ 
+                    html: `<div style="background-color: ${color}; width: ${s}px; height: ${s}px; border: 1.5px solid #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.25); transform: rotate(45deg);"></div>`, 
+                    className: '', 
+                    iconSize: [s, s], 
+                    iconAnchor: [s/2, s/2] 
+                });
+            } else if (mode === "diamond") {
+                return L.divIcon({ 
+                    html: `<div style="background-color: ${color}; width: ${s}px; height: ${s}px; border: 1.5px solid #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.25); clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);"></div>`, 
+                    className: '', 
+                    iconSize: [s, s], 
+                    iconAnchor: [s/2, s/2] 
+                });
             }
-            return L.divIcon({ html: `<div style="background-color: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.25);"></div>`, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] });
+            return L.divIcon({ 
+                html: `<div style="background-color: ${color}; width: ${s}px; height: ${s}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.25);"></div>`, 
+                className: '', 
+                iconSize: [s, s], 
+                iconAnchor: [s/2, s/2] 
+            });
         };
 
         const pts = __GEOJSON__;
         const layerMeta = __LAYER_META_JSON__;
+        let markers = [];
         
         pts.forEach(p => {
             const meta = layerMeta[p.type] || { color: "__MARKER_COLOR__", style: "__MARKER_STYLE__", size: 12 };
-            const m = L.marker([p.lat, p.lon], { icon: generateMarker(meta.color, meta.style, meta.size) }).bindPopup(`<b>${p.name}</b><br><span style="font-size:10px; color:#64748b;">${p.type}</span>`);
-            if (p.name) m.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -6], className: 'poi-text-label' });
+            const m = L.marker([p.lat, p.lon], { icon: generateMarker(meta.color, meta.style, meta.size) });
+            m.bindPopup(`<b>${p.name}</b><br><span style="font-size:10px; color:#6b7280;">${p.type}</span>`);
+            if (p.name) {
+                m.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -6], className: 'poi-text-label' });
+            }
             m.addTo(map);
+            markers.push(m);
         });
 
+        // Update footer with map info
+        function updateFooter() {
+            const center = map.getCenter();
+            const zoom = map.getZoom();
+            if (window.parent && window.parent.updateFooter) {
+                window.parent.updateFooter(center.lat, center.lng, zoom);
+            }
+        }
+        map.on('moveend', updateFooter);
+        map.on('zoomend', updateFooter);
+        setTimeout(updateFooter, 500);
+
+        // Fit bounds if there are points
         if (pts.length > 0 && !__IS_STALE__) {
             const group = L.featureGroup([L.marker([__LAT__, __LON__]), ...pts.map(p => L.marker([p.lat, p.lon]))]);
             map.fitBounds(group.getBounds().pad(0.05));
@@ -1303,36 +1466,6 @@ leaflet_template = """
 </html>
 """
 
-# Hidden input for target coordinates
-target_input_html = f'''
-<input type="hidden" id="target_coords_input" value='{target_coords_json}' />
-<script>
-    document.getElementById('target_coords_input').addEventListener('change', function() {{
-        try {{
-            const data = JSON.parse(this.value);
-            // Send to Streamlit
-            const hiddenInput = document.getElementById('target_state_input');
-            if (hiddenInput) {{
-                hiddenInput.value = this.value;
-                hiddenInput.dispatchEvent(new Event('change'));
-            }}
-        }} catch(e) {{
-            console.error('Invalid target coords');
-        }}
-    }});
-</script>
-'''
-
-# Streamlit hidden input for target state
-target_state = st.text_input("", key="target_state_input", label_visibility="collapsed", placeholder="target_state")
-if target_state:
-    try:
-        target_data = json.loads(target_state)
-        st.session_state.target_lat = target_data.get('lat')
-        st.session_state.target_lon = target_data.get('lon')
-    except:
-        pass
-
 leaflet_html = (leaflet_template
                 .replace("__LAT__", str(render_lat))
                 .replace("__LON__", str(render_lon))
@@ -1340,12 +1473,84 @@ leaflet_html = (leaflet_template
                 .replace("__IS_STALE__", is_stale)
                 .replace("__GEOJSON__", geojson_str)
                 .replace("__LAYER_META_JSON__", layer_meta_json)
-                .replace("__BASEMAP_CHOICE__", basemap_choice)
-                .replace("__LABELS_ACTIVE__", "true" if show_labels else "false")
-                .replace("__LABEL_SIZE__", str(label_size))
-                .replace("__MARKER_STYLE__", marker_style)
-                .replace("__MARKER_COLOR__", marker_color)
-                .replace("__API_LOG_PANEL__", api_log_panel)
-                .replace("__TARGET_COORDS__", target_coords_json))
+                .replace("__BASEMAP_CHOICE__", st.session_state.basemap_choice)
+                .replace("__LABELS_ACTIVE__", "true" if st.session_state.show_labels else "false")
+                .replace("__LABEL_SIZE__", str(st.session_state.label_size))
+                .replace("__MARKER_STYLE__", st.session_state.marker_style)
+                .replace("__MARKER_COLOR__", st.session_state.marker_color))
 
-st.components.v1.html(leaflet_html + target_input_html, height=900, scrolling=False)
+st.components.v1.html(leaflet_html, height=900, scrolling=False)
+
+# Update sidebar via Streamlit (workspace content)
+# This runs after the HTML is rendered
+if st.session_state.scanned_records:
+    grouped = {}
+    for record in st.session_state.scanned_records:
+        rec_type = record.get('type', 'Unclassified')
+        if rec_type not in grouped: grouped[rec_type] = []
+        grouped[rec_type].append(record)
+    
+    workspace_html = ""
+    for rec_type, items in grouped.items():
+        if rec_type not in st.session_state.layer_meta:
+            st.session_state.layer_meta[rec_type] = {"color": st.session_state.marker_color, "style": st.session_state.marker_style, "size": 12}
+        current_color = st.session_state.layer_meta[rec_type].get('color', st.session_state.marker_color)
+        
+        workspace_html += f'''
+            <div class="workspace-layer">
+                <div class="workspace-layer-header">
+                    <span class="color-dot" style="background-color:{current_color};"></span>
+                    <span>{rec_type}</span>
+                    <span class="layer-count">({len(items)})</span>
+                </div>
+        '''
+        for item in items[:12]:
+            name = item.get('name', 'Unknown Target')[:26]
+            workspace_html += f'''
+                <div class="workspace-item">
+                    <span class="item-name">{name}</span>
+                    <span class="item-type">{item.get('type', '')[:12]}</span>
+                </div>
+            '''
+        if len(items) > 12:
+            workspace_html += f'<div style="font-size:9px; color:#6b7280; padding:4px 12px;">+ {len(items) - 12} more</div>'
+        workspace_html += '</div>'
+    
+    # Update workspace content via JavaScript
+    st.markdown(f"""
+        <script>
+            const workspaceContent = document.getElementById('workspace-content');
+            if (workspaceContent) {{
+                workspaceContent.innerHTML = `{workspace_html}`;
+            }}
+            const assetCount = document.getElementById('asset-count');
+            if (assetCount) {{
+                assetCount.textContent = '{len(st.session_state.scanned_records)}';
+            }}
+        </script>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <script>
+            const workspaceContent = document.getElementById('workspace-content');
+            if (workspaceContent) {
+                workspaceContent.innerHTML = `<div class="workspace-empty">No active vectors inside workspace.<br>Execute spatial search profile.</div>`;
+            }
+            const assetCount = document.getElementById('asset-count');
+            if (assetCount) {
+                assetCount.textContent = '0';
+            }
+        </script>
+    """, unsafe_allow_html=True)
+
+# Update logs
+if st.session_state.api_logs:
+    log_entries_html = "".join([f'<div class="log-entry"><span class="log-time">[{l["time"]}]</span> <span class="log-{l["level"].lower()}">{l["message"]}</span></div>' for l in st.session_state.api_logs[-15:]])
+    st.markdown(f"""
+        <script>
+            const logContent = document.getElementById('log-content');
+            if (logContent) {{
+                logContent.innerHTML = `{log_entries_html}`;
+            }}
+        </script>
+    """, unsafe_allow_html=True)
