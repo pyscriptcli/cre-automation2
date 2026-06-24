@@ -252,10 +252,12 @@ def render_isolated_map_editor():
     
     st.markdown("</div><br>", unsafe_allow_html=True)
 
+    # Define all keys at the top level - consistent naming
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
     size_key = f"map_size_{token_key}"
+    image_key = f"map_bytes_holder_{token_key}"
     
     # Initialize all keys properly
     if style_key not in st.session_state: 
@@ -266,6 +268,8 @@ def render_isolated_map_editor():
         st.session_state[color_key] = "#DC3545"
     if size_key not in st.session_state: 
         st.session_state[size_key] = 32
+    if image_key not in st.session_state:
+        st.session_state[image_key] = None
 
     # Direct variable linkage inside layout columns reflects parameter sweeps immediately
     c1, c2, c3, c4 = st.columns([1.5, 2, 1, 2])
@@ -376,12 +380,10 @@ def render_isolated_map_editor():
                     style=basemap_style, pin_color=pin_color, pin_size=pin_size
                 )
                 
-                # Store in session state - use a unique key for the image
-                image_key = f"map_bytes_holder_{token_key}"
+                # Store in session state using the predefined key
                 st.session_state[image_key] = map_img_bytes
                 
-                # Update the coordinate in session state safely
-                coord_key = f"map_coord_{token_key}"
+                # Update the coordinate in session state safely using the predefined key
                 st.session_state[coord_key] = f"{export_lat}, {export_lon}"
                 
                 # Clear editor state and return
@@ -732,7 +734,9 @@ else:
                             elif data_type == "Map" and template_type == 'pptx':
                                 st.markdown(f'<div class="field-label">{clean_label} (Map Mode)</div>', unsafe_allow_html=True)
                                 
-                                saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
+                                # Check for saved map image using consistent key
+                                map_key = f"map_bytes_holder_{token}"
+                                saved_map_img = st.session_state.get(map_key)
                                 if saved_map_img:
                                     image_data[token] = saved_map_img
                                     st.success("✅ Map snapshot attached")
