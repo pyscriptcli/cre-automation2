@@ -8,7 +8,7 @@ import math
 import streamlit as st
 from pptx import Presentation
 from pptx.util import Pt
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
 from docx import Document
 from docx.shared import Inches, Pt as DocxPt
@@ -153,13 +153,13 @@ def auto_save_config():
 # --- DYNAMIC HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
     """Dynamically scales zoom to construct a massive high-res stitch and drops styled vector pins"""
-    target_tiles_span = 8  # Increased multiplier for Ultra High-Res
+    target_tiles_span = 8  # Increased for higher resolution
     lon_span = e - w
     if lon_span <= 0: lon_span = 0.001
     
-    # Overdrive zoom resolution +1 level deep for crisp rendering
-    zoom = int(math.log2(360.0 / lon_span * target_tiles_span)) + 1
-    zoom = max(10, min(19, zoom))
+    # Calculate optimal zoom level for high resolution
+    zoom = int(math.log2(360.0 / lon_span * target_tiles_span))
+    zoom = max(10, min(18, zoom))  # Cap at 18 to prevent excessive tile downloads
     
     def deg2num(lat_deg, lon_deg, z):
         lat_rad = math.radians(lat_deg)
@@ -171,17 +171,20 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     x_min, y_min = deg2num(n, w, zoom)
     x_max, y_max = deg2num(s, e, zoom)
     
-    if (x_max - x_min + 1) * (y_max - y_min + 1) > 160:
+    # Limit tile count to prevent memory issues
+    tile_count = (x_max - x_min + 1) * (y_max - y_min + 1)
+    if tile_count > 100:
         zoom -= 1
         x_min, y_min = deg2num(n, w, zoom)
         x_max, y_max = deg2num(s, e, zoom)
+        tile_count = (x_max - x_min + 1) * (y_max - y_min + 1)
         
     width_tiles = x_max - x_min + 1
     height_tiles = y_max - y_min + 1
     tile_size = 256
     
     stitched = Image.new('RGB', (width_tiles * tile_size, height_tiles * tile_size))
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     
     styles = {
         "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -191,16 +194,22 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     }
     url_template = styles.get(style, styles["Hybrid"])
     
+    # Download tiles with retry logic
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             url = url_template.format(z=zoom, x=x, y=y)
-            try:
-                resp = requests.get(url, headers=headers, timeout=5)
-                if resp.status_code == 200:
-                    img = Image.open(io.BytesIO(resp.content))
-                    stitched.paste(img, ((x - x_min) * tile_size, (y - y_min) * tile_size))
-            except Exception:
-                pass
+            max_retries = 2
+            for attempt in range(max_retries):
+                try:
+                    resp = requests.get(url, headers=headers, timeout=10)
+                    if resp.status_code == 200:
+                        img = Image.open(io.BytesIO(resp.content))
+                        stitched.paste(img, ((x - x_min) * tile_size, (y - y_min) * tile_size))
+                        break
+                except Exception:
+                    if attempt == max_retries - 1:
+                        pass  # Skip failed tile
+                    continue
                 
     def num2px(lat_deg, lon_deg, z):
         lat_rad = math.radians(lat_deg)
@@ -220,18 +229,35 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     right = int(px_e - base_x)
     bottom = int(py_s - base_y)
     
+    # Ensure we don't crop outside the stitched image
+    left = max(0, min(left, stitched.width - 1))
+    top = max(0, min(top, stitched.height - 1))
+    right = max(left + 1, min(right, stitched.width))
+    bottom = max(top + 1, min(bottom, stitched.height))
+    
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
+    # STAMP PROPORTIONALLY SCALED PIN AT EXACT PIXEL COORDINATES
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
-    # Scale multiplier accommodates deep zoom rendering densities
-    scale = (pin_size / 32.0) * 1.5
+    # Ensure pin is within image bounds
+    pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
+    pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
+    
+    scale = pin_size / 32.0
     w_px = 16 * scale
     h_px = 32 * scale
     
+    # Draw pin shadow
+    draw.ellipse([
+        pin_local_x - w_px - 2, pin_local_y - h_px - w_px + 2, 
+        pin_local_x + w_px + 2, pin_local_y - h_px + w_px + 2
+    ], fill="rgba(0,0,0,0.3)")
+    
+    # Draw pin base
     draw.polygon([
         (pin_local_x, pin_local_y), 
         (pin_local_x - w_px, pin_local_y - h_px), 
@@ -241,6 +267,8 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         pin_local_x - w_px, pin_local_y - h_px - w_px, 
         pin_local_x + w_px, pin_local_y - h_px + w_px
     ], fill="#ffffff")
+    
+    # Draw pin body
     draw.polygon([
         (pin_local_x, pin_local_y - (4 * scale)), 
         (pin_local_x - (w_px * 0.75), pin_local_y - h_px), 
@@ -250,14 +278,25 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         pin_local_x - (w_px * 0.75), pin_local_y - h_px - (w_px * 0.75), 
         pin_local_x + (w_px * 0.75), pin_local_y - h_px + (w_px * 0.75)
     ], fill=pin_color)
+    
+    # Draw inner circle
+    inner_radius = w_px * 0.33
     draw.ellipse([
-        pin_local_x - (w_px * 0.33), pin_local_y - h_px - (w_px * 0.33), 
-        pin_local_x + (w_px * 0.33), pin_local_y - h_px + (w_px * 0.33)
+        pin_local_x - inner_radius, pin_local_y - h_px - inner_radius, 
+        pin_local_x + inner_radius, pin_local_y - h_px + inner_radius
     ], fill="#ffffff")
     
     final_img = cropped.convert("RGB")
+    
+    # Upscale for higher resolution if needed
+    if cropped.width < 1000 or cropped.height < 1000:
+        scale_factor = 2
+        new_width = cropped.width * scale_factor
+        new_height = cropped.height * scale_factor
+        final_img = final_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    
     img_byte_arr = io.BytesIO()
-    final_img.save(img_byte_arr, format='PNG', quality=100)
+    final_img.save(img_byte_arr, format='PNG', quality=95, optimize=True)
     img_byte_arr.seek(0)
     return img_byte_arr
 
@@ -277,15 +316,20 @@ def map_editor_modal(token_key):
     </style>
     """, unsafe_allow_html=True)
     
+    # Initialize keys directly into session state
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
     size_key = f"map_size_{token_key}"
+    zoom_key = f"map_zoom_{token_key}"
+    bounds_key = f"map_bounds_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.3294, 120.9368"
     if color_key not in st.session_state: st.session_state[color_key] = "#DC3545"
     if size_key not in st.session_state: st.session_state[size_key] = 32
+    if zoom_key not in st.session_state: st.session_state[zoom_key] = 15
+    if bounds_key not in st.session_state: st.session_state[bounds_key] = None
 
     # Tiny Horizontally Packed Controls
     c1, c2, c3, c4 = st.columns([1.2, 1.6, 0.6, 1.2])
@@ -298,6 +342,7 @@ def map_editor_modal(token_key):
     with c4:
         pin_size = st.slider("Pin Size", 16, 64, key=size_key)
     
+    # Safe Coordinate Calculation Handling
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
@@ -318,12 +363,13 @@ def map_editor_modal(token_key):
     
     m = folium.Map(
         location=[plat, plon], 
-        zoom_start=15,
+        zoom_start=st.session_state[zoom_key],
         tiles=tiles_dict[basemap_style],
         attr=attr_dict[basemap_style],
         zoom_control=True
     )
 
+    # Injecting parameterized pin asset sizes cleanly
     icon_html = f"""
     <div style="position: relative;">
         <span style="position: absolute; left: -{pin_size//2}px; top: -{pin_size}px; width: {pin_size}px; height: {pin_size}px; background-color: {pin_color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);"></span>
@@ -340,47 +386,79 @@ def map_editor_modal(token_key):
     )
     draw.add_to(m)
     
-    st.caption("✏️ **Use the Rectangle tool (⬛) to frame your export.** Live edits to sliders/colors won't flash the map out of existence anymore.")
+    st.caption("✏️ **Use the Rectangle tool (⬛) on the left to draw your crop box.** If no box is explicitly drawn, the current map view boundaries will be exported.")
     
-    # Decoupled tracking prevents infinite reruns. We strictly pull ONLY the bounds and drawings.
+    # Large Viewport Canvas Map
     map_data = st_folium(
-        m, height=680, width=1150, key=f"int_map_{token_key}",
-        returned_objects=["last_marker_moved", "all_drawings", "bounds"]
+        m, height=680, width=1150, use_container_width=True, key=f"int_map_{token_key}",
+        returned_objects=["last_marker_moved", "all_drawings", "center", "zoom", "bounds"]
     )
     
-    # Handle marker dragging purely in state without forcing immediate visual redraws
-    if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
-        moved = map_data["last_marker_moved"]
-        mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
-        st.session_state[coord_key] = f"{mlat}, {mlon}"
+    # Decoupled Non-refresh State Synchronization Logic Box
+    if isinstance(map_data, dict):
+        if map_data.get("last_marker_moved"):
+            moved = map_data["last_marker_moved"]
+            mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
+            if f"{mlat}, {mlon}" != st.session_state[coord_key]:
+                st.session_state[coord_key] = f"{mlat}, {mlon}"
+                
+        if map_data.get("zoom"):
+            st.session_state[zoom_key] = map_data["zoom"]
+        
+        # Store bounds for export
+        if map_data.get("bounds"):
+            st.session_state[bounds_key] = map_data["bounds"]
 
-    # Execution Action Trigger
-    if st.button("🚀 Confirm & Export High-Res Map", key=f"exp_{token_key}"):
+    # Export & Output Rendering Pipeline Action Triggers
+    if st.button("🚀 Confirm & Export Map Snapshot", key=f"exp_{token_key}", use_container_width=True):
         with st.spinner("Compiling Crisp High-Density Image Assets..."):
             n, s, e, w = None, None, None, None
-            if isinstance(map_data, dict) and map_data.get("all_drawings"):
-                last_draw = map_data["all_drawings"][-1]
-                if last_draw["geometry"]["type"] == "Polygon":
-                    coords = last_draw["geometry"]["coordinates"][0]
-                    lats = [c[1] for c in coords]
-                    lons = [c[0] for c in coords]
-                    n, s = max(lats), min(lats)
-                    e, w = max(lons), min(lons)
             
+            # First try to get bounds from drawn rectangle
+            if isinstance(map_data, dict) and map_data.get("all_drawings"):
+                drawings = map_data["all_drawings"]
+                if drawings:
+                    last_draw = drawings[-1]
+                    if last_draw.get("geometry", {}).get("type") == "Polygon":
+                        coords = last_draw["geometry"]["coordinates"][0]
+                        if coords and len(coords) >= 4:
+                            lats = [c[1] for c in coords]
+                            lons = [c[0] for c in coords]
+                            n, s = max(lats), min(lats)
+                            e, w = max(lons), min(lons)
+            
+            # If no rectangle, use map view bounds
             if n is None and isinstance(map_data, dict) and map_data.get("bounds"):
                 b = map_data["bounds"]
-                n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
-                e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+                if b and "_northEast" in b and "_southWest" in b:
+                    n = b["_northEast"]["lat"]
+                    s = b["_southWest"]["lat"]
+                    e = b["_northEast"]["lng"]
+                    w = b["_southWest"]["lng"]
             
+            # Fallback to coordinates with offset
             if n is None:
-                n, s, e, w = plat + 0.01, plat - 0.01, plon + 0.01, plon - 0.01
+                n, s = plat + 0.02, plat - 0.02
+                e, w = plon + 0.02, plon - 0.02
 
+            # Generate high-res map
             map_img_bytes = generate_static_map_bounds(
                 n, s, e, w, plat, plon, 
                 style=basemap_style, pin_color=pin_color, pin_size=pin_size
             )
+            
+            # Store in session state
             st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
-            st.success("High-res map snap generated!")
+            
+            # Also store the bounds for later reference
+            st.session_state[f"map_bounds_{token_key}"] = {
+                'n': n, 's': s, 'e': e, 'w': w,
+                'style': basemap_style,
+                'pin_color': pin_color,
+                'pin_size': pin_size
+            }
+            
+            st.success("✅ High-res map snapshot generated successfully!")
             st.rerun()
 
 # --- CORE UTILITIES ---
@@ -401,7 +479,7 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
             img = img.crop((0, top, img_w, top + new_h))
             
         img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='PNG')
+        img.save(img_byte_arr, format='PNG', quality=95)
         img_byte_arr.seek(0)
         return img_byte_arr
     except Exception:
