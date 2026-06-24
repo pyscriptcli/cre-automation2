@@ -14,6 +14,17 @@ import time
 import base64
 import requests
 import math
+import pickle
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from streamlit.components.v1 import html
+
+# --- GOOGLE DRIVE CONFIG ---
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+FOLDER_ID = '1na-bYwLW8qR9SrBLAJh3PfDDc8F6WVej'
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -130,11 +141,163 @@ MINIMAL_CRE_SYSTEM = """
         padding: 16px;
         margin: 12px 0;
     }
+    .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .popup-content {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        max-width: 90%;
+        max-height: 90%;
+        overflow: auto;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
     
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     .streamlit-expanderHeader { font-size: 14px !important; font-weight: 600 !important; }
 </style>
 """
+
+# --- GOOGLE DRIVE FUNCTIONS ---
+def get_gdrive_credentials():
+    """Get Google Drive credentials"""
+    creds = None
+    token_path = 'token.pickle'
+    
+    # Check if token exists
+    if os.path.exists(token_path):
+        with open(token_path, 'rb') as token:
+            creds = pickle.load(token)
+    
+    # If no valid credentials, let user log in
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            # Use the service account approach for cloud deployment
+            # You'll need to set up a service account and download credentials
+            try:
+                from google.oauth2 import service_account
+                creds = service_account.Credentials.from_service_account_file(
+                    'service_account.json', scopes=SCOPES
+                )
+            except:
+                st.warning("Google Drive credentials not found. Please set up service account.")
+                return None
+        
+        # Save credentials for next run
+        with open(token_path, 'wb') as token:
+            pickle.dump(creds, token)
+    
+    return creds
+
+def upload_to_gdrive(file_bytes, filename):
+    """Upload file to Google Drive"""
+    try:
+        creds = get_gdrive_credentials()
+        if not creds:
+            return None
+        
+        service = build('drive', 'v3', credentials=creds)
+        
+        # Check if file already exists
+        query = f"name='{filename}' and '{FOLDER_ID}' in parents and trashed=false"
+        results = service.files().list(q=query, fields="files(id, name)").execute()
+        files = results.get('files', [])
+        
+        if files:
+            # Delete existing file
+            for file in files:
+                service.files().delete(fileId=file['id']).execute()
+        
+        # Upload new file
+        file_metadata = {
+            'name': filename,
+            'parents': [FOLDER_ID]
+        }
+        
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
+        
+        media = MediaFileUpload(tmp_path, resumable=True)
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink'
+        ).execute()
+        
+        os.unlink(tmp_path)
+        
+        return file.get('webViewLink')
+        
+    except Exception as e:
+        st.error(f"Error uploading to Google Drive: {str(e)}")
+        return None
+
+def list_gdrive_templates():
+    """List templates from Google Drive"""
+    try:
+        creds = get_gdrive_credentials()
+        if not creds:
+            return []
+        
+        service = build('drive', 'v3', credentials=creds)
+        
+        query = f"'{FOLDER_ID}' in parents and trashed=false"
+        results = service.files().list(
+            q=query,
+            fields="files(id, name, mimeType, size, modifiedTime)"
+        ).execute()
+        
+        templates = []
+        for file in results.get('files', []):
+            if file['name'].endswith('.pptx') or file['name'].endswith('.docx'):
+                templates.append({
+                    'id': file['id'],
+                    'name': file['name'],
+                    'size': file.get('size', 0),
+                    'modified': file.get('modifiedTime', ''),
+                    'type': 'PPTX' if file['name'].endswith('.pptx') else 'DOCX'
+                })
+        
+        return templates
+        
+    except Exception as e:
+        st.error(f"Error listing templates: {str(e)}")
+        return []
+
+def download_from_gdrive(file_id):
+    """Download template from Google Drive"""
+    try:
+        creds = get_gdrive_credentials()
+        if not creds:
+            return None
+        
+        service = build('drive', 'v3', credentials=creds)
+        
+        request = service.files().get_media(fileId=file_id)
+        file_bytes = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_bytes, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+        
+        return file_bytes.getvalue()
+        
+    except Exception as e:
+        st.error(f"Error downloading template: {str(e)}")
+        return None
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
@@ -150,6 +313,10 @@ def save_template_to_file(template_bytes, template_name):
     filepath = os.path.join(storage_dir, safe_name)
     with open(filepath, 'wb') as f:
         f.write(template_bytes)
+    
+    # Also upload to Google Drive
+    upload_to_gdrive(template_bytes, safe_name)
+    
     return filepath
 
 def load_template_from_file(template_name):
@@ -161,6 +328,7 @@ def load_template_from_file(template_name):
     return None
 
 def get_saved_templates():
+    # Get from local storage
     storage_dir = get_storage_dir()
     templates = []
     if os.path.exists(storage_dir):
@@ -173,8 +341,22 @@ def get_saved_templates():
                     'path': filepath,
                     'size': stat.st_size,
                     'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX'
+                    'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
+                    'source': 'local'
                 })
+    
+    # Get from Google Drive
+    drive_templates = list_gdrive_templates()
+    for t in drive_templates:
+        templates.append({
+            'name': t['name'],
+            'id': t['id'],
+            'size': t['size'],
+            'modified': t['modified'],
+            'type': t['type'],
+            'source': 'gdrive'
+        })
+    
     return templates
 
 def delete_template_file(template_name):
@@ -405,112 +587,27 @@ def get_basemap_tiles(basemap_choice):
     }
     return basemaps.get(basemap_choice, basemaps['satellite'])
 
-# --- AUTO CAPTURE METHODS ---
-
-def capture_with_osm_tiles(lat, lng, basemap='satellite', zoom=15):
-    """Method 1: Pure Python OSM tiles - No browser needed!"""
+def capture_map_auto(lat, lng, basemap='satellite', zoom=15):
+    """
+    Try all automatic capture methods in order
+    Returns: (image_bytes, method_used)
+    """
+    # Try Google Static API first
     try:
-        import math
-        from PIL import Image, ImageDraw
-        
-        def get_tile(zoom, x, y):
-            url = f"https://tile.openstreetmap.org/{zoom}/{x}/{y}.png"
-            response = requests.get(url, headers={"User-Agent": "OpenFlux/1.0"}, timeout=5)
-            return Image.open(io.BytesIO(response.content))
-        
-        def lat_lon_to_tile(lat, lon, zoom):
-            lat_rad = math.radians(lat)
-            n = 2.0 ** zoom
-            x = int((lon + 180.0) / 360.0 * n)
-            y = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
-            return x, y
-        
-        # Only works with OSM basemap
-        if basemap != 'openstreetmap':
-            return None
-        
-        # Calculate tile coordinates
-        center_x, center_y = lat_lon_to_tile(lat, lng, zoom)
-        
-        # Create canvas
-        width, height = 800, 600
-        tile_size = 256
-        tiles_across = math.ceil(width / tile_size) + 1
-        tiles_down = math.ceil(height / tile_size) + 1
-        
-        # Create combined image
-        combined = Image.new('RGB', (tiles_across * tile_size, tiles_down * tile_size))
-        
-        # Download and stitch tiles
-        for i in range(tiles_across):
-            for j in range(tiles_down):
-                tile_x = center_x - tiles_across//2 + i
-                tile_y = center_y - tiles_down//2 + j
-                try:
-                    tile = get_tile(zoom, tile_x, tile_y)
-                    combined.paste(tile, (i * tile_size, j * tile_size))
-                except:
-                    # Placeholder for missing tiles
-                    placeholder = Image.new('RGB', (tile_size, tile_size), color='#E8ECF0')
-                    combined.paste(placeholder, (i * tile_size, j * tile_size))
-        
-        # Crop to center
-        crop_x = (combined.width - width) // 2
-        crop_y = (combined.height - height) // 2
-        cropped = combined.crop((crop_x, crop_y, crop_x + width, crop_y + height))
-        
-        # Draw pin at center
-        draw = ImageDraw.Draw(cropped)
-        pin_x, pin_y = width//2, height//2
-        
-        # Pin shadow
-        draw.ellipse([pin_x-10, pin_y+20, pin_x+10, pin_y+30], fill='#B0B8C0')
-        
-        # Pin body
-        draw.polygon([
-            (pin_x, pin_y-20),
-            (pin_x-12, pin_y+8),
-            (pin_x+12, pin_y+8)
-        ], fill='#FF0000')
-        
-        # Pin head
-        draw.ellipse([pin_x-8, pin_y-8, pin_x+8, pin_y+8], fill='#FFFFFF')
-        draw.ellipse([pin_x-4, pin_y-4, pin_x+4, pin_y+4], fill='#FF0000')
-        
-        # Save to bytes
-        img_bytes = io.BytesIO()
-        cropped.save(img_bytes, format='PNG')
-        img_bytes.seek(0)
-        return img_bytes
-        
-    except Exception as e:
-        print(f"OSM tiles capture failed: {e}")
-        return None
-
-def capture_with_google_static(lat, lng, basemap='satellite', zoom=15):
-    """Method 2: Google Maps Static API"""
-    try:
-        api_key = "YOUR_GOOGLE_MAPS_API_KEY"
-        if api_key == "YOUR_GOOGLE_MAPS_API_KEY":
-            # Demo key - limited usage
-            api_key = "AIzaSyA5oEohxJ-jB5WBR6pR3D8VtaY8X2CkT-8"
-        
+        api_key = "AIzaSyA5oEohxJ-jB5WBR6pR3D8VtaY8X2CkT-8"
         maptype = 'satellite' if basemap == 'satellite' else 'roadmap'
         url = f"https://maps.googleapis.com/maps/api/staticmap?center={lat},{lng}&zoom={zoom}&size=800x600&maptype={maptype}&markers=color:red%7C{lat},{lng}&key={api_key}"
-        
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             img = Image.open(io.BytesIO(response.content))
             img_bytes = io.BytesIO()
             img.save(img_bytes, format='PNG')
             img_bytes.seek(0)
-            return img_bytes
-        return None
+            return img_bytes, "Google Static API"
     except:
-        return None
-
-def capture_with_osm_static(lat, lng, basemap='satellite', zoom=15):
-    """Method 3: OSM Static API"""
+        pass
+    
+    # Try OSM Static API
     try:
         url = f"https://staticmap.openstreetmap.de/staticmap.php?center={lat},{lng}&zoom={zoom}&size=800x600&maptype=mapnik&markers={lat},{lng},red-pin"
         response = requests.get(url, timeout=10)
@@ -519,126 +616,12 @@ def capture_with_osm_static(lat, lng, basemap='satellite', zoom=15):
             img_bytes = io.BytesIO()
             img.save(img_bytes, format='PNG')
             img_bytes.seek(0)
-            return img_bytes
-        return None
+            return img_bytes, "OSM Static API"
     except:
-        return None
-
-def capture_with_selenium(lat, lng, basemap='satellite', zoom=15):
-    """Method 4: Selenium with Chrome"""
-    try:
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options
-        from selenium.webdriver.chrome.service import Service
-        from webdriver_manager.chrome import ChromeDriverManager
-        
-        tile_url = get_basemap_tiles(basemap)
-        
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <style>body, html {{ margin:0; padding:0; height:100%; }} #map {{ height:100vh; }}</style>
-        </head>
-        <body>
-            <div id="map"></div>
-            <script>
-                var map = L.map('map').setView([{lat}, {lng}], {zoom});
-                L.tileLayer('{tile_url}', {{maxZoom:20}}).addTo(map);
-                var pinIcon = L.divIcon({{
-                    html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
-                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
-                              fill="#FF0000" stroke="#FFFFFF" stroke-width="1.5"/>
-                        <circle cx="12" cy="9" r="2" fill="#FFFFFF"/>
-                    </svg>`,
-                    className:'', iconSize:[32,32], iconAnchor:[16,32]
-                }});
-                L.marker([{lat}, {lng}], {{icon: pinIcon, draggable:true}}).addTo(map);
-            </script>
-        </body>
-        </html>
-        """
-        
-        chrome_options = Options()
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--window-size=800,600')
-        
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
-            f.write(html)
-            html_path = f.name
-        
-        driver.get(f'file://{html_path}')
-        time.sleep(2)
-        screenshot = driver.get_screenshot_as_png()
-        driver.quit()
-        os.unlink(html_path)
-        
-        return io.BytesIO(screenshot)
-        
-    except Exception as e:
-        print(f"Selenium capture failed: {e}")
-        return None
-
-def capture_with_playwright(lat, lng, basemap='satellite', zoom=15):
-    """Method 5: Playwright"""
-    try:
-        from playwright.sync_api import sync_playwright
-        
-        tile_url = get_basemap_tiles(basemap)
-        
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <style>body, html {{ margin:0; padding:0; height:100%; }} #map {{ height:100vh; }}</style>
-        </head>
-        <body>
-            <div id="map"></div>
-            <script>
-                var map = L.map('map').setView([{lat}, {lng}], {zoom});
-                L.tileLayer('{tile_url}', {{maxZoom:20}}).addTo(map);
-                var pinIcon = L.divIcon({{
-                    html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
-                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
-                              fill="#FF0000" stroke="#FFFFFF" stroke-width="1.5"/>
-                        <circle cx="12" cy="9" r="2" fill="#FFFFFF"/>
-                    </svg>`,
-                    className:'', iconSize:[32,32], iconAnchor:[16,32]
-                }});
-                L.marker([{lat}, {lng}], {{icon: pinIcon, draggable:true}}).addTo(map);
-            </script>
-        </body>
-        </html>
-        """
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
-            f.write(html)
-            html_path = f.name
-        
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page(viewport={'width': 800, 'height': 600})
-            page.goto(f'file://{html_path}')
-            page.wait_for_timeout(2000)
-            screenshot = page.screenshot(full_page=True)
-            browser.close()
-        
-        os.unlink(html_path)
-        return io.BytesIO(screenshot)
-        
-    except Exception as e:
-        print(f"Playwright capture failed: {e}")
-        return None
+        pass
+    
+    # Ultimate fallback: Create a placeholder image
+    return create_placeholder_image(lat, lng), "Placeholder Image"
 
 def create_placeholder_image(lat, lng):
     """Ultimate fallback: Create a placeholder image"""
@@ -687,33 +670,8 @@ def create_placeholder_image(lat, lng):
         img_bytes.seek(0)
         return img_bytes
 
-def capture_map_auto(lat, lng, basemap='satellite', zoom=15):
-    """
-    Try all automatic capture methods in order
-    Returns: (image_bytes, method_used)
-    """
-    methods = [
-        ('OSM Tiles (Pure Python)', capture_with_osm_tiles),
-        ('Google Static API', capture_with_google_static),
-        ('OSM Static API', capture_with_osm_static),
-        ('Selenium', capture_with_selenium),
-        ('Playwright', capture_with_playwright),
-    ]
-    
-    for method_name, method in methods:
-        try:
-            result = method(lat, lng, basemap, zoom)
-            if result is not None:
-                return result, method_name
-        except Exception as e:
-            print(f"Method {method_name} failed: {e}")
-            continue
-    
-    # Ultimate fallback
-    return create_placeholder_image(lat, lng), "Placeholder Image"
-
-def create_map_html_for_download(lat, lng, basemap='satellite', zoom=15):
-    """Create HTML file for manual download"""
+def create_map_export_html(lat, lng, basemap='satellite', zoom=15):
+    """Create HTML with export functionality"""
     tile_url = get_basemap_tiles(basemap)
     
     html = f"""
@@ -721,27 +679,110 @@ def create_map_html_for_download(lat, lng, basemap='satellite', zoom=15):
     <html>
     <head>
         <meta charset="utf-8">
-        <title>Map Capture</title>
+        <title>Map Export</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
         <style>
-            body, html {{ margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }}
-            #map {{ height: calc(100% - 50px); width: 100%; }}
+            body, html {{ margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; background: #f0f4f8; }}
+            #container {{
+                max-width: 900px;
+                margin: 20px auto;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }}
             #controls {{
-                height: 50px;
+                padding: 16px 24px;
                 background: #003366;
                 color: white;
                 display: flex;
                 align-items: center;
-                justify-content: center;
-                gap: 20px;
-                font-size: 14px;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 12px;
             }}
-            #controls span {{ opacity: 0.8; }}
-            #controls strong {{ color: #FFD700; }}
-            .info {{
+            #controls .info {{
+                display: flex;
+                gap: 20px;
+                font-size: 13px;
+            }}
+            #controls .info span {{ opacity: 0.8; }}
+            #controls .info strong {{ color: #FFD700; }}
+            #map {{ height: 500px; width: 100%; }}
+            #export-section {{
+                padding: 16px 24px;
+                background: #f8f9fa;
+                display: flex;
+                justify-content: center;
+                gap: 12px;
+                border-top: 1px solid #e0e0e0;
+            }}
+            .btn {{
+                padding: 10px 24px;
+                border: none;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 14px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }}
+            .btn-primary {{
+                background: #003366;
+                color: white;
+            }}
+            .btn-primary:hover {{
+                background: #002244;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,51,102,0.3);
+            }}
+            .btn-success {{
+                background: #28a745;
+                color: white;
+            }}
+            .btn-success:hover {{
+                background: #218838;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(40,167,69,0.3);
+            }}
+            .btn-secondary {{
+                background: #6c757d;
+                color: white;
+            }}
+            .btn-secondary:hover {{
+                background: #5a6268;
+            }}
+            #status {{
+                padding: 12px 24px;
+                text-align: center;
+                display: none;
+            }}
+            #status.success {{
+                display: block;
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }}
+            #status.error {{
+                display: block;
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }}
+            #preview {{
+                display: none;
+                padding: 16px 24px;
+                text-align: center;
+            }}
+            #preview img {{
+                max-width: 100%;
+                border-radius: 8px;
+                border: 1px solid #e0e0e0;
+            }}
+            .info-box {{
                 position: absolute;
-                bottom: 70px;
+                bottom: 80px;
                 right: 20px;
                 background: white;
                 padding: 12px 16px;
@@ -754,59 +795,173 @@ def create_map_html_for_download(lat, lng, basemap='satellite', zoom=15):
         </style>
     </head>
     <body>
-        <div id="controls">
-            <span>📍 Location: <strong>{lat:.6f}, {lng:.6f}</strong></span>
-            <span>|</span>
-            <span>🗺️ Basemap: <strong>{basemap}</strong></span>
-            <span>|</span>
-            <span>🔍 Zoom: <strong>{zoom}</strong></span>
-        </div>
-        <div id="map"></div>
-        <div class="info">
-            <b>📍 Pin Location</b><br>
-            Lat: {lat:.6f}<br>
-            Lng: {lng:.6f}<br>
-            <span style="font-size:10px; color:#999;">Drag pin to adjust</span>
+        <div id="container">
+            <div id="controls">
+                <div class="info">
+                    <span>📍 Location: <strong>{lat:.6f}, {lng:.6f}</strong></span>
+                    <span>🗺️ Basemap: <strong>{basemap}</strong></span>
+                    <span>🔍 Zoom: <strong>{zoom}</strong></span>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="closePopup()">Close</button>
+                </div>
+            </div>
+            <div id="map" style="position:relative;"></div>
+            <div class="info-box" id="coordInfo">
+                <b>📍 Pin Location</b><br>
+                Lat: {lat:.6f}<br>
+                Lng: {lng:.6f}
+            </div>
+            <div id="status"></div>
+            <div id="preview">
+                <h4>Map Preview</h4>
+                <img id="previewImage" />
+                <br><br>
+                <button class="btn btn-success" onclick="useThisMap()">Use This Map</button>
+                <button class="btn btn-secondary" onclick="retryExport()">Retry</button>
+            </div>
+            <div id="export-section">
+                <button class="btn btn-primary" onclick="exportMap()">📷 Export as Image</button>
+            </div>
         </div>
         <script>
-            var map = L.map('map').setView([{lat}, {lng}], {zoom});
+            var currentLat = {lat};
+            var currentLng = {lng};
+            var mapInstance = null;
+            var capturedImageData = null;
             
-            L.tileLayer('{tile_url}', {{
-                maxZoom: 20,
-                attribution: 'Map'
-            }}).addTo(map);
+            function initMap() {{
+                mapInstance = L.map('map').setView([currentLat, currentLng], {zoom});
+                
+                L.tileLayer('{tile_url}', {{
+                    maxZoom: 20,
+                    attribution: 'Map'
+                }}).addTo(mapInstance);
+                
+                var pinIcon = L.divIcon({{
+                    html: `
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+                                  fill="#FF0000" stroke="#FFFFFF" stroke-width="1.5"/>
+                            <circle cx="12" cy="9" r="2" fill="#FFFFFF"/>
+                        </svg>
+                    `,
+                    className: '',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32]
+                }});
+                
+                var marker = L.marker([currentLat, currentLng], {{
+                    icon: pinIcon,
+                    draggable: true
+                }}).addTo(mapInstance);
+                
+                marker.on('dragend', function(e) {{
+                    var pos = marker.getLatLng();
+                    currentLat = pos.lat;
+                    currentLng = pos.lng;
+                    document.getElementById('coordInfo').innerHTML = 
+                        '<b>📍 Pin Location</b><br>Lat: ' + pos.lat.toFixed(6) + '<br>Lng: ' + pos.lng.toFixed(6) +
+                        '<br><span style="font-size:10px; color:#999;">Drag pin to adjust</span>';
+                }});
+                
+                // Fix map sizing
+                setTimeout(function() {{
+                    mapInstance.invalidateSize();
+                }}, 500);
+            }}
             
-            var pinIcon = L.divIcon({{
-                html: `
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
-                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
-                              fill="#FF0000" stroke="#FFFFFF" stroke-width="1.5"/>
-                        <circle cx="12" cy="9" r="2" fill="#FFFFFF"/>
-                    </svg>
-                `,
-                className: '',
-                iconSize: [32, 32],
-                iconAnchor: [16, 32]
-            }});
+            function exportMap() {{
+                var status = document.getElementById('status');
+                var mapContainer = document.getElementById('map');
+                
+                status.className = '';
+                status.textContent = '⏳ Capturing map...';
+                status.style.display = 'block';
+                
+                // Update coordinates before capture
+                var latInput = document.querySelector('input[data-key="coords"]');
+                if (latInput) {{
+                    latInput.value = currentLat.toFixed(6) + ', ' + currentLng.toFixed(6);
+                }}
+                
+                html2canvas(mapContainer, {{
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#FFFFFF',
+                    logging: false,
+                    width: mapContainer.scrollWidth,
+                    height: mapContainer.scrollHeight
+                }}).then(function(canvas) {{
+                    capturedImageData = canvas.toDataURL('image/png');
+                    
+                    // Show preview
+                    var preview = document.getElementById('preview');
+                    var previewImg = document.getElementById('previewImage');
+                    previewImg.src = capturedImageData;
+                    preview.style.display = 'block';
+                    
+                    status.className = 'success';
+                    status.textContent = '✅ Map captured successfully! Click "Use This Map" to apply.';
+                    
+                    // Scroll to preview
+                    preview.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                    
+                }}).catch(function(error) {{
+                    console.error('Capture error:', error);
+                    status.className = 'error';
+                    status.textContent = '❌ Capture failed: ' + error.message;
+                }});
+            }}
             
-            var marker = L.marker([{lat}, {lng}], {{
-                icon: pinIcon,
-                draggable: true
-            }}).addTo(map);
+            function useThisMap() {{
+                if (!capturedImageData) {{
+                    alert('Please export the map first.');
+                    return;
+                }}
+                
+                // Send to parent window
+                window.parent.postMessage({{
+                    type: 'map_capture',
+                    token: '{token}',
+                    image: capturedImageData,
+                    lat: currentLat,
+                    lng: currentLng
+                }}, '*');
+                
+                var status = document.getElementById('status');
+                status.className = 'success';
+                status.textContent = '✅ Map applied to document!';
+                
+                // Close after 2 seconds
+                setTimeout(function() {{
+                    window.parent.postMessage({{
+                        type: 'close_popup',
+                        token: '{token}'
+                    }}, '*');
+                }}, 1500);
+            }}
             
-            // Update info when dragged
-            marker.on('dragend', function(e) {{
-                var pos = marker.getLatLng();
-                document.querySelector('.info').innerHTML = 
-                    '<b>📍 Pin Location</b><br>Lat: ' + pos.lat.toFixed(6) + '<br>Lng: ' + pos.lng.toFixed(6) +
-                    '<br><span style="font-size:10px; color:#999;">Drag pin to adjust</span>';
-            }});
+            function retryExport() {{
+                document.getElementById('preview').style.display = 'none';
+                document.getElementById('status').style.display = 'none';
+                exportMap();
+            }}
             
-            // Instructions
-            console.log('📸 To capture this map:');
-            console.log('1. Adjust the pin and zoom as needed');
-            console.log('2. Take a screenshot of the entire page');
-            console.log('3. Upload the screenshot back to OpenFlux');
+            function closePopup() {{
+                window.parent.postMessage({{
+                    type: 'close_popup',
+                    token: '{token}'
+                }}, '*');
+            }}
+            
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {{
+                document.addEventListener('DOMContentLoaded', initMap);
+            }} else {{
+                initMap();
+            }}
         </script>
     </body>
     </html>
@@ -829,7 +984,8 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
             "zoom": 15,
             "editor_open": False,
             "auto_capture_failed": False,
-            "capture_method": None
+            "capture_method": None,
+            "show_popup": False
         }
     
     # Show current status
@@ -860,7 +1016,7 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
     # Map Editor Expander
     if st.session_state[map_key]["editor_open"]:
         with st.expander("🗺️ Map Editor", expanded=True):
-            st.markdown('<div class="map-editor-header">📍 Set location, then click "Auto Capture" to try automatic capture</div>', unsafe_allow_html=True)
+            st.markdown('<div class="map-editor-header">📍 Set location, then click "Auto Capture" or "Manual Export"</div>', unsafe_allow_html=True)
             
             # Editor controls
             col1, col2, col3 = st.columns([2, 2, 1])
@@ -967,7 +1123,7 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
             
             with col_auto:
                 if st.button("📷 Auto Capture", key=f"auto_capture_{token}", use_container_width=True):
-                    with st.spinner("Trying automatic capture methods..."):
+                    with st.spinner("Trying automatic capture..."):
                         lat = st.session_state[map_key]["lat"]
                         lng = st.session_state[map_key]["lng"]
                         basemap = st.session_state[map_key]["basemap"]
@@ -985,74 +1141,61 @@ def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=12
                             st.rerun()
                         else:
                             st.session_state[map_key]["auto_capture_failed"] = True
-                            st.error("❌ Auto capture failed. Please use manual capture below.")
+                            st.error("❌ Auto capture failed. Please use Manual Export below.")
                             st.rerun()
             
             with col_manual:
-                if st.button("📄 Manual Capture", key=f"manual_capture_{token}", use_container_width=True):
-                    # Generate HTML for download
-                    lat = st.session_state[map_key]["lat"]
-                    lng = st.session_state[map_key]["lng"]
-                    basemap = st.session_state[map_key]["basemap"]
-                    zoom = st.session_state[map_key]["zoom"]
-                    
-                    html_content = create_map_html_for_download(lat, lng, basemap, zoom)
-                    st.session_state[f"manual_html_{token}"] = html_content
+                if st.button("📤 Manual Export", key=f"manual_export_{token}", use_container_width=True):
+                    st.session_state[map_key]["show_popup"] = True
                     st.rerun()
             
-            # --- MANUAL CAPTURE SECTION (shows after auto fails or manual clicked) ---
-            if st.session_state[map_key]["auto_capture_failed"] or f"manual_html_{token}" in st.session_state:
-                st.markdown('<div class="manual-capture-box">', unsafe_allow_html=True)
-                st.markdown("### 📄 Manual Capture Instructions")
-                st.markdown("""
-                1. **Download the HTML file** below
-                2. **Open it in your browser** (Chrome, Firefox, Safari)
-                3. **Adjust the map** (drag pin, zoom) until it looks right
-                4. **Take a screenshot** of the entire page
-                5. **Upload the screenshot** using the uploader below
-                """)
+            # --- MANUAL EXPORT POPUP ---
+            if st.session_state[map_key]["show_popup"]:
+                lat = st.session_state[map_key]["lat"]
+                lng = st.session_state[map_key]["lng"]
+                basemap = st.session_state[map_key]["basemap"]
+                zoom = st.session_state[map_key]["zoom"]
                 
-                # Download HTML button
-                if f"manual_html_{token}" in st.session_state:
-                    html_content = st.session_state[f"manual_html_{token}"]
-                    st.download_button(
-                        label="📥 Download Map HTML File",
-                        data=html_content,
-                        file_name=f"map_{token}.html",
-                        mime="text/html",
-                        use_container_width=True,
-                        key=f"download_html_{token}"
-                    )
+                # Create the HTML content
+                html_content = create_map_export_html(lat, lng, basemap, zoom, token)
                 
-                # Upload screenshot
-                st.markdown("---")
-                st.markdown("### 📤 Upload Your Screenshot")
-                uploaded_file = st.file_uploader(
-                    "Upload map screenshot (PNG or JPG)",
-                    type=["png", "jpg", "jpeg"],
-                    key=f"manual_upload_{token}",
-                    label_visibility="collapsed"
-                )
-                
-                if uploaded_file is not None:
-                    # Process uploaded image
-                    img = Image.open(uploaded_file)
-                    img_bytes = io.BytesIO()
-                    img.save(img_bytes, format='PNG')
+                # Show as popup using Streamlit dialog
+                with st.container():
+                    st.markdown("""
+                    <div class="popup-overlay">
+                        <div class="popup-content">
+                    """, unsafe_allow_html=True)
+                    
+                    # Embed the HTML
+                    components.html(html_content, height=700, scrolling=True)
+                    
+                    # Close button
+                    if st.button("Close", key=f"close_popup_{token}"):
+                        st.session_state[map_key]["show_popup"] = False
+                        st.rerun()
+                    
+                    st.markdown("</div></div>", unsafe_allow_html=True)
+            
+            # Handle postMessage from iframe
+            # Check if we have a captured image from the popup
+            captured_img = st.query_params.get(f"captured_image_{token}")
+            if captured_img:
+                try:
+                    # Decode and save
+                    img_data = base64.b64decode(captured_img.split(',')[1])
+                    img_bytes = io.BytesIO(img_data)
                     img_bytes.seek(0)
                     
                     st.session_state[map_key]["screenshot"] = img_bytes
                     st.session_state[map_key]["saved"] = True
-                    st.session_state[map_key]["capture_method"] = "Manual Upload"
-                    st.session_state[map_key]["auto_capture_failed"] = False
+                    st.session_state[map_key]["capture_method"] = "Manual Export"
+                    st.session_state[map_key]["show_popup"] = False
                     auto_save_config()
                     
-                    st.success("✅ Manual map uploaded successfully!")
+                    st.success("✅ Map captured from manual export!")
                     st.rerun()
-                
-                st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Show captured preview if exists but not saved? (This is handled above)
+                except:
+                    pass
     
     # Return screenshot if saved
     if st.session_state[map_key]["saved"] and st.session_state[map_key]["screenshot"] is not None:
@@ -1072,9 +1215,48 @@ def simple_uploader_row(label_text, allowed_types, key):
     st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
     return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
 
+# --- JAVASCRIPT LISTENER FOR POSTMESSAGE ---
+def add_postmessage_listener():
+    """Add JavaScript listener for postMessage from iframe"""
+    js = """
+    <script>
+        window.addEventListener('message', function(event) {
+            // Handle map capture messages
+            if (event.data && event.data.type === 'map_capture') {
+                // Store the captured image
+                var hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'captured_image_' + event.data.token;
+                hiddenInput.value = event.data.image;
+                document.body.appendChild(hiddenInput);
+                hiddenInput.dispatchEvent(new Event('change'));
+                
+                // Update coordinates
+                var coordInput = document.querySelector('input[data-key="coords_' + event.data.token + '"]');
+                if (coordInput) {
+                    coordInput.value = event.data.lat.toFixed(6) + ', ' + event.data.lng.toFixed(6);
+                    coordInput.dispatchEvent(new Event('change'));
+                }
+            }
+            
+            if (event.data && event.data.type === 'close_popup') {
+                // Find and click the close button
+                var closeBtn = document.querySelector('[data-testid="baseButton-secondary"]');
+                if (closeBtn && closeBtn.textContent === 'Close') {
+                    closeBtn.click();
+                }
+            }
+        });
+    </script>
+    """
+    st.components.v1.html(js, height=0)
+
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux - Template Automation", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
+
+# Add postMessage listener
+add_postmessage_listener()
 
 # Initialize session state
 if "custom_mapping" not in st.session_state:
@@ -1118,7 +1300,8 @@ with col_template1:
     template_options = ["Select saved template"]
     if saved_templates:
         for t in saved_templates:
-            template_options.append(f"{t['name']} ({t['type']})")
+            source_label = " (Google Drive)" if t.get('source') == 'gdrive' else ""
+            template_options.append(f"{t['name']} ({t['type']}){source_label}")
     
     dropdown_col, delete_col = st.columns([4, 1])
     
@@ -1161,7 +1344,20 @@ with col_template1:
     
     if selected_template and selected_template != "Select saved template" and not st.session_state.delete_trigger:
         template_name = selected_template.split(' (')[0]
-        template_bytes = load_template_from_file(template_name)
+        
+        # Check if it's from Google Drive
+        is_gdrive = "(Google Drive)" in selected_template
+        template_bytes = None
+        
+        if is_gdrive:
+            # Find the drive ID
+            for t in saved_templates:
+                if t['name'] == template_name and t.get('source') == 'gdrive':
+                    template_bytes = download_from_gdrive(t['id'])
+                    break
+        else:
+            template_bytes = load_template_from_file(template_name)
+        
         if template_bytes:
             st.session_state.template_bytes = template_bytes
             st.session_state.saved_template_name = template_name
@@ -1199,28 +1395,46 @@ with col_template2:
         tokens = extract_placeholders(template_bytes, st.session_state.template_type)
         st.session_state.tokens = tokens
         
-        if st.button("Save Template", key="save_template_btn", use_container_width=True):
-            saved_path = save_template_to_file(template_bytes, uploaded_template.name)
-            st.session_state.saved_template_name = uploaded_template.name
-            
-            if st.session_state.custom_mapping:
-                config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
-                save_config_to_file(st.session_state.custom_mapping, config_name)
-            
-            st.session_state.save_success = True
-            st.session_state.saved_file_name = uploaded_template.name
-            st.session_state.clear_uploader = True
-            st.rerun()
+        # Show Google Drive save option
+        col_save_local, col_save_drive = st.columns([1, 1])
+        with col_save_local:
+            if st.button("💾 Save Local", key="save_local_btn", use_container_width=True):
+                saved_path = save_template_to_file(template_bytes, uploaded_template.name)
+                st.session_state.saved_template_name = uploaded_template.name
+                
+                if st.session_state.custom_mapping:
+                    config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                    save_config_to_file(st.session_state.custom_mapping, config_name)
+                
+                st.session_state.save_success = True
+                st.session_state.saved_file_name = uploaded_template.name
+                st.session_state.clear_uploader = True
+                st.success(f"✅ Template saved locally and to Google Drive!")
+                st.rerun()
+        
+        with col_save_drive:
+            if st.button("☁️ Save to Google Drive", key="save_drive_btn", use_container_width=True):
+                # Upload directly to Google Drive
+                link = upload_to_gdrive(template_bytes, uploaded_template.name)
+                if link:
+                    st.success(f"✅ Template uploaded to Google Drive!")
+                    # Also save locally
+                    save_template_to_file(template_bytes, uploaded_template.name)
+                    st.session_state.saved_template_name = uploaded_template.name
+                    st.session_state.save_success = True
+                    st.session_state.saved_file_name = uploaded_template.name
+                    st.session_state.clear_uploader = True
+                    st.rerun()
 
 if st.session_state.save_success:
-    st.success(f"Template '{st.session_state.saved_file_name}' saved successfully!")
+    st.success(f"✅ Template '{st.session_state.saved_file_name}' saved successfully!")
     st.session_state.save_success = False
     st.session_state.saved_file_name = None
 
 if st.session_state.template_bytes is not None:
     template_name = st.session_state.saved_template_name or "Unsaved Template"
     template_type = st.session_state.template_type or "Unknown"
-    st.markdown(f'<div class="saved-indicator">Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="saved-indicator">📌 Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1240,10 +1454,10 @@ if u_template is not None and st.session_state.tokens:
     tokens = st.session_state.tokens
     
     if not tokens:
-        st.info("No placeholders found in the template.")
+        st.info("ℹ️ No placeholders found in the template.")
     else:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">🔧 Placeholder Values</div>', unsafe_allow_html=True)
         st.info(f"Found {len(tokens)} placeholders. Select type: Text, Image, or Map")
         
         mid_point = len(tokens) // 2
@@ -1274,14 +1488,14 @@ if u_template is not None and st.session_state.tokens:
                     if data_type == "Image" and template_type == 'pptx':
                         image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                         field_types[token] = "Image"
-                        st.caption("Upload image (PNG, JPG)")
+                        st.caption("📷 Upload image (PNG, JPG)")
                     elif data_type == "Map":
                         st.session_state.map_data[token] = map_editor_component(token, clean_label)
                         field_types[token] = "Map"
-                        st.caption("Click Open Map Editor to set location and capture map")
+                        st.caption("📍 Click Open Map Editor to set location and capture map")
                     else:
                         if data_type == "Image" and template_type != 'pptx':
-                            st.warning("Image replacement only supported in PPTX templates")
+                            st.warning("⚠️ Image replacement only supported in PPTX templates")
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input(
                             clean_label, 
@@ -1315,14 +1529,14 @@ if u_template is not None and st.session_state.tokens:
                     if data_type == "Image" and template_type == 'pptx':
                         image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
                         field_types[token] = "Image"
-                        st.caption("Upload image (PNG, JPG)")
+                        st.caption("📷 Upload image (PNG, JPG)")
                     elif data_type == "Map":
                         st.session_state.map_data[token] = map_editor_component(token, clean_label)
                         field_types[token] = "Map"
-                        st.caption("Click Open Map Editor to set location and capture map")
+                        st.caption("📍 Click Open Map Editor to set location and capture map")
                     else:
                         if data_type == "Image" and template_type != 'pptx':
-                            st.warning("Image replacement only supported in PPTX templates")
+                            st.warning("⚠️ Image replacement only supported in PPTX templates")
                         st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                         text_data[token] = st.text_input(
                             clean_label, 
@@ -1336,7 +1550,7 @@ if u_template is not None and st.session_state.tokens:
 # Download Section
 if u_template is not None:
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📥 Download Document</div>', unsafe_allow_html=True)
     
     # Merge map screenshots into image_data
     for token, map_screenshot in st.session_state.map_data.items():
@@ -1351,13 +1565,13 @@ if u_template is not None:
     with col1:
         pptx_disabled = template_type != 'pptx'
         if pptx_disabled:
-            st.button("Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
+            st.button("📊 Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
         else:
             try:
                 pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
                 pptx_filename = get_download_filename(base_template_name, "pptx")
                 st.download_button(
-                    label="Download PPTX",
+                    label="📊 Download PPTX",
                     data=pptx_data,
                     file_name=pptx_filename,
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -1370,14 +1584,14 @@ if u_template is not None:
     with col2:
         docx_disabled = template_type != 'docx'
         if docx_disabled:
-            st.button("Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
+            st.button("📄 Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
         else:
             try:
                 docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
                 if docx_data:
                     docx_filename = get_download_filename(base_template_name, "docx")
                     st.download_button(
-                        label="Download DOCX",
+                        label="📄 Download DOCX",
                         data=docx_data,
                         file_name=docx_filename,
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -1391,7 +1605,7 @@ if u_template is not None:
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("Please upload or select a template to begin")
+    st.info("📌 Please upload or select a template to begin")
 
 st.markdown("---")
-st.caption("")
+st.caption("OpenFlux v2.0 | Template Automation with Google Drive Storage")
