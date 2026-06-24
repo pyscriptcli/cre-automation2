@@ -155,9 +155,7 @@ def get_templates_from_root():
     
     for file in os.listdir(root_dir):
         if file.startswith('template_') and (file.endswith('.pptx') or file.endswith('.docx')):
-            # Extract template name (remove 'template_' prefix and extension)
             name = file.replace('template_', '')
-            # Remove extension
             name = re.sub(r'\.(pptx|docx)$', '', name)
             templates.append({
                 'name': name,
@@ -170,13 +168,11 @@ def get_templates_from_root():
     return templates
 
 def get_storage_dir():
-    """Get the stored_templates directory for user-uploaded templates"""
     storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
     os.makedirs(storage_dir, exist_ok=True)
     return storage_dir
 
 def load_template_from_root(template_file):
-    """Load a template from the root directory"""
     root_dir = os.path.dirname(os.path.abspath(__file__))
     filepath = os.path.join(root_dir, template_file)
     if os.path.exists(filepath):
@@ -185,7 +181,6 @@ def load_template_from_root(template_file):
     return None
 
 def save_template_user(template_bytes, template_name):
-    """Save user-uploaded template to stored_templates folder"""
     storage_dir = get_storage_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
     if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
@@ -196,7 +191,6 @@ def save_template_user(template_bytes, template_name):
     return filepath
 
 def load_template_user(template_name):
-    """Load user-uploaded template from stored_templates folder"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -205,7 +199,6 @@ def load_template_user(template_name):
     return None
 
 def get_user_templates():
-    """Get user-uploaded templates from stored_templates folder"""
     storage_dir = get_storage_dir()
     templates = []
     if os.path.exists(storage_dir):
@@ -224,26 +217,18 @@ def get_user_templates():
     return templates
 
 def get_all_templates():
-    """Get all templates from both root and user storage"""
     templates = []
-    
-    # Get root templates (template_*.pptx/docx)
     root_templates = get_templates_from_root()
     templates.extend(root_templates)
-    
-    # Get user templates
     user_templates = get_user_templates()
     templates.extend(user_templates)
-    
     return templates
 
 def delete_user_template(template_name):
-    """Delete a user-uploaded template"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
         os.remove(filepath)
-        # Delete associated config
         config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         config_path = os.path.join(storage_dir, config_name)
         if os.path.exists(config_path):
@@ -307,50 +292,58 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
         return img_file
 
 def extract_placeholders_from_pptx(pptx_bytes):
-    prs = Presentation(io.BytesIO(pptx_bytes))
-    tokens = []
-    seen = set()
-    
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                found = re.findall(r'\{\{.*?\}\}', shape.text)
-                for token in found:
-                    if token not in seen:
-                        tokens.append(token)
-                        seen.add(token)
-            if shape.has_table:
-                for row in shape.table.rows:
-                    for cell in row.cells:
-                        found = re.findall(r'\{\{.*?\}\}', cell.text)
-                        for token in found:
-                            if token not in seen:
-                                tokens.append(token)
-                                seen.add(token)
-    return tokens
+    try:
+        prs = Presentation(io.BytesIO(pptx_bytes))
+        tokens = []
+        seen = set()
+        
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    found = re.findall(r'\{\{.*?\}\}', shape.text)
+                    for token in found:
+                        if token not in seen:
+                            tokens.append(token)
+                            seen.add(token)
+                if shape.has_table:
+                    for row in shape.table.rows:
+                        for cell in row.cells:
+                            found = re.findall(r'\{\{.*?\}\}', cell.text)
+                            for token in found:
+                                if token not in seen:
+                                    tokens.append(token)
+                                    seen.add(token)
+        return tokens
+    except Exception as e:
+        st.error(f"Error reading PPTX file: {str(e)}")
+        return []
 
 def extract_placeholders_from_docx(docx_bytes):
-    doc = Document(io.BytesIO(docx_bytes))
-    tokens = []
-    seen = set()
-    
-    for paragraph in doc.paragraphs:
-        found = re.findall(r'\{\{.*?\}\}', paragraph.text)
-        for token in found:
-            if token not in seen:
-                tokens.append(token)
-                seen.add(token)
-    
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                found = re.findall(r'\{\{.*?\}\}', cell.text)
-                for token in found:
-                    if token not in seen:
-                        tokens.append(token)
-                        seen.add(token)
-    
-    return tokens
+    try:
+        doc = Document(io.BytesIO(docx_bytes))
+        tokens = []
+        seen = set()
+        
+        for paragraph in doc.paragraphs:
+            found = re.findall(r'\{\{.*?\}\}', paragraph.text)
+            for token in found:
+                if token not in seen:
+                    tokens.append(token)
+                    seen.add(token)
+        
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    found = re.findall(r'\{\{.*?\}\}', cell.text)
+                    for token in found:
+                        if token not in seen:
+                            tokens.append(token)
+                            seen.add(token)
+        
+        return tokens
+    except Exception as e:
+        st.error(f"Error reading DOCX file: {str(e)}")
+        return []
 
 def extract_placeholders(template_bytes, template_type):
     if template_type == 'pptx':
@@ -358,6 +351,24 @@ def extract_placeholders(template_bytes, template_type):
     elif template_type == 'docx':
         return extract_placeholders_from_docx(template_bytes)
     return []
+
+def get_file_type_from_bytes(file_bytes):
+    """Detect file type from bytes"""
+    try:
+        # Try PPTX first
+        Presentation(io.BytesIO(file_bytes))
+        return 'pptx'
+    except:
+        pass
+    
+    try:
+        # Try DOCX
+        Document(io.BytesIO(file_bytes))
+        return 'docx'
+    except:
+        pass
+    
+    return None
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     for run in paragraph.runs:
@@ -743,16 +754,13 @@ with col_template1:
     templates = get_all_templates()
     template_options = ["Select template"]
     
-    # Separate root and user templates
     root_templates = [t for t in templates if t.get('source') == 'root']
     user_templates = [t for t in templates if t.get('source') == 'user']
     
-    # Add root templates (show clean names without template_ prefix)
     if root_templates:
         for t in root_templates:
             template_options.append(f"{t['name']} (root)")
     
-    # Add user templates
     if user_templates:
         for t in user_templates:
             template_options.append(f"{t['name']} (uploaded)")
@@ -795,33 +803,53 @@ with col_template1:
                 st.rerun()
     
     if selected_template and selected_template != "Select template":
-        # Parse selection
         name_parts = selected_template.split(' (')
         template_name = name_parts[0]
         source = name_parts[1].replace(')', '') if len(name_parts) > 1 else 'root'
         
         template_bytes = None
+        detected_type = None
         
         if source == 'root':
-            # Find the actual file name
             for t in root_templates:
                 if t['name'] == template_name:
                     template_bytes = load_template_from_root(t['file'])
+                    detected_type = t['type']
                     break
         else:
             template_bytes = load_template_user(template_name)
+            # Detect type from file extension
+            if template_name.endswith('.pptx'):
+                detected_type = 'PPTX'
+            elif template_name.endswith('.docx'):
+                detected_type = 'DOCX'
         
         if template_bytes:
             st.session_state.template_bytes = template_bytes
             st.session_state.saved_template_name = template_name
             st.session_state.template_loaded = True
-            st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
             
+            # Set template type
+            if detected_type:
+                st.session_state.template_type = 'pptx' if detected_type == 'PPTX' else 'docx'
+            else:
+                # Auto-detect
+                detected = get_file_type_from_bytes(template_bytes)
+                if detected:
+                    st.session_state.template_type = detected
+                else:
+                    st.error("Could not detect file type. Please check the file.")
+                    st.stop()
+            
+            # Load config
             config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
             config_data = load_config_from_file(config_name)
             if config_data:
                 st.session_state.custom_mapping = config_data
+            else:
+                st.session_state.custom_mapping = {}
             
+            # Extract placeholders
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
 
@@ -836,14 +864,28 @@ with col_template2:
     if uploaded_template:
         template_bytes = uploaded_template.getvalue()
         template_name = uploaded_template.name
+        
+        # Detect file type
+        detected_type = None
+        if template_name.endswith('.pptx'):
+            detected_type = 'pptx'
+        elif template_name.endswith('.docx'):
+            detected_type = 'docx'
+        
+        if not detected_type:
+            detected_type = get_file_type_from_bytes(template_bytes)
+            if not detected_type:
+                st.error("Could not detect file type. Please upload a valid PPTX or DOCX file.")
+                st.stop()
+        
         st.session_state.template_bytes = template_bytes
         st.session_state.saved_template_name = None
         st.session_state.template_loaded = True
-        st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
-        
-        tokens = extract_placeholders(template_bytes, st.session_state.template_type)
-        st.session_state.tokens = tokens
+        st.session_state.template_type = detected_type
         st.session_state.custom_mapping = {}
+        
+        tokens = extract_placeholders(template_bytes, detected_type)
+        st.session_state.tokens = tokens
         
         if st.button("Save Template", key="save_template_btn", use_container_width=True):
             save_template_user(template_bytes, template_name)
