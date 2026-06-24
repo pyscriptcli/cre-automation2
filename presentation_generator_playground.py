@@ -10,11 +10,9 @@ from docx import Document
 import requests
 import folium
 from streamlit_folium import folium_static
-import base64
 import tempfile
 import time
-import subprocess
-import sys
+import base64
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -405,8 +403,8 @@ def get_basemap_tiles(basemap_choice):
     }
     return basemaps.get(basemap_choice, basemaps['satellite'])
 
-def create_map_html_with_draggable(lat, lng, basemap='satellite', zoom=15):
-    """Create HTML with draggable marker using Leaflet"""
+def create_map_html_with_pin(lat, lng, basemap='satellite', zoom=15):
+    """Create HTML with red pin marker (no radius circle)"""
     tile_url = get_basemap_tiles(basemap)
     
     attribution = {
@@ -426,49 +424,48 @@ def create_map_html_with_draggable(lat, lng, basemap='satellite', zoom=15):
         <style>
             body, html {{ margin: 0; padding: 0; height: 100%; width: 100%; }}
             #map {{ height: 100vh; width: 100vw; }}
-            .custom-marker {{
-                background: #FF0000;
-                width: 20px;
-                height: 20px;
-                border-radius: 50%;
-                border: 3px solid #FFFFFF;
-                box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            .pin-marker {{
+                background: transparent;
+                border: none;
             }}
         </style>
     </head>
     <body>
         <div id="map"></div>
         <script>
-            var map = L.map('map').setView([{lat}, {lng}], {zoom});
+            var map = L.map('map', {{
+                zoomControl: true,
+                attributionControl: true
+            }}).setView([{lat}, {lng}], {zoom});
             
             L.tileLayer('{tile_url}', {{
                 maxZoom: 20,
                 attribution: '{attribution}'
             }}).addTo(map);
             
-            // Create custom draggable marker
-            var markerIcon = L.divIcon({{
-                html: '<div class="custom-marker"></div>',
-                className: '',
-                iconSize: [20, 20],
-                iconAnchor: [10, 10]
+            // Red pin SVG icon
+            var pinIcon = L.divIcon({{
+                html: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+                              fill="#FF0000" 
+                              stroke="#FFFFFF" 
+                              stroke-width="1.5"/>
+                        <circle cx="12" cy="9" r="2" fill="#FFFFFF"/>
+                    </svg>
+                `,
+                className: 'pin-marker',
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+                popupAnchor: [0, -32]
             }});
             
             var marker = L.marker([{lat}, {lng}], {{
-                icon: markerIcon,
+                icon: pinIcon,
                 draggable: true
             }}).addTo(map);
             
-            // Add circle
-            L.circle([{lat}, {lng}], {{
-                radius: 100,
-                color: '#003366',
-                fillColor: '#003366',
-                fillOpacity: 0.1,
-                weight: 2
-            }}).addTo(map);
-            
-            // Update coordinates when marker is dragged
+            // Coordinates display
             var coordDisplay = L.control({{position: 'bottomright'}});
             coordDisplay.onAdd = function(map) {{
                 var div = L.DomUtil.create('div', 'info');
@@ -478,158 +475,164 @@ def create_map_html_with_draggable(lat, lng, basemap='satellite', zoom=15):
                 div.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
                 div.style.fontFamily = 'monospace';
                 div.style.fontSize = '12px';
+                div.style.color = '#003366';
                 div.innerHTML = '<b>Location</b><br>Lat: {lat:.6f}<br>Lng: {lng:.6f}';
                 return div;
             }};
             coordDisplay.addTo(map);
-            
-            // Update coordinates when marker is dragged
-            marker.on('dragend', function(e) {{
-                var pos = marker.getLatLng();
-                document.getElementById('lat_display').textContent = pos.lat.toFixed(6);
-                document.getElementById('lng_display').textContent = pos.lng.toFixed(6);
-                
-                // Update the info control
-                var infoDiv = document.querySelector('.info');
-                if (infoDiv) {{
-                    infoDiv.innerHTML = '<b>Location</b><br>Lat: ' + pos.lat.toFixed(6) + '<br>Lng: ' + pos.lng.toFixed(6);
-                }}
-            }});
         </script>
     </body>
     </html>
     """
     return html
 
-def capture_map_screenshot_selenium(lat, lng, basemap='satellite', zoom=15):
-    """Capture map screenshot using selenium - most reliable for draggable markers"""
+def capture_map_screenshot_html2image(lat, lng, basemap='satellite', zoom=15):
+    """Capture map using html2image (lightweight, no browser needed)"""
     try:
-        # Try using html2image first (lighter weight)
-        try:
-            from html2image import Html2Image
-            hti = Html2Image(size=(800, 600))
-            
-            html_content = create_map_html_with_draggable(lat, lng, basemap, zoom)
-            
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
-                f.write(html_content)
-                html_path = f.name
-            
-            # Generate screenshot using html2image
-            output_path = tempfile.NamedTemporaryFile(suffix='.png', delete=False).name
-            hti.screenshot(html_file=html_path, save_as=output_path)
-            
-            with open(output_path, 'rb') as f:
-                img_data = f.read()
-            
-            # Clean up temp files
-            os.unlink(html_path)
-            os.unlink(output_path)
-            
-            img_byte_arr = io.BytesIO(img_data)
-            img_byte_arr.seek(0)
-            return img_byte_arr
-            
-        except ImportError:
-            st.info("html2image not installed. Using fallback method.")
-            pass
-        except Exception as e:
-            st.warning(f"html2image capture failed: {str(e)}. Trying fallback.")
+        from html2image import Html2Image
         
-        # Fallback: Try using selenium
+        html = create_map_html_with_pin(lat, lng, basemap, zoom)
+        
+        hti = Html2Image(size=(800, 600))
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
+            f.write(html)
+            html_path = f.name
+        
+        output_path = tempfile.NamedTemporaryFile(suffix='.png', delete=False).name
+        hti.screenshot(html_file=html_path, save_as=output_path)
+        
+        with open(output_path, 'rb') as f:
+            img_data = f.read()
+        
+        os.unlink(html_path)
+        os.unlink(output_path)
+        
+        img_byte_arr = io.BytesIO(img_data)
+        img_byte_arr.seek(0)
+        return img_byte_arr
+        
+    except ImportError:
+        return None
+    except Exception as e:
+        return None
+
+def capture_map_screenshot_selenium(lat, lng, basemap='satellite', zoom=15):
+    """Capture map using selenium (requires Chrome)"""
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        
+        html = create_map_html_with_pin(lat, lng, basemap, zoom)
+        
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--window-size=800,600')
+        
         try:
-            from selenium import webdriver
-            from selenium.webdriver.chrome.options import Options
             from selenium.webdriver.chrome.service import Service
             from webdriver_manager.chrome import ChromeDriverManager
-            
-            chrome_options = Options()
-            chrome_options.add_argument('--headless')
-            chrome_options.add_argument('--no-sandbox')
-            chrome_options.add_argument('--disable-dev-shm-usage')
-            chrome_options.add_argument('--disable-gpu')
-            chrome_options.add_argument('--window-size=800,600')
-            
-            try:
-                service = Service(ChromeDriverManager().install())
-                driver = webdriver.Chrome(service=service, options=chrome_options)
-            except:
-                driver = webdriver.Chrome(options=chrome_options)
-            
-            html_content = create_map_html_with_draggable(lat, lng, basemap, zoom)
-            
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
-                f.write(html_content)
-                html_path = f.name
-            
-            driver.get(f'file://{html_path}')
-            time.sleep(2)
-            
-            screenshot = driver.get_screenshot_as_png()
-            driver.quit()
-            
-            os.unlink(html_path)
-            
-            img_byte_arr = io.BytesIO(screenshot)
-            img_byte_arr.seek(0)
-            return img_byte_arr
-            
-        except Exception as e:
-            st.warning(f"Selenium capture failed: {str(e)}")
-            return capture_map_screenshot_static(lat, lng, basemap, zoom)
-            
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        except:
+            driver = webdriver.Chrome(options=chrome_options)
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
+            f.write(html)
+            html_path = f.name
+        
+        driver.get(f'file://{html_path}')
+        time.sleep(2)
+        
+        screenshot = driver.get_screenshot_as_png()
+        driver.quit()
+        
+        os.unlink(html_path)
+        
+        img_byte_arr = io.BytesIO(screenshot)
+        img_byte_arr.seek(0)
+        return img_byte_arr
+        
     except Exception as e:
-        st.warning(f"Map capture failed: {str(e)}. Using static fallback.")
-        return capture_map_screenshot_static(lat, lng, basemap, zoom)
+        return None
 
 def capture_map_screenshot_static(lat, lng, basemap='satellite', zoom=15):
-    """Fallback: Use static map API or placeholder"""
+    """Fallback: Use static map API with pin marker"""
     try:
-        # Try using Google Maps Static API (free tier)
-        map_urls = [
-            f"https://maps.googleapis.com/maps/api/staticmap?center={lat},{lng}&zoom={zoom}&size=600x400&markers=color:red%7C{lat},{lng}&key=YOUR_API_KEY",
-            f"https://staticmap.openstreetmap.de/staticmap.php?center={lat},{lng}&zoom={zoom}&size=600x400&maptype=mapnik&markers={lat},{lng},red",
-            f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/{lng},{lat},{zoom},0/600x400?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw"
-        ]
+        # Try OpenStreetMap static with pin
+        url = f"https://staticmap.openstreetmap.de/staticmap.php?center={lat},{lng}&zoom={zoom}&size=600x400&maptype=mapnik&markers={lat},{lng},red-pin"
         
-        for url in map_urls:
-            try:
-                response = requests.get(url, timeout=10)
-                if response.status_code == 200:
-                    img = Image.open(io.BytesIO(response.content))
-                    img_byte_arr = io.BytesIO()
-                    img.save(img_byte_arr, format='PNG')
-                    img_byte_arr.seek(0)
-                    return img_byte_arr
-            except:
-                continue
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            img = Image.open(io.BytesIO(response.content))
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+            return img_byte_arr
                 
     except Exception:
         pass
     
-    # Ultimate fallback: Create placeholder
+    # Ultimate fallback: Create placeholder with pin
     return create_placeholder_map(lat, lng)
 
 def create_placeholder_map(lat, lng):
-    """Create a placeholder image with coordinates"""
-    from PIL import Image, ImageDraw, ImageFont
+    """Create a placeholder image with red pin"""
+    from PIL import Image, ImageDraw
     
     img = Image.new('RGB', (600, 400), color='#F0F4F8')
     draw = ImageDraw.Draw(img)
     
-    # Draw map-like background
+    # Draw map frame
     draw.rectangle([50, 50, 550, 350], outline='#003366', width=2)
-    draw.ellipse([280, 180, 320, 220], fill='#FF0000', outline='#FF0000')
     
+    # Draw red pin (simple triangle + circle)
+    pin_x, pin_y = 300, 200
+    
+    # Pin shadow
+    draw.ellipse([pin_x-8, pin_y+20, pin_x+8, pin_y+30], fill='#CCCCCC')
+    
+    # Pin body (triangle)
+    draw.polygon([
+        (pin_x, pin_y-15),
+        (pin_x-10, pin_y+5),
+        (pin_x+10, pin_y+5)
+    ], fill='#FF0000', outline='#FF0000')
+    
+    # Pin head (circle)
+    draw.ellipse([pin_x-6, pin_y-6, pin_x+6, pin_y+6], fill='#FFFFFF', outline='#FF0000')
+    draw.ellipse([pin_x-3, pin_y-3, pin_x+3, pin_y+3], fill='#FF0000')
+    
+    # Coordinates text
     coords_text = f"Lat: {lat:.6f}, Lng: {lng:.6f}"
-    draw.text((190, 230), coords_text, fill='#003366')
-    draw.text((240, 250), "Location Pin", fill='#003366')
+    draw.text((190, 240), coords_text, fill='#003366')
+    draw.text((230, 260), "Location Pin", fill='#003366')
+    
+    # Border
     draw.rectangle([0, 0, 599, 399], outline='#CCCCCC', width=1)
     
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='PNG')
     img_byte_arr.seek(0)
     return img_byte_arr
+
+def capture_map_screenshot(lat, lng, basemap='satellite', zoom=15):
+    """Try multiple capture methods in order"""
+    # Try html2image first (lightest)
+    result = capture_map_screenshot_html2image(lat, lng, basemap, zoom)
+    if result is not None:
+        return result
+    
+    # Try selenium (requires Chrome)
+    result = capture_map_screenshot_selenium(lat, lng, basemap, zoom)
+    if result is not None:
+        return result
+    
+    # Fallback to static API
+    return capture_map_screenshot_static(lat, lng, basemap, zoom)
 
 def parse_coordinates(coord_string):
     """Parse coordinates from a string format: 'lat, lon'"""
@@ -641,7 +644,7 @@ def parse_coordinates(coord_string):
     return None, None
 
 def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120.9842):
-    """Interactive map input with draggable marker"""
+    """Interactive map input with draggable red pin marker"""
     
     map_key = f"map_{token}"
     
@@ -696,7 +699,7 @@ def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120
         st.session_state[map_key]["lng"] = lng
     
     # Action buttons
-    col_save, col_capture, col_clear = st.columns([1, 1, 1])
+    col_save, col_preview, col_clear = st.columns([1, 1, 1])
     with col_save:
         if st.button("Save Location", key=f"save_map_{token}", use_container_width=True):
             if lat is not None and lng is not None:
@@ -706,7 +709,7 @@ def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120
                 st.session_state[map_key]["basemap"] = basemap_choice
                 
                 with st.spinner("Capturing map..."):
-                    screenshot = capture_map_screenshot_selenium(
+                    screenshot = capture_map_screenshot(
                         lat, 
                         lng, 
                         basemap_choice,
@@ -720,17 +723,16 @@ def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120
             else:
                 st.warning("Please enter valid coordinates")
     
-    with col_capture:
-        if st.button("Capture Preview", key=f"capture_map_{token}", use_container_width=True):
+    with col_preview:
+        if st.button("Preview", key=f"preview_map_{token}", use_container_width=True):
             if lat is not None and lng is not None:
-                with st.spinner("Capturing map preview..."):
-                    screenshot = capture_map_screenshot_selenium(
+                with st.spinner("Capturing preview..."):
+                    screenshot = capture_map_screenshot(
                         lat, 
                         lng, 
                         basemap_choice,
                         zoom=15
                     )
-                    # Store as preview without marking as saved
                     st.session_state[f"preview_{token}"] = screenshot
                     st.rerun()
             else:
@@ -749,7 +751,7 @@ def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120
     if preview_key in st.session_state and st.session_state[preview_key] is not None:
         st.image(st.session_state[preview_key], caption="Map Preview", use_container_width=True)
     
-    # Interactive map with draggable marker
+    # Interactive map with draggable red pin
     st.markdown('<div class="map-container">', unsafe_allow_html=True)
     
     try:
@@ -758,7 +760,7 @@ def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120
         
         tile_url = get_basemap_tiles(basemap_choice)
         
-        # Create map with draggable marker using Folium
+        # Create map
         m = folium.Map(
             location=[current_lat, current_lng],
             zoom_start=14,
@@ -768,66 +770,66 @@ def map_input_component(token, clean_label, default_lat=14.5995, default_lng=120
             attr='Map'
         )
         
-        # Create a draggable marker with custom icon
-        marker_html = """
-        <div style="
-            background-color: #FF0000;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            border: 3px solid #FFFFFF;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
-        "></div>
+        # Red pin SVG marker
+        pin_svg = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+                  fill="#FF0000" 
+                  stroke="#FFFFFF" 
+                  stroke-width="1.5"/>
+            <circle cx="12" cy="9" r="2" fill="#FFFFFF"/>
+        </svg>
         """
         
-        # Add draggable marker
+        # Add draggable pin marker
         marker = folium.Marker(
             [current_lat, current_lng],
             popup=f"{clean_label}<br>{current_lat:.6f}, {current_lng:.6f}",
             icon=folium.DivIcon(
-                html=marker_html,
-                icon_size=(20, 20),
-                icon_anchor=(10, 10)
+                html=pin_svg,
+                icon_size=(32, 32),
+                icon_anchor=(16, 32),
+                popup_anchor=(0, -32)
             ),
             draggable=True
         ).add_to(m)
         
-        # Add circle
-        folium.Circle(
-            [current_lat, current_lng],
-            radius=100,
-            color='#003366',
-            fill=True,
-            fillOpacity=0.1,
-            weight=2
-        ).add_to(m)
-        
-        # Add JavaScript to update coordinates when marker is dragged
-        js_code = f"""
+        # Add click handler to update coordinates
+        click_js = f"""
         <script>
             document.addEventListener('DOMContentLoaded', function() {{
                 setTimeout(function() {{
                     var mapElement = document.querySelector('.folium-map');
                     if (mapElement) {{
+                        // Listen for marker drag events
                         var marker = mapElement._markers ? mapElement._markers[0] : null;
                         if (marker) {{
                             marker.on('dragend', function(e) {{
                                 var pos = marker.getLatLng();
-                                var latInput = document.querySelector('input[data-key="coords_{token}"]');
-                                if (latInput) {{
-                                    latInput.value = pos.lat.toFixed(6) + ', ' + pos.lng.toFixed(6);
+                                var coordInput = document.querySelector('input[data-key="coords_{token}"]');
+                                if (coordInput) {{
+                                    coordInput.value = pos.lat.toFixed(6) + ', ' + pos.lng.toFixed(6);
                                 }}
                             }});
                         }}
+                        
+                        // Listen for map clicks
+                        mapElement.addEventListener('click', function(e) {{
+                            var lat = e.latlng.lat;
+                            var lng = e.latlng.lng;
+                            var coordInput = document.querySelector('input[data-key="coords_{token}"]');
+                            if (coordInput) {{
+                                coordInput.value = lat.toFixed(6) + ', ' + lng.toFixed(6);
+                            }}
+                        }});
                     }}
                 }}, 1500);
             }});
         </script>
         """
         
-        # Display the map
         folium_static(m, width=700, height=450)
-        st.caption("Drag the red marker to set location, then click Save Location")
+        st.caption("Drag the red pin or click on the map to set location, then click Save Location")
         
     except Exception as e:
         st.warning(f"Map display limited: {str(e)}")
@@ -1050,7 +1052,7 @@ if u_template is not None and st.session_state.tokens:
                     elif data_type == "Map":
                         st.session_state.map_data[token] = map_input_component(token, clean_label)
                         field_types[token] = "Map"
-                        st.caption("Drag marker to set location, click Save Location")
+                        st.caption("Drag red pin or click map to set location, click Save Location")
                     else:
                         if data_type == "Image" and template_type != 'pptx':
                             st.warning("Image replacement only supported in PPTX templates")
@@ -1091,7 +1093,7 @@ if u_template is not None and st.session_state.tokens:
                     elif data_type == "Map":
                         st.session_state.map_data[token] = map_input_component(token, clean_label)
                         field_types[token] = "Map"
-                        st.caption("Drag marker to set location, click Save Location")
+                        st.caption("Drag red pin or click map to set location, click Save Location")
                     else:
                         if data_type == "Image" and template_type != 'pptx':
                             st.warning("Image replacement only supported in PPTX templates")
@@ -1166,4 +1168,4 @@ else:
     st.info("Please upload or select a template to begin")
 
 st.markdown("---")
-st.caption("OpenFlux v2.0 | Template Automation with Draggable Map Markers")
+st.caption("OpenFlux v2.0 | Template Automation with Draggable Map Pins")
