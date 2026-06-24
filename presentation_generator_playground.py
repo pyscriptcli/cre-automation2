@@ -347,7 +347,7 @@ def render_isolated_map_editor():
             st.session_state.active_map_editor_token = None
             st.rerun()
     with col_title:
-        st.markdown(f"### Full-Screen Map Editor: {token_key}")
+        st.markdown(f"### Map Editor: {token_key}")
     
     st.markdown("</div><br>", unsafe_allow_html=True)
 
@@ -364,7 +364,7 @@ def render_isolated_map_editor():
     # Initialize all keys with Manila coordinates
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
-    if color_key not in st.session_state: st.session_state[color_key] = "#0033A0"  # Blue
+    if color_key not in st.session_state: st.session_state[color_key] = "#003366"  # Blue
     if size_key not in st.session_state: st.session_state[size_key] = 32
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
@@ -729,12 +729,12 @@ else:
         stored_templates = [t for t in saved_templates if t['source'] == 'stored']
         
         if github_templates:
-            template_options.append("--- GitHub Templates ---")
+            template_options.append("--- Templates ---")
             for t in github_templates:
                 template_options.append(f"{t['display_name']} ({t['type']})")
         
         if stored_templates:
-            template_options.append("--- Stored Templates ---")
+            template_options.append("--- User Templates ---")
             for t in stored_templates:
                 template_options.append(f"{t['display_name']} ({t['type']})")
         
