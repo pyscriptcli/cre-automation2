@@ -68,7 +68,6 @@ MINIMAL_CRE_SYSTEM = """
     .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 6px; }
     .section-header { font-size: 15px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 10px; }
     .saved-indicator { background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 6px; }
-    .error-indicator { background-color: #FFEBEE; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #C62828; border-left: 3px solid #C62828; margin-top: 6px; }
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
     div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
@@ -80,42 +79,6 @@ def get_storage_dir():
     storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
     os.makedirs(storage_dir, exist_ok=True)
     return storage_dir
-
-def validate_pptx_file(file_bytes):
-    """Validate if the file is a valid PPTX file"""
-    try:
-        # Check if it's a valid zip file first
-        with zipfile.ZipFile(io.BytesIO(file_bytes), 'r') as z:
-            # Check for required PPTX files
-            required_files = ['[Content_Types].xml', '_rels/.rels']
-            for req in required_files:
-                try:
-                    z.getinfo(req)
-                except KeyError:
-                    return False, f"Missing required file: {req}"
-            return True, "Valid PPTX file"
-    except zipfile.BadZipFile:
-        return False, "File is not a valid zip file (corrupted or not a PPTX)"
-    except Exception as e:
-        return False, f"Error validating file: {str(e)}"
-
-def validate_docx_file(file_bytes):
-    """Validate if the file is a valid DOCX file"""
-    try:
-        # Check if it's a valid zip file first
-        with zipfile.ZipFile(io.BytesIO(file_bytes), 'r') as z:
-            # Check for required DOCX files
-            required_files = ['[Content_Types].xml', 'word/document.xml']
-            for req in required_files:
-                try:
-                    z.getinfo(req)
-                except KeyError:
-                    return False, f"Missing required file: {req}"
-            return True, "Valid DOCX file"
-    except zipfile.BadZipFile:
-        return False, "File is not a valid zip file (corrupted or not a DOCX)"
-    except Exception as e:
-        return False, f"Error validating file: {str(e)}"
 
 def get_github_templates():
     """
@@ -131,17 +94,21 @@ def get_github_templates():
             if file.startswith('template_') and (file.endswith('.pptx') or file.endswith('.docx')):
                 filepath = os.path.join(root_dir, file)
                 try:
-                    # Read and validate the file
+                    # Read the file in BINARY mode - CRITICAL FIX
                     with open(filepath, 'rb') as f:
                         file_bytes = f.read()
                     
-                    # Validate based on file type
-                    is_valid = False
-                    error_msg = ""
-                    if file.endswith('.pptx'):
-                        is_valid, error_msg = validate_pptx_file(file_bytes)
-                    elif file.endswith('.docx'):
-                        is_valid, error_msg = validate_docx_file(file_bytes)
+                    # Test if it's a valid zip file (for both PPTX and DOCX)
+                    try:
+                        with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                            # Just test if we can open it
+                            pass
+                        is_valid = True
+                        error_msg = None
+                    except zipfile.BadZipFile:
+                        # If it's not a zip file, it might be corrupted
+                        is_valid = False
+                        error_msg = "File is not a valid zip archive"
                     
                     stat = os.stat(filepath)
                     # Extract display name (remove 'template_' prefix and extension)
@@ -155,10 +122,9 @@ def get_github_templates():
                         'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
                         'source': 'github',
                         'valid': is_valid,
-                        'error': error_msg if not is_valid else None
+                        'error': error_msg
                     })
                 except Exception as e:
-                    # If file can't be read, mark as invalid
                     templates.append({
                         'name': file,
                         'display_name': file.replace('template_', '').replace('.pptx', '').replace('.docx', ''),
@@ -168,7 +134,7 @@ def get_github_templates():
                         'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
                         'source': 'github',
                         'valid': False,
-                        'error': f"Cannot read file: {str(e)}"
+                        'error': f"Error reading file: {str(e)}"
                     })
     
     return templates
@@ -179,7 +145,7 @@ def save_template_to_file(template_bytes, template_name):
     if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
         safe_name += '.docx'
     filepath = os.path.join(storage_dir, safe_name)
-    with open(filepath, 'wb') as f:
+    with open(filepath, 'wb') as f:  # Write in binary mode
         f.write(template_bytes)
     return filepath
 
@@ -187,24 +153,22 @@ def load_template_from_file(template_name):
     # First check if it's a GitHub template (in root directory)
     root_dir = os.path.dirname(os.path.abspath(__file__))
     root_filepath = os.path.join(root_dir, template_name)
+    
     if os.path.exists(root_filepath):
         try:
+            # Read in BINARY mode - CRITICAL FIX
             with open(root_filepath, 'rb') as f:
                 file_bytes = f.read()
             
-            # Validate the file before returning
-            if template_name.endswith('.pptx'):
-                is_valid, error_msg = validate_pptx_file(file_bytes)
-                if not is_valid:
-                    st.error(f"Invalid PPTX file '{template_name}': {error_msg}")
-                    return None
-            elif template_name.endswith('.docx'):
-                is_valid, error_msg = validate_docx_file(file_bytes)
-                if not is_valid:
-                    st.error(f"Invalid DOCX file '{template_name}': {error_msg}")
-                    return None
-            
-            return file_bytes
+            # Validate it's a proper zip file
+            try:
+                with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                    # Test if we can read the zip structure
+                    pass
+                return file_bytes
+            except zipfile.BadZipFile as e:
+                st.error(f"File '{template_name}' is corrupted: {str(e)}")
+                return None
         except Exception as e:
             st.error(f"Error loading template '{template_name}': {str(e)}")
             return None
@@ -213,7 +177,7 @@ def load_template_from_file(template_name):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
-        with open(filepath, 'rb') as f:
+        with open(filepath, 'rb') as f:  # Read in binary mode
             return f.read()
     return None
 
@@ -634,54 +598,46 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
         return img_file
 
 def extract_placeholders_from_pptx(pptx_bytes):
-    try:
-        prs = Presentation(io.BytesIO(pptx_bytes))
-        tokens = []
-        seen = set()
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    found = re.findall(r'\{\{.*?\}\}', shape.text)
-                    for token in found:
-                        if token not in seen:
-                            tokens.append(token)
-                            seen.add(token)
-                if shape.has_table:
-                    for row in shape.table.rows:
-                        for cell in row.cells:
-                            found = re.findall(r'\{\{.*?\}\}', cell.text)
-                            for token in found:
-                                if token not in seen:
-                                    tokens.append(token)
-                                    seen.add(token)
-        return tokens
-    except Exception as e:
-        st.error(f"Error extracting placeholders from PPTX: {str(e)}")
-        return []
+    prs = Presentation(io.BytesIO(pptx_bytes))
+    tokens = []
+    seen = set()
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                found = re.findall(r'\{\{.*?\}\}', shape.text)
+                for token in found:
+                    if token not in seen:
+                        tokens.append(token)
+                        seen.add(token)
+            if shape.has_table:
+                for row in shape.table.rows:
+                    for cell in row.cells:
+                        found = re.findall(r'\{\{.*?\}\}', cell.text)
+                        for token in found:
+                            if token not in seen:
+                                tokens.append(token)
+                                seen.add(token)
+    return tokens
 
 def extract_placeholders_from_docx(docx_bytes):
-    try:
-        doc = Document(io.BytesIO(docx_bytes))
-        tokens = []
-        seen = set()
-        for paragraph in doc.paragraphs:
-            found = re.findall(r'\{\{.*?\}\}', paragraph.text)
-            for token in found:
-                if token not in seen:
-                    tokens.append(token)
-                    seen.add(token)
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    found = re.findall(r'\{\{.*?\}\}', cell.text)
-                    for token in found:
-                        if token not in seen:
-                            tokens.append(token)
-                            seen.add(token)
-        return tokens
-    except Exception as e:
-        st.error(f"Error extracting placeholders from DOCX: {str(e)}")
-        return []
+    doc = Document(io.BytesIO(docx_bytes))
+    tokens = []
+    seen = set()
+    for paragraph in doc.paragraphs:
+        found = re.findall(r'\{\{.*?\}\}', paragraph.text)
+        for token in found:
+            if token not in seen:
+                tokens.append(token)
+                seen.add(token)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                found = re.findall(r'\{\{.*?\}\}', cell.text)
+                for token in found:
+                    if token not in seen:
+                        tokens.append(token)
+                        seen.add(token)
+    return tokens
 
 def extract_placeholders(template_bytes, template_type):
     if template_type == 'pptx':
@@ -822,9 +778,9 @@ else:
         if github_templates:
             template_options.append("--- GitHub Templates ---")
             for t in github_templates:
-                # Add validation status indicator
-                status_icon = "✅" if t['valid'] else "❌"
-                template_options.append(f"{status_icon} 📁 {t['display_name']} ({t['type']})")
+                # Only show valid templates
+                if t['valid']:
+                    template_options.append(f"📁 {t['display_name']} ({t['type']})")
         
         if stored_templates:
             template_options.append("--- Stored Templates ---")
@@ -838,8 +794,6 @@ else:
             if selected_template and selected_template != "Select saved template" and not selected_template.startswith("---"):
                 # Extract template name (remove icon and type)
                 template_display = selected_template.split(' (')[0].strip()
-                # Remove icons and status indicators
-                template_display = re.sub(r'^[✅❌]\s*', '', template_display)
                 if template_display.startswith('📁 ') or template_display.startswith('💾 '):
                     template_display = template_display[2:].strip()
                 
@@ -877,8 +831,6 @@ else:
         if selected_template and selected_template != "Select saved template" and not selected_template.startswith("---"):
             # Extract template name
             template_display = selected_template.split(' (')[0].strip()
-            # Remove icons and status indicators
-            template_display = re.sub(r'^[✅❌]\s*', '', template_display)
             if template_display.startswith('📁 ') or template_display.startswith('💾 '):
                 template_display = template_display[2:].strip()
             
@@ -886,16 +838,6 @@ else:
             for t in saved_templates:
                 if t['display_name'] == template_display:
                     template_name = t['name']
-                    
-                    # Check if template is valid
-                    if t['source'] == 'github' and not t['valid']:
-                        st.error(f"Cannot load '{template_name}': {t['error']}")
-                        st.session_state.template_bytes = None
-                        st.session_state.saved_template_name = None
-                        st.session_state.template_loaded = False
-                        st.session_state.tokens = []
-                        break
-                    
                     template_bytes = load_template_from_file(template_name)
                     if template_bytes:
                         st.session_state.template_bytes = template_bytes
@@ -917,20 +859,6 @@ else:
         
         if uploaded_template:
             template_bytes = uploaded_template.getvalue()
-            
-            # Validate the uploaded file
-            is_valid = False
-            if uploaded_template.name.endswith('.pptx'):
-                is_valid, error_msg = validate_pptx_file(template_bytes)
-                if not is_valid:
-                    st.error(f"Invalid PPTX file: {error_msg}")
-                    st.stop()
-            elif uploaded_template.name.endswith('.docx'):
-                is_valid, error_msg = validate_docx_file(template_bytes)
-                if not is_valid:
-                    st.error(f"Invalid DOCX file: {error_msg}")
-                    st.stop()
-            
             st.session_state.template_bytes = template_bytes
             st.session_state.saved_template_name = None
             st.session_state.template_loaded = True
