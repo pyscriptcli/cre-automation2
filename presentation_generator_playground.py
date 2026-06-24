@@ -66,32 +66,86 @@ MINIMAL_CRE_SYSTEM = """
     div.stButton > button:hover { background-color: #002244 !important; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0, 51, 102, 0.2); }
     div.stButton > button:disabled { background-color: #666666 !important; opacity: 0.6; cursor: not-allowed; }
     
-    .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 2px; margin-bottom: 2px; }
+    .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 6px; }
     .section-header { font-size: 15px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 10px; }
     .saved-indicator { background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 6px; }
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
     div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
     
-    /* Strict CSS layout override matching dropdown sizes side-by-side on mobile screen dimensions */
-    div[data-testid="stHorizontalBlock"] {
+    /* Compact placeholder row with icon dropdown */
+    .placeholder-row {
         display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        align-items: flex-end !important;
-        gap: 8px !important;
+        align-items: center !important;
+        gap: 6px !important;
+        margin-bottom: 6px !important;
+        padding: 2px 0 !important;
+        width: 100% !important;
     }
-    div[data-testid="stHorizontalBlock"] > div {
+    .placeholder-label {
+        font-weight: 600 !important;
+        font-size: 12px !important;
+        color: #1A1A1A !important;
+        white-space: nowrap !important;
+        min-width: 100px !important;
+        flex-shrink: 0 !important;
+    }
+    .placeholder-input {
+        flex: 1 !important;
         min-width: 0 !important;
     }
-    /* Set column percentage widths forcefully */
-    div[data-testid="stHorizontalBlock"] > div:nth-child(1) {
-        flex: 3 1 0% !important;
+    .placeholder-input input {
+        font-size: 13px !important;
+        padding: 4px 8px !important;
+        height: 32px !important;
     }
-    div[data-testid="stHorizontalBlock"] > div:nth-child(2) {
-        flex: 1 1 0% !important;
-        min-width: 95px !important;
-        max-width: 120px !important;
+    .type-icon-btn {
+        background: none !important;
+        border: none !important;
+        padding: 4px 6px !important;
+        cursor: pointer !important;
+        font-size: 16px !important;
+        min-width: 32px !important;
+        text-align: center !important;
+        color: #666 !important;
+    }
+    .type-icon-btn:hover {
+        background: #f0f0f0 !important;
+        border-radius: 4px !important;
+        color: #003366 !important;
+    }
+    .type-dropdown-compact {
+        min-width: 80px !important;
+        max-width: 90px !important;
+        flex-shrink: 0 !important;
+    }
+    .type-dropdown-compact select {
+        font-size: 11px !important;
+        padding: 2px 4px !important;
+        height: 28px !important;
+        min-height: 28px !important;
+    }
+    
+    /* 2-column layout for placeholders */
+    .placeholder-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px 16px !important;
+        width: 100% !important;
+    }
+    
+    @media (max-width: 768px) {
+        .placeholder-grid {
+            grid-template-columns: 1fr !important;
+        }
+        .placeholder-label {
+            min-width: 70px !important;
+            font-size: 11px !important;
+        }
+        .type-dropdown-compact {
+            min-width: 60px !important;
+            max-width: 70px !important;
+        }
     }
 </style>
 """
@@ -103,13 +157,20 @@ def get_storage_dir():
     return storage_dir
 
 def get_github_templates():
+    """
+    Detect all templates from the GitHub root folder (same directory as source code)
+    that start with 'template_' and end with .pptx or .docx
+    """
     root_dir = os.path.dirname(os.path.abspath(__file__))
     templates = []
+    
     if os.path.exists(root_dir):
         for file in os.listdir(root_dir):
+            # Check if file starts with 'template_' and ends with .pptx or .docx
             if file.startswith('template_') and (file.endswith('.pptx') or file.endswith('.docx')):
                 filepath = os.path.join(root_dir, file)
                 stat = os.stat(filepath)
+                # Extract display name (remove 'template_' prefix and extension)
                 display_name = file.replace('template_', '').replace('.pptx', '').replace('.docx', '')
                 templates.append({
                     'name': file,
@@ -120,6 +181,7 @@ def get_github_templates():
                     'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
                     'source': 'github'
                 })
+    
     return templates
 
 def save_template_to_file(template_bytes, template_name):
@@ -133,11 +195,17 @@ def save_template_to_file(template_bytes, template_name):
     return filepath
 
 def load_template_from_file(template_name):
+    # First check if it's a GitHub template (in root directory)
     root_dir = os.path.dirname(os.path.abspath(__file__))
     root_filepath = os.path.join(root_dir, template_name)
+    
     if os.path.exists(root_filepath):
+        # Read the file exactly like how Streamlit handles uploads
         with open(root_filepath, 'rb') as f:
-            return f.read()
+            file_bytes = f.read()
+        return file_bytes
+    
+    # Then check stored templates
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -146,8 +214,13 @@ def load_template_from_file(template_name):
     return None
 
 def get_saved_templates():
+    """
+    Get all templates from both stored_templates folder and GitHub root folder
+    """
     storage_dir = get_storage_dir()
     templates = []
+    
+    # Get templates from stored_templates folder
     if os.path.exists(storage_dir):
         for file in os.listdir(storage_dir):
             if file.endswith('.pptx') or file.endswith('.docx'):
@@ -162,15 +235,21 @@ def get_saved_templates():
                     'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
                     'source': 'stored'
                 })
-    templates.extend(get_github_templates())
+    
+    # Get templates from GitHub root folder
+    github_templates = get_github_templates()
+    templates.extend(github_templates)
+    
     return templates
 
 def delete_template_file(template_name):
+    # Check if it's a GitHub template (in root directory) - don't allow deletion
     root_dir = os.path.dirname(os.path.abspath(__file__))
     root_filepath = os.path.join(root_dir, template_name)
     if os.path.exists(root_filepath):
         st.warning("Cannot delete GitHub repository templates")
         return False
+    
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -203,11 +282,20 @@ def auto_save_config():
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
 
-# --- FIXED HIGH-RESOLUTION CLOSE-ZOOM BOUNDING BOX GENERATOR ---
+# --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
-    """Generates high-res structured map map snapshot locked tight to structural target coords"""
-    # Overriding standard map span dimensions to guarantee a macro, high-detail view of property asset site
-    zoom = 18  # Hard fixed closer detail factor to prevent far zoomed out looks
+    """Generates high-res map with pin included - optimized for zoom"""
+    lon_span = e - w
+    lat_span = n - s
+    
+    target_width_tiles = 8
+    if lon_span <= 0: lon_span = 0.001
+    
+    zoom = int(math.log2((360.0 / lon_span) * target_width_tiles))
+    zoom = max(13, min(20, zoom))
+    
+    if lon_span < 0.01 and lat_span < 0.01:
+        zoom = min(20, zoom + 2)
     
     def deg2num(lat_deg, lon_deg, z):
         lat_rad = math.radians(lat_deg)
@@ -216,19 +304,22 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         ytile = int((1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n_tiles)
         return (xtile, ytile)
         
-    # Capture bounding coordinate arrays around the specific explicit marker target pin position instead of map canvas edges
-    center_x, center_y = deg2num(pin_lat, pin_lon, zoom)
+    x_min, y_min = deg2num(n, w, zoom)
+    x_max, y_max = deg2num(s, e, zoom)
     
-    # Grab structural 5x5 tile configuration framework grid directly around central location node
-    radius_tiles = 2 
-    x_min, x_max = center_x - radius_tiles, center_x + radius_tiles
-    y_min, y_max = center_y - radius_tiles, center_y + radius_tiles
+    if x_max == x_min: x_max += 1
+    if y_max == y_min: y_max += 1
+    
+    if (x_max - x_min + 1) * (y_max - y_min + 1) > 100:
+        zoom -= 1
+        x_min, y_min = deg2num(n, w, zoom)
+        x_max, y_max = deg2num(s, e, zoom)
         
     width_tiles = x_max - x_min + 1
     height_tiles = y_max - y_min + 1
     tile_size = 256
-    scale_factor = 2  # Double grid resolution compilation structure logic
     
+    scale_factor = 2
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
     headers = {"User-Agent": "Mozilla/5.0"}
     
@@ -259,51 +350,70 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
         px_y = (1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n_tiles * tile_size * scale_factor
         return px_x, px_y
         
+    px_w, py_n = num2px(n, w, zoom)
+    px_e, py_s = num2px(s, e, zoom)
+    
     base_x = x_min * tile_size * scale_factor
     base_y = y_min * tile_size * scale_factor
     
-    pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
-    pin_local_x = int(pin_px_x - base_x)
-    pin_local_y = int(pin_px_y - base_y)
+    left = int(px_w - base_x)
+    top = int(py_n - base_y)
+    right = int(px_e - base_x)
+    bottom = int(py_s - base_y)
     
-    # Executing tighter square dynamic cropping boundaries around center pin vector map layer
-    crop_w, crop_h = 750 * scale_factor, 500 * scale_factor
-    left = max(0, pin_local_x - (crop_w // 2))
-    top = max(0, pin_local_y - (crop_h // 2))
-    right = min(stitched.width, left + crop_w)
-    bottom = min(stitched.height, top + crop_h)
+    if right <= left: right = left + 100
+    if bottom <= top: bottom = top + 100
     
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
+    
     draw = ImageDraw.Draw(cropped)
     
-    # Re-calculate tracking coordinate metrics within newly transformed cropped context space bounds
-    pin_dest_x = pin_local_x - left
-    pin_dest_y = pin_local_y - top
+    pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
+    pin_local_x = int(pin_px_x - base_x) - left
+    pin_local_y = int(pin_px_y - base_y) - top
     
-    scale = max(1.5, (pin_size / 32.0) * scale_factor * 1.5)
-    radius = int(16 * scale)
+    pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
+    pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
-    # Shadow layer elements
-    shadow_offset = int(2 * scale)
-    draw.ellipse([pin_dest_x - radius - shadow_offset, pin_dest_y - radius - shadow_offset,
-                  pin_dest_x + radius + shadow_offset, pin_dest_y + radius + shadow_offset], fill=(0, 0, 0, 60))
+    img_width = cropped.width
+    img_height = cropped.height
+    base_scale = min(img_width, img_height) / 600.0
+    scale = max(1.5, (pin_size / 32.0) * base_scale * 2.0)
     
-    # Core pinpoint structural badge graphics
-    draw.ellipse([pin_dest_x - radius, pin_dest_y - radius, pin_dest_x + radius, pin_dest_y + radius], 
-                 fill=pin_color, outline=(255, 255, 255), width=int(2.5 * scale))
+    radius = int(20 * scale)
     
-    star_size = int(radius * 0.55)
+    shadow_offset = int(3 * scale)
+    draw.ellipse([
+        pin_local_x - radius - shadow_offset,
+        pin_local_y - radius - shadow_offset,
+        pin_local_x + radius + shadow_offset,
+        pin_local_y + radius + shadow_offset
+    ], fill=(0, 0, 0, 60))
+    
+    draw.ellipse([
+        pin_local_x - radius,
+        pin_local_y - radius,
+        pin_local_x + radius,
+        pin_local_y + radius
+    ], fill=pin_color, outline=(255, 255, 255), width=int(3 * scale))
+    
+    star_size = int(radius * 0.6)
     star_points = []
     for i in range(10):
         angle = math.radians(i * 36 - 90)
-        r = star_size if i % 2 == 0 else star_size * 0.4
-        star_points.append((pin_dest_x + r * math.cos(angle), pin_dest_y + r * math.sin(angle)))
+        if i % 2 == 0:
+            r = star_size
+        else:
+            r = star_size * 0.4
+        x = pin_local_x + r * math.cos(angle)
+        y = pin_local_y + r * math.sin(angle)
+        star_points.append((x, y))
     
     draw.polygon(star_points, fill=(255, 255, 255))
     
     final_img = cropped.convert("RGB")
     img_byte_arr = io.BytesIO()
-    final_img.save(img_byte_arr, format='PNG', quality=100)
+    final_img.save(img_byte_arr, format='PNG', quality=100, optimize=True)
     img_byte_arr.seek(0)
     return img_byte_arr
 
@@ -312,28 +422,39 @@ def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
     
     st.markdown('<div class="editor-card">', unsafe_allow_html=True)
+    
     col_back, col_title = st.columns([1, 4])
     with col_back:
         if st.button("← Back to Document", key="back_from_map"):
+            # Signal to restore form data
+            st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
             st.rerun()
     with col_title:
         st.markdown(f"### Map Editor: {token_key}")
+    
     st.markdown("</div><br>", unsafe_allow_html=True)
 
+    # Define all keys
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
     size_key = f"map_size_{token_key}"
     dragged_key = f"map_dragged_{token_key}"
     image_key = f"map_bytes_holder_{token_key}"
+    marker_key = f"map_marker_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
     
+    # Initialize all keys with Manila coordinates
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
     if size_key not in st.session_state: st.session_state[size_key] = 32
+    if image_key not in st.session_state: st.session_state[image_key] = None
+    if marker_key not in st.session_state: st.session_state[marker_key] = None
+    if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     
+    # Safe Bridge State
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
@@ -356,47 +477,143 @@ def render_isolated_map_editor():
         "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
     }
     attr_dict = {
-        "OSM": "OpenStreetMap", "Carto Light": "CartoDB", "Satellite": "Google Maps", "Hybrid": "Google Maps"
+        "OSM": "OpenStreetMap",
+        "Carto Light": "CartoDB",
+        "Satellite": "Google Maps",
+        "Hybrid": "Google Maps"
     }
     
-    m = folium.Map(location=[plat, plon], zoom_start=17, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style])
+    m = folium.Map(
+        location=[plat, plon], 
+        zoom_start=15,
+        tiles=tiles_dict[basemap_style],
+        attr=attr_dict[basemap_style],
+        zoom_control=True
+    )
 
+    # Create blue circle with white star marker
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40">
-            <circle cx="20" cy="20" r="18" fill="{pin_color}" stroke="white" stroke-width="2"/>
-            <polygon points="20,6 23.5,14.5 32,15 25.5,21 27.5,30 20,25 12.5,30 14.5,21 8,15 16.5,14.5" fill="white"/>
+            <defs>
+                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+                </filter>
+            </defs>
+            <g filter="url(#shadow)">
+                <circle cx="20" cy="20" r="18" fill="{pin_color}" stroke="white" stroke-width="2"/>
+                <polygon points="20,6 23.5,14.5 32,15 25.5,21 27.5,30 20,25 12.5,30 14.5,21 8,15 16.5,14.5" fill="white"/>
+            </g>
         </svg>
     </div>
     """
     
-    folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
-    Draw(export=False, position='topleft', draw_options={'polyline':False, 'polygon':False, 'circle':False, 'marker':False, 'circlemarker':False, 'rectangle':True}).add_to(m)
+    # Add marker
+    marker = folium.Marker(
+        [plat, plon], 
+        draggable=True, 
+        icon=folium.DivIcon(html=icon_html)
+    )
+    marker.add_to(m)
     
-    map_data = st_folium(m, height=500, width=1300, use_container_width=True, key=f"int_map_{token_key}", returned_objects=["bounds", "last_marker_moved"])
+    # Store marker reference
+    st.session_state[marker_key] = marker
+    
+    # Add draw control
+    draw = Draw(
+        export=False, position='topleft',
+        draw_options={'polyline':False, 'polygon':False, 'circle':False, 'marker':False, 'circlemarker':False, 'rectangle':True},
+        edit_options={'edit':True}
+    )
+    draw.add_to(m)
+    
+    st.info("Use the Rectangle tool (square icon) to frame your export area. Drag the pin to move it.")
+    
+    # Display map
+    map_data = st_folium(
+        m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}",
+        returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
+    )
 
+    # Store bounds from map_data for export
     if isinstance(map_data, dict) and map_data.get("bounds"):
         st.session_state[bounds_key] = map_data["bounds"]
 
-    if st.button("Confirm and Export High-Res Image to Document", type="primary", use_container_width=True):
-        export_lat, export_lon = plat, plon
-        if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
-            moved = map_data["last_marker_moved"]
-            if moved:
-                export_lat, export_lon = moved["lat"], moved["lng"]
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Export button
+    if st.button("Confirm and Export High-Res Image to Document", type="primary", use_container_width=True, key=f"export_map_{token_key}"):
+        with st.spinner("Compiling High-Density Map Asset..."):
+            
+            # Get the latest marker position
+            export_lat, export_lon = plat, plon
+            if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
+                moved = map_data["last_marker_moved"]
+                if moved:
+                    export_lat = moved["lat"]
+                    export_lon = moved["lng"]
 
-        n, s, e, w = export_lat + 0.002, export_lat - 0.002, export_lon + 0.002, export_lon - 0.002
-        
-        map_img_bytes = generate_static_map_bounds(n, s, e, w, export_lat, export_lon, style=basemap_style, pin_color=pin_color, pin_size=pin_size)
-        
-        st.session_state[image_key] = map_img_bytes
-        # Map output content into standard form fields directly to shield against UI refreshes
-        st.session_state[f"form_val_{token_key}"] = map_img_bytes
-        st.session_state[coord_key] = f"{export_lat}, {export_lon}"
-        st.session_state.active_map_editor_token = None
-        st.success("High-res closed-zoom map view pinned successfully!")
-        time.sleep(0.4)
-        st.rerun()
+            # Get bounds - first from drawn rectangle, then from map bounds
+            n, s, e, w = None, None, None, None
+            
+            # Try to get from drawn rectangle
+            if isinstance(map_data, dict) and map_data.get("last_active_drawing"):
+                drawing = map_data["last_active_drawing"]
+                if drawing and drawing.get("geometry", {}).get("type") == "Polygon":
+                    coords = drawing["geometry"]["coordinates"][0]
+                    if coords and len(coords) >= 4:
+                        lats = [c[1] for c in coords]
+                        lons = [c[0] for c in coords]
+                        n, s = max(lats), min(lats)
+                        e, w = max(lons), min(lons)
+            
+            # If no rectangle, use map bounds from session state
+            if n is None and st.session_state.get(bounds_key):
+                b = st.session_state[bounds_key]
+                if b and "_northEast" in b and "_southWest" in b:
+                    n = b["_northEast"]["lat"]
+                    s = b["_southWest"]["lat"]
+                    e = b["_northEast"]["lng"]
+                    w = b["_southWest"]["lng"]
+            
+            # Fallback to area around pin - smaller for better zoom
+            if n is None:
+                n, s = export_lat + 0.005, export_lat - 0.005
+                e, w = export_lon + 0.005, export_lon - 0.005
+
+            # Generate high-res image with pin at the exported position
+            map_img_bytes = generate_static_map_bounds(
+                n, s, e, w, 
+                export_lat, export_lon,
+                style=basemap_style, 
+                pin_color=pin_color, 
+                pin_size=pin_size
+            )
+            
+            # Store in session state
+            st.session_state[image_key] = map_img_bytes
+            
+            # Update coordinates using a key that won't conflict with widgets
+            coord_value = f"{export_lat}, {export_lon}"
+            st.session_state[f"coord_{token_key}"] = coord_value
+            
+            # Signal to restore form data
+            st.session_state.restore_form_data = True
+            
+            st.session_state.active_map_editor_token = None
+            st.success("High-res map rendering attached successfully!")
+            time.sleep(0.5)
+            st.rerun()
+
+    # Handle marker movement
+    if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
+        moved = map_data["last_marker_moved"]
+        if moved:
+            mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
+            new_coord = f"{mlat}, {mlon}"
+            if new_coord != st.session_state.get(coord_key, ""):
+                st.session_state[dragged_key] = new_coord
+                st.rerun()
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -405,6 +622,7 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
         img_w, img_h = img.size
         target_ratio = target_w_emu / target_h_emu
         img_ratio = img_w / img_h
+        
         if img_ratio > target_ratio:
             new_w = int(img_h * target_ratio)
             left = (img_w - new_w) // 2
@@ -413,6 +631,7 @@ def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
             new_h = int(img_w / target_ratio)
             top = (img_h - new_h) // 2
             img = img.crop((0, top, img_w, top + new_h))
+            
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG', quality=95)
         img_byte_arr.seek(0)
@@ -430,14 +649,16 @@ def extract_placeholders_from_pptx(pptx_bytes):
                 found = re.findall(r'\{\{.*?\}\}', shape.text)
                 for token in found:
                     if token not in seen:
-                        tokens.append(token); seen.add(token)
+                        tokens.append(token)
+                        seen.add(token)
             if shape.has_table:
                 for row in shape.table.rows:
                     for cell in row.cells:
                         found = re.findall(r'\{\{.*?\}\}', cell.text)
                         for token in found:
                             if token not in seen:
-                                tokens.append(token); seen.add(token)
+                                tokens.append(token)
+                                seen.add(token)
     return tokens
 
 def extract_placeholders_from_docx(docx_bytes):
@@ -447,37 +668,47 @@ def extract_placeholders_from_docx(docx_bytes):
     for paragraph in doc.paragraphs:
         found = re.findall(r'\{\{.*?\}\}', paragraph.text)
         for token in found:
-            if token not in seen: tokens.append(token); seen.add(token)
+            if token not in seen:
+                tokens.append(token)
+                seen.add(token)
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 found = re.findall(r'\{\{.*?\}\}', cell.text)
                 for token in found:
-                    if token not in seen: tokens.append(token); seen.add(token)
+                    if token not in seen:
+                        tokens.append(token)
+                        seen.add(token)
     return tokens
 
 def extract_placeholders(template_bytes, template_type):
-    if template_type == 'pptx': return extract_placeholders_from_pptx(template_bytes)
-    if template_type == 'docx': return extract_placeholders_from_docx(template_bytes)
+    if template_type == 'pptx':
+        return extract_placeholders_from_pptx(template_bytes)
+    elif template_type == 'docx':
+        return extract_placeholders_from_docx(template_bytes)
     return []
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     for run in paragraph.runs:
         for token, value in text_inputs.items():
             if token in run.text:
-                run.text = run.text.replace(token, str(value) if value else '')
+                replacement = str(value) if value else ''
+                run.text = run.text.replace(token, replacement)
     if hasattr(paragraph, 'text') and paragraph.text:
         for token, value in text_inputs.items():
             if token in paragraph.text:
-                if not paragraph.runs: paragraph.add_run()
+                if not paragraph.runs:
+                    paragraph.add_run()
                 for run in paragraph.runs:
                     if token in run.text:
-                        run.text = run.text.replace(token, str(value) if value else '')
+                        replacement = str(value) if value else ''
+                        run.text = run.text.replace(token, replacement)
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
     for slide in prs.slides:
-        shapes_to_delete = []; images_to_add = []
+        shapes_to_delete = []
+        images_to_add = []
         for shape in slide.shapes:
             if shape.has_text_frame:
                 text_content = shape.text
@@ -489,22 +720,26 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
         for shape in slide.shapes:
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
-                    for paragraph in shape.text_frame.paragraphs: replace_text_in_paragraph(paragraph, text_inputs)
+                    for paragraph in shape.text_frame.paragraphs:
+                        replace_text_in_paragraph(paragraph, text_inputs)
                 if hasattr(shape, 'table') and shape.table:
                     for row in shape.table.rows:
                         for cell in row.cells:
                             if cell.text_frame:
-                                for paragraph in cell.text_frame.paragraphs: replace_text_in_paragraph(paragraph, text_inputs)
+                                for paragraph in cell.text_frame.paragraphs:
+                                    replace_text_in_paragraph(paragraph, text_inputs)
         for img_file, left, top, width, height in images_to_add:
             try:
                 processed_img = smart_crop_to_fit(img_file, width, height)
                 slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
-            except Exception: pass
+            except Exception:
+                pass
         for old_shape in shapes_to_delete:
             try:
                 sp = old_shape._element
                 sp.getparent().remove(sp)
-            except Exception: pass
+            except Exception:
+                pass
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
     return pptx_stream.getvalue()
@@ -512,37 +747,89 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     doc = Document(io.BytesIO(template_bytes))
     for paragraph in doc.paragraphs:
-        has_image = any(img_token in paragraph.text for img_token in image_inputs.keys())
-        if not has_image: replace_text_in_paragraph(paragraph, text_inputs)
+        has_image = False
+        for img_token in image_inputs.keys():
+            if img_token in paragraph.text:
+                has_image = True
+                break
+        if not has_image:
+            replace_text_in_paragraph(paragraph, text_inputs)
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                for paragraph in cell.paragraphs: replace_text_in_paragraph(paragraph, text_inputs)
+                for paragraph in cell.paragraphs:
+                    replace_text_in_paragraph(paragraph, text_inputs)
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
+    doc_stream.seek(0)
     return doc_stream.getvalue()
 
 def get_download_filename(template_name, file_type):
-    base_name = re.sub(r'\.(pptx|docx)$', '', template_name or "Generated_Document")
-    base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
-    return f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_type}"
+    if template_name:
+        base_name = re.sub(r'\.(pptx|docx)$', '', template_name)
+        base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        return f"{base_name}_{timestamp}.{file_type}"
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    return f"Generated_Document_{timestamp}.{file_type}"
+
+def simple_uploader_row(label_text, allowed_types, key):
+    st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
+    return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
+
+# --- Function to preserve form data ---
+def save_form_data():
+    """Save all form data to session state before rerun"""
+    if st.session_state.tokens:
+        for token in st.session_state.tokens:
+            key = f"val_{token}"
+            if key in st.session_state:
+                if token not in st.session_state.form_data:
+                    st.session_state.form_data = {}
+                st.session_state.form_data[token] = st.session_state[key]
+
+def restore_form_data():
+    """Restore form data from session state after rerun"""
+    if hasattr(st.session_state, 'restore_form_data') and st.session_state.restore_form_data:
+        if hasattr(st.session_state, 'form_data') and st.session_state.form_data:
+            for token, value in st.session_state.form_data.items():
+                key = f"val_{token}"
+                # Only restore if the widget exists
+                if key in st.session_state:
+                    st.session_state[key] = value
+        st.session_state.restore_form_data = False
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
-# System-level routing properties definitions
-states = ["active_map_editor_token", "custom_mapping", "tokens", "template_bytes", "saved_template_name", 
-          "template_loaded", "template_type", "show_delete_confirm", "save_success", "clear_uploader"]
-for state in states:
-    if state not in st.session_state:
-        st.session_state[state] = {} if "mapping" in state else ([] if "tokens" in state else None if "bytes" in state or "name" in state or "token" in state else False)
+if "active_map_editor_token" not in st.session_state: st.session_state.active_map_editor_token = None
+if "custom_mapping" not in st.session_state: st.session_state.custom_mapping = {}
+if "tokens" not in st.session_state: st.session_state.tokens = []
+if "template_bytes" not in st.session_state: st.session_state.template_bytes = None
+if "saved_template_name" not in st.session_state: st.session_state.saved_template_name = None
+if "template_loaded" not in st.session_state: st.session_state.template_loaded = False
+if "template_type" not in st.session_state: st.session_state.template_type = None
+if "delete_trigger" not in st.session_state: st.session_state.delete_trigger = False
+if "show_delete_confirm" not in st.session_state: st.session_state.show_delete_confirm = False
+if "template_to_delete" not in st.session_state: st.session_state.template_to_delete = None
+if "save_success" not in st.session_state: st.session_state.save_success = False
+if "saved_file_name" not in st.session_state: st.session_state.saved_file_name = None
+if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = False
+if "form_data" not in st.session_state: st.session_state.form_data = {}
+if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 
-# --- APP ROUTER ---
+
+# --- ISOLATED APP ROUTER ---
 if st.session_state.active_map_editor_token:
     render_isolated_map_editor()
 else:
+    # Restore form data if needed
+    restore_form_data()
+    
+    # --- MAIN DOCUMENT GENERATOR APP ---
     st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
+    
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Template Setup</div>', unsafe_allow_html=True)
 
@@ -551,15 +838,20 @@ else:
     with col_template1:
         saved_templates = get_saved_templates()
         template_options = ["Select saved template"]
+        
+        # Group templates by source for display
         github_templates = [t for t in saved_templates if t['source'] == 'github']
         stored_templates = [t for t in saved_templates if t['source'] == 'stored']
         
         if github_templates:
-            template_options.append("--- Templates ---")
-            for t in github_templates: template_options.append(f"{t['display_name']} ({t['type']})")
+            template_options.append("--- GitHub Templates ---")
+            for t in github_templates:
+                template_options.append(f"{t['display_name']} ({t['type']})")
+        
         if stored_templates:
-            template_options.append("--- User Uploaded Templates ---")
-            for t in stored_templates: template_options.append(f"{t['display_name']} ({t['type']})")
+            template_options.append("--- Stored Templates ---")
+            for t in stored_templates:
+                template_options.append(f"{t['display_name']} ({t['type']})")
         
         dropdown_col, delete_col = st.columns([4, 1])
         with dropdown_col:
@@ -568,135 +860,229 @@ else:
             if selected_template and selected_template != "Select saved template" and not selected_template.startswith("---"):
                 template_display = selected_template.split(' (')[0].strip()
                 for t in saved_templates:
-                    if t['display_name'] == template_display and t['source'] == 'stored':
-                        if st.button("🗑️", key="delete_template"):
-                            st.session_state.show_delete_confirm = True
-                            st.session_state.template_to_delete = t['name']
-                            st.rerun()
-        
+                    if t['display_name'] == template_display:
+                        template_name = t['name']
+                        if t['source'] == 'stored':
+                            if st.button("🗑️", key="delete_template", help="Delete this template"):
+                                st.session_state.show_delete_confirm = True
+                                st.session_state.template_to_delete = template_name
+                                st.rerun()
+                        break
+                    
         if st.session_state.show_delete_confirm:
             st.warning(f"Are you sure you want to delete '{st.session_state.template_to_delete}'?")
-            c_con1, c_con2 = st.columns(2)
-            if c_con1.button("Yes, Delete"):
-                if delete_template_file(st.session_state.template_to_delete):
-                    st.session_state.template_bytes = None
-                    st.session_state.tokens = []
+            col_confirm1, col_confirm2 = st.columns([1, 1])
+            with col_confirm1:
+                if st.button("Yes, Delete", key="confirm_delete"):
+                    if delete_template_file(st.session_state.template_to_delete):
+                        st.session_state.delete_trigger = True
+                        st.session_state.template_bytes = None
+                        st.session_state.saved_template_name = None
+                        st.session_state.template_loaded = False
+                        st.session_state.tokens = []
+                        st.session_state.form_data = {}
+                        st.session_state.show_delete_confirm = False
+                        st.session_state.template_to_delete = None
+                        st.rerun()
+            with col_confirm2:
+                if st.button("Cancel", key="cancel_delete"):
                     st.session_state.show_delete_confirm = False
+                    st.session_state.template_to_delete = None
                     st.rerun()
-            if c_con2.button("Cancel"):
-                st.session_state.show_delete_confirm = False
-                st.rerun()
-                
+                    
         if selected_template and selected_template != "Select saved template" and not selected_template.startswith("---"):
             template_display = selected_template.split(' (')[0].strip()
             for t in saved_templates:
                 if t['display_name'] == template_display:
-                    template_bytes = load_template_from_file(t['name'])
-                    if template_bytes and st.session_state.template_bytes != template_bytes:
+                    template_name = t['name']
+                    template_bytes = load_template_from_file(template_name)
+                    if template_bytes:
                         st.session_state.template_bytes = template_bytes
-                        st.session_state.saved_template_name = t['name']
-                        st.session_state.template_type = 'pptx' if t['name'].endswith('.pptx') else 'docx'
-                        st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
-                        config_data = load_config_from_file(t['name'].replace('.pptx', '').replace('.docx', '') + '_config.json')
-                        if config_data: st.session_state.custom_mapping = config_data
+                        st.session_state.saved_template_name = template_name
+                        st.session_state.template_loaded = True
+                        st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+                        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                        config_data = load_config_from_file(config_name)
+                        if config_data:
+                            st.session_state.custom_mapping = config_data
+                        tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+                        st.session_state.tokens = tokens
+                        st.session_state.form_data = {}
                     break
 
     with col_template2:
         uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
         uploaded_template = st.file_uploader("Upload New Template", type=["pptx", "docx"], label_visibility="collapsed", key=uploader_key)
+        if st.session_state.clear_uploader: st.session_state.clear_uploader = False
         
         if uploaded_template:
             template_bytes = uploaded_template.getvalue()
             st.session_state.template_bytes = template_bytes
             st.session_state.saved_template_name = None
+            st.session_state.template_loaded = True
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
-            st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+            tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+            st.session_state.tokens = tokens
+            st.session_state.form_data = {}
             
-            if st.button("Save Template", use_container_width=True):
-                save_template_to_file(template_bytes, uploaded_template.name)
+            if st.button("Save Template", key="save_template_btn", use_container_width=True):
+                saved_path = save_template_to_file(template_bytes, uploaded_template.name)
                 st.session_state.saved_template_name = uploaded_template.name
                 if st.session_state.custom_mapping:
-                    save_config_to_file(st.session_state.custom_mapping, uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json')
+                    config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                    save_config_to_file(st.session_state.custom_mapping, config_name)
                 st.session_state.save_success = True
+                st.session_state.saved_file_name = uploaded_template.name
                 st.session_state.clear_uploader = True
                 st.rerun()
 
     if st.session_state.save_success:
-        st.success("Template stored successfully!")
+        st.success(f"Template '{st.session_state.saved_file_name}' saved successfully!")
         st.session_state.save_success = False
+        st.session_state.saved_file_name = None
 
     if st.session_state.template_bytes is not None:
-        t_name = st.session_state.saved_template_name or "Unsaved Template"
-        st.markdown(f'<div class="saved-indicator">Active: {t_name} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
+        template_name = st.session_state.saved_template_name or "Unsaved Template"
+        template_type = st.session_state.template_type or "Unknown"
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        is_github = os.path.exists(os.path.join(root_dir, template_name))
+        source_label = " (GitHub)" if is_github else " (Stored)"
+        st.markdown(f'<div class="saved-indicator">Active: {template_name}{source_label} ({template_type.upper()})</div>', unsafe_allow_html=True)
+
     st.markdown('</div>', unsafe_allow_html=True)
 
-    text_data = {}; image_data = {}
+    template_bytes = st.session_state.template_bytes
+    template_type = st.session_state.template_type
+    u_template = None
+    if template_bytes is not None:
+        u_template = type('obj', (object,), {'getvalue': lambda: template_bytes})()
 
-    if st.session_state.template_bytes is not None and st.session_state.tokens:
-        st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
-        
-        # Iterating placeholders matching flat-line structural row designs
-        for token in st.session_state.tokens:
-            clean_label = token.replace("{", "").replace("}", "")
-            current_type = st.session_state.custom_mapping.get(token, "Text")
+    text_data = {}
+    image_data = {}
+    field_types = {}
+
+    if u_template is not None and st.session_state.tokens:
+        tokens = st.session_state.tokens
+        if not tokens:
+            st.info("No placeholders found in the template.")
+        else:
+            st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
             
-            # Form field layout row implementation blocks
-            col_a, col_b = st.columns([3, 1])
+            # Split into two columns for display
+            mid_point = len(tokens) // 2
+            col1, col2 = st.columns(2)
             
-            with col_a:
-                st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
-                form_key = f"form_val_{token}"
-                
-                if current_type == "Image" and st.session_state.template_type == 'pptx':
-                    image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=form_key, label_visibility="collapsed")
-                elif current_type == "Map" and st.session_state.template_type == 'pptx':
-                    saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
-                    if saved_map_img:
-                        image_data[token] = saved_map_img
-                        st.caption("✨ Dynamic high-density close-zoom map attached.")
-                    
-                    if st.button(f"Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
-                        st.session_state.active_map_editor_token = token
-                        st.rerun()
-                else:
-                    # Text data handling utilizing standard persistent layout keys
-                    if form_key not in st.session_state:
-                        st.session_state[form_key] = ""
-                    text_data[token] = st.text_input(clean_label, key=form_key, label_visibility="collapsed")
-            
-            with col_b:
-                st.markdown('<div style="padding-top: 20px;"></div>', unsafe_allow_html=True)
-                data_type = st.selectbox("Type", ["Text", "Image", "Map"], index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0, key=f"type_{token}", label_visibility="collapsed")
-                if data_type != current_type:
-                    st.session_state.custom_mapping[token] = data_type
-                    auto_save_config()
-                    st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+            def render_token_fields(token_list, col_target):
+                with col_target:
+                    for token in token_list:
+                        clean_label = token.replace("{", "").replace("}", "")
+                        current_type = st.session_state.custom_mapping.get(token, "Text")
+                        
+                        # Get the type icon
+                        type_icons = {
+                            "Text": "📝",
+                            "Image": "🖼️",
+                            "Map": "🗺️"
+                        }
+                        current_icon = type_icons.get(current_type, "📝")
+                        
+                        # Use HTML for compact layout with icon-based dropdown
+                        st.markdown(f"""
+                        <div class="placeholder-row">
+                            <span class="placeholder-label">{clean_label}</span>
+                            <div class="placeholder-input">
+                        """, unsafe_allow_html=True)
+                        
+                        # Render the appropriate input
+                        if current_type == "Image" and template_type == 'pptx':
+                            image_data[token] = simple_uploader_row("", ["png", "jpg", "jpeg"], token)
+                            field_types[token] = "Image"
+                        elif current_type == "Map" and template_type == 'pptx':
+                            st.markdown(f'<div class="field-label">{clean_label} (Map Mode)</div>', unsafe_allow_html=True)
+                            saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
+                            if saved_map_img:
+                                image_data[token] = saved_map_img
+                                st.caption("Map snapshot attached.")
+                            
+                            # Save form data before opening map editor
+                            if st.button("🗺️ Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
+                                save_form_data()
+                                st.session_state.active_map_editor_token = token
+                                st.rerun()
+                            field_types[token] = "Image"
+                        else:
+                            if current_type in ["Image", "Map"] and template_type != 'pptx':
+                                st.warning("Media and Map uploads are only supported in PPTX files.")
+                            input_key = f"val_{token}"
+                            text_data[token] = st.text_input("", key=input_key, label_visibility="collapsed", placeholder=clean_label)
+                            field_types[token] = "Text"
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        
+                        # Type dropdown as compact select with icon
+                        st.markdown(f"""
+                            <div class="type-dropdown-compact">
+                        """, unsafe_allow_html=True)
+                        data_type = st.selectbox(
+                            "", 
+                            ["Text", "Image", "Map"], 
+                            index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
+                            key=f"type_{token}", 
+                            label_visibility="collapsed"
+                        )
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        
+                        if data_type != current_type:
+                            st.session_state.custom_mapping[token] = data_type
+                            auto_save_config()
+                            st.rerun()
+
+            render_token_fields(tokens[:mid_point], col1)
+            render_token_fields(tokens[mid_point:], col2)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # --- DOWNLOAD SECTION ---
-    if st.session_state.template_bytes is not None:
+    if u_template is not None:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
+        
+        template_name = st.session_state.saved_template_name or "Generated_Document"
+        base_template_name = re.sub(r'\.(pptx|docx)$', '', template_name)
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.session_state.template_type != 'pptx':
+            if template_type != 'pptx':
                 st.button("Download PPTX", disabled=True, use_container_width=True)
             else:
                 try:
-                    pptx_data = generate_pptx_bytes(st.session_state.template_bytes, text_data, image_data)
-                    st.download_button(label="Download PPTX", data=pptx_data, file_name=get_download_filename(st.session_state.saved_template_name, "pptx"), mime="application/vnd.openxmlformats-officedocument.presentationml.presentation", use_container_width=True)
-                except Exception as e: st.error(f"Error: {str(e)}")
+                    pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
+                    st.download_button(
+                        label="Download PPTX", data=pptx_data,
+                        file_name=get_download_filename(base_template_name, "pptx"),
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        use_container_width=True, key="download_pptx"
+                    )
+                except Exception as e:
+                    st.error(f"Error generating PPTX: {str(e)}")
                     
         with col2:
-            if st.session_state.template_type != 'docx':
+            if template_type != 'docx':
                 st.button("Download DOCX", disabled=True, use_container_width=True)
             else:
                 try:
-                    docx_data = generate_docx_bytes(st.session_state.template_bytes, text_data, image_data)
-                    st.download_button(label="Download DOCX", data=docx_data, file_name=get_download_filename(st.session_state.saved_template_name, "docx"), mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
-                except Exception as e: st.error(f"Error: {str(e)}")
+                    docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
+                    if docx_data:
+                        st.download_button(
+                            label="Download DOCX", data=docx_data,
+                            file_name=get_download_filename(base_template_name, "docx"),
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True, key="download_docx"
+                        )
+                except Exception as e:
+                    st.error(f"Error generating document: {str(e)}")
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("Please upload or select a template to begin")
