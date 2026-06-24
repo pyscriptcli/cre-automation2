@@ -128,6 +128,29 @@ MINIMAL_CRE_SYSTEM = """
 </style>
 """
 
+
+# === TEMPLATE EXPORT TOOL ===
+# I-add ito sa baba ng file, before ng st.caption()
+
+if st.sidebar.button("📤 Export All Templates", use_container_width=True):
+    saved = get_saved_templates()
+    if saved:
+        for t in saved:
+            data = load_template_from_file(t['name'])
+            if data:
+                ext = 'pptx' if t['name'].endswith('.pptx') else 'docx'
+                mime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation' if ext == 'pptx' else 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                st.download_button(
+                    label=f"💾 {t['name']}",
+                    data=data,
+                    file_name=t['name'],
+                    mime=mime,
+                    key=f"export_{t['name']}"
+                )
+    else:
+        st.warning("No templates found")
+
+
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
     storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
