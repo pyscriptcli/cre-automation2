@@ -391,40 +391,37 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    st.markdown('<div class="map-controls-row">', unsafe_allow_html=True)
-    st.markdown('<div class="map-control-item" style="flex: 0 0 auto;">', unsafe_allow_html=True)
-    export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # --- SINGLE HORIZONTALLY COMPRESSED CONTROLS ROW ---
+    c_btn, c_style, c_color, c_lbl, c_min, c_val, c_pls = st.columns([1.6, 2.0, 0.5, 0.4, 0.3, 0.4, 0.3])
     
-    st.markdown('<div class="map-control-item" style="flex: 1;">', unsafe_allow_html=True)
-    basemap_style = st.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key, label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="map-control-item" style="flex: 0 0 auto;">', unsafe_allow_html=True)
-    pin_color = st.color_picker("Pin Color", key=color_key, label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="map-control-item" style="flex: 0 0 auto;">', unsafe_allow_html=True)
-    st.markdown('<label>Size</label>', unsafe_allow_html=True)
-    st.markdown('<div class="size-control">', unsafe_allow_html=True)
-    
-    col_minus, col_size, col_plus = st.columns([1, 1, 1])
-    with col_minus:
+    with c_btn:
+        export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}")
+        
+    with c_style:
+        basemap_style = st.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key, label_visibility="collapsed")
+        
+    with c_color:
+        pin_color = st.color_picker("Pin Color", key=color_key, label_visibility="collapsed")
+        
+    with c_lbl:
+        st.markdown('<div style="font-size: 13px; font-weight: 600; line-height: 32px; text-align: right; color: #1A1A1A;">Size</div>', unsafe_allow_html=True)
+        
+    with c_min:
         if st.button("-", key=f"size_minus_{token_key}"):
             if st.session_state[size_key] > 16:
                 st.session_state[size_key] -= 2
                 st.rerun()
-    with col_size:
-        st.markdown(f'<span>{st.session_state[size_key]}</span>', unsafe_allow_html=True)
-    with col_plus:
+                
+    with c_val:
+        st.markdown(f'<div style="font-size: 14px; font-weight: 600; line-height: 32px; text-align: center; color: #1A1A1A;">{st.session_state[size_key]}</div>', unsafe_allow_html=True)
+        
+    with c_pls:
         if st.button("+", key=f"size_plus_{token_key}"):
             if st.session_state[size_key] < 64:
                 st.session_state[size_key] += 2
                 st.rerun()
     
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
     
     coord_input = st.text_input("Coordinates (Lat, Lon)", key=coord_key)
     try:
@@ -482,7 +479,6 @@ def render_isolated_map_editor():
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
             
-            # Flush textual elements and map state references out to localized persistent storage
             if st.session_state.temp_form_data:
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
