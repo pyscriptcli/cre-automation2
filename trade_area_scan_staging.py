@@ -1219,12 +1219,12 @@ st.markdown("""
     </script>
 """, unsafe_allow_html=True)
 
-# Hidden inputs for Streamlit state
-st.text_input("", key="sidebar_state_input", label_visibility="collapsed", placeholder="sidebar_state")
-st.text_input("", key="marker_color_input", label_visibility="collapsed", placeholder="marker_color")
-st.text_input("", key="marker_style_input", label_visibility="collapsed", placeholder="marker_style")
-st.text_input("", key="labels_input", label_visibility="collapsed", placeholder="labels")
-st.text_input("", key="basemap_input", label_visibility="collapsed", placeholder="basemap")
+# Hidden inputs for Streamlit state - using st.text_input with labels
+st.text_input("Sidebar State", key="sidebar_state_input", label_visibility="collapsed", placeholder="sidebar_state")
+st.text_input("Marker Color", key="marker_color_input", label_visibility="collapsed", placeholder="marker_color")
+st.text_input("Marker Style", key="marker_style_input", label_visibility="collapsed", placeholder="marker_style")
+st.text_input("Labels", key="labels_input", label_visibility="collapsed", placeholder="labels")
+st.text_input("Basemap", key="basemap_input", label_visibility="collapsed", placeholder="basemap")
 
 # Update state from hidden inputs
 if st.session_state.get('sidebar_state_input') == "collapsed":
@@ -1254,9 +1254,9 @@ coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.
 lat_coord, lon_coord = (float(coord_match.group(1)), float(coord_match.group(2))) if coord_match else (14.64650, 121.05804)
 radius_val = st.session_state.geo_radius
 
-# Handle search from UI
-search_query = st.text_input("", key="search_bar_input", label_visibility="collapsed", placeholder="Search establishments...")
-search_clicked = st.button("SEARCH", key="search_btn", label_visibility="collapsed")
+# Handle search from UI - using proper labels
+search_query = st.text_input("Search", key="search_bar_input", label_visibility="collapsed", placeholder="Search establishments...", max_chars=SearchGuardrails.MAX_QUERY_LENGTH)
+search_clicked = st.button("SEARCH", key="search_btn", use_container_width=False)
 
 if search_clicked and search_query.strip():
     st.session_state.last_search_query = search_query
@@ -1272,6 +1272,13 @@ if search_clicked and search_query.strip():
             st.session_state.search_cooldown_until = time.time() + SearchGuardrails.COOLDOWN_SECONDS
             st.session_state.scan_active_loading = True
             st.rerun()
+
+# Clear button handler - use a different approach
+if st.button("✕", key="clear_search_btn", use_container_width=False):
+    # Use st.session_state with proper widget key
+    st.session_state.search_bar_input = ""
+    st.session_state.last_search_query = ""
+    st.rerun()
 
 # -----------------------------------------------------------------------------
 # 8. PIPELINE RUNTIME EVALUATION LOOP
@@ -1328,8 +1335,8 @@ layer_meta_json = json.dumps(st.session_state.layer_meta)
 geojson_str = json.dumps(st.session_state.scanned_records)
 is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
 
-# Build log content for sidebar
-log_entries = "".join([f'<div class="log-entry"><span class="log-time">[{l["time"]}]</span> <span class="log-{l["level"].lower()}">{l["message"]}</span></div>' for l in st.session_state.api_logs[-15:]])
+# Use the marker_color from session state
+marker_color = st.session_state.marker_color
 
 leaflet_template = """
 <!DOCTYPE html>
@@ -1477,9 +1484,10 @@ leaflet_html = (leaflet_template
                 .replace("__LABELS_ACTIVE__", "true" if st.session_state.show_labels else "false")
                 .replace("__LABEL_SIZE__", str(st.session_state.label_size))
                 .replace("__MARKER_STYLE__", st.session_state.marker_style)
-                .replace("__MARKER_COLOR__", st.session_state.marker_color))
+                .replace("__MARKER_COLOR__", marker_color))
 
-st.components.v1.html(leaflet_html, height=900, scrolling=False)
+# Use st.iframe instead of st.components.v1.html (deprecated)
+st.iframe(leaflet_html, height=900, scrolling=False)
 
 # Update sidebar via Streamlit (workspace content)
 # This runs after the HTML is rendered
@@ -1493,8 +1501,8 @@ if st.session_state.scanned_records:
     workspace_html = ""
     for rec_type, items in grouped.items():
         if rec_type not in st.session_state.layer_meta:
-            st.session_state.layer_meta[rec_type] = {"color": st.session_state.marker_color, "style": st.session_state.marker_style, "size": 12}
-        current_color = st.session_state.layer_meta[rec_type].get('color', st.session_state.marker_color)
+            st.session_state.layer_meta[rec_type] = {"color": marker_color, "style": st.session_state.marker_style, "size": 12}
+        current_color = st.session_state.layer_meta[rec_type].get('color', marker_color)
         
         workspace_html += f'''
             <div class="workspace-layer">
