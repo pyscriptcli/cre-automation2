@@ -304,7 +304,7 @@ def render_isolated_map_editor():
     # Initialize all keys with Manila coordinates
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
-    if color_key not in st.session_state: st.session_state[color_key] = "#0033A0"  # Blue
+    if color_key not in st.session_state: st.session_state[color_key] = "#003366"  # Blue
     if size_key not in st.session_state: st.session_state[size_key] = 32
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
