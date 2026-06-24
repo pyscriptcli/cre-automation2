@@ -228,11 +228,15 @@ st.markdown("""
             const isCollapsed = container.classList.contains('sidebar-collapsed');
             btn.textContent = isCollapsed ? 'Open Panel' : 'Close Panel';
             
-            // FIX: Targeted using the placeholder attribute since custom keys do not write structural IDs directly to input tags
+            // Find the active hidden text widget inside the web view DOM space
             const hiddenInput = document.querySelector('input[placeholder="sidebar_state"]');
             if (hiddenInput) {
                 hiddenInput.value = isCollapsed ? 'collapsed' : 'expanded';
-                hiddenInput.dispatchEvent(new Event('change'));
+                
+                // FIX: Dispatch both 'input' and 'change' events with proper bubbling parameters 
+                // to force Streamlit's background network architecture to catch and sync the state change
+                hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+                hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
             }
         }
     </script>
