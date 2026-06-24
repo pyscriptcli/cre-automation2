@@ -407,7 +407,8 @@ def render_isolated_map_editor():
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
-    if size_key not in st.session_state: st.session_state[size_key] = 32
+    # FIXED: Default pin size baseline updated to 24
+    if size_key not in st.session_state: st.session_state[size_key] = 24
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
@@ -465,7 +466,7 @@ def render_isolated_map_editor():
                 n, s = plat + 0.005, plat - 0.005
                 e, w = plon + 0.005, plon - 0.005
             
-            # Explicitly route parameters to fix the disappearing placeholder canvas bug
+            # Explicit dynamic parameters routing into the generator engine
             map_img_bytes = generate_static_map_bounds(
                 n=n, s=s, e=e, w=w, 
                 pin_lat=plat, pin_lon=plon, 
