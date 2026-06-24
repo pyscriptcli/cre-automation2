@@ -148,7 +148,6 @@ def auto_save_config():
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
-    """Calculates deep zoom levels to generate crisp print-quality document assets."""
     target_width_tiles = 10
     lon_span = e - w
     if lon_span <= 0: lon_span = 0.001
@@ -217,13 +216,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # STAMP VECTOR PIN
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
-    # CRITICAL FIX: The canvas scale factor ensures the pin visually scales up for ultra-high-resolution canvases
     canvas_scale_factor = max(right - left, bottom - top) / 800.0
     scale = (pin_size / 32.0) * canvas_scale_factor * 1.5
     w_px = 16 * scale
@@ -263,7 +260,7 @@ def render_isolated_map_editor():
     size_key = f"map_size_{token_key}"
     dragged_key = f"map_dragged_{token_key}"
     
-    # Safe Bridge State - Prevent Streamlit Exception Loops
+    # Safe Bridge State: Applies changes BEFORE the text_input widget renders
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
@@ -273,7 +270,6 @@ def render_isolated_map_editor():
     if color_key not in st.session_state: st.session_state[color_key] = "#DC3545"
     if size_key not in st.session_state: st.session_state[size_key] = 32
 
-    # Direct Native Widgets -> Reflect changes immediately without needing an Update button
     c1, c2, c3, c4 = st.columns([1.5, 2, 1, 2])
     basemap_style = c1.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
     coord_input = c2.text_input("Coordinates (Lat, Lon)", key=coord_key)
@@ -293,7 +289,7 @@ def render_isolated_map_editor():
     }
     attr_dict = {
         "OSM": "OpenStreetMap",
-        "Carto Light": "&copy; CartoDB",
+        "Carto Light": "CartoDB",
         "Satellite": "Google Maps",
         "Hybrid": "Google Maps (Clean Streets)"
     }
@@ -322,7 +318,7 @@ def render_isolated_map_editor():
     )
     draw.add_to(m)
     
-    st.info("Use the Rectangle tool (Square Icon) to frame your export area. Drag the pin to move it.")
+    st.info("Use the Rectangle tool to frame your export area. Drag the pin to move it. The map will not flash while adjusting settings.")
     
     map_data = st_folium(
         m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}",
@@ -363,6 +359,8 @@ def render_isolated_map_editor():
             )
             
             st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
+            
+            # The Fix: Safe buffer setting instead of modifying the active widget key
             st.session_state[dragged_key] = f"{export_lat}, {export_lon}"
             
             st.session_state.active_map_editor_token = None
@@ -372,7 +370,7 @@ def render_isolated_map_editor():
     if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
         moved = map_data["last_marker_moved"]
         mlat, mlon = round(moved["lat"], 5), round(moved["lng"], 5)
-        if f"{mlat}, {mlon}" != st.session_state[coord_key]:
+        if f"{mlat}, {mlon}" != st.session_state.get(coord_key, ""):
             st.session_state[dragged_key] = f"{mlat}, {mlon}"
             st.rerun()
 
