@@ -625,8 +625,15 @@ def save_form_data_to_session():
         form_data = {}
         for token in st.session_state.tokens:
             key = f"val_{token}"
+            current_type = st.session_state.custom_mapping.get(token, "Text")
+            
+            # File uploaders shouldn't have raw bytes serialized to the config file
+            if current_type == "Image":
+                continue
+                
             if key in st.session_state:
                 form_data[token] = st.session_state[key]
+                
         st.session_state.temp_form_data = form_data
         
         # Flush directly to localized temp file configuration automatically on input changes
@@ -646,6 +653,12 @@ def restore_form_data_from_session():
 
     if st.session_state.temp_form_data:
         for token, value in st.session_state.temp_form_data.items():
+            current_type = st.session_state.custom_mapping.get(token, "Text")
+            
+            # CRITICAL FIX: Skip injecting values into st.session_state for widgets where it's not allowed
+            if current_type == "Image":
+                continue
+                
             st.session_state[f"val_{token}"] = value
         return True
     return False
