@@ -407,7 +407,7 @@ def render_isolated_map_editor():
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
     # FIXED: Initial baseline size updated to 16
-    if size_key not in st.session_state: st.session_state[size_key] = 16
+    if size_key not in st.session_state: st.session_state[size_key] = 32
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
