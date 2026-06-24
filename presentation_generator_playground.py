@@ -129,26 +129,34 @@ MINIMAL_CRE_SYSTEM = """
 """
 
 
-# === TEMPLATE EXPORT TOOL ===
-# I-add ito sa baba ng file, before ng st.caption()
+# === ONE-TIME TEMPLATE EXPORT FUNCTION ===
+# Idagdag ito para ma-download ang lahat ng templates
+# Pwede mong tawagin sa sidebar or sa main area
 
-if st.sidebar.button("📤 Export All Templates", use_container_width=True):
+def export_all_templates_simple():
+    """Simple function to download all templates"""
     saved = get_saved_templates()
     if saved:
+        st.markdown("---")
+        st.markdown("### 📥 Export All Templates")
+        
+        # Option 1: Download one by one
         for t in saved:
             data = load_template_from_file(t['name'])
             if data:
-                ext = 'pptx' if t['name'].endswith('.pptx') else 'docx'
-                mime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation' if ext == 'pptx' else 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                 st.download_button(
-                    label=f"💾 {t['name']}",
+                    label=f"Download {t['name']}",
                     data=data,
                     file_name=t['name'],
-                    mime=mime,
-                    key=f"export_{t['name']}"
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation" if t['name'].endswith('.pptx') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key=f"exp_{t['name']}"
                 )
     else:
-        st.warning("No templates found")
+        st.info("No templates saved yet")
+
+# Ilagay ito sa sidebar or main area:
+# with st.sidebar:
+#     export_all_templates_simple()
 
 
 # --- FILE MANAGEMENT FUNCTIONS ---
