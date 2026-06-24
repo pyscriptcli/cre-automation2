@@ -9,13 +9,9 @@ from datetime import datetime
 from docx import Document
 import folium
 from streamlit_folium import folium_static
-import tempfile
-import time
-import base64
 import requests
-import math
+import base64
 from github import Github, GithubException
-from github import Auth
 
 # --- GITHUB CONFIG ---
 GITHUB_REPO = "openflux_templates"
@@ -146,28 +142,40 @@ MINIMAL_CRE_SYSTEM = """
         border-left: 3px solid #C62828;
     }
     
+    .cta-preview {
+        background-color: #F8F9FA;
+        padding: 8px 12px;
+        border-radius: 4px;
+        border-left: 3px solid #003366;
+        font-size: 13px;
+        margin: 4px 0;
+        font-family: monospace;
+    }
+    .cta-preset-card {
+        background-color: #FFFFFF;
+        border: 1px solid #E0E0E0;
+        border-radius: 4px;
+        padding: 12px;
+        margin-bottom: 8px;
+    }
+    .cta-preset-card .cta-name {
+        font-weight: 700;
+        color: #003366;
+    }
+    .cta-preset-card .cta-detail {
+        font-size: 12px;
+        color: #666;
+    }
+    
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
 </style>
 """
 
 # --- GITHUB FUNCTIONS ---
 def get_github_token():
-    """Get GitHub token from Streamlit secrets or environment"""
-    try:
-        # Try Streamlit secrets
-        token = st.secrets["github"]["token"]
-        if token:
-            return token
-    except:
-        pass
-    
-    # Try environment variable
-    token = os.environ.get("GITHUB_TOKEN")
-    if token:
-        return token
-    
-    st.warning("⚠️ GitHub token not found. Please set GITHUB_TOKEN in Streamlit secrets.")
-    return None
+    """Get GitHub token - HARDCODED FOR TESTING"""
+    # WARNING: Remove this after testing!
+    return "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"
 
 def get_github_repo():
     """Get GitHub repository object"""
@@ -177,7 +185,9 @@ def get_github_repo():
     
     try:
         g = Github(token)
-        # Try to get the repository
+        user = g.get_user()
+        user.login
+        
         try:
             repo = g.get_user().get_repo(GITHUB_REPO)
             return repo
@@ -187,8 +197,11 @@ def get_github_repo():
             else:
                 st.error(f"❌ GitHub error: {e}")
             return None
+    except GithubException as e:
+        st.error(f"❌ Authentication failed. Check your token: {e}")
+        return None
     except Exception as e:
-        st.error(f"❌ Error connecting to GitHub: {e}")
+        st.error(f"❌ Error: {e}")
         return None
 
 def list_github_templates():
@@ -225,10 +238,8 @@ def upload_to_github(file_bytes, filename):
         if not repo:
             return False
         
-        # Check if file exists
         try:
             contents = repo.get_contents(filename, ref=GITHUB_BRANCH)
-            # Update existing file
             repo.update_file(
                 path=filename,
                 message=f"Update template: {filename}",
@@ -238,7 +249,6 @@ def upload_to_github(file_bytes, filename):
             )
             return True
         except GithubException:
-            # File doesn't exist, create new
             repo.create_file(
                 path=filename,
                 message=f"Add template: {filename}",
@@ -331,13 +341,11 @@ def download_config_from_github(template_name):
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
-    """Get local storage directory"""
     storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
     os.makedirs(storage_dir, exist_ok=True)
     return storage_dir
 
 def save_template_local(template_bytes, template_name):
-    """Save template locally"""
     storage_dir = get_storage_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
     if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
@@ -348,7 +356,6 @@ def save_template_local(template_bytes, template_name):
     return filepath
 
 def load_template_local(template_name):
-    """Load template from local storage"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -357,7 +364,6 @@ def load_template_local(template_name):
     return None
 
 def delete_template_local(template_name):
-    """Delete template from local storage"""
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -365,10 +371,8 @@ def delete_template_local(template_name):
     return True
 
 def get_all_templates():
-    """Get templates from both local and GitHub"""
     templates = []
     
-    # Get local templates
     storage_dir = get_storage_dir()
     if os.path.exists(storage_dir):
         for file in os.listdir(storage_dir):
@@ -379,20 +383,101 @@ def get_all_templates():
                     'source': 'local'
                 })
     
-    # Get GitHub templates
     github_templates = list_github_templates()
     for t in github_templates:
-        # Check if already in list
         if not any(x['name'] == t['name'] for x in templates):
             templates.append(t)
     
     return templates
 
 def delete_template(template_name):
-    """Delete template from both local and GitHub"""
     delete_template_local(template_name)
     delete_from_github(template_name)
     return True
+
+# --- CTA PRESET MANAGER FUNCTIONS ---
+def load_cta_presets():
+    """Load CTA presets from JSON file"""
+    storage_dir = get_storage_dir()
+    presets_file = os.path.join(storage_dir, "cta_presets.json")
+    
+    if os.path.exists(presets_file):
+        try:
+            with open(presets_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_cta_presets(presets):
+    """Save CTA presets to JSON file"""
+    storage_dir = get_storage_dir()
+    presets_file = os.path.join(storage_dir, "cta_presets.json")
+    
+    with open(presets_file, 'w', encoding='utf-8') as f:
+        json.dump(presets, f, indent=4)
+    
+    # Also upload to GitHub
+    try:
+        config_json = json.dumps(presets, indent=4).encode('utf-8')
+        repo = get_github_repo()
+        if repo:
+            try:
+                contents = repo.get_contents("cta_presets.json", ref=GITHUB_BRANCH)
+                repo.update_file(
+                    path="cta_presets.json",
+                    message="Update CTA presets",
+                    content=base64.b64encode(config_json).decode('utf-8'),
+                    sha=contents.sha,
+                    branch=GITHUB_BRANCH
+                )
+            except:
+                repo.create_file(
+                    path="cta_presets.json",
+                    message="Add CTA presets",
+                    content=base64.b64encode(config_json).decode('utf-8'),
+                    branch=GITHUB_BRANCH
+                )
+    except:
+        pass
+
+def format_cta_list(cta_list):
+    """Format a list of CTAs into a readable string"""
+    if not cta_list:
+        return ""
+    
+    formatted = []
+    for cta in cta_list:
+        parts = [cta['name']]
+        if cta.get('phone'):
+            parts.append(f"({cta['phone']})")
+        if cta.get('email'):
+            parts.append(cta['email'])
+        formatted.append(" ".join(parts))
+    
+    return ", ".join(formatted)
+
+def format_cta_with_company(cta_list):
+    """Format CTAs with company information"""
+    if not cta_list:
+        return ""
+    
+    formatted = []
+    for cta in cta_list:
+        parts = [cta['name']]
+        if cta.get('company'):
+            parts.append(f"- {cta['company']}")
+        if cta.get('phone'):
+            parts.append(f"({cta['phone']})")
+        if cta.get('email'):
+            parts.append(cta['email'])
+        formatted.append(" ".join(parts))
+    
+    return "\n".join(formatted) if len(cta_list) > 1 else " ".join(formatted)
+
+def get_cta_token_names():
+    """Get list of placeholder names that should use CTA selector"""
+    return ['cta', 'contact', 'contacts', 'contact_person', 'point_of_contact']
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -579,8 +664,6 @@ def get_basemap_tiles(basemap):
     return basemaps.get(basemap, basemaps['satellite'])
 
 def capture_map(lat, lng, basemap='satellite', zoom=15):
-    """Try to capture map using multiple methods"""
-    # Method 1: Google Static API
     try:
         url = f"https://maps.googleapis.com/maps/api/staticmap?center={lat},{lng}&zoom={zoom}&size=800x600&maptype=satellite&markers=color:red%7C{lat},{lng}&key=AIzaSyA5oEohxJ-jB5WBR6pR3D8VtaY8X2CkT-8"
         response = requests.get(url, timeout=10)
@@ -593,7 +676,6 @@ def capture_map(lat, lng, basemap='satellite', zoom=15):
     except:
         pass
     
-    # Method 2: OSM Static
     try:
         url = f"https://staticmap.openstreetmap.de/staticmap.php?center={lat},{lng}&zoom={zoom}&size=800x600&maptype=mapnik&markers={lat},{lng},red-pin"
         response = requests.get(url, timeout=10)
@@ -606,7 +688,6 @@ def capture_map(lat, lng, basemap='satellite', zoom=15):
     except:
         pass
     
-    # Fallback: placeholder
     img = Image.new('RGB', (800, 600), color='#F0F4F8')
     from PIL import ImageDraw
     draw = ImageDraw.Draw(img)
@@ -623,7 +704,6 @@ def parse_coordinates(coord_string):
     return None, None
 
 def map_input_component(token, label, default_lat=14.5995, default_lng=120.9842):
-    """Map input component"""
     map_key = f"map_{token}"
     
     if map_key not in st.session_state:
@@ -723,6 +803,183 @@ def map_input_component(token, label, default_lat=14.5995, default_lng=120.9842)
         return st.session_state[map_key]["screenshot"]
     return None
 
+# --- CTA PRESET MANAGER UI COMPONENT ---
+def cta_preset_manager():
+    """Display and manage CTA presets"""
+    
+    # Initialize session state for CTA presets
+    if "cta_presets" not in st.session_state:
+        st.session_state.cta_presets = load_cta_presets()
+    
+    if "editing_cta" not in st.session_state:
+        st.session_state.editing_cta = None
+    
+    with st.expander("📋 CTA Preset Manager", expanded=False):
+        st.markdown('<div class="map-editor-header">Manage your CTA presets for quick insertion</div>', unsafe_allow_html=True)
+        
+        # --- Add/Edit Form ---
+        st.markdown("#### Add New CTA Preset")
+        
+        col_name, col_phone, col_email, col_company = st.columns([2, 2, 2, 2])
+        
+        with col_name:
+            cta_name = st.text_input("Name", key="cta_name_input", placeholder="e.g., Sondi Tuazon")
+        with col_phone:
+            cta_phone = st.text_input("Phone", key="cta_phone_input", placeholder="e.g., 0917 843 6128")
+        with col_email:
+            cta_email = st.text_input("Email", key="cta_email_input", placeholder="e.g., sondi@company.com")
+        with col_company:
+            cta_company = st.text_input("Company/Title", key="cta_company_input", placeholder="e.g., Prime Philippines")
+        
+        col_add, col_clear = st.columns([1, 1])
+        with col_add:
+            if st.button("➕ Add Preset", key="add_cta_btn", use_container_width=True):
+                if cta_name.strip():
+                    new_preset = {
+                        "name": cta_name.strip(),
+                        "phone": cta_phone.strip(),
+                        "email": cta_email.strip(),
+                        "company": cta_company.strip()
+                    }
+                    st.session_state.cta_presets.append(new_preset)
+                    st.session_state.cta_presets.sort(key=lambda x: x['name'].lower())
+                    save_cta_presets(st.session_state.cta_presets)
+                    st.success(f"✅ Added: {cta_name}")
+                    st.rerun()
+                else:
+                    st.warning("Name is required")
+        
+        with col_clear:
+            if st.button("🗑️ Clear Fields", key="clear_cta_fields", use_container_width=True):
+                for key in ["cta_name_input", "cta_phone_input", "cta_email_input", "cta_company_input"]:
+                    st.session_state[key] = ""
+                st.rerun()
+        
+        st.markdown("---")
+        
+        # --- Display Existing Presets ---
+        st.markdown("#### Existing Presets")
+        
+        if not st.session_state.cta_presets:
+            st.info("No CTA presets yet. Add one above.")
+        else:
+            for idx, preset in enumerate(st.session_state.cta_presets):
+                col_display, col_actions = st.columns([3, 1])
+                
+                with col_display:
+                    st.markdown(f"""
+                    <div class="cta-preset-card">
+                        <div class="cta-name">{preset['name']}</div>
+                        <div class="cta-detail">
+                            {preset.get('phone', '')}
+                            {f" • {preset.get('email', '')}" if preset.get('email') else ''}
+                            {f" • {preset.get('company', '')}" if preset.get('company') else ''}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_actions:
+                    col_edit, col_delete = st.columns([1, 1])
+                    with col_edit:
+                        if st.button("✏️", key=f"edit_cta_{idx}", help="Edit this preset"):
+                            st.session_state.editing_cta = idx
+                            st.session_state.cta_name_input = preset['name']
+                            st.session_state.cta_phone_input = preset.get('phone', '')
+                            st.session_state.cta_email_input = preset.get('email', '')
+                            st.session_state.cta_company_input = preset.get('company', '')
+                            st.rerun()
+                    
+                    with col_delete:
+                        if st.button("🗑️", key=f"delete_cta_{idx}", help="Delete this preset"):
+                            if st.session_state.cta_presets:
+                                del st.session_state.cta_presets[idx]
+                                save_cta_presets(st.session_state.cta_presets)
+                                st.rerun()
+        
+        # --- Edit Mode ---
+        if st.session_state.editing_cta is not None:
+            st.markdown("---")
+            st.markdown("#### Edit CTA Preset")
+            idx = st.session_state.editing_cta
+            
+            col_edit_name, col_edit_phone, col_edit_email, col_edit_company = st.columns([2, 2, 2, 2])
+            
+            with col_edit_name:
+                edit_name = st.text_input("Name", value=st.session_state.cta_name_input, key="edit_cta_name")
+            with col_edit_phone:
+                edit_phone = st.text_input("Phone", value=st.session_state.cta_phone_input, key="edit_cta_phone")
+            with col_edit_email:
+                edit_email = st.text_input("Email", value=st.session_state.cta_email_input, key="edit_cta_email")
+            with col_edit_company:
+                edit_company = st.text_input("Company/Title", value=st.session_state.cta_company_input, key="edit_cta_company")
+            
+            col_update, col_cancel = st.columns([1, 1])
+            with col_update:
+                if st.button("💾 Update Preset", key="update_cta_btn", use_container_width=True):
+                    if edit_name.strip():
+                        st.session_state.cta_presets[idx] = {
+                            "name": edit_name.strip(),
+                            "phone": edit_phone.strip(),
+                            "email": edit_email.strip(),
+                            "company": edit_company.strip()
+                        }
+                        st.session_state.cta_presets.sort(key=lambda x: x['name'].lower())
+                        save_cta_presets(st.session_state.cta_presets)
+                        st.session_state.editing_cta = None
+                        for key in ["cta_name_input", "cta_phone_input", "cta_email_input", "cta_company_input"]:
+                            st.session_state[key] = ""
+                        st.success("✅ Preset updated")
+                        st.rerun()
+                    else:
+                        st.warning("Name is required")
+            
+            with col_cancel:
+                if st.button("❌ Cancel Edit", key="cancel_edit_cta", use_container_width=True):
+                    st.session_state.editing_cta = None
+                    for key in ["cta_name_input", "cta_phone_input", "cta_email_input", "cta_company_input"]:
+                        st.session_state[key] = ""
+                    st.rerun()
+
+def get_cta_placeholder_value(token, clean_label):
+    """Get the value for a CTA placeholder"""
+    cta_token = f"cta_{token}"
+    
+    if cta_token not in st.session_state:
+        st.session_state[cta_token] = []
+    
+    # Get all preset names
+    preset_names = [p['name'] for p in st.session_state.cta_presets]
+    
+    if not preset_names:
+        st.info(f"No CTA presets available. Add some in the CTA Preset Manager.")
+        return ""
+    
+    # Multi-select for CTAs
+    selected = st.multiselect(
+        f"Select CTAs for {clean_label}",
+        options=preset_names,
+        default=st.session_state[cta_token],
+        key=f"cta_select_{token}",
+        help="Select one or more CTAs to insert"
+    )
+    
+    st.session_state[cta_token] = selected
+    
+    if not selected:
+        return ""
+    
+    # Get the selected preset objects
+    selected_presets = [p for p in st.session_state.cta_presets if p['name'] in selected]
+    
+    # Show preview
+    if selected_presets:
+        st.markdown("**Preview:**")
+        preview_text = format_cta_with_company(selected_presets)
+        st.markdown(f'<div class="cta-preview">{preview_text}</div>', unsafe_allow_html=True)
+    
+    # Return formatted string for document insertion
+    return format_cta_with_company(selected_presets)
+
 # --- MAIN APP ---
 st.set_page_config(page_title="OpenFlux - Template Automation", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -756,6 +1013,10 @@ if "map_data" not in st.session_state:
     st.session_state.map_data = {}
 if "github_connected" not in st.session_state:
     st.session_state.github_connected = None
+if "cta_presets" not in st.session_state:
+    st.session_state.cta_presets = load_cta_presets()
+if "editing_cta" not in st.session_state:
+    st.session_state.editing_cta = None
 
 # Check GitHub connection
 if st.session_state.github_connected is None:
@@ -782,7 +1043,9 @@ with col_status:
         st.markdown('<div class="github-status success">✅ Connected to GitHub</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="github-status error">❌ Not connected to GitHub</div>', unsafe_allow_html=True)
-        st.caption("Please set GITHUB_TOKEN in .streamlit/secrets.toml")
+
+# --- CTA PRESET MANAGER ---
+cta_preset_manager()
 
 # --- TEMPLATE MANAGEMENT ---
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
@@ -805,12 +1068,10 @@ with col_template1:
     )
     
     if selected_template and selected_template != "Select a template":
-        # Extract name
         name_parts = selected_template.split(' (')
         template_name = name_parts[0]
         is_github = "(GitHub)" in selected_template
         
-        # Load template
         if is_github:
             template_bytes = download_from_github(template_name)
         else:
@@ -822,19 +1083,16 @@ with col_template1:
             st.session_state.template_loaded = True
             st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
             
-            # Load config if exists
             config = download_config_from_github(template_name)
             if config:
                 st.session_state.custom_mapping = config
             else:
                 st.session_state.custom_mapping = {}
             
-            # Extract placeholders
             tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.tokens = tokens
             st.success(f"✅ Loaded: {template_name}")
     
-    # Delete option
     if selected_template and selected_template != "Select a template":
         template_name = selected_template.split(' (')[0]
         if st.button("🗑️ Delete Template", key="delete_btn", use_container_width=True):
@@ -881,11 +1139,8 @@ with col_template2:
         st.session_state.custom_mapping = {}
         
         if st.button("💾 Save to GitHub", key="save_github_btn", use_container_width=True):
-            # Save locally
             save_template_local(template_bytes, template_name)
-            # Upload to GitHub
             if upload_to_github(template_bytes, template_name):
-                # Upload config
                 if st.session_state.custom_mapping:
                     upload_config_to_github(st.session_state.custom_mapping, template_name)
                 st.session_state.saved_template_name = template_name
@@ -924,28 +1179,39 @@ if template_bytes and st.session_state.tokens:
     mid = len(tokens) // 2
     col1, col2 = st.columns(2)
     
+    cta_tokens = get_cta_token_names()
+    
     for idx, token in enumerate(tokens):
-        clean_label = token.replace("{", "").replace("}", "")
+        clean_label = token.replace("{", "").replace("}", "").strip()
         current_type = st.session_state.custom_mapping.get(token, "Text")
+        
+        # Check if this is a CTA token
+        is_cta = any(cta_token in clean_label.lower() for cta_token in cta_tokens) or clean_label.lower() in cta_tokens
         
         col_a, col_b = st.columns([3, 1])
         
         with col_b:
-            dtype = st.selectbox(
-                "Type",
-                ["Text", "Image", "Map"],
-                index=["Text", "Image", "Map"].index(current_type),
-                key=f"type_{token}",
-                label_visibility="collapsed"
-            )
-            if dtype != current_type:
-                st.session_state.custom_mapping[token] = dtype
-                # Auto-save config to GitHub
-                if st.session_state.saved_template_name:
-                    upload_config_to_github(st.session_state.custom_mapping, st.session_state.saved_template_name)
+            if is_cta:
+                dtype = "CTA"
+                st.markdown("**CTA**")
+            else:
+                dtype = st.selectbox(
+                    "Type",
+                    ["Text", "Image", "Map"],
+                    index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
+                    key=f"type_{token}",
+                    label_visibility="collapsed"
+                )
+                if dtype != current_type:
+                    st.session_state.custom_mapping[token] = dtype
+                    if st.session_state.saved_template_name:
+                        upload_config_to_github(st.session_state.custom_mapping, st.session_state.saved_template_name)
         
         with col_a:
-            if dtype == "Image" and template_type == 'pptx':
+            if is_cta:
+                # CTA selector
+                text_data[token] = get_cta_placeholder_value(token, clean_label)
+            elif dtype == "Image" and template_type == 'pptx':
                 image_data[token] = st.file_uploader(
                     clean_label,
                     type=["png", "jpg", "jpeg"],
@@ -955,6 +1221,7 @@ if template_bytes and st.session_state.tokens:
             elif dtype == "Map":
                 st.session_state.map_data[token] = map_input_component(token, clean_label)
             else:
+                # Text input
                 text_data[token] = st.text_input(
                     clean_label,
                     key=f"txt_{token}",
@@ -1017,4 +1284,4 @@ else:
     st.info("📌 Please upload or select a template to begin")
 
 st.markdown("---")
-st.caption("")
+st.caption("OpenFlux v2.0 | CTA Preset Manager | GitHub Storage")
