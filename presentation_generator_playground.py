@@ -391,8 +391,8 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    # --- SINGLE HORIZONTALLY COMPRESSED CONTROLS ROW ---
-    c_btn, c_style, c_color, c_lbl, c_min, c_val, c_pls = st.columns([1.6, 2.0, 0.5, 0.4, 0.3, 0.4, 0.3])
+    # --- SINGLE EXTENDED HORIZONTAL CONTROL ROW ---
+    c_btn, c_style, c_color, c_lbl, c_min, c_val, c_pls, c_coord = st.columns([1.6, 2.0, 0.5, 0.4, 0.3, 0.4, 0.3, 3.5])
     
     with c_btn:
         export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}")
@@ -420,10 +420,12 @@ def render_isolated_map_editor():
             if st.session_state[size_key] < 64:
                 st.session_state[size_key] += 2
                 st.rerun()
+
+    with c_coord:
+        coord_input = st.text_input("Coordinates (Lat, Lon)", key=coord_key, label_visibility="collapsed", placeholder="Lat, Lon")
     
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
     
-    coord_input = st.text_input("Coordinates (Lat, Lon)", key=coord_key)
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
@@ -498,7 +500,7 @@ def render_isolated_map_editor():
             if new_coord != st.session_state.get(coord_key, ""):
                 st.session_state[dragged_key] = new_coord
                 st.rerun()
-
+                
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     try:
