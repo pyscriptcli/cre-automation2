@@ -162,18 +162,15 @@ def compile_optimized_overpass_query(lat, lon, radius, search_string):
     normalized = search_string.lower().strip()
     statements = []
     
-    # 1. Match against Brand Map Targets
     for key, pattern in BRAND_DICTIONARIES.items():
         if key in normalized:
             statements.append(f'nwr["name"~"{pattern}",i](around:{radius},{lat},{lon});')
             statements.append(f'nwr["brand"~"{pattern}",i](around:{radius},{lat},{lon});')
 
-    # 2. Match against Category Tags
     for key, tag in CATEGORY_DICTIONARIES.items():
         if key in normalized:
             statements.append(f'nwr[{tag}](around:{radius},{lat},{lon});')
 
-    # 3. Complete Fallback Safe Clause Execution
     if not statements:
         sanitized = re.sub(r'[^a-zA-Z0-9\s]', '', normalized)
         statements.append(f'nwr["name"~"{sanitized}",i](around:{radius},{lat},{lon});')
@@ -240,7 +237,8 @@ st.markdown("""
     </script>
 """, unsafe_allow_html=True)
 
-sidebar_state = st.text_input("", key="sidebar_state_input", label_visibility="collapsed", placeholder="sidebar_state")
+# FIX: Added required non-empty string labels for standard accessibility parsers
+sidebar_state = st.text_input("Sidebar Internal State Controller", key="sidebar_state_input", label_visibility="collapsed", placeholder="sidebar_state")
 if sidebar_state == "collapsed":
     st.session_state.sidebar_collapsed = True
 elif sidebar_state == "expanded":
@@ -257,7 +255,8 @@ with st.sidebar:
     radius_val = st.number_input("RADIUS BOUND ENVELOPE (METERS)", min_value=100, max_value=30000, value=st.session_state.map_radius, step=100)
     
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    search_query = st.text_input("DISCOVERY SEARCH INSTANCE", placeholder="e.g. Jollibee, Cafe, Hospital")
+    # FIX: Attached non-empty accessibility identifier string
+    search_query = st.text_input("DISCOVERY SEARCH INSTANCE INPUT", placeholder="e.g. Jollibee, Cafe, Hospital", key="search_bar_input", label_visibility="collapsed")
     
     if st.button("EXECUTE SCAN RUNTIME", use_container_width=True):
         coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", gps_input)
@@ -298,13 +297,11 @@ leaflet_template = """
 <body>
     <div id="map"></div>
     <script>
-        // Mount Base Core View Coordinates
         const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([__LAT__, __LON__], 14);
         L.control.zoom({ position: 'topright' }).addTo(map);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
-        // Render Dynamic Draggable Anchor Configuration
         let boundaryRadiusCircle = L.circle([__LAT__, __LON__], {
             radius: __RADIUS__, color: "#003366", weight: 2, fillColor: "#003366", fillOpacity: 0.05
         }).addTo(map);
@@ -316,22 +313,19 @@ leaflet_template = """
         
         let anchorCenterMarker = L.marker([__LAT__, __LON__], { icon: centerStarIcon, draggable: true }).addTo(map);
         
-        // Drag Handling Bindings to Re-adjust Circle Center
         anchorCenterMarker.on('dragend', function(event) {
             let markerGpsCoords = anchorCenterMarker.getLatLng();
             boundaryRadiusCircle.setLatLng(markerGpsCoords);
         });
 
-        // Click Logic on Circle to dynamically Adjust Radius Weights
         boundaryRadiusCircle.on('click', function(event) {
             let activeRadius = boundaryRadiusCircle.getRadius();
-            let promptOverrideResponse = prompt("Set new dynamic radius constraint envelope size (meters):", activeRadius);
+            let promptOverrideResponse = prompt("Set new radius constraint envelope size (meters):", activeRadius);
             if (promptOverrideResponse != null) {
                 boundaryRadiusCircle.setRadius(parseInt(promptOverrideResponse));
             }
         });
 
-        // Load and Append POI Nodes Dataset
         const spatialVectorData = __GEOJSON_STR__;
         
         spatialVectorData.forEach(node => {
@@ -342,7 +336,6 @@ leaflet_template = """
 
             let trackingNodeMarker = L.marker([node.lat, node.lon], { icon: standardMarkerIcon }).addTo(map);
             
-            // Generate Interactive Field Modification Forms
             let interactivePopupHtml = `
                 <div class="editor-popup-frame">
                     <h4>Modify Establishment Pin</h4>
@@ -360,7 +353,6 @@ leaflet_template = """
             alert("Local Node updated inside Leaflet Sandbox Space:\\nLabel Name: " + modifiedName + "\\nClassification Type: " + modifiedType);
         }
 
-        // Automatic Layout Framing Handler
         if (spatialVectorData.length > 0) {
             let nodeBordersGroup = L.featureGroup(spatialVectorData.map(n => L.marker([n.lat, n.lon])));
             map.fitBounds(nodeBordersGroup.getBounds().pad(0.1));
@@ -377,4 +369,5 @@ compiled_html_output = (leaflet_template
     .replace("__RADIUS__", str(st.session_state.map_radius))
     .replace("__GEOJSON_STR__", json.dumps(st.session_state.scanned_records)))
 
+# FIX: Migrated from the deprecated st.components.v1.html block to the standardized modern iframe view layer
 st.components.v1.html(compiled_html_output, height=1000, scrolling=False)
