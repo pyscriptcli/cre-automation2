@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 import re
 import json
+import math
 import streamlit as st
 from pptx import Presentation
 from pptx.util import Pt
@@ -15,11 +16,10 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
 
-# New Map Dependencies
+# --- MAP SPECIFIC DEPENDENCIES ---
 import folium
 from streamlit_folium import st_folium
 import requests
-import math
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -206,7 +206,7 @@ def auto_save_config():
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
-# --- STATIC MAP GENERATION LOGIC ---
+# --- STATIC MAP STITCHING LOGIC ---
 def latlon_to_tile(lat, lon, zoom):
     lat_rad = math.radians(lat)
     n = 2.0 ** zoom
@@ -214,20 +214,19 @@ def latlon_to_tile(lat, lon, zoom):
     y = int((1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n)
     return x, y
 
-def generate_static_map(lat, lon, zoom=14, style="OSM"):
-    """Fetches and stitches map tiles around coordinates to return a single image pipeline file."""
+def generate_static_map(lat, lon, zoom=14, style="Carto Light"):
+    """Fetches tiles and stitches map with a programmatic rendering pipeline."""
     styles = {
         "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "Satellite": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{x}/{y}"
+        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"  # Integrated Google Satellite Tiles
     }
-    url_template = styles.get(style, styles["OSM"])
+    url_template = styles.get(style, styles["Carto Light"])
     cx, cy = latlon_to_tile(lat, lon, zoom)
     
-    # Create a 3x3 grid image map setup
     tile_size = 256
     stitched_image = Image.new('RGB', (tile_size * 3, tile_size * 3))
-    headers = {"User-Agent": "OpenFlux-DocumentGenerator/1.0"}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
     for i, dx in enumerate([-1, 0, 1]):
         for j, dy in enumerate([-1, 0, 1]):
@@ -240,7 +239,7 @@ def generate_static_map(lat, lon, zoom=14, style="OSM"):
             except Exception:
                 pass
                 
-    # Crop to center
+    # Center frame bounding box crop
     crop_box = (tile_size, tile_size, tile_size * 2, tile_size * 2)
     final_img = stitched_image.crop(crop_box)
     
@@ -252,72 +251,118 @@ def generate_static_map(lat, lon, zoom=14, style="OSM"):
 # --- DIALOG POPUP MAP EDITOR ---
 @st.dialog("Map Editor Config", width="large")
 def map_editor_modal(token_key):
-    st.write(f"Configure Map View for placeholder: `{token_key}`")
+    st.markdown(f"🗺️ **Placeholder Target:** `{token_key}`")
     
-    # Fetch existing configurations or defaults
     map_state_key = f"map_state_{token_key}"
     if map_state_key not in st.session_state:
-        st.session_state[map_state_key] = {"lat": 14.3294, "lon": 120.9368, "style": "OSM", "zoom": 14}
+        st.session_state[map_state_key] = {"lat": 14.3294, "lon": 120.9368, "style": "Carto Light", "zoom": 14}
         
     current_config = st.session_state[map_state_key]
     
-    col_selectors1, col_selectors2 = st.columns(2)
-    with col_selectors1:
-        basemap_style = st.selectbox("Base Map Style", ["OSM", "Satellite", "Carto Light"], index=["OSM", "Satellite", "Carto Light"].index(current_config["style"]))
-    with col_selectors2:
-        coord_input = st.text_input("Coordinates (Lat, Lon)", f"{current_config['lat']}, {current_config['lon']}")
+    # Ultra-compact 3-column control row layout
+    c1, c2, c3 = st.columns([1.5, 2, 1])
+    with c1:
+        basemap_style = st.selectbox(
+            "Style", ["Carto Light", "OSM", "Satellite"], 
+            index=["Carto Light", "OSM", "Satellite"].index(current_config["style"]),
+            key=f"style_sel_{token_key}"
+        )
+    with c2:
+        coord_input = st.text_input("Coordinates (Lat, Lon)", f"{current_config['lat']}, {current_config['lon']}", key=f"coord_in_{token_key}")
+    with c3:
+        zoom_level = st.slider("Zoom", 10, 18, current_config["zoom"], key=f"zoom_sl_{token_key}")
     
-    # Parse inputs safely
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
         plat, plon = current_config["lat"], current_config["lon"]
-        st.error("Format error: Write coordinates as 'lat, lon'")
 
-    # Initialize Folium View Map Window
+    # Assign correct Map APIs
     tiles_dict = {
         "OSM": "OpenStreetMap",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "Satellite": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{x}/{y}"
+        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
     }
-    
     attr_dict = {
         "OSM": "OpenStreetMap",
         "Carto Light": "&copy; CartoDB",
-        "Satellite": "Esri World Imagery"
+        "Satellite": "Google Maps Imagery"
     }
     
     m = folium.Map(
         location=[plat, plon], 
-        zoom_start=current_config["zoom"],
+        zoom_start=zoom_level,
         tiles=tiles_dict[basemap_style],
-        attr=attr_dict[basemap_style]
+        attr=attr_dict[basemap_style],
+        zoom_control=True
     )
-    marker = folium.Marker([plat, plon], draggable=True)
+
+    # SVG Vector inline map custom pin solution (Prevents broken default assets)
+    icon_html = """
+    <div style="position: relative;">
+        <span style="
+            position: absolute;
+            left: -12px; top: -24px;
+            width: 24px; height: 24px;
+            background-color: #DC3545;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+        "></span>
+        <span style="
+            position: absolute;
+            left: -4px; top: -16px;
+            width: 8px; height: 8px;
+            background-color: white;
+            border-radius: 50%;
+        "></span>
+    </div>
+    """
+    
+    marker = folium.Marker(
+        [plat, plon], 
+        draggable=True,
+        icon=folium.DivIcon(html=icon_html)
+    )
     marker.add_to(m)
     
-    # Render Interactive UI Map Component
-    map_data = st_folium(m, height=350, width=650, key=f"interactive_map_{token_key}")
-    
-    # Capture updates dynamically from Marker Drag changes
-    if map_data and map_data.get("last_object_clicked_popup") is not None or (map_data and map_data.get("last_object_signaled") or map_data.get("last_active_drawing")):
-         pass 
-    if map_data and map_data.get("last_object_clicked"):
-        # standard fallback assignment if tracking coordinates change
-        pass
+    # Visual aspect ratio box overlay boundary indicator guide
+    folium.Rectangle(
+        bounds=[[plat - 0.0035, plon - 0.0055], [plat + 0.0035, plon + 0.0055]],
+        color="#003366",
+        weight=2,
+        fill=True,
+        fill_color="#003366",
+        fill_opacity=0.07,
+        popup="Crop Frame Safe Guide"
+    ).add_to(m)
 
-    # Save state changes
-    st.session_state[map_state_key] = {
-        "lat": plat, "lon": plon, "style": basemap_style, "zoom": 14
-    }
+    st.caption("💡 Drag pin map marker. Shaded window shows final cropped document export safe margins.")
     
-    if st.button("Export Map Frame to Document View", use_container_width=True):
-        with st.spinner("Generating High-Res Map snapshot..."):
-            map_img_bytes = generate_static_map(plat, plon, zoom=14, style=basemap_style)
-            # Inject directly into image_data mapping container
-            st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
-            st.success("Map image rendered successfully!")
+    # Load Interactive map widget window frame
+    map_data = st_folium(m, height=260, width=680, use_container_width=True, key=f"int_map_{token_key}")
+    
+    # Real-time synchronization coordinate state capture on user movement actions
+    if map_data and map_data.get("last_marker_moved"):
+        new_coords = map_data["last_marker_moved"]
+        plat = round(new_coords["lat"], 5)
+        plon = round(new_coords["lng"], 5)
+        st.session_state[map_state_key] = {"lat": plat, "lon": plon, "style": basemap_style, "zoom": zoom_level}
+
+    st.session_state[map_state_key] = {"lat": plat, "lon": plon, "style": basemap_style, "zoom": zoom_level}
+    
+    col_act1, col_act2 = st.columns([1, 1])
+    with col_act1:
+        if st.button("Apply Changes", key=f"apply_{token_key}", use_container_width=True):
             st.rerun()
+    with col_act2:
+        if st.button("🚀 Export Map Snapshot", key=f"exp_{token_key}", use_container_width=True):
+            with st.spinner("Processing..."):
+                map_img_bytes = generate_static_map(plat, plon, zoom=zoom_level, style=basemap_style)
+                st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
+                st.success("Attached to document!")
+                st.rerun()
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -616,7 +661,6 @@ if u_template is not None and st.session_state.tokens:
         mid_point = len(tokens) // 2
         col1, col2 = st.columns(2)
         
-        # Helper to process token lists
         def render_token_fields(token_list, col_target):
             with col_target:
                 for token in token_list:
@@ -643,18 +687,17 @@ if u_template is not None and st.session_state.tokens:
                         elif data_type == "Map" and template_type == 'pptx':
                             st.markdown(f'<div class="field-label">{clean_label} (Map Mode)</div>', unsafe_allow_html=True)
                             
-                            # Check if map bytes already exist from an export session
                             saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
                             if saved_map_img:
                                 image_data[token] = saved_map_img
-                                st.caption("✅ Map snapshot attached.")
+                                st.caption("✅ Map frame snapshot attached.")
                             
                             if st.button(f"Configure Map View", key=f"btn_map_{token}", use_container_width=True):
                                 map_editor_modal(token)
                             field_types[token] = "Image"
                         else:
                             if data_type in ["Image", "Map"] and template_type != 'pptx':
-                                st.warning("Media/Map updates are only supported in PPTX templates")
+                                st.warning("Media & Map uploads are only supported in PPTX files.")
                             st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
                             text_data[token] = st.text_input(clean_label, key=f"val_{token}", label_visibility="collapsed")
                             field_types[token] = "Text"
