@@ -360,30 +360,21 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
 def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
     
-    # Custom CSS adjustments to normalize default Streamlit widget margins
+    # Custom CSS adjustments to normalize structural alignment with visible labels
     st.markdown("""
         <style>
-            /* Aligns block contents explicitly to their bottom bounding baseline */
+            /* Ensures that elements with varying native heights snap predictably */
             div[data-testid="stHorizontalBlock"] {
                 align-items: flex-end !important;
-                gap: 8px !important;
+                gap: 12px !important;
             }
-            /* Match form element wrapper heights exactly to standard buttons */
+            /* Match element inner wrapper boundaries cleanly */
             div[data-baseweb="input"], div[data-baseweb="select"], .stColorPicker div {
                 height: 38px !important;
             }
-            /* Clean structural padding for custom size badge element */
-            .custom-size-badge {
-                font-size: 13px; 
-                font-weight: 600; 
-                line-height: 36px; 
-                text-align: center; 
-                color: #1A1A1A; 
-                border: 1px solid #CCCCCC; 
-                border-radius: 4px; 
-                background-color: #F8F9FA; 
-                height: 38px;
-                width: 100%;
+            /* Adjust color picker alignment to prevent label spacing overflow */
+            .stColorPicker > label {
+                margin-bottom: 4px !important;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -420,36 +411,31 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    # --- FLAT SLICK 5-COLUMN HORIZONTAL CONTROLS MATRIX ---
-    c_btn, c_style, c_color, c_size_cnt, c_coord = st.columns([1.5, 1.8, 0.6, 2.2, 3.2])
+    # --- FLAT SLICK HORIZONTAL CONTROLS MATRIX WITH TOP LABELS ---
+    c_btn, c_style, c_color, c_size, c_coord = st.columns([1.6, 2.0, 0.8, 1.2, 3.4])
     
     with c_btn:
+        # Pushed slightly down using empty markdown space to stay flush with text-labeled inputs
+        st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
         export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
         
     with c_style:
-        basemap_style = st.selectbox("Map Layer", ["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key, label_visibility="collapsed")
+        basemap_style = st.selectbox(label="Basemap Layer", options=["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
         
     with c_color:
-        pin_color = st.color_picker("Pin Color", key=color_key, label_visibility="collapsed")
+        pin_color = st.color_picker(label="Pin Color", key=color_key)
         
-    with c_size_cnt:
-        # Mini-columns nested inside the Size space to tightly snap button components next to value indicator
-        sub_min, sub_val, sub_pls = st.columns([0.8, 1.4, 0.8])
-        with sub_min:
-            if st.button("-", key=f"size_minus_{token_key}", use_container_width=True):
-                if st.session_state[size_key] > 16:
-                    st.session_state[size_key] -= 2
-                    st.rerun()
-        with sub_val:
-            st.markdown(f'<div class="custom-size-badge">Size: {st.session_state[size_key]}</div>', unsafe_allow_html=True)
-        with sub_pls:
-            if st.button("+", key=f"size_plus_{token_key}", use_container_width=True):
-                if st.session_state[size_key] < 64:
-                    st.session_state[size_key] += 2
-                    st.rerun()
-
+    with c_size:
+        pin_size = st.number_input(
+            label="Pin Size", 
+            min_value=16, 
+            max_value=64, 
+            step=2, 
+            key=size_key
+        )
+        
     with c_coord:
-        coord_input = st.text_input("Coordinates (Lat, Lon)", key=coord_key, label_visibility="collapsed", placeholder="Lat, Lon")
+        coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     
@@ -467,7 +453,7 @@ def render_isolated_map_editor():
     attr_dict = {"OSM": "OpenStreetMap", "Carto Light": "CartoDB", "Satellite": "Google Maps", "Hybrid": "Google Maps"}
     
     m = folium.Map(location=[plat, plon], zoom_start=15, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style], zoom_control=True)
-    pin_size = st.session_state[size_key]
+    
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40">
