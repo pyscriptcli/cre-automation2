@@ -19,6 +19,7 @@ import traceback
 # --- MAP SPECIFIC DEPENDENCIES ---
 import folium
 from streamlit_folium import st_folium
+from folium.plugins import Draw
 import requests
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
@@ -29,7 +30,7 @@ if not os.path.exists(_config_file):
     with open(_config_file, "w", encoding="utf-8") as f:
         f.write("[theme]\nbase=\"light\"\n")
 
-# --- MINIMAL UI CSS ---
+# --- MINIMAL UI & DIALOG MAXIMIZATION CSS ---
 MINIMAL_CRE_SYSTEM = """
 <style>
     #MainMenu {visibility: hidden;}
@@ -40,40 +41,39 @@ MINIMAL_CRE_SYSTEM = """
     
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
-    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1200px !important; }
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1400px !important; }
     
+    /* Tiny Compact Inputs */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
         background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important;
-        color: #1A1A1A !important;
+        color: #1A1A1A !important; min-height: 26px !important;
     }
     div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, textarea:focus { border-color: #003366 !important; box-shadow: none !important; }
-    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 14px !important; }
+    input[type="text"], .stTextInput input, div[data-baseweb="select"] div { color: #1A1A1A !important; font-size: 11px !important; padding: 2px 6px !important; }
     
-    div[data-baseweb="select"] { min-height: 32px !important; }
-    div[data-baseweb="select"] > div { min-height: 32px !important; padding: 0 8px !important; }
-    div[data-baseweb="select"] select { font-size: 13px !important; padding: 2px 8px !important; }
+    div[data-baseweb="select"] { min-height: 26px !important; }
+    div[data-baseweb="select"] > div { min-height: 26px !important; padding: 0 4px !important; }
+    div[data-baseweb="select"] select { font-size: 11px !important; padding: 1px 4px !important; }
+    
+    /* Shrink sliders labels & height */
+    div[data-testid="stSlider"] { padding-top: 0px !important; margin-bottom: 0px !important; }
+    div[data-testid="stSlider"] label { font-size: 11px !important; font-weight: 600 !important; margin-bottom: -4px !important; }
     
     section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important; padding: 4px 12px !important; }
-    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
+    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 14px; margin-bottom: 10px; }
     
     div.stButton > button { 
         background-color: #003366 !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 11px !important; 
-        border: none !important; border-radius: 3px !important; padding: 5px 12px !important; width: 100% !important; min-height: 28px !important;
-    }
-    div.stButton > button:hover { background-color: #002244 !important; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3); }
-    
-    div[data-testid="stDownloadButton"] > button { 
-        background-color: #003366 !important; color: #FFFFFF !important; border-radius: 3px !important; 
-        font-weight: 600 !important; padding: 5px 12px !important; width: 100% !important; font-size: 11px !important; min-height: 28px !important;
+        border: none !important; border-radius: 3px !important; padding: 4px 10px !important; width: 100% !important; min-height: 26px !important;
     }
     
-    .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 6px; }
-    .section-header { font-size: 15px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 10px; }
-    .saved-indicator { background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 6px; }
-    hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
+    .field-label { font-size: 11px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 2px; }
+    .section-header { font-size: 14px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 8px; }
+    .saved-indicator { background-color: #E8F5E9; padding: 4px 10px; border-radius: 4px; font-size: 12px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 4px; }
     
-    /* Make Dialog content maximize mapping viewport area */
-    div[role="dialog"] { max-width: 95vw !important; width: 95vw !important; }
+    /* Maximize Modal Viewport Vertically and Horizontally */
+    div[role="dialog"] { max-width: 96vw !important; width: 96vw !important; max-height: 95vh !important; }
+    div[role="dialog"] .stVerticalBlock { gap: 0.4rem !important; }
 </style>
 """
 
@@ -148,7 +148,7 @@ def auto_save_config():
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
-# --- HIGH-RESOLUTION STATIC MAP GENERATION LOGIC ---
+# --- ULTRA HIGH-RESOLUTION PRINT SPEC STATIC MAP ENGINE ---
 def latlon_to_tile(lat, lon, zoom):
     lat_rad = math.radians(lat)
     n = 2.0 ** zoom
@@ -156,25 +156,25 @@ def latlon_to_tile(lat, lon, zoom):
     y = (1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n
     return x, y
 
-def generate_static_map_high_res(lat, lon, zoom=15, style="Carto Light"):
-    """Fetches a 5x5 tile grid to output a sharp, high-res crisp snapshot with a vector pin."""
+def generate_static_map_ultra_res(lat, lon, zoom=16, style="Satellite", bounds=None):
+    """Fetches a massive 7x7 tile matrix yielding an uncompressed 1800x1800 map canvas asset."""
     styles = {
         "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
         "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
     }
-    url_template = styles.get(style, styles["Carto Light"])
+    url_template = styles.get(style, styles["Satellite"])
     
     fx, fy = latlon_to_tile(lat, lon, zoom)
     cx, cy = int(fx), int(fy)
     
     tile_size = 256
-    # 5x5 Grid for ultra-clear density tracking canvas coverage
-    stitched_image = Image.new('RGB', (tile_size * 5, tile_size * 5))
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    # 7x7 grid matrix handles wide viewport bounding extractions cleanly
+    stitched_image = Image.new('RGB', (tile_size * 7, tile_size * 7))
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     
-    for i, dx in enumerate([-2, -1, 0, 1, 2]):
-        for j, dy in enumerate([-2, -1, 0, 1, 2]):
+    for i, dx in enumerate([-3, -2, -1, 0, 1, 2, 3]):
+        for j, dy in enumerate([-3, -2, -1, 0, 1, 2, 3]):
             url = url_template.format(z=zoom, x=cx + dx, y=cy + dy)
             try:
                 response = requests.get(url, headers=headers, timeout=5)
@@ -184,64 +184,61 @@ def generate_static_map_high_res(lat, lon, zoom=15, style="Carto Light"):
             except Exception:
                 pass
 
-    # Exact pixel offsets from coordinate float residuals
-    center_pixel_x = int((2 + (fx - cx)) * tile_size)
-    center_pixel_y = int((2 + (fy - cy)) * tile_size)
+    center_pixel_x = int((3 + (fx - cx)) * tile_size)
+    center_pixel_y = int((3 + (fy - cy)) * tile_size)
     
-    # Crop a clean 600x600 high-density block centered precisely around coordinates
-    crop_w, crop_h = 600, 600
+    # Extract crisp 1500x1500px raw canvas segment
+    crop_w, crop_h = 1500, 1500
     left = center_pixel_x - (crop_w // 2)
     top = center_pixel_y - (crop_h // 2)
     final_img = stitched_image.crop((left, top, left + crop_w, top + crop_h)).convert("RGBA")
     
-    # Render crisp vector point marker directly on final static export canvas asset
+    # Overlap vector pin in dead-center pixel coordinate matching target lat/lon
     draw = ImageDraw.Draw(final_img)
     px, py = crop_w // 2, crop_h // 2
     
-    # Pin shapes drop coordinate markers coordinates paths
-    draw.polygon([(px, py), (px - 9, py - 18), (px + 9, py - 18)], fill="#DC3545")
-    draw.ellipse([px - 9, py - 27, px + 9, py - 9], fill="#DC3545")
-    draw.ellipse([px - 3, py - 21, px + 3, py - 15], fill="#FFFFFF")
+    # High-DPI Vector Pin rendering logic
+    draw.polygon([(px, py), (px - 14, py - 28), (px + 14, py - 28)], fill="#E41B1B")
+    draw.ellipse([px - 15, py - 42, px + 15, py - 14], fill="#E41B1B")
+    draw.ellipse([px - 5, py - 33, px + 5, py - 23], fill="#FFFFFF")
     
     final_img = final_img.convert("RGB")
     img_byte_arr = io.BytesIO()
-    final_img.save(img_byte_arr, format='PNG', quality=100)
+    final_img.save(img_byte_arr, format='PNG', quality=100, subsampling=0)
     img_byte_arr.seek(0)
     return img_byte_arr
 
 # --- DIALOG POPUP MAP EDITOR ---
 @st.dialog("Map Editor Config", width="large")
 def map_editor_modal(token_key):
-    st.markdown(f"🗺️ **Placeholder Target Frame:** `{token_key}`")
-    
+    # Setup base configuration parameters
     map_state_key = f"map_state_{token_key}"
     if map_state_key not in st.session_state:
-        st.session_state[map_state_key] = {"lat": 14.3294, "lon": 120.9368, "style": "Satellite", "box_size": 1.0}
+        st.session_state[map_state_key] = {"lat": 14.3294, "lon": 120.9368, "style": "Satellite", "box_size": 0.6}
         
     current_config = st.session_state[map_state_key]
     
-    # Micro-sized horizontal top-tier menu panels
-    c1, c2, c3 = st.columns([1, 1.5, 1.5])
-    with c1:
+    # Tiny Compact top configuration toolbar bar setup
+    col_ui1, col_ui2, col_ui3 = st.columns([1, 1.5, 1.5])
+    with col_ui1:
         basemap_style = st.selectbox(
             "Style", ["Satellite", "Carto Light", "OSM"], 
             index=["Satellite", "Carto Light", "OSM"].index(current_config["style"]),
             key=f"style_sel_{token_key}"
         )
-    with c2:
-        coord_input = st.text_input("Coordinates (Lat, Lon)", f"{current_config['lat']}, {current_config['lon']}", key=f"coord_in_{token_key}")
-    with c3:
-        box_size_km = st.slider("Box Size Coverage (km)", 0.2, 5.0, float(current_config["box_size"]), step=0.1, key=f"box_size_{token_key}")
+    with col_ui2:
+        coord_input = st.text_input("Center Location", f"{current_config['lat']}, {current_config['lon']}", key=f"coord_in_{token_key}")
+    with col_ui3:
+        box_size_km = st.slider("Box Range Span (km)", 0.2, 3.0, float(current_config["box_size"]), step=0.1, key=f"box_size_{token_key}")
     
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
         plat, plon = current_config["lat"], current_config["lon"]
 
-    # Map Slider Map scale tracking logic (Inverting metric kilometers to map tile dimensions)
-    # 0.5km -> Zoom 16 (Close-up), 1.0km -> Zoom 15, 2.5km -> Zoom 14, etc.
+    # Map Kilometer box coverage parameters conversion math directly to clear base layers
     calculated_zoom = 16 - int(math.log2(box_size_km / 0.5))
-    calculated_zoom = max(10, min(18, calculated_zoom))
+    calculated_zoom = max(11, min(18, calculated_zoom))
 
     tiles_dict = {
         "OSM": "OpenStreetMap",
@@ -254,6 +251,7 @@ def map_editor_modal(token_key):
         "Satellite": "Google Maps Imagery"
     }
     
+    # Initialize basic frame viewport instance canvas map
     m = folium.Map(
         location=[plat, plon], 
         zoom_start=calculated_zoom,
@@ -262,67 +260,71 @@ def map_editor_modal(token_key):
         zoom_control=True
     )
 
-    # Clean HTML inline pointer replacement structure logic
-    icon_html = """
-    <div style="position: relative;">
-        <span style="
-            position: absolute; left: -12px; top: -24px;
-            width: 24px; height: 24px; background-color: #DC3545;
-            border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
-            border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.4);
-        "></span>
-        <span style="
-            position: absolute; left: -4px; top: -16px;
-            width: 8px; height: 8px; background-color: white;
-            border-radius: 50%;
-        "></span>
-    </div>
-    """
+    # Core conversion of kilometers radius bounding frame dimensions offsets
+    lat_offset = (box_size_km / 111.0) * 0.4
+    lon_offset = (box_size_km / (111.0 * math.cos(math.radians(plat)))) * 0.4
     
-    # Active trackable pin element container logic block
-    marker = folium.Marker(
-        [plat, plon], 
-        draggable=True,
-        icon=folium.DivIcon(html=icon_html)
-    )
-    marker.add_to(m)
-    
-    # BOUNDING PREVIEW BOX: Scaled proportionally dynamically via kilometer slider variables
-    lat_offset = (box_size_km / 111.0) * 0.35
-    lon_offset = (box_size_km / (111.0 * math.cos(math.radians(plat)))) * 0.35
-    
+    # Generate FeatureGroup containing default Crop Bounding Box template geometry
+    feature_group = folium.FeatureGroup(name="Crop Border Target Box")
     folium.Rectangle(
         bounds=[[plat - lat_offset, plon - lon_offset], [plat + lat_offset, plon + lon_offset]],
         color="#003366",
-        weight=3,
+        weight=4,
         fill=True,
         fill_color="#003366",
-        fill_opacity=0.12,
-        popup="Dynamic Crop Margin Window"
-    ).add_to(m)
+        fill_opacity=0.15,
+        popup="Crop Bound View Area Frame"
+    ).add_to(feature_group)
+    feature_group.add_to(m)
+
+    # REPLACEMENT INTEGRATION: Inject Leaflet Draw Toolkit directly to handle resizable dragging actions
+    draw_control = Draw(
+        export=False,
+        draw_options={
+            'polyline': False, 'polygon': False, 'circle': False, 
+            'marker': False, 'circlemarker': False, 'rectangle': False
+        },
+        edit_options={
+            'featureGroup': feature_group,
+            'edit': True,
+            'remove': False
+        }
+    )
+    draw_control.add_to(m)
+
+    st.markdown("<p style='font-size:11px; margin:-5px 0px; color:#555;'>🛠️ <b>Interactive Box Control:</b> Click the <b>Layer Edit Icon</b> (second from top on sidebar control stack) to stretch, pull, or drag the frame box borders directly on map surface layer.</p>", unsafe_allow_html=True)
     
-    # Expanded View Map canvas container height optimization footprint rules
-    map_data = st_folium(m, height=480, width=1100, use_container_width=True, key=f"int_map_{token_key}")
+    # MAXIMIZED VERTICAL LAYOUT VIEWPORT HEIGHT
+    map_data = st_folium(m, height=560, width=1300, use_container_width=True, key=f"int_map_{token_key}")
     
-    # Handle dragging events and synchronize coordinates fluidly
-    if map_data and map_data.get("last_marker_moved"):
-        moved_coords = map_data["last_marker_moved"]
-        plat = round(moved_coords["lat"], 5)
-        plon = round(moved_coords["lng"], 5)
-        st.session_state[map_state_key] = {"lat": plat, "lon": plon, "style": basemap_style, "box_size": box_size_km}
+    # Check if user dragged/resized the bounding layer box geometry parameters frame
+    if map_data and map_data.get("last_active_drawing") and map_data["last_active_drawing"].get("geometry"):
+        geom_info = map_data["last_active_drawing"]["geometry"]
+        if geom_info.get("type") == "Polygon":
+            coordinates_array = geom_info["coordinates"][0]
+            lats = [pt[1] for pt in coordinates_array]
+            lons = [pt[0] for pt in coordinates_array]
+            plat = round(sum(lats) / len(lats), 5)
+            plon = round(sum(lons) / len(lons), 5)
+            
+            # Recalculate kilometer dimension baseline limits tracking modifications
+            calculated_lat_span = max(lats) - min(lats)
+            box_size_km = round((calculated_lat_span * 111.0) / 0.8, 2)
+            st.session_state[map_state_key] = {"lat": plat, "lon": plon, "style": basemap_style, "box_size": box_size_km}
 
     st.session_state[map_state_key] = {"lat": plat, "lon": plon, "style": basemap_style, "box_size": box_size_km}
     
+    # Footprint operational trigger buttons column blocks setup
     col_act1, col_act2 = st.columns([1, 1])
     with col_act1:
-        if st.button("Apply Parameters", key=f"apply_{token_key}", use_container_width=True):
+        if st.button("Apply Settings Parameters", key=f"apply_{token_key}", use_container_width=True):
             st.rerun()
     with col_act2:
-        if st.button("🚀 Export Map Snapshot", key=f"exp_{token_key}", use_container_width=True):
-            with st.spinner("Compiling High-Density Image View..."):
-                map_img_bytes = generate_static_map_high_res(plat, plon, zoom=calculated_zoom, style=basemap_style)
+        if st.button("🚀 Render & Export Crisp Print Map Snapshot", key=f"exp_{token_key}", use_container_width=True):
+            with st.spinner("Stitching high-resolution map assets tiles grid..."):
+                map_img_bytes = generate_static_map_ultra_res(plat, plon, zoom=calculated_zoom, style=basemap_style)
                 st.session_state[f"map_bytes_holder_{token_key}"] = map_img_bytes
-                st.success("High-res asset linked successfully!")
+                st.success("Sharp Map asset merged successfully!")
                 st.rerun()
 
 # --- CORE UTILITIES ---
