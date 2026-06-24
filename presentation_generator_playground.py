@@ -9,13 +9,22 @@ from datetime import datetime
 from docx import Document
 import folium
 from streamlit_folium import folium_static
-import requests
-import base64
 import tempfile
+import time
+import base64
+import requests
+import math
+import pickle
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from streamlit.components.v1 import html
 
-# --- GITHUB CONFIG ---
-GITHUB_REPO = "openflux_templates"
-GITHUB_BRANCH = "main"
+# --- GOOGLE DRIVE CONFIG ---
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+FOLDER_ID = '1na-bYwLW8qR9SrBLAJh3PfDDc8F6WVej'
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -116,123 +125,201 @@ MINIMAL_CRE_SYSTEM = """
         border-left: 3px solid #003366;
         margin: 4px 0;
     }
-    .cta-preview {
+    .map-editor-header {
         background-color: #F8F9FA;
         padding: 8px 12px;
         border-radius: 4px;
-        border-left: 3px solid #003366;
-        font-size: 13px;
-        margin: 4px 0;
-        font-family: monospace;
-    }
-    .cta-preset-card {
-        background-color: #FFFFFF;
+        margin-bottom: 8px;
         border: 1px solid #E0E0E0;
-        border-radius: 4px;
-        padding: 8px 12px;
-        margin-bottom: 6px;
-    }
-    .cta-preset-card .cta-name {
-        font-weight: 700;
-        color: #003366;
+        font-weight: 600;
         font-size: 13px;
     }
-    .cta-preset-card .cta-detail {
-        font-size: 11px;
-        color: #666;
+    .manual-capture-box {
+        background-color: #FFF3E0;
+        border: 2px dashed #FF9800;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 12px 0;
+    }
+    .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .popup-content {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        max-width: 90%;
+        max-height: 90%;
+        overflow: auto;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
     }
     
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
+    .streamlit-expanderHeader { font-size: 14px !important; font-weight: 600 !important; }
 </style>
 """
 
-# --- GITHUB FUNCTIONS ---
-def get_github_token():
-    try:
-        return st.secrets["github"]["token"]
-    except:
-        return os.environ.get("GITHUB_TOKEN")
+# --- GOOGLE DRIVE FUNCTIONS ---
+def get_gdrive_credentials():
+    """Get Google Drive credentials"""
+    creds = None
+    token_path = 'token.pickle'
+    
+    # Check if token exists
+    if os.path.exists(token_path):
+        with open(token_path, 'rb') as token:
+            creds = pickle.load(token)
+    
+    # If no valid credentials, let user log in
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            # Use the service account approach for cloud deployment
+            # You'll need to set up a service account and download credentials
+            try:
+                from google.oauth2 import service_account
+                creds = service_account.Credentials.from_service_account_file(
+                    'service_account.json', scopes=SCOPES
+                )
+            except:
+                st.warning("Google Drive credentials not found. Please set up service account.")
+                return None
+        
+        # Save credentials for next run
+        with open(token_path, 'wb') as token:
+            pickle.dump(creds, token)
+    
+    return creds
 
-def get_github_repo():
-    token = get_github_token()
-    if not token:
-        return None
+def upload_to_gdrive(file_bytes, filename):
+    """Upload file to Google Drive"""
     try:
-        from github import Github
-        g = Github(token)
-        return g.get_user().get_repo(GITHUB_REPO)
-    except:
+        creds = get_gdrive_credentials()
+        if not creds:
+            return None
+        
+        service = build('drive', 'v3', credentials=creds)
+        
+        # Check if file already exists
+        query = f"name='{filename}' and '{FOLDER_ID}' in parents and trashed=false"
+        results = service.files().list(q=query, fields="files(id, name)").execute()
+        files = results.get('files', [])
+        
+        if files:
+            # Delete existing file
+            for file in files:
+                service.files().delete(fileId=file['id']).execute()
+        
+        # Upload new file
+        file_metadata = {
+            'name': filename,
+            'parents': [FOLDER_ID]
+        }
+        
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
+        
+        media = MediaFileUpload(tmp_path, resumable=True)
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink'
+        ).execute()
+        
+        os.unlink(tmp_path)
+        
+        return file.get('webViewLink')
+        
+    except Exception as e:
+        st.error(f"Error uploading to Google Drive: {str(e)}")
         return None
 
-def list_github_templates():
+def list_gdrive_templates():
+    """List templates from Google Drive"""
     try:
-        repo = get_github_repo()
-        if not repo:
+        creds = get_gdrive_credentials()
+        if not creds:
             return []
+        
+        service = build('drive', 'v3', credentials=creds)
+        
+        query = f"'{FOLDER_ID}' in parents and trashed=false"
+        results = service.files().list(
+            q=query,
+            fields="files(id, name, mimeType, size, modifiedTime)"
+        ).execute()
+        
         templates = []
-        contents = repo.get_contents("", ref=GITHUB_BRANCH)
-        for content in contents:
-            if content.type == "file" and (content.name.endswith('.pptx') or content.name.endswith('.docx')):
+        for file in results.get('files', []):
+            if file['name'].endswith('.pptx') or file['name'].endswith('.docx'):
                 templates.append({
-                    'name': content.name,
-                    'sha': content.sha,
-                    'type': 'PPTX' if content.name.endswith('.pptx') else 'DOCX',
-                    'source': 'github'
+                    'id': file['id'],
+                    'name': file['name'],
+                    'size': file.get('size', 0),
+                    'modified': file.get('modifiedTime', ''),
+                    'type': 'PPTX' if file['name'].endswith('.pptx') else 'DOCX'
                 })
+        
         return templates
-    except:
+        
+    except Exception as e:
+        st.error(f"Error listing templates: {str(e)}")
         return []
 
-def upload_to_github(file_bytes, filename):
+def download_from_gdrive(file_id):
+    """Download template from Google Drive"""
     try:
-        repo = get_github_repo()
-        if not repo:
-            return False
-        try:
-            contents = repo.get_contents(filename, ref=GITHUB_BRANCH)
-            repo.update_file(
-                path=filename,
-                message=f"Update: {filename}",
-                content=base64.b64encode(file_bytes).decode('utf-8'),
-                sha=contents.sha,
-                branch=GITHUB_BRANCH
-            )
-        except:
-            repo.create_file(
-                path=filename,
-                message=f"Add: {filename}",
-                content=base64.b64encode(file_bytes).decode('utf-8'),
-                branch=GITHUB_BRANCH
-            )
-        return True
-    except:
-        return False
-
-def download_from_github(filename):
-    try:
-        repo = get_github_repo()
-        if not repo:
+        creds = get_gdrive_credentials()
+        if not creds:
             return None
-        contents = repo.get_contents(filename, ref=GITHUB_BRANCH)
-        return base64.b64decode(contents.content)
-    except:
+        
+        service = build('drive', 'v3', credentials=creds)
+        
+        request = service.files().get_media(fileId=file_id)
+        file_bytes = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_bytes, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+        
+        return file_bytes.getvalue()
+        
+    except Exception as e:
+        st.error(f"Error downloading template: {str(e)}")
         return None
 
-# --- FILE MANAGEMENT ---
+# --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
     storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
     os.makedirs(storage_dir, exist_ok=True)
     return storage_dir
 
-def save_template_local(template_bytes, template_name):
+def save_template_to_file(template_bytes, template_name):
     storage_dir = get_storage_dir()
     safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
+    if not safe_name.endswith('.pptx') and not safe_name.endswith('.docx'):
+        safe_name += '.docx'
     filepath = os.path.join(storage_dir, safe_name)
     with open(filepath, 'wb') as f:
         f.write(template_bytes)
+    
+    # Also upload to Google Drive
+    upload_to_gdrive(template_bytes, safe_name)
+    
     return filepath
 
-def load_template_local(template_name):
+def load_template_from_file(template_name):
     storage_dir = get_storage_dir()
     filepath = os.path.join(storage_dir, template_name)
     if os.path.exists(filepath):
@@ -240,63 +327,110 @@ def load_template_local(template_name):
             return f.read()
     return None
 
-def get_all_templates():
-    templates = []
+def get_saved_templates():
+    # Get from local storage
     storage_dir = get_storage_dir()
+    templates = []
     if os.path.exists(storage_dir):
         for file in os.listdir(storage_dir):
             if file.endswith('.pptx') or file.endswith('.docx'):
+                filepath = os.path.join(storage_dir, file)
+                stat = os.stat(filepath)
                 templates.append({
                     'name': file,
+                    'path': filepath,
+                    'size': stat.st_size,
+                    'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
                     'type': 'PPTX' if file.endswith('.pptx') else 'DOCX',
                     'source': 'local'
                 })
-    for t in list_github_templates():
-        if not any(x['name'] == t['name'] for x in templates):
-            templates.append(t)
+    
+    # Get from Google Drive
+    drive_templates = list_gdrive_templates()
+    for t in drive_templates:
+        templates.append({
+            'name': t['name'],
+            'id': t['id'],
+            'size': t['size'],
+            'modified': t['modified'],
+            'type': t['type'],
+            'source': 'gdrive'
+        })
+    
     return templates
 
-# --- CTA PRESET FUNCTIONS ---
-def load_cta_presets():
+def delete_template_file(template_name):
     storage_dir = get_storage_dir()
-    presets_file = os.path.join(storage_dir, "cta_presets.json")
-    if os.path.exists(presets_file):
-        try:
-            with open(presets_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return []
-    return []
+    filepath = os.path.join(storage_dir, template_name)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+        config_path = os.path.join(storage_dir, config_name)
+        if os.path.exists(config_path):
+            os.remove(config_path)
+        return True
+    return False
 
-def save_cta_presets(presets):
+def save_config_to_file(config_data, config_name="template_config.json"):
     storage_dir = get_storage_dir()
-    presets_file = os.path.join(storage_dir, "cta_presets.json")
-    with open(presets_file, 'w', encoding='utf-8') as f:
-        json.dump(presets, f, indent=4)
+    filepath = os.path.join(storage_dir, config_name)
+    serializable_config = {}
+    for key, value in config_data.items():
+        if isinstance(value, dict) and 'screenshot' in value:
+            serializable_config[key] = {
+                'type': value.get('type', 'Map'),
+                'lat': value.get('lat'),
+                'lng': value.get('lng'),
+                'basemap': value.get('basemap', 'satellite')
+            }
+        else:
+            serializable_config[key] = value
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(serializable_config, f, indent=4)
+    return filepath
 
-def format_cta_list(cta_list):
-    if not cta_list:
-        return ""
-    formatted = []
-    for cta in cta_list:
-        parts = [cta['name']]
-        if cta.get('phone'):
-            parts.append(f"({cta['phone']})")
-        if cta.get('email'):
-            parts.append(cta['email'])
-        if cta.get('company'):
-            parts.append(f"- {cta['company']}")
-        formatted.append(" ".join(parts))
-    return ", ".join(formatted)
+def load_config_from_file(config_name="template_config.json"):
+    storage_dir = get_storage_dir()
+    filepath = os.path.join(storage_dir, config_name)
+    if os.path.exists(filepath):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return None
 
-def get_cta_token_names():
-    return ['cta', 'contact', 'contacts', 'contact_person', 'point_of_contact']
+def auto_save_config():
+    if st.session_state.saved_template_name and st.session_state.custom_mapping:
+        config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+        save_config_to_file(st.session_state.custom_mapping, config_name)
 
 # --- CORE UTILITIES ---
+def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
+    try:
+        img = Image.open(img_file)
+        img_w, img_h = img.size
+        target_ratio = target_w_emu / target_h_emu
+        img_ratio = img_w / img_h
+        
+        if img_ratio > target_ratio:
+            new_w = int(img_h * target_ratio)
+            left = (img_w - new_w) // 2
+            img = img.crop((left, 0, left + new_w, img_h))
+        else:
+            new_h = int(img_w / target_ratio)
+            top = (img_h - new_h) // 2
+            img = img.crop((0, top, img_w, top + new_h))
+            
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
+        return img_byte_arr
+    except Exception:
+        return img_file
+
 def extract_placeholders_from_pptx(pptx_bytes):
     prs = Presentation(io.BytesIO(pptx_bytes))
     tokens = []
     seen = set()
+    
     for slide in prs.slides:
         for shape in slide.shapes:
             if shape.has_text_frame:
@@ -319,12 +453,14 @@ def extract_placeholders_from_docx(docx_bytes):
     doc = Document(io.BytesIO(docx_bytes))
     tokens = []
     seen = set()
+    
     for paragraph in doc.paragraphs:
         found = re.findall(r'\{\{.*?\}\}', paragraph.text)
         for token in found:
             if token not in seen:
                 tokens.append(token)
                 seen.add(token)
+    
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
@@ -333,6 +469,7 @@ def extract_placeholders_from_docx(docx_bytes):
                     if token not in seen:
                         tokens.append(token)
                         seen.add(token)
+    
     return tokens
 
 def extract_placeholders(template_bytes, template_type):
@@ -346,61 +483,85 @@ def replace_text_in_paragraph(paragraph, text_inputs):
     for run in paragraph.runs:
         for token, value in text_inputs.items():
             if token in run.text:
-                run.text = run.text.replace(token, str(value) if value else '')
+                replacement = str(value) if value else ''
+                run.text = run.text.replace(token, replacement)
+    
+    if hasattr(paragraph, 'text') and paragraph.text:
+        for token, value in text_inputs.items():
+            if token in paragraph.text:
+                if not paragraph.runs:
+                    paragraph.add_run()
+                for run in paragraph.runs:
+                    if token in run.text:
+                        replacement = str(value) if value else ''
+                        run.text = run.text.replace(token, replacement)
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
+    
     for slide in prs.slides:
         shapes_to_delete = []
         images_to_add = []
+
         for shape in slide.shapes:
             if shape.has_text_frame:
+                text_content = shape.text
                 for img_token, img_file in image_inputs.items():
-                    if img_token in shape.text and img_file is not None:
+                    if img_token in text_content and img_file is not None:
                         images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
                         shapes_to_delete.append(shape)
                         break
+
         for shape in slide.shapes:
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
                         replace_text_in_paragraph(paragraph, text_inputs)
+                
                 if hasattr(shape, 'table') and shape.table:
                     for row in shape.table.rows:
                         for cell in row.cells:
                             if cell.text_frame:
                                 for paragraph in cell.text_frame.paragraphs:
                                     replace_text_in_paragraph(paragraph, text_inputs)
+
         for img_file, left, top, width, height in images_to_add:
             try:
-                slide.shapes.add_picture(img_file, left, top, width=width, height=height)
-            except:
+                processed_img = smart_crop_to_fit(img_file, width, height)
+                slide.shapes.add_picture(processed_img, left, top, width=width, height=height)
+            except Exception:
                 pass
+
         for old_shape in shapes_to_delete:
             try:
                 sp = old_shape._element
                 sp.getparent().remove(sp)
-            except:
+            except Exception:
                 pass
+
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
     return pptx_stream.getvalue()
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     doc = Document(io.BytesIO(template_bytes))
+    
     for paragraph in doc.paragraphs:
         has_image = False
         for img_token in image_inputs.keys():
             if img_token in paragraph.text:
                 has_image = True
                 break
+        
         if not has_image:
             replace_text_in_paragraph(paragraph, text_inputs)
+    
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
                     replace_text_in_paragraph(paragraph, text_inputs)
+    
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
     doc_stream.seek(0)
@@ -409,185 +570,695 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
 def get_download_filename(template_name, file_type):
     if template_name:
         base_name = re.sub(r'\.(pptx|docx)$', '', template_name)
+        base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"{base_name}_{timestamp}.{file_type}"
-    return f"Document_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_type}"
+    else:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        return f"Generated_Document_{timestamp}.{file_type}"
 
-# --- MAP FUNCTIONS ---
-def get_basemap_tiles(basemap):
+# --- MAP FUNCTIONALITY - HYBRID AUTO + MANUAL ---
+def get_basemap_tiles(basemap_choice):
+    """Get the appropriate tile layer URL based on basemap choice"""
     basemaps = {
         'satellite': 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
         'openstreetmap': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         'carto_light': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
     }
-    return basemaps.get(basemap, basemaps['satellite'])
+    return basemaps.get(basemap_choice, basemaps['satellite'])
 
-def capture_map_simple(lat, lng, basemap='satellite', zoom=15):
-    """Simple map capture using static API"""
+def capture_map_auto(lat, lng, basemap='satellite', zoom=15):
+    """
+    Try all automatic capture methods in order
+    Returns: (image_bytes, method_used)
+    """
+    # Try Google Static API first
     try:
-        # Try Google Static API
-        url = f"https://maps.googleapis.com/maps/api/staticmap?center={lat},{lng}&zoom={zoom}&size=800x600&maptype=satellite&markers=color:red%7C{lat},{lng}&key=AIzaSyA5oEohxJ-jB5WBR6pR3D8VtaY8X2CkT-8"
+        api_key = "AIzaSyA5oEohxJ-jB5WBR6pR3D8VtaY8X2CkT-8"
+        maptype = 'satellite' if basemap == 'satellite' else 'roadmap'
+        url = f"https://maps.googleapis.com/maps/api/staticmap?center={lat},{lng}&zoom={zoom}&size=800x600&maptype={maptype}&markers=color:red%7C{lat},{lng}&key={api_key}"
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             img = Image.open(io.BytesIO(response.content))
             img_bytes = io.BytesIO()
             img.save(img_bytes, format='PNG')
             img_bytes.seek(0)
-            return img_bytes
+            return img_bytes, "Google Static API"
     except:
         pass
-    # Fallback: Create placeholder
+    
+    # Try OSM Static API
     try:
-        from PIL import ImageDraw
+        url = f"https://staticmap.openstreetmap.de/staticmap.php?center={lat},{lng}&zoom={zoom}&size=800x600&maptype=mapnik&markers={lat},{lng},red-pin"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            img = Image.open(io.BytesIO(response.content))
+            img_bytes = io.BytesIO()
+            img.save(img_bytes, format='PNG')
+            img_bytes.seek(0)
+            return img_bytes, "OSM Static API"
+    except:
+        pass
+    
+    # Ultimate fallback: Create a placeholder image
+    return create_placeholder_image(lat, lng), "Placeholder Image"
+
+def create_placeholder_image(lat, lng):
+    """Ultimate fallback: Create a placeholder image"""
+    try:
+        from PIL import Image, ImageDraw
+        
         img = Image.new('RGB', (800, 600), color='#F0F4F8')
         draw = ImageDraw.Draw(img)
-        draw.text((300, 280), f"Location: {lat:.6f}, {lng:.6f}", fill='#003366')
+        
+        # Border
+        draw.rectangle([10, 10, 790, 590], outline='#003366', width=2)
+        
+        # Grid
+        for i in range(50, 800, 50):
+            draw.line([(i, 10), (i, 590)], fill='#E0E5EC', width=1)
+        for i in range(50, 600, 50):
+            draw.line([(10, i), (790, i)], fill='#E0E5EC', width=1)
+        
+        # Pin
+        pin_x, pin_y = 400, 250
+        draw.ellipse([pin_x-10, pin_y+20, pin_x+10, pin_y+30], fill='#B0B8C0')
+        draw.polygon([
+            (pin_x, pin_y-20),
+            (pin_x-12, pin_y+8),
+            (pin_x+12, pin_y+8)
+        ], fill='#FF0000')
+        draw.ellipse([pin_x-8, pin_y-8, pin_x+8, pin_y+8], fill='#FFFFFF')
+        draw.ellipse([pin_x-4, pin_y-4, pin_x+4, pin_y+4], fill='#FF0000')
+        
+        # Text
+        draw.text((300, 400), f"Lat: {lat:.6f}, Lng: {lng:.6f}", fill='#003366')
+        draw.text((350, 430), "Location Pin", fill='#003366')
+        
         img_bytes = io.BytesIO()
         img.save(img_bytes, format='PNG')
         img_bytes.seek(0)
         return img_bytes
+        
     except:
-        return None
+        # Super simple fallback
+        img = Image.new('RGB', (800, 600), color='#FFFFFF')
+        draw = ImageDraw.Draw(img)
+        draw.text((300, 280), f"Location: {lat:.6f}, {lng:.6f}", fill='#000000')
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='PNG')
+        img_bytes.seek(0)
+        return img_bytes
 
-def parse_coordinates(coord_string):
-    match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$', coord_string.strip())
-    if match:
-        return float(match.group(1)), float(match.group(2))
-    return None, None
+def create_map_export_html(lat, lng, basemap='satellite', zoom=15):
+    """Create HTML with export functionality"""
+    tile_url = get_basemap_tiles(basemap)
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Map Export</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+        <style>
+            body, html {{ margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; background: #f0f4f8; }}
+            #container {{
+                max-width: 900px;
+                margin: 20px auto;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }}
+            #controls {{
+                padding: 16px 24px;
+                background: #003366;
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 12px;
+            }}
+            #controls .info {{
+                display: flex;
+                gap: 20px;
+                font-size: 13px;
+            }}
+            #controls .info span {{ opacity: 0.8; }}
+            #controls .info strong {{ color: #FFD700; }}
+            #map {{ height: 500px; width: 100%; }}
+            #export-section {{
+                padding: 16px 24px;
+                background: #f8f9fa;
+                display: flex;
+                justify-content: center;
+                gap: 12px;
+                border-top: 1px solid #e0e0e0;
+            }}
+            .btn {{
+                padding: 10px 24px;
+                border: none;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 14px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }}
+            .btn-primary {{
+                background: #003366;
+                color: white;
+            }}
+            .btn-primary:hover {{
+                background: #002244;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,51,102,0.3);
+            }}
+            .btn-success {{
+                background: #28a745;
+                color: white;
+            }}
+            .btn-success:hover {{
+                background: #218838;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(40,167,69,0.3);
+            }}
+            .btn-secondary {{
+                background: #6c757d;
+                color: white;
+            }}
+            .btn-secondary:hover {{
+                background: #5a6268;
+            }}
+            #status {{
+                padding: 12px 24px;
+                text-align: center;
+                display: none;
+            }}
+            #status.success {{
+                display: block;
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }}
+            #status.error {{
+                display: block;
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }}
+            #preview {{
+                display: none;
+                padding: 16px 24px;
+                text-align: center;
+            }}
+            #preview img {{
+                max-width: 100%;
+                border-radius: 8px;
+                border: 1px solid #e0e0e0;
+            }}
+            .info-box {{
+                position: absolute;
+                bottom: 80px;
+                right: 20px;
+                background: white;
+                padding: 12px 16px;
+                border-radius: 6px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                font-family: monospace;
+                font-size: 12px;
+                z-index: 1000;
+            }}
+        </style>
+    </head>
+    <body>
+        <div id="container">
+            <div id="controls">
+                <div class="info">
+                    <span>📍 Location: <strong>{lat:.6f}, {lng:.6f}</strong></span>
+                    <span>🗺️ Basemap: <strong>{basemap}</strong></span>
+                    <span>🔍 Zoom: <strong>{zoom}</strong></span>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="closePopup()">Close</button>
+                </div>
+            </div>
+            <div id="map" style="position:relative;"></div>
+            <div class="info-box" id="coordInfo">
+                <b>📍 Pin Location</b><br>
+                Lat: {lat:.6f}<br>
+                Lng: {lng:.6f}
+            </div>
+            <div id="status"></div>
+            <div id="preview">
+                <h4>Map Preview</h4>
+                <img id="previewImage" />
+                <br><br>
+                <button class="btn btn-success" onclick="useThisMap()">Use This Map</button>
+                <button class="btn btn-secondary" onclick="retryExport()">Retry</button>
+            </div>
+            <div id="export-section">
+                <button class="btn btn-primary" onclick="exportMap()">📷 Export as Image</button>
+            </div>
+        </div>
+        <script>
+            var currentLat = {lat};
+            var currentLng = {lng};
+            var mapInstance = null;
+            var capturedImageData = null;
+            
+            function initMap() {{
+                mapInstance = L.map('map').setView([currentLat, currentLng], {zoom});
+                
+                L.tileLayer('{tile_url}', {{
+                    maxZoom: 20,
+                    attribution: 'Map'
+                }}).addTo(mapInstance);
+                
+                var pinIcon = L.divIcon({{
+                    html: `
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+                                  fill="#FF0000" stroke="#FFFFFF" stroke-width="1.5"/>
+                            <circle cx="12" cy="9" r="2" fill="#FFFFFF"/>
+                        </svg>
+                    `,
+                    className: '',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32]
+                }});
+                
+                var marker = L.marker([currentLat, currentLng], {{
+                    icon: pinIcon,
+                    draggable: true
+                }}).addTo(mapInstance);
+                
+                marker.on('dragend', function(e) {{
+                    var pos = marker.getLatLng();
+                    currentLat = pos.lat;
+                    currentLng = pos.lng;
+                    document.getElementById('coordInfo').innerHTML = 
+                        '<b>📍 Pin Location</b><br>Lat: ' + pos.lat.toFixed(6) + '<br>Lng: ' + pos.lng.toFixed(6) +
+                        '<br><span style="font-size:10px; color:#999;">Drag pin to adjust</span>';
+                }});
+                
+                // Fix map sizing
+                setTimeout(function() {{
+                    mapInstance.invalidateSize();
+                }}, 500);
+            }}
+            
+            function exportMap() {{
+                var status = document.getElementById('status');
+                var mapContainer = document.getElementById('map');
+                
+                status.className = '';
+                status.textContent = '⏳ Capturing map...';
+                status.style.display = 'block';
+                
+                // Update coordinates before capture
+                var latInput = document.querySelector('input[data-key="coords"]');
+                if (latInput) {{
+                    latInput.value = currentLat.toFixed(6) + ', ' + currentLng.toFixed(6);
+                }}
+                
+                html2canvas(mapContainer, {{
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#FFFFFF',
+                    logging: false,
+                    width: mapContainer.scrollWidth,
+                    height: mapContainer.scrollHeight
+                }}).then(function(canvas) {{
+                    capturedImageData = canvas.toDataURL('image/png');
+                    
+                    // Show preview
+                    var preview = document.getElementById('preview');
+                    var previewImg = document.getElementById('previewImage');
+                    previewImg.src = capturedImageData;
+                    preview.style.display = 'block';
+                    
+                    status.className = 'success';
+                    status.textContent = '✅ Map captured successfully! Click "Use This Map" to apply.';
+                    
+                    // Scroll to preview
+                    preview.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                    
+                }}).catch(function(error) {{
+                    console.error('Capture error:', error);
+                    status.className = 'error';
+                    status.textContent = '❌ Capture failed: ' + error.message;
+                }});
+            }}
+            
+            function useThisMap() {{
+                if (!capturedImageData) {{
+                    alert('Please export the map first.');
+                    return;
+                }}
+                
+                // Send to parent window
+                window.parent.postMessage({{
+                    type: 'map_capture',
+                    token: '{token}',
+                    image: capturedImageData,
+                    lat: currentLat,
+                    lng: currentLng
+                }}, '*');
+                
+                var status = document.getElementById('status');
+                status.className = 'success';
+                status.textContent = '✅ Map applied to document!';
+                
+                // Close after 2 seconds
+                setTimeout(function() {{
+                    window.parent.postMessage({{
+                        type: 'close_popup',
+                        token: '{token}'
+                    }}, '*');
+                }}, 1500);
+            }}
+            
+            function retryExport() {{
+                document.getElementById('preview').style.display = 'none';
+                document.getElementById('status').style.display = 'none';
+                exportMap();
+            }}
+            
+            function closePopup() {{
+                window.parent.postMessage({{
+                    type: 'close_popup',
+                    token: '{token}'
+                }}, '*');
+            }}
+            
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {{
+                document.addEventListener('DOMContentLoaded', initMap);
+            }} else {{
+                initMap();
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return html
 
-def map_input_component(token, label, default_lat=14.5995, default_lng=120.9842):
+def map_editor_component(token, clean_label, default_lat=14.5995, default_lng=120.9842):
+    """Map Editor with Hybrid Auto + Manual approach"""
+    
     map_key = f"map_{token}"
+    
+    # Initialize session state for this map
     if map_key not in st.session_state:
         st.session_state[map_key] = {
-            "lat": default_lat, "lng": default_lng,
-            "screenshot": None, "saved": False,
-            "basemap": "satellite", "zoom": 15, "open": False
+            "lat": default_lat,
+            "lng": default_lng,
+            "screenshot": None,
+            "saved": False,
+            "basemap": "satellite",
+            "zoom": 15,
+            "editor_open": False,
+            "auto_capture_failed": False,
+            "capture_method": None,
+            "show_popup": False
         }
     
+    # Show current status
     if st.session_state[map_key]["saved"]:
-        st.markdown(f'<div class="map-saved-indicator">Location: {st.session_state[map_key]["lat"]:.6f}, {st.session_state[map_key]["lng"]:.6f}</div>', unsafe_allow_html=True)
-        if st.session_state[map_key]["screenshot"]:
-            st.image(st.session_state[map_key]["screenshot"], width=200)
+        st.markdown(
+            f'<div class="map-saved-indicator">✅ Location saved: {st.session_state[map_key]["lat"]:.6f}, {st.session_state[map_key]["lng"]:.6f}</div>', 
+            unsafe_allow_html=True
+        )
+        if st.session_state[map_key]["screenshot"] is not None:
+            st.image(st.session_state[map_key]["screenshot"], caption="Current Map", width=250)
+            if st.session_state[map_key]["capture_method"]:
+                st.caption(f"Captured via: {st.session_state[map_key]['capture_method']}")
     
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        if st.button("Open Map", key=f"open_{token}", use_container_width=True):
-            st.session_state[map_key]["open"] = not st.session_state[map_key].get("open", False)
+    # Buttons
+    col_btn, col_clear = st.columns([3, 1])
+    with col_btn:
+        if st.button("🗺️ Open Map Editor", key=f"open_editor_{token}", use_container_width=True):
+            st.session_state[map_key]["editor_open"] = not st.session_state[map_key]["editor_open"]
             st.rerun()
-    with col2:
-        if st.button("Clear", key=f"clear_{token}", use_container_width=True):
+    
+    with col_clear:
+        if st.button("Clear Map", key=f"clear_map_{token}", use_container_width=True):
             st.session_state[map_key]["saved"] = False
             st.session_state[map_key]["screenshot"] = None
+            st.session_state[map_key]["auto_capture_failed"] = False
             st.rerun()
     
-    if st.session_state[map_key].get("open", False):
-        with st.expander("Map Editor", expanded=True):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                basemap = st.selectbox("Basemap", ["satellite", "openstreetmap", "carto_light"], 
-                    index=["satellite", "openstreetmap", "carto_light"].index(st.session_state[map_key].get("basemap", "satellite")),
-                    key=f"basemap_{token}", label_visibility="collapsed")
-                st.session_state[map_key]["basemap"] = basemap
-            with col_b:
-                zoom = st.slider("Zoom", 10, 18, st.session_state[map_key]["zoom"], key=f"zoom_{token}")
+    # Map Editor Expander
+    if st.session_state[map_key]["editor_open"]:
+        with st.expander("🗺️ Map Editor", expanded=True):
+            st.markdown('<div class="map-editor-header">📍 Set location, then click "Auto Capture" or "Manual Export"</div>', unsafe_allow_html=True)
+            
+            # Editor controls
+            col1, col2, col3 = st.columns([2, 2, 1])
+            
+            with col1:
+                basemap_choice = st.selectbox(
+                    "Basemap",
+                    ["satellite", "openstreetmap", "carto_light"],
+                    index=["satellite", "openstreetmap", "carto_light"].index(
+                        st.session_state[map_key].get("basemap", "satellite")
+                    ),
+                    key=f"basemap_editor_{token}",
+                    label_visibility="collapsed"
+                )
+                if basemap_choice != st.session_state[map_key].get("basemap", "satellite"):
+                    st.session_state[map_key]["basemap"] = basemap_choice
+            
+            with col2:
+                zoom = st.slider(
+                    "Zoom",
+                    min_value=10,
+                    max_value=18,
+                    value=st.session_state[map_key].get("zoom", 15),
+                    key=f"zoom_editor_{token}"
+                )
                 st.session_state[map_key]["zoom"] = zoom
             
-            coords = st.text_input("Coordinates (lat, lon)",
-                value=f"{st.session_state[map_key]['lat']:.6f}, {st.session_state[map_key]['lng']:.6f}",
-                key=f"coords_{token}")
-            lat, lng = parse_coordinates(coords)
-            if lat and lng:
-                st.session_state[map_key]["lat"] = lat
-                st.session_state[map_key]["lng"] = lng
+            with col3:
+                st.markdown('<div style="padding-top: 24px;"></div>', unsafe_allow_html=True)
+                if st.button("🔄 Refresh", key=f"refresh_map_{token}", use_container_width=True):
+                    st.rerun()
+            
+            # Coordinate input
+            current_lat = st.session_state[map_key]["lat"]
+            current_lng = st.session_state[map_key]["lng"]
+            
+            default_coords = f"{current_lat:.6f}, {current_lng:.6f}"
+            coords_input = st.text_input(
+                "Coordinates (lat, lon)",
+                value=default_coords,
+                key=f"coords_{token}",
+                help="Enter coordinates in format: lat, lon",
+                placeholder="e.g., 14.5995, 120.9842"
+            )
+            
+            # Parse coordinates
+            lat, lng = parse_coordinates(coords_input)
+            if lat is not None and lng is not None:
+                if lat != st.session_state[map_key]["lat"] or lng != st.session_state[map_key]["lng"]:
+                    st.session_state[map_key]["lat"] = lat
+                    st.session_state[map_key]["lng"] = lng
+                    st.rerun()
+            
+            # Display interactive map
+            st.markdown('<div class="map-container">', unsafe_allow_html=True)
             
             try:
-                tile_url = get_basemap_tiles(basemap)
-                m = folium.Map(location=[st.session_state[map_key]["lat"], st.session_state[map_key]["lng"]],
-                    zoom_start=zoom, width='100%', height=350, tiles=tile_url)
-                folium.Marker([st.session_state[map_key]["lat"], st.session_state[map_key]["lng"]], draggable=True).add_to(m)
-                folium_static(m, width=700, height=350)
-            except:
-                st.info("Enter coordinates manually.")
+                current_lat = st.session_state[map_key]["lat"]
+                current_lng = st.session_state[map_key]["lng"]
+                
+                tile_url = get_basemap_tiles(basemap_choice)
+                
+                m = folium.Map(
+                    location=[current_lat, current_lng],
+                    zoom_start=st.session_state[map_key]["zoom"],
+                    width='100%',
+                    height=400,
+                    tiles=tile_url,
+                    attr='Map'
+                )
+                
+                pin_svg = """
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+                          fill="#FF0000" stroke="#FFFFFF" stroke-width="1.5"/>
+                    <circle cx="12" cy="9" r="2" fill="#FFFFFF"/>
+                </svg>
+                """
+                
+                marker = folium.Marker(
+                    [current_lat, current_lng],
+                    popup=f"{clean_label}<br>{current_lat:.6f}, {current_lng:.6f}",
+                    icon=folium.DivIcon(
+                        html=pin_svg,
+                        icon_size=(32, 32),
+                        icon_anchor=(16, 32),
+                        popup_anchor=(0, -32)
+                    ),
+                    draggable=True
+                ).add_to(m)
+                
+                folium_static(m, width=700, height=400)
+                st.caption("Drag the red pin to set location")
+                
+            except Exception as e:
+                st.warning(f"Map display limited: {str(e)}")
+                st.info("Enter coordinates manually and click Auto Capture")
             
-            if st.button("Capture Map", key=f"capture_{token}", use_container_width=True):
-                with st.spinner("Capturing..."):
-                    result = capture_map_simple(st.session_state[map_key]["lat"], st.session_state[map_key]["lng"], basemap, zoom)
-                    if result:
-                        st.session_state[map_key]["screenshot"] = result
-                        st.session_state[map_key]["saved"] = True
-                        st.success("Map captured!")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # --- AUTO CAPTURE SECTION ---
+            st.markdown("---")
+            col_auto, col_manual = st.columns([1, 1])
+            
+            with col_auto:
+                if st.button("📷 Auto Capture", key=f"auto_capture_{token}", use_container_width=True):
+                    with st.spinner("Trying automatic capture..."):
+                        lat = st.session_state[map_key]["lat"]
+                        lng = st.session_state[map_key]["lng"]
+                        basemap = st.session_state[map_key]["basemap"]
+                        zoom = st.session_state[map_key]["zoom"]
+                        
+                        result, method = capture_map_auto(lat, lng, basemap, zoom)
+                        
+                        if result is not None:
+                            st.session_state[map_key]["screenshot"] = result
+                            st.session_state[map_key]["saved"] = True
+                            st.session_state[map_key]["capture_method"] = method
+                            st.session_state[map_key]["auto_capture_failed"] = False
+                            auto_save_config()
+                            st.success(f"✅ Map captured successfully via: {method}")
+                            st.rerun()
+                        else:
+                            st.session_state[map_key]["auto_capture_failed"] = True
+                            st.error("❌ Auto capture failed. Please use Manual Export below.")
+                            st.rerun()
+            
+            with col_manual:
+                if st.button("📤 Manual Export", key=f"manual_export_{token}", use_container_width=True):
+                    st.session_state[map_key]["show_popup"] = True
+                    st.rerun()
+            
+            # --- MANUAL EXPORT POPUP ---
+            if st.session_state[map_key]["show_popup"]:
+                lat = st.session_state[map_key]["lat"]
+                lng = st.session_state[map_key]["lng"]
+                basemap = st.session_state[map_key]["basemap"]
+                zoom = st.session_state[map_key]["zoom"]
+                
+                # Create the HTML content
+                html_content = create_map_export_html(lat, lng, basemap, zoom, token)
+                
+                # Show as popup using Streamlit dialog
+                with st.container():
+                    st.markdown("""
+                    <div class="popup-overlay">
+                        <div class="popup-content">
+                    """, unsafe_allow_html=True)
+                    
+                    # Embed the HTML
+                    components.html(html_content, height=700, scrolling=True)
+                    
+                    # Close button
+                    if st.button("Close", key=f"close_popup_{token}"):
+                        st.session_state[map_key]["show_popup"] = False
                         st.rerun()
+                    
+                    st.markdown("</div></div>", unsafe_allow_html=True)
+            
+            # Handle postMessage from iframe
+            # Check if we have a captured image from the popup
+            captured_img = st.query_params.get(f"captured_image_{token}")
+            if captured_img:
+                try:
+                    # Decode and save
+                    img_data = base64.b64decode(captured_img.split(',')[1])
+                    img_bytes = io.BytesIO(img_data)
+                    img_bytes.seek(0)
+                    
+                    st.session_state[map_key]["screenshot"] = img_bytes
+                    st.session_state[map_key]["saved"] = True
+                    st.session_state[map_key]["capture_method"] = "Manual Export"
+                    st.session_state[map_key]["show_popup"] = False
+                    auto_save_config()
+                    
+                    st.success("✅ Map captured from manual export!")
+                    st.rerun()
+                except:
+                    pass
     
-    if st.session_state[map_key]["saved"] and st.session_state[map_key]["screenshot"]:
+    # Return screenshot if saved
+    if st.session_state[map_key]["saved"] and st.session_state[map_key]["screenshot"] is not None:
         return st.session_state[map_key]["screenshot"]
     return None
 
-# --- CTA PRESET MANAGER UI ---
-def cta_preset_manager():
-    if "cta_presets" not in st.session_state:
-        st.session_state.cta_presets = load_cta_presets()
-    
-    with st.expander("CTA Preset Manager", expanded=False):
-        # Add new preset
-        col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1])
-        with col1:
-            name = st.text_input("Name", key="cta_name", placeholder="Name", label_visibility="collapsed")
-        with col2:
-            phone = st.text_input("Phone", key="cta_phone", placeholder="Phone", label_visibility="collapsed")
-        with col3:
-            email = st.text_input("Email", key="cta_email", placeholder="Email", label_visibility="collapsed")
-        with col4:
-            company = st.text_input("Company", key="cta_company", placeholder="Company", label_visibility="collapsed")
-        with col5:
-            if st.button("Add", key="add_cta", use_container_width=True):
-                if name.strip():
-                    st.session_state.cta_presets.append({
-                        "name": name.strip(), "phone": phone.strip(),
-                        "email": email.strip(), "company": company.strip()
-                    })
-                    st.session_state.cta_presets.sort(key=lambda x: x['name'].lower())
-                    save_cta_presets(st.session_state.cta_presets)
-                    st.rerun()
-        
-        # Display presets
-        if st.session_state.cta_presets:
-            for idx, preset in enumerate(st.session_state.cta_presets):
-                col_display, col_delete = st.columns([5, 1])
-                with col_display:
-                    st.markdown(f"""
-                    <div class="cta-preset-card">
-                        <div class="cta-name">{preset['name']}</div>
-                        <div class="cta-detail">{preset.get('phone', '')} {preset.get('email', '')} {preset.get('company', '')}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with col_delete:
-                    if st.button("X", key=f"del_cta_{idx}", use_container_width=True):
-                        del st.session_state.cta_presets[idx]
-                        save_cta_presets(st.session_state.cta_presets)
-                        st.rerun()
+def parse_coordinates(coord_string):
+    """Parse coordinates from a string format: 'lat, lon'"""
+    match = re.match(r'^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$', coord_string.strip())
+    if match:
+        lat = float(match.group(1))
+        lon = float(match.group(2))
+        return lat, lon
+    return None, None
 
-def cta_selector(token, label):
-    cta_token = f"cta_{token}"
-    if cta_token not in st.session_state:
-        st.session_state[cta_token] = []
-    
-    preset_names = [p['name'] for p in st.session_state.cta_presets]
-    if not preset_names:
-        return ""
-    
-    selected = st.multiselect(label, options=preset_names, default=st.session_state[cta_token], key=f"cta_select_{token}")
-    st.session_state[cta_token] = selected
-    selected_presets = [p for p in st.session_state.cta_presets if p['name'] in selected]
-    if selected_presets:
-        preview = format_cta_list(selected_presets)
-        st.markdown(f'<div class="cta-preview">{preview}</div>', unsafe_allow_html=True)
-    return format_cta_list(selected_presets)
+def simple_uploader_row(label_text, allowed_types, key):
+    st.markdown(f'<div class="field-label">{label_text}</div>', unsafe_allow_html=True)
+    return st.file_uploader(label_text, type=allowed_types, key=f"val_{key}", label_visibility="collapsed")
+
+# --- JAVASCRIPT LISTENER FOR POSTMESSAGE ---
+def add_postmessage_listener():
+    """Add JavaScript listener for postMessage from iframe"""
+    js = """
+    <script>
+        window.addEventListener('message', function(event) {
+            // Handle map capture messages
+            if (event.data && event.data.type === 'map_capture') {
+                // Store the captured image
+                var hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'captured_image_' + event.data.token;
+                hiddenInput.value = event.data.image;
+                document.body.appendChild(hiddenInput);
+                hiddenInput.dispatchEvent(new Event('change'));
+                
+                // Update coordinates
+                var coordInput = document.querySelector('input[data-key="coords_' + event.data.token + '"]');
+                if (coordInput) {
+                    coordInput.value = event.data.lat.toFixed(6) + ', ' + event.data.lng.toFixed(6);
+                    coordInput.dispatchEvent(new Event('change'));
+                }
+            }
+            
+            if (event.data && event.data.type === 'close_popup') {
+                // Find and click the close button
+                var closeBtn = document.querySelector('[data-testid="baseButton-secondary"]');
+                if (closeBtn && closeBtn.textContent === 'Close') {
+                    closeBtn.click();
+                }
+            }
+        });
+    </script>
+    """
+    st.components.v1.html(js, height=0)
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux - Template Automation", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
-# Session state
+# Add postMessage listener
+add_postmessage_listener()
+
+# Initialize session state
 if "custom_mapping" not in st.session_state:
     st.session_state.custom_mapping = {}
 if "tokens" not in st.session_state:
@@ -600,6 +1271,12 @@ if "template_loaded" not in st.session_state:
     st.session_state.template_loaded = False
 if "template_type" not in st.session_state:
     st.session_state.template_type = None
+if "delete_trigger" not in st.session_state:
+    st.session_state.delete_trigger = False
+if "show_delete_confirm" not in st.session_state:
+    st.session_state.show_delete_confirm = False
+if "template_to_delete" not in st.session_state:
+    st.session_state.template_to_delete = None
 if "save_success" not in st.session_state:
     st.session_state.save_success = False
 if "saved_file_name" not in st.session_state:
@@ -608,131 +1285,327 @@ if "clear_uploader" not in st.session_state:
     st.session_state.clear_uploader = False
 if "map_data" not in st.session_state:
     st.session_state.map_data = {}
-if "cta_presets" not in st.session_state:
-    st.session_state.cta_presets = load_cta_presets()
 
 # --- MAIN UI ---
-st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
 
 # Template Management
 st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-header">Templates</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header">Template Management</div>', unsafe_allow_html=True)
 
-col1, col2 = st.columns(2)
+col_template1, col_template2 = st.columns(2)
 
-with col1:
-    templates = get_all_templates()
-    options = ["Select template"] + [f"{t['name']} ({t['type']})" for t in templates]
-    selected = st.selectbox("Load Template", options, label_visibility="collapsed")
+with col_template1:
+    saved_templates = get_saved_templates()
+    template_options = ["Select saved template"]
+    if saved_templates:
+        for t in saved_templates:
+            source_label = " (Google Drive)" if t.get('source') == 'gdrive' else ""
+            template_options.append(f"{t['name']} ({t['type']}){source_label}")
     
-    if selected and selected != "Select template":
-        name = selected.split(' (')[0]
-        is_github = any(t['source'] == 'github' for t in templates if t['name'] == name)
-        bytes_data = download_from_github(name) if is_github else load_template_local(name)
-        if bytes_data:
-            st.session_state.template_bytes = bytes_data
-            st.session_state.saved_template_name = name
+    dropdown_col, delete_col = st.columns([4, 1])
+    
+    with dropdown_col:
+        selected_template = st.selectbox(
+            "Load Template",
+            template_options,
+            key="saved_template_select",
+            label_visibility="collapsed"
+        )
+    
+    with delete_col:
+        if selected_template and selected_template != "Select saved template":
+            template_name = selected_template.split(' (')[0]
+            if st.button("Delete", key="delete_template", help="Delete this template"):
+                st.session_state.show_delete_confirm = True
+                st.session_state.template_to_delete = template_name
+                st.rerun()
+    
+    if st.session_state.show_delete_confirm:
+        st.warning(f"Are you sure you want to delete '{st.session_state.template_to_delete}'?")
+        col_confirm1, col_confirm2 = st.columns([1, 1])
+        with col_confirm1:
+            if st.button("Yes, Delete", key="confirm_delete"):
+                if delete_template_file(st.session_state.template_to_delete):
+                    st.session_state.delete_trigger = True
+                    st.session_state.template_bytes = None
+                    st.session_state.saved_template_name = None
+                    st.session_state.template_loaded = False
+                    st.session_state.tokens = []
+                    st.session_state.show_delete_confirm = False
+                    st.session_state.template_to_delete = None
+                    st.success(f"Deleted: {st.session_state.template_to_delete}")
+                    st.rerun()
+        with col_confirm2:
+            if st.button("Cancel", key="cancel_delete"):
+                st.session_state.show_delete_confirm = False
+                st.session_state.template_to_delete = None
+                st.rerun()
+    
+    if selected_template and selected_template != "Select saved template" and not st.session_state.delete_trigger:
+        template_name = selected_template.split(' (')[0]
+        
+        # Check if it's from Google Drive
+        is_gdrive = "(Google Drive)" in selected_template
+        template_bytes = None
+        
+        if is_gdrive:
+            # Find the drive ID
+            for t in saved_templates:
+                if t['name'] == template_name and t.get('source') == 'gdrive':
+                    template_bytes = download_from_gdrive(t['id'])
+                    break
+        else:
+            template_bytes = load_template_from_file(template_name)
+        
+        if template_bytes:
+            st.session_state.template_bytes = template_bytes
+            st.session_state.saved_template_name = template_name
             st.session_state.template_loaded = True
-            st.session_state.template_type = 'pptx' if name.endswith('.pptx') else 'docx'
-            st.session_state.tokens = extract_placeholders(bytes_data, st.session_state.template_type)
+            st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+            
+            config_name = template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+            config_data = load_config_from_file(config_name)
+            if config_data:
+                st.session_state.custom_mapping = config_data
+            
+            tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+            st.session_state.tokens = tokens
 
-with col2:
-    uploaded = st.file_uploader("Upload Template", type=["pptx", "docx"], label_visibility="collapsed")
-    if uploaded:
-        bytes_data = uploaded.getvalue()
-        st.session_state.template_bytes = bytes_data
+with col_template2:
+    uploader_key = "new_template_upload_clear" if st.session_state.clear_uploader else "new_template_upload"
+    
+    uploaded_template = st.file_uploader(
+        "Upload New Template", 
+        type=["pptx", "docx"], 
+        label_visibility="collapsed", 
+        key=uploader_key
+    )
+    
+    if st.session_state.clear_uploader:
+        st.session_state.clear_uploader = False
+    
+    if uploaded_template:
+        template_bytes = uploaded_template.getvalue()
+        st.session_state.template_bytes = template_bytes
         st.session_state.saved_template_name = None
         st.session_state.template_loaded = True
-        st.session_state.template_type = 'pptx' if uploaded.name.endswith('.pptx') else 'docx'
-        st.session_state.tokens = extract_placeholders(bytes_data, st.session_state.template_type)
-        if st.button("Save Template", use_container_width=True):
-            save_template_local(bytes_data, uploaded.name)
-            upload_to_github(bytes_data, uploaded.name)
-            st.session_state.saved_template_name = uploaded.name
-            st.success("Template saved!")
+        st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
+        
+        tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+        st.session_state.tokens = tokens
+        
+        # Show Google Drive save option
+        col_save_local, col_save_drive = st.columns([1, 1])
+        with col_save_local:
+            if st.button("💾 Save Local", key="save_local_btn", use_container_width=True):
+                saved_path = save_template_to_file(template_bytes, uploaded_template.name)
+                st.session_state.saved_template_name = uploaded_template.name
+                
+                if st.session_state.custom_mapping:
+                    config_name = uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json'
+                    save_config_to_file(st.session_state.custom_mapping, config_name)
+                
+                st.session_state.save_success = True
+                st.session_state.saved_file_name = uploaded_template.name
+                st.session_state.clear_uploader = True
+                st.success(f"✅ Template saved locally and to Google Drive!")
+                st.rerun()
+        
+        with col_save_drive:
+            if st.button("☁️ Save to Google Drive", key="save_drive_btn", use_container_width=True):
+                # Upload directly to Google Drive
+                link = upload_to_gdrive(template_bytes, uploaded_template.name)
+                if link:
+                    st.success(f"✅ Template uploaded to Google Drive!")
+                    # Also save locally
+                    save_template_to_file(template_bytes, uploaded_template.name)
+                    st.session_state.saved_template_name = uploaded_template.name
+                    st.session_state.save_success = True
+                    st.session_state.saved_file_name = uploaded_template.name
+                    st.session_state.clear_uploader = True
+                    st.rerun()
 
-if st.session_state.template_bytes:
-    st.markdown(f'<div class="saved-indicator">Active: {st.session_state.saved_template_name or "Unsaved"} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
+if st.session_state.save_success:
+    st.success(f"✅ Template '{st.session_state.saved_file_name}' saved successfully!")
+    st.session_state.save_success = False
+    st.session_state.saved_file_name = None
+
+if st.session_state.template_bytes is not None:
+    template_name = st.session_state.saved_template_name or "Unsaved Template"
+    template_type = st.session_state.template_type or "Unknown"
+    st.markdown(f'<div class="saved-indicator">📌 Active: {template_name} ({template_type.upper()})</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- CTA PRESET MANAGER (Before Placeholders) ---
-cta_preset_manager()
-
-# --- PLACEHOLDER VALUES ---
+# Placeholder Values
 template_bytes = st.session_state.template_bytes
 template_type = st.session_state.template_type
+u_template = None
+if template_bytes is not None:
+    u_template = type('obj', (object,), {'getvalue': lambda: template_bytes})()
 
-if template_bytes and st.session_state.tokens:
-    st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
-    
+text_data = {}
+image_data = {}
+map_data = {}
+field_types = {}
+
+if u_template is not None and st.session_state.tokens:
     tokens = st.session_state.tokens
-    text_data = {}
-    image_data = {}
-    cta_tokens = get_cta_token_names()
     
-    # Split into two columns
-    mid = len(tokens) // 2
+    if not tokens:
+        st.info("ℹ️ No placeholders found in the template.")
+    else:
+        st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">🔧 Placeholder Values</div>', unsafe_allow_html=True)
+        st.info(f"Found {len(tokens)} placeholders. Select type: Text, Image, or Map")
+        
+        mid_point = len(tokens) // 2
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            for token in tokens[:mid_point]:
+                clean_label = token.replace("{", "").replace("}", "")
+                current_type = st.session_state.custom_mapping.get(token, "Text")
+                col_a, col_b = st.columns([3, 1])
+                
+                with col_b:
+                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                    type_key = f"type_{token}"
+                    data_type = st.selectbox(
+                        "Type",
+                        ["Text", "Image", "Map"],
+                        index=0 if current_type == "Text" else (1 if current_type == "Image" else 2),
+                        key=type_key,
+                        label_visibility="collapsed"
+                    )
+                    if data_type != current_type:
+                        st.session_state.custom_mapping[token] = data_type
+                        auto_save_config()
+                        st.rerun()
+                
+                with col_a:
+                    if data_type == "Image" and template_type == 'pptx':
+                        image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                        field_types[token] = "Image"
+                        st.caption("📷 Upload image (PNG, JPG)")
+                    elif data_type == "Map":
+                        st.session_state.map_data[token] = map_editor_component(token, clean_label)
+                        field_types[token] = "Map"
+                        st.caption("📍 Click Open Map Editor to set location and capture map")
+                    else:
+                        if data_type == "Image" and template_type != 'pptx':
+                            st.warning("⚠️ Image replacement only supported in PPTX templates")
+                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                        text_data[token] = st.text_input(
+                            clean_label, 
+                            key=f"val_{token}", 
+                            label_visibility="collapsed"
+                        )
+                        field_types[token] = "Text"
+        
+        with col2:
+            for token in tokens[mid_point:]:
+                clean_label = token.replace("{", "").replace("}", "")
+                current_type = st.session_state.custom_mapping.get(token, "Text")
+                col_a, col_b = st.columns([3, 1])
+                
+                with col_b:
+                    st.markdown('<div style="padding-top: 6px;"></div>', unsafe_allow_html=True)
+                    type_key = f"type_{token}_2"
+                    data_type = st.selectbox(
+                        "Type",
+                        ["Text", "Image", "Map"],
+                        index=0 if current_type == "Text" else (1 if current_type == "Image" else 2),
+                        key=type_key,
+                        label_visibility="collapsed"
+                    )
+                    if data_type != current_type:
+                        st.session_state.custom_mapping[token] = data_type
+                        auto_save_config()
+                        st.rerun()
+                
+                with col_a:
+                    if data_type == "Image" and template_type == 'pptx':
+                        image_data[token] = simple_uploader_row(clean_label, ["png", "jpg", "jpeg"], token)
+                        field_types[token] = "Image"
+                        st.caption("📷 Upload image (PNG, JPG)")
+                    elif data_type == "Map":
+                        st.session_state.map_data[token] = map_editor_component(token, clean_label)
+                        field_types[token] = "Map"
+                        st.caption("📍 Click Open Map Editor to set location and capture map")
+                    else:
+                        if data_type == "Image" and template_type != 'pptx':
+                            st.warning("⚠️ Image replacement only supported in PPTX templates")
+                        st.markdown(f'<div class="field-label">{clean_label}</div>', unsafe_allow_html=True)
+                        text_data[token] = st.text_input(
+                            clean_label, 
+                            key=f"val_{token}", 
+                            label_visibility="collapsed"
+                        )
+                        field_types[token] = "Text"
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Download Section
+if u_template is not None:
+    st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">📥 Download Document</div>', unsafe_allow_html=True)
+    
+    # Merge map screenshots into image_data
+    for token, map_screenshot in st.session_state.map_data.items():
+        if map_screenshot is not None:
+            image_data[token] = map_screenshot
+    
+    template_name = st.session_state.saved_template_name or "Generated_Document"
+    base_template_name = re.sub(r'\.(pptx|docx)$', '', template_name)
+    
     col1, col2 = st.columns(2)
     
-    for idx, token in enumerate(tokens):
-        clean_label = token.replace("{", "").replace("}", "").strip()
-        current_type = st.session_state.custom_mapping.get(token, "Text")
-        is_cta = any(cta_token in clean_label.lower() for cta_token in cta_tokens) or clean_label.lower() in cta_tokens
-        
-        col_a, col_b = st.columns([3, 1])
-        with col_b:
-            if is_cta:
-                dtype = "CTA"
-                st.markdown("**CTA**")
-            else:
-                dtype = st.selectbox("Type", ["Text", "Image", "Map"],
-                    index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
-                    key=f"type_{token}", label_visibility="collapsed")
-                if dtype != current_type:
-                    st.session_state.custom_mapping[token] = dtype
-        
-        with col_a:
-            if is_cta:
-                text_data[token] = cta_selector(token, clean_label)
-            elif dtype == "Image" and template_type == 'pptx':
-                image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"img_{token}", label_visibility="collapsed")
-            elif dtype == "Map":
-                st.session_state.map_data[token] = map_input_component(token, clean_label)
-            else:
-                text_data[token] = st.text_input(clean_label, key=f"txt_{token}", label_visibility="collapsed")
+    with col1:
+        pptx_disabled = template_type != 'pptx'
+        if pptx_disabled:
+            st.button("📊 Download PPTX", disabled=True, use_container_width=True, help="Only available for PPTX templates")
+        else:
+            try:
+                pptx_data = generate_pptx_bytes(template_bytes, text_data, image_data)
+                pptx_filename = get_download_filename(base_template_name, "pptx")
+                st.download_button(
+                    label="📊 Download PPTX",
+                    data=pptx_data,
+                    file_name=pptx_filename,
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True,
+                    key="download_pptx"
+                )
+            except Exception as e:
+                st.error(f"Error generating PPTX: {str(e)}")
     
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# --- DOWNLOAD SECTION ---
-if template_bytes:
-    st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Download</div>', unsafe_allow_html=True)
-    
-    for token, map_img in st.session_state.map_data.items():
-        if map_img:
-            image_data[token] = map_img
-    
-    template_name = st.session_state.saved_template_name or "Document"
-    base_name = re.sub(r'\.(pptx|docx)$', '', template_name)
-    
-    if template_type == 'pptx':
-        try:
-            data = generate_pptx_bytes(template_bytes, text_data, image_data)
-            st.download_button("Download PPTX", data, get_download_filename(base_name, "pptx"), use_container_width=True)
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
-    else:
-        try:
-            data = generate_docx_bytes(template_bytes, text_data, image_data)
-            st.download_button("Download DOCX", data, get_download_filename(base_name, "docx"), use_container_width=True)
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
+    with col2:
+        docx_disabled = template_type != 'docx'
+        if docx_disabled:
+            st.button("📄 Download DOCX", disabled=True, use_container_width=True, help="Only available for DOCX templates")
+        else:
+            try:
+                docx_data = generate_docx_bytes(template_bytes, text_data, image_data)
+                if docx_data:
+                    docx_filename = get_download_filename(base_template_name, "docx")
+                    st.download_button(
+                        label="📄 Download DOCX",
+                        data=docx_data,
+                        file_name=docx_filename,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key="download_docx"
+                    )
+                else:
+                    st.error("Failed to generate document.")
+            except Exception as e:
+                st.error(f"Error generating document: {str(e)}")
     
     st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("Upload or select a template to begin")
+    st.info("📌 Please upload or select a template to begin")
 
 st.markdown("---")
-st.caption("OpenFlux")
+st.caption("OpenFlux v2.0 | Template Automation with Google Drive Storage")
