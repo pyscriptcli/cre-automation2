@@ -265,7 +265,7 @@ def auto_save_config():
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#003366", pin_size=12):
     """Generates high-res map with pin included - supports street highlighted styles"""
     lon_span = e - w
     lat_span = n - s
@@ -298,11 +298,10 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
     headers = {"User-Agent": "Mozilla/5.0"}
     
-    # Map styles with street highlighting options
+    # Map styles with street highlighting options - removed "Satellite with Streets"
     styles = {
         "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
-        "Satellite with Streets": "https://mt1.google.com/vt/lyrs=y&s=Google&x={x}&y={y}&z={z}",
         "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
         "Street Map": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         "Terrain": "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
@@ -350,15 +349,24 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
+    # Calculate scale based on image dimensions and pin size
     img_width = cropped.width
     img_height = cropped.height
+    # Base scale relative to image size
     base_scale = min(img_width, img_height) / 600.0
-    # Use pin_size directly with a minimum scale
-    scale = max(0.8, (pin_size / 12.0) * base_scale * 1.5)
+    # Pin size scaling - use the exact pin_size from editor
+    # The pin_size is the diameter in points, we need to scale it appropriately
+    scale = max(0.5, (pin_size / 12.0) * base_scale * 1.8)
     radius = int(16 * scale)
+    
+    # Ensure minimum visibility
+    if radius < 4:
+        radius = 4
     
     # Draw shadow
     shadow_offset = int(2 * scale)
+    if shadow_offset < 1:
+        shadow_offset = 1
     draw.ellipse([
         pin_local_x - radius - shadow_offset, 
         pin_local_y - radius - shadow_offset, 
@@ -366,16 +374,18 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
         pin_local_y + radius + shadow_offset
     ], fill=(0, 0, 0, 60))
     
-    # Draw blue circle background
+    # Draw circle background
     draw.ellipse([
         pin_local_x - radius,
         pin_local_y - radius,
         pin_local_x + radius,
         pin_local_y + radius
-    ], fill=pin_color, outline=(255, 255, 255), width=int(2 * scale))
+    ], fill=pin_color, outline=(255, 255, 255), width=max(1, int(2 * scale)))
     
     # Draw white star in the center
     star_size = int(radius * 0.55)
+    if star_size < 2:
+        star_size = 2
     star_points = []
     for i in range(10):
         angle = math.radians(i * 36 - 90)
@@ -438,7 +448,7 @@ def render_isolated_map_editor():
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid with Streets"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
-    if size_key not in st.session_state: st.session_state[size_key] = 12  # Default pin size 12
+    if size_key not in st.session_state: st.session_state[size_key] = 12
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
@@ -448,11 +458,10 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    # Map style options with street highlighting
+    # Map style options - removed "Satellite with Streets"
     map_styles = [
         "Hybrid with Streets",
         "Hybrid", 
-        "Satellite with Streets",
         "Satellite",
         "Street Map",
         "Terrain",
@@ -509,13 +518,13 @@ def render_isolated_map_editor():
                 n, s = plat + 0.005, plat - 0.005
                 e, w = plon + 0.005, plon - 0.005
             
-            # Generate with the selected style and pin size
+            # Generate with the selected style and pin size - use EXACT same values as editor
             map_img_bytes = generate_static_map_bounds(
                 n=n, s=s, e=e, w=w, 
                 pin_lat=plat, pin_lon=plon, 
                 style=basemap_style, 
                 pin_color=pin_color, 
-                pin_size=int(pin_size)
+                pin_size=int(pin_size)  # Use the exact pin size from editor
             )
             
             st.session_state[image_key] = map_img_bytes
@@ -534,11 +543,10 @@ def render_isolated_map_editor():
             time.sleep(0.5)
             st.rerun()
 
-    # Map tile URLs with street highlighting
+    # Map tile URLs - removed "Satellite with Streets"
     tiles_dict = {
         "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
-        "Satellite with Streets": "https://mt1.google.com/vt/lyrs=y&s=Google&x={x}&y={y}&z={z}",
         "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
         "Street Map": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         "Terrain": "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
@@ -548,7 +556,6 @@ def render_isolated_map_editor():
     attr_dict = {
         "Hybrid with Streets": "Google Maps",
         "Hybrid": "Google Maps",
-        "Satellite with Streets": "Google Maps",
         "Satellite": "Google Maps",
         "Street Map": "Google Maps",
         "Terrain": "Google Maps",
@@ -564,7 +571,7 @@ def render_isolated_map_editor():
         zoom_control=True
     )
     
-    # Create blue circle with white star marker
+    # Create blue circle with white star marker - use EXACT pin size from editor
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40">
