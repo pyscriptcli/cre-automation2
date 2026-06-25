@@ -125,37 +125,13 @@ MINIMAL_CRE_SYSTEM = """
         color: #333 !important;
         white-space: nowrap !important;
     }
-    .size-control {
-        display: flex !important;
-        align-items: center !important;
-        gap: 4px !important;
-    }
-    .size-control button {
-        min-width: 28px !important;
-        height: 28px !important;
-        padding: 0 8px !important;
-        font-size: 14px !important;
-        background: #f0f0f0 !important;
-        border: 1px solid #ccc !important;
-        border-radius: 4px !important;
-        cursor: pointer !important;
-    }
-    .size-control button:hover {
-        background: #e0e0e0 !important;
-    }
-    .size-control span {
-        min-width: 30px !important;
-        text-align: center !important;
-        font-weight: 600 !important;
-        font-size: 14px !important;
-    }
     
-    /* CTA preset styles - Simplified */
+    /* CTA preset styles */
     .cta-preset-container {
         background-color: #F0F7FF !important;
         border: 1px solid #003366 !important;
         border-radius: 6px !important;
-        padding: 12px !important;
+        padding: 14px !important;
         margin-bottom: 16px !important;
     }
     .cta-preset-label {
@@ -163,19 +139,6 @@ MINIMAL_CRE_SYSTEM = """
         font-size: 13px !important;
         color: #003366 !important;
         margin-bottom: 8px !important;
-    }
-    .cta-multi-select {
-        margin-bottom: 8px !important;
-    }
-    
-    @media (max-width: 768px) {
-        .type-mapping-grid {
-            grid-template-columns: 1fr !important;
-        }
-        .map-controls-row {
-            flex-direction: column !important;
-            align-items: stretch !important;
-        }
     }
 </style>
 """
@@ -297,26 +260,19 @@ def auto_save_config():
 def detect_cta_sets():
     """Detect CTA sets in the template placeholders"""
     cta_sets = {}
-    
     for token in st.session_state.tokens:
         clean_label = token.replace("{", "").replace("}", "").upper()
-        
-        # Check for CTA pattern: CTA1_NAME, CTA2_NAME, etc.
         match = re.match(r'CTA(\d+)_(NAME|CONTACT_NUMBER|EMAIL)', clean_label)
         if match:
             cta_num = int(match.group(1))
             field_type = match.group(2)
-            
             if cta_num not in cta_sets:
                 cta_sets[cta_num] = {
                     'tokens': {},
                     'fields': set()
                 }
-            
-            # Store the token with its field type
             cta_sets[cta_num]['tokens'][field_type] = token
             cta_sets[cta_num]['fields'].add(field_type)
-    
     return cta_sets
 
 def apply_cta_preset(cta_num, advisor_name):
@@ -330,23 +286,17 @@ def apply_cta_preset(cta_num, advisor_name):
     if cta_num not in cta_sets:
         return False
     
-    # Get the tokens for this CTA set
     tokens = cta_sets[cta_num]['tokens']
-    
-    # Fill the placeholders
     if 'NAME' in tokens:
         st.session_state[f"val_{tokens['NAME']}"] = advisor_name
         st.session_state.temp_form_data[tokens['NAME']] = advisor_name
-    
     if 'CONTACT_NUMBER' in tokens:
         st.session_state[f"val_{tokens['CONTACT_NUMBER']}"] = contact_info["phone"]
         st.session_state.temp_form_data[tokens['CONTACT_NUMBER']] = contact_info["phone"]
-    
     if 'EMAIL' in tokens:
         st.session_state[f"val_{tokens['EMAIL']}"] = contact_info["email"]
         st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
-    
-    # Save to disk
+        
     if st.session_state.saved_template_name:
         temp_path = get_temp_config_path(st.session_state.saved_template_name)
         try:
@@ -355,20 +305,7 @@ def apply_cta_preset(cta_num, advisor_name):
             return True
         except Exception:
             return False
-    
     return True
-
-def apply_cta_presets_to_selected(advisor_name, selected_ctas):
-    """Apply CTA preset to selected CTA sets"""
-    if advisor_name not in contacts_database:
-        return False, []
-    
-    success_list = []
-    for cta_num in selected_ctas:
-        if apply_cta_preset(cta_num, advisor_name):
-            success_list.append(cta_num)
-    
-    return len(success_list) > 0, success_list
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12, radius_km=0, polygon_coords=None):
@@ -404,7 +341,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
     headers = {"User-Agent": "Mozilla/5.0"}
     
-    # Map styles with street highlighting options
     styles = {
         "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
@@ -447,7 +383,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     if bottom <= top: bottom = top + 100
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # --- DRAW PIN AND RADIUS ON THE CROPPED IMAGE ---
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
@@ -455,7 +390,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
-    # --- DRAW POLYGON IF PROVIDED ---
+    # --- DRAW POLYGON IF PROVIDED (OUTLINE ONLY TO PREVENT BLANKET COVERAGE) ---
     if polygon_coords and len(polygon_coords) > 2:
         polygon_points = []
         for coord in polygon_coords:
@@ -463,62 +398,41 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
             local_x = int(px - base_x) - left
             local_y = int(py - base_y) - top
             polygon_points.append((local_x, local_y))
-        
-        # Draw polygon with semi-transparent fill
-        draw.polygon(polygon_points, fill=(*hex_to_rgb(pin_color), 30), outline=pin_color, width=3)
+        draw.polygon(polygon_points, fill=None, outline=pin_color, width=3)
     
     # --- DRAW RADIUS CIRCLE IF SPECIFIED ---
     if radius_km > 0:
-        # Calculate radius in pixels at this zoom level
-        # 1 degree latitude approximately 111.32 km
         lat_deg_per_km = 1.0 / 111.32
         radius_deg = radius_km * lat_deg_per_km
-        
-        # Get pixel coordinates for a point at the radius distance
         radius_lat = pin_lat + radius_deg
         radius_px_x, radius_px_y = num2px(radius_lat, pin_lon, zoom)
         radius_local_x = int(radius_px_x - base_x) - left
         radius_local_y = int(radius_px_y - base_y) - top
-        
-        # Calculate radius in pixels
         radius_pixels = abs(radius_local_y - pin_local_y)
         
-        # Draw the radius circle with semi-transparent fill
-        # Create a temporary image for the circle to handle transparency properly
         circle_layer = Image.new('RGBA', cropped.size, (0, 0, 0, 0))
         circle_draw = ImageDraw.Draw(circle_layer)
-        
-        # Draw filled circle with transparency
         circle_draw.ellipse(
             [pin_local_x - radius_pixels, pin_local_y - radius_pixels,
              pin_local_x + radius_pixels, pin_local_y + radius_pixels],
-            fill=(*hex_to_rgb(pin_color), 40),  # 40 = approximately 15% opacity
+            fill=(*hex_to_rgb(pin_color), 40),
             outline=pin_color,
             width=max(2, int(radius_pixels * 0.02))
         )
-        
-        # Composite the circle onto the main image
         cropped = Image.alpha_composite(cropped, circle_layer)
         
-        # Draw a distance label at the right edge of the circle
         label_x = pin_local_x + int(radius_pixels * 0.6)
         label_y = pin_local_y - 15
-        
-        # Draw label background
         label_text = f"{radius_km} km"
         from PIL import ImageFont
         try:
-            # Try to use a default font
             font = ImageFont.truetype("arial.ttf", int(radius_pixels * 0.08) + 10)
         except:
             font = ImageFont.load_default()
         
-        # Get text size
         bbox = draw.textbbox((0, 0), label_text, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
-        
-        # Draw label background
         padding = 6
         draw.rectangle(
             [label_x - padding, label_y - padding,
@@ -527,11 +441,8 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
             outline=pin_color,
             width=2
         )
-        
-        # Draw label text
         draw.text((label_x, label_y), label_text, fill="#1A1A1A", font=font)
         
-        # Draw small tick marks at cardinal points
         tick_length = max(6, int(radius_pixels * 0.05))
         for angle in [0, 90, 180, 270]:
             rad = math.radians(angle)
@@ -546,10 +457,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
                 width=2
             )
     
-    # Scale pin size specifically to respect high-res canvas magnification
     radius = int((pin_size / 2) * scale_factor)
-    
-    # Draw shadow
     shadow_offset = max(1, int(radius * 0.15))
     draw.ellipse([
         pin_local_x - radius - shadow_offset, 
@@ -558,7 +466,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
         pin_local_y + radius + shadow_offset
     ], fill=(0, 0, 0, 60))
     
-    # Draw circle background
     draw.ellipse([
         pin_local_x - radius,
         pin_local_y - radius,
@@ -566,7 +473,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
         pin_local_y + radius
     ], fill=pin_color, outline=(255, 255, 255), width=max(1, int(radius * 0.1)))
     
-    # Draw white star in the center
     star_size = int(radius * 0.55)
     star_points = []
     for i in range(10):
@@ -582,7 +488,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     return img_byte_arr
 
 def hex_to_rgb(hex_color):
-    """Convert hex color to RGB tuple"""
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
@@ -590,7 +495,6 @@ def hex_to_rgb(hex_color):
 def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
     
-    # Custom CSS adjustments
     st.markdown("""
         <style>
             div[data-testid="stHorizontalBlock"] {
@@ -639,7 +543,6 @@ def render_isolated_map_editor():
         st.markdown(f"### Map Editor: {token_key}")
     st.markdown("</div><br>", unsafe_allow_html=True)
 
-    # Initialize session state keys
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
@@ -653,7 +556,6 @@ def render_isolated_map_editor():
     polygon_key = f"map_polygon_{token_key}"
     draw_objects_key = f"map_draw_objects_{token_key}"
     
-    # Initialize all keys
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid with Streets"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
@@ -670,20 +572,9 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    # Map style options
-    map_styles = [
-        "Hybrid with Streets",
-        "Hybrid", 
-        "Satellite",
-        "Street Map",
-        "Terrain",
-        "Carto Light",
-        "OSM"
-    ]
+    map_styles = ["Hybrid with Streets", "Hybrid", "Satellite", "Street Map", "Terrain", "Carto Light", "OSM"]
 
-    # --- MAP CONTROLS ---
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
-    
     with c_btn:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
         export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
@@ -692,49 +583,24 @@ def render_isolated_map_editor():
         
     with c_style:
         basemap_style = st.selectbox(label="Basemap Layer", options=map_styles, key=style_key)
-        
     with c_color:
         st.markdown('<div class="manual-picker-label">Pin Color</div>', unsafe_allow_html=True)
         pin_color = st.color_picker(label="Pin Color", key=color_key, label_visibility="collapsed")
-        
     with c_size:
         st.markdown('<div class="manual-picker-label">Pin Size</div>', unsafe_allow_html=True)
-        pin_size = st.number_input(
-            label="Pin Size", 
-            min_value=8, 
-            max_value=64, 
-            step=1, 
-            value=st.session_state[size_key],
-            key=size_key,
-            label_visibility="collapsed"
-        )
-        
+        pin_size = st.number_input(label="Pin Size", min_value=8, max_value=64, step=1, value=st.session_state[size_key], key=size_key, label_visibility="collapsed")
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # --- RADIUS CONTROLS (Inside map controls) ---
     st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
-    
-    # Use columns for radius controls inline with map
     col_radius1, col_radius2, col_radius3 = st.columns([2, 1, 1])
-    
     with col_radius1:
-        radius_km = st.number_input(
-            label="Radius (km)",
-            min_value=0.1,
-            max_value=100.0,
-            step=0.1,
-            value=float(st.session_state[radius_key]),
-            key=radius_key,
-            label_visibility="collapsed"
-        )
-    
+        radius_km = st.number_input(label="Radius (km)", min_value=0.1, max_value=100.0, step=0.1, value=float(st.session_state[radius_key]), key=radius_key, label_visibility="collapsed")
     with col_radius2:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
         if st.button("Add Radius", key=f"add_radius_btn_{token_key}", use_container_width=True):
             st.session_state[add_radius_key] = not st.session_state[add_radius_key]
             st.rerun()
-    
     with col_radius3:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
         if st.button("Clear Radius", key=f"clear_radius_btn_{token_key}", use_container_width=True):
@@ -742,65 +608,42 @@ def render_isolated_map_editor():
             st.rerun()
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
-    
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
-    # --- Calculate radius in degrees for the circle ---
     def km_to_degrees(lat, km):
         lat_deg = km / 111.32
-        lon_deg = km / (111.32 * math.cos(math.radians(lat)))
-        return lat_deg, lon_deg
+        return lat_deg, km / (111.32 * math.cos(math.radians(lat)))
 
     radius_lat_deg, radius_lon_deg = km_to_degrees(plat, radius_km)
     show_radius = st.session_state[add_radius_key]
 
-    # --- EXPORT LOGIC ---
     if st.session_state[export_trigger_key]:
         with st.spinner("Compiling ultra high-resolution map asset... Please wait"):
             n, s, e, w = None, None, None, None
-            
-            # Get bounds from rectangle if available
             if st.session_state.get(bounds_key):
                 b = st.session_state[bounds_key]
                 if b and "_northEast" in b and "_southWest" in b:
                     n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
                     e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
             
-            # If no bounds, use pin with buffer
             if n is None:
-                if show_radius:
-                    radius_buffer = max(radius_lat_deg, radius_lon_deg) * 1.5
-                else:
-                    radius_buffer = 0.01
+                radius_buffer = max(radius_lat_deg, radius_lon_deg) * 1.5 if show_radius else 0.01
                 n, s = plat + radius_buffer, plat - radius_buffer
                 e, w = plon + radius_buffer, plon - radius_buffer
             
-            # Get polygon data if exists
-            polygon_coords = None
-            if st.session_state.get(polygon_key):
-                polygon_coords = st.session_state[polygon_key]
-            
-            # Generate with all map elements
+            polygon_coords = st.session_state.get(polygon_key)
             map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w, 
-                pin_lat=plat, pin_lon=plon, 
-                style=basemap_style, 
-                pin_color=pin_color, 
-                pin_size=int(pin_size),
-                radius_km=radius_km if show_radius else 0,
-                polygon_coords=polygon_coords
+                n=n, s=s, e=e, w=w, pin_lat=plat, pin_lon=plon, style=basemap_style, pin_color=pin_color, pin_size=int(pin_size),
+                radius_km=radius_km if show_radius else 0, polygon_coords=polygon_coords
             )
-            
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
-            
             if show_radius:
                 st.session_state[f"radius_{token_key}"] = radius_km
             
-            # Save map data to temp form data
             if st.session_state.temp_form_data:
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
                 if show_radius:
@@ -816,7 +659,6 @@ def render_isolated_map_editor():
             time.sleep(0.5)
             st.rerun()
 
-    # --- BUILD MAP ---
     tiles_dict = {
         "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
@@ -827,87 +669,28 @@ def render_isolated_map_editor():
         "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
     }
     attr_dict = {
-        "Hybrid with Streets": "Google Maps",
-        "Hybrid": "Google Maps",
-        "Satellite": "Google Maps",
-        "Street Map": "Google Maps",
-        "Terrain": "Google Maps",
-        "Carto Light": "CartoDB",
-        "OSM": "OpenStreetMap"
+        "Hybrid with Streets": "Google Maps", "Hybrid": "Google Maps", "Satellite": "Google Maps",
+        "Street Map": "Google Maps", "Terrain": "Google Maps", "Carto Light": "CartoDB", "OSM": "OpenStreetMap"
     }
     
-    m = folium.Map(
-        location=[plat, plon], 
-        zoom_start=15,
-        tiles=tiles_dict[basemap_style],
-        attr=attr_dict[basemap_style],
-        zoom_control=True
-    )
-    
-    # --- ADD RADIUS CIRCLE IF ENABLED ---
+    m = folium.Map(location=[plat, plon], zoom_start=15, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style], zoom_control=True)
     if show_radius and radius_km > 0:
         folium.Circle(
-            location=[plat, plon],
-            radius=radius_km * 1000,
-            color=pin_color,
-            fill=True,
-            fill_color=pin_color,
-            fill_opacity=0.15,
-            weight=2,
-            popup=f"Radius: {radius_km} km",
-            tooltip=f"{radius_km} km radius"
+            location=[plat, plon], radius=radius_km * 1000, color=pin_color, fill=True, fill_color=pin_color, fill_opacity=0.15, weight=2,
+            popup=f"Radius: {radius_km} km", tooltip=f"{radius_km} km radius"
         ).add_to(m)
         
-        # Distance label at edge
-        label_lat = plat
-        label_lon = plon + radius_lon_deg * 0.7
+        label_html = f'<div style="background: rgba(255,255,255,0.9); padding: 4px 10px; border-radius: 12px; border: 2px solid {pin_color}; font-weight: bold; font-size: 13px; color: #1A1A1A; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap;">{radius_km} km</div>'
+        folium.Marker([plat, plon + radius_lon_deg * 0.7], icon=folium.DivIcon(html=label_html), draggable=False).add_to(m)
         
-        label_html = f"""
-        <div style="
-            background: rgba(255,255,255,0.9);
-            padding: 4px 10px;
-            border-radius: 12px;
-            border: 2px solid {pin_color};
-            font-weight: bold;
-            font-size: 13px;
-            color: #1A1A1A;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-            white-space: nowrap;
-        ">
-            {radius_km} km
-        </div>
-        """
-        
-        folium.Marker(
-            [label_lat, label_lon],
-            icon=folium.DivIcon(html=label_html),
-            draggable=False
-        ).add_to(m)
-        
-        # Cardinal tick marks
         for angle in [0, 90, 180, 270]:
             rad = math.radians(angle)
-            tick_lat = plat + radius_lat_deg * math.sin(rad)
-            tick_lon = plon + radius_lon_deg * math.cos(rad)
-            folium.CircleMarker(
-                [tick_lat, tick_lon],
-                radius=3,
-                color=pin_color,
-                fill=True,
-                fill_color=pin_color,
-                fill_opacity=0.8,
-                weight=1
-            ).add_to(m)
+            folium.CircleMarker([plat + radius_lat_deg * math.sin(rad), plon + radius_lon_deg * math.cos(rad)], radius=3, color=pin_color, fill=True, fill_color=pin_color, fill_opacity=0.8, weight=1).add_to(m)
     
-    # --- ADD PIN MARKER ---
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40" style="width: 100%; height: 100%;">
-            <defs>
-                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
-                </filter>
-            </defs>
+            <defs><filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/></filter></defs>
             <g filter="url(#shadow)">
                 <circle cx="20" cy="20" r="18" fill="{pin_color}" stroke="white" stroke-width="2"/>
                 <polygon points="20,6 23.5,14.5 32,15 25.5,21 27.5,30 20,25 12.5,30 14.5,21 8,15 16.5,14.5" fill="white"/>
@@ -915,62 +698,25 @@ def render_isolated_map_editor():
         </svg>
     </div>
     """
-    
-    folium.Marker(
-        [plat, plon], 
-        draggable=True, 
-        icon=folium.DivIcon(html=icon_html)
-    ).add_to(m)
-    
-    # --- DRAW TOOLS: Rectangle and Polygon ---
-    Draw(
-        export=False, 
-        position='topleft',
-        draw_options={
-            'polyline': False,
-            'polygon': True,
-            'circle': False,
-            'marker': False,
-            'circlemarker': False,
-            'rectangle': True
-        },
-        edit_options={'edit': True}
-    ).add_to(m)
+    folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
+    Draw(export=False, position='topleft', draw_options={'polyline': False, 'polygon': True, 'circle': False, 'marker': False, 'circlemarker': False, 'rectangle': True}, edit_options={'edit': True}).add_to(m)
     
     st.info("Use Rectangle tool for export area | Use Polygon tool to draw custom shapes | Click 'Add Radius' for distance circles")
-    map_data = st_folium(
-        m, 
-        height=600, 
-        width=1300, 
-        use_container_width=True, 
-        key=f"int_map_{token_key}", 
-        returned_objects=["last_active_drawing", "bounds", "last_marker_moved", "all_drawings"]
-    )
+    map_data = st_folium(m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", returned_objects=["last_active_drawing", "bounds", "last_marker_moved", "all_drawings"])
 
-    # --- CAPTURE MAP INTERACTIONS ---
     if isinstance(map_data, dict):
-        # Capture bounds from rectangle
         if map_data.get("bounds"):
             st.session_state[bounds_key] = map_data["bounds"]
-        
-        # Capture polygon data
         if map_data.get("all_drawings"):
             drawings = map_data["all_drawings"]
             if drawings and len(drawings) > 0:
-                # Get the last drawing (most recent)
                 last_drawing = drawings[-1]
                 if last_drawing and "geometry" in last_drawing:
                     geom = last_drawing["geometry"]
                     if geom and "type" in geom and geom["type"] == "Polygon":
-                        # Store polygon coordinates for export
                         if "coordinates" in geom and len(geom["coordinates"]) > 0:
                             coords = geom["coordinates"][0]
-                            polygon_coords = []
-                            for coord in coords:
-                                polygon_coords.append({"lat": coord[1], "lng": coord[0]})
-                            st.session_state[polygon_key] = polygon_coords
-        
-        # Capture marker movement
+                            st.session_state[polygon_key] = [{"lat": c[1], "lng": c[0]} for c in coords]
         if map_data.get("last_marker_moved"):
             moved = map_data["last_marker_moved"]
             if moved:
@@ -978,7 +724,7 @@ def render_isolated_map_editor():
                 if new_coord != st.session_state.get(coord_key, ""):
                     st.session_state[dragged_key] = new_coord
                     st.rerun()
-                
+
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     try:
@@ -1097,18 +843,15 @@ def get_download_filename(template_name, file_type):
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
     return f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_type}"
 
-# --- ENHANCED FORM DATA LIVE PERSISTENCE ---
 def autosave_current_form_data():
     if not st.session_state.saved_template_name or not st.session_state.tokens:
         return False
-    
     for token in st.session_state.tokens:
         val_key = f"val_{token}"
         if val_key in st.session_state:
             current_type = st.session_state.custom_mapping.get(token, "Text")
             if current_type != "Image":
                 st.session_state.temp_form_data[token] = st.session_state[val_key]
-    
     temp_path = get_temp_config_path(st.session_state.saved_template_name)
     try:
         with open(temp_path, 'w', encoding='utf-8') as f:
@@ -1117,29 +860,18 @@ def autosave_current_form_data():
     except Exception:
         return False
 
-def save_form_data_to_session():
-    return autosave_current_form_data()
-
 def restore_form_data_from_session():
     if not st.session_state.saved_template_name:
         return False
-    
-    has_session_data = False
-    for token in st.session_state.tokens:
-        if f"val_{token}" in st.session_state:
-            has_session_data = True
-            break
-    
+    has_session_data = any(f"val_{token}" in st.session_state for token in st.session_state.tokens)
     if has_session_data:
         return True
-    
     if st.session_state.temp_form_data:
         for token, value in st.session_state.temp_form_data.items():
             current_type = st.session_state.custom_mapping.get(token, "Text")
             if current_type != "Image" and f"val_{token}" not in st.session_state:
                 st.session_state[f"val_{token}"] = value
         return True
-    
     temp_path = get_temp_config_path(st.session_state.saved_template_name)
     if os.path.exists(temp_path):
         try:
@@ -1151,9 +883,7 @@ def restore_form_data_from_session():
                     if current_type != "Image" and f"val_{token}" not in st.session_state:
                         st.session_state[f"val_{token}"] = value
                 return True
-        except Exception:
-            pass
-    
+        except Exception: pass
     return False
 
 def purge_all_temporary_data():
@@ -1162,14 +892,10 @@ def purge_all_temporary_data():
         if os.path.exists(temp_path):
             try: os.remove(temp_path)
             except Exception: pass
-    
     if st.session_state.tokens:
         for token in st.session_state.tokens:
-            if f"val_{token}" in st.session_state: 
-                del st.session_state[f"val_{token}"]
-            if f"map_bytes_holder_{token}" in st.session_state: 
-                del st.session_state[f"map_bytes_holder_{token}"]
-    
+            if f"val_{token}" in st.session_state: del st.session_state[f"val_{token}"]
+            if f"map_bytes_holder_{token}" in st.session_state: del st.session_state[f"map_bytes_holder_{token}"]
     st.session_state.temp_form_data = {}
 
 # --- INIT APP ---
@@ -1310,51 +1036,43 @@ else:
         tokens = st.session_state.tokens
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
         
-        # --- SIMPLIFIED CTA PRESET SECTION ---
+        # --- SIMPLE SINGLE ROW MULTISELECT CTA PRESET SECTION ---
         cta_sets = detect_cta_sets()
         if cta_sets:
             st.markdown('<div class="cta-preset-container">', unsafe_allow_html=True)
             st.markdown('<div class="cta-preset-label">Quick Fill CTA Information</div>', unsafe_allow_html=True)
             
-            # Get list of CTA numbers for multi-select
-            cta_numbers = sorted(cta_sets.keys())
-            cta_options = [f"CTA{num}" for num in cta_numbers]
-            
-            # Multi-select for CTA sets
-            selected_ctas_display = st.multiselect(
-                "Select CTA sets to fill",
-                options=cta_options,
-                default=cta_options,  # Select all by default
-                key="cta_multi_select",
-                label_visibility="collapsed"
-            )
-            
-            # Convert display names back to numbers
-            selected_cta_numbers = [int(item.replace("CTA", "")) for item in selected_ctas_display]
-            
-            # Advisor selector and apply button in one row
-            col_advisor, col_apply = st.columns([3, 1])
+            col_advisor, col_sets, col_apply = st.columns([1.5, 2, 1])
             with col_advisor:
-                advisor_names = list(contacts_database.keys())
                 selected_advisor = st.selectbox(
                     "Select Advisor",
-                    options=advisor_names,
-                    key="cta_advisor_select_simple",
+                    options=list(contacts_database.keys()),
+                    key="cta_advisor_dropdown",
+                    label_visibility="collapsed"
+                )
+            with col_sets:
+                cta_options = sorted(list(cta_sets.keys()))
+                selected_ctas = st.multiselect(
+                    "Apply info to:",
+                    options=cta_options,
+                    default=cta_options,
+                    format_func=lambda x: f"CTA {x}",
+                    key="cta_multiselect_sets",
                     label_visibility="collapsed"
                 )
             with col_apply:
-                if st.button("Apply to Selected", key="apply_cta_selected", use_container_width=True):
-                    if selected_cta_numbers:
-                        success, applied_list = apply_cta_presets_to_selected(selected_advisor, selected_cta_numbers)
+                if st.button("Apply Selected CTA", key="apply_cta_simple_btn", use_container_width=True):
+                    if selected_ctas:
+                        success = False
+                        for cta_num in selected_ctas:
+                            if apply_cta_preset(cta_num, selected_advisor):
+                                success = True
                         if success:
-                            applied_ctas = ", ".join([f"CTA{num}" for num in applied_list])
-                            st.success(f"Applied {selected_advisor}'s information to: {applied_ctas}")
+                            st.success(f"Applied info to chosen CTA targets!")
+                            time.sleep(0.4)
                             st.rerun()
-                        else:
-                            st.error("Failed to apply CTA presets")
                     else:
-                        st.warning("Please select at least one CTA set")
-            
+                        st.warning("Please choose at least one CTA target block.")
             st.markdown('</div>', unsafe_allow_html=True)
         
         with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
@@ -1421,14 +1139,12 @@ else:
                             try:
                                 with open(temp_path, 'w', encoding='utf-8') as f:
                                     json.dump(st.session_state.temp_form_data, f, indent=4)
-                            except Exception:
-                                pass
+                            except Exception: pass
                         
                         st.session_state.active_map_editor_token = token_key
                         st.rerun()
                     
-                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True, 
-                                 on_click=save_all_and_navigate, args=(token,)):
+                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True, on_click=save_all_and_navigate, args=(token,)):
                         pass
                     
                     field_types[token] = "Image"
@@ -1445,11 +1161,7 @@ else:
                         st.session_state[f"val_{token}"] = current_value
                     
                     new_value = st.text_input(
-                        "",
-                        value=current_value,
-                        key=f"val_{token}",
-                        label_visibility="collapsed",
-                        placeholder="Enter value..."
+                        "", value=current_value, key=f"val_{token}", label_visibility="collapsed", placeholder="Enter value..."
                     )
                     
                     if new_value != current_value:
@@ -1461,8 +1173,7 @@ else:
                             try:
                                 with open(temp_path, 'w', encoding='utf-8') as f:
                                     json.dump(st.session_state.temp_form_data, f, indent=4)
-                            except Exception:
-                                pass
+                            except Exception: pass
                     
                     text_data[token] = new_value
                     field_types[token] = "Text"
@@ -1486,11 +1197,9 @@ else:
                 try:
                     pptx_data = generate_pptx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="Download PPTX", data=pptx_data,
-                        file_name=get_download_filename(base_template_name, "pptx"),
+                        label="Download PPTX", data=pptx_data, file_name=get_download_filename(base_template_name, "pptx"),
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        use_container_width=True, key="download_pptx",
-                        on_click=purge_all_temporary_data
+                        use_container_width=True, key="download_pptx", on_click=purge_all_temporary_data
                     )
                 except Exception as e:
                     st.error(f"Error generating PPTX: {str(e)}")
@@ -1502,11 +1211,9 @@ else:
                 try:
                     docx_data = generate_docx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="Download DOCX", data=docx_data,
-                        file_name=get_download_filename(base_template_name, "docx"),
+                        label="Download DOCX", data=docx_data, file_name=get_download_filename(base_template_name, "docx"),
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True, key="download_docx",
-                        on_click=purge_all_temporary_data
+                        use_container_width=True, key="download_docx", on_click=purge_all_temporary_data
                     )
                 except Exception as e:
                     st.error(f"Error generating document: {str(e)}")
