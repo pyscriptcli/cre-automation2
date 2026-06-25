@@ -411,10 +411,31 @@ def render_isolated_map_editor():
     st.markdown('<div class="editor-card">', unsafe_allow_html=True)
     col_back, col_title = st.columns([1, 4])
     with col_back:
-        if st.button("Back to Document", key="back_from_map"):
+        # --- IMPROVED BACK BUTTON WITH EXPLICIT RESTORE ---
+        def return_to_main():
+            # Explicitly restore form data from disk before returning
+            if st.session_state.saved_template_name:
+                temp_path = get_temp_config_path(st.session_state.saved_template_name)
+                if os.path.exists(temp_path):
+                    try:
+                        with open(temp_path, 'r', encoding='utf-8') as f:
+                            loaded_data = json.load(f)
+                            st.session_state.temp_form_data = loaded_data
+                            # Restore to individual session state keys
+                            for token, value in loaded_data.items():
+                                current_type = st.session_state.custom_mapping.get(token, "Text")
+                                if current_type != "Image":
+                                    st.session_state[f"val_{token}"] = value
+                    except Exception as e:
+                        st.error(f"Error restoring data: {e}")
+            
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
             st.rerun()
+        
+        if st.button("Back to Document", key="back_from_map", on_click=return_to_main):
+            pass  # on_click handles everything
+            
     with col_title:
         st.markdown(f"### Map Editor: {token_key}")
     st.markdown("</div><br>", unsafe_allow_html=True)
@@ -515,6 +536,7 @@ def render_isolated_map_editor():
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
             
+            # Save map data to temp form data
             if st.session_state.temp_form_data:
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
@@ -720,48 +742,77 @@ def get_download_filename(template_name, file_type):
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
     return f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_type}"
 
-# --- FORM DATA LIVE PERSISTENCE ---
-def save_form_data_to_session():
-    if st.session_state.saved_template_name and st.session_state.tokens:
-        form_data = {}
-        for token in st.session_state.tokens:
-            key = f"val_{token}"
+# --- ENHANCED FORM DATA LIVE PERSISTENCE ---
+def autosave_current_form_data():
+    """Universal autosave function that can be called anywhere - saves all current form data"""
+    if not st.session_state.saved_template_name or not st.session_state.tokens:
+        return False
+    
+    # Gather all current values from session state
+    for token in st.session_state.tokens:
+        val_key = f"val_{token}"
+        if val_key in st.session_state:
             current_type = st.session_state.custom_mapping.get(token, "Text")
-            
-            # File uploaders shouldn't have raw bytes serialized to the config file
-            if current_type == "Image":
-                continue
-                
-            if key in st.session_state:
-                form_data[token] = st.session_state[key]
-                
-        st.session_state.temp_form_data = form_data
-        
-        # Flush directly to localized temp file configuration automatically on input changes
-        temp_path = get_temp_config_path(st.session_state.saved_template_name)
+            if current_type != "Image":  # Don't save file objects
+                st.session_state.temp_form_data[token] = st.session_state[val_key]
+    
+    # Write to disk
+    temp_path = get_temp_config_path(st.session_state.saved_template_name)
+    try:
         with open(temp_path, 'w', encoding='utf-8') as f:
-            json.dump(form_data, f, indent=4)
+            json.dump(st.session_state.temp_form_data, f, indent=4)
+        return True
+    except Exception:
+        return False
+
+def save_form_data_to_session():
+    """Legacy function - kept for backward compatibility, now calls autosave"""
+    return autosave_current_form_data()
 
 def restore_form_data_from_session():
-    # Attempt to read cached entries from disk if memory baseline is currently uninitialized
-    if not st.session_state.temp_form_data and st.session_state.saved_template_name:
-        temp_path = get_temp_config_path(st.session_state.saved_template_name)
-        if os.path.exists(temp_path):
-            try:
-                with open(temp_path, 'r', encoding='utf-8') as f:
-                    st.session_state.temp_form_data = json.load(f)
-            except Exception: pass
-
+    """Enhanced restore with proper priority: session state > temp data > disk"""
+    if not st.session_state.saved_template_name:
+        return False
+    
+    # 1. First try: Session state already has values (most recent)
+    has_session_data = False
+    for token in st.session_state.tokens:
+        if f"val_{token}" in st.session_state:
+            has_session_data = True
+            break
+    
+    if has_session_data:
+        # Session state is the source of truth
+        for token in st.session_state.tokens:
+            current_type = st.session_state.custom_mapping.get(token, "Text")
+            if current_type != "Image" and f"val_{token}" in st.session_state:
+                # Already set, do nothing
+                pass
+        return True
+    
+    # 2. Second try: temp_form_data in session state
     if st.session_state.temp_form_data:
         for token, value in st.session_state.temp_form_data.items():
             current_type = st.session_state.custom_mapping.get(token, "Text")
-            
-            # CRITICAL FIX: Skip injecting values into st.session_state for widgets where it's not allowed
-            if current_type == "Image":
-                continue
-                
-            st.session_state[f"val_{token}"] = value
+            if current_type != "Image" and f"val_{token}" not in st.session_state:
+                st.session_state[f"val_{token}"] = value
         return True
+    
+    # 3. Third try: Load from disk
+    temp_path = get_temp_config_path(st.session_state.saved_template_name)
+    if os.path.exists(temp_path):
+        try:
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                loaded_data = json.load(f)
+                st.session_state.temp_form_data = loaded_data
+                for token, value in loaded_data.items():
+                    current_type = st.session_state.custom_mapping.get(token, "Text")
+                    if current_type != "Image" and f"val_{token}" not in st.session_state:
+                        st.session_state[f"val_{token}"] = value
+                return True
+        except Exception:
+            pass
+    
     return False
 
 def purge_all_temporary_data():
@@ -775,8 +826,10 @@ def purge_all_temporary_data():
     # Wipe references out of live session runtime memory blocks
     if st.session_state.tokens:
         for token in st.session_state.tokens:
-            if f"val_{token}" in st.session_state: del st.session_state[f"val_{token}"]
-            if f"map_bytes_holder_{token}" in st.session_state: del st.session_state[f"map_bytes_holder_{token}"]
+            if f"val_{token}" in st.session_state: 
+                del st.session_state[f"val_{token}"]
+            if f"map_bytes_holder_{token}" in st.session_state: 
+                del st.session_state[f"map_bytes_holder_{token}"]
             
     st.session_state.temp_form_data = {}
 
@@ -955,23 +1008,86 @@ else:
                 if current_type == "Image" and st.session_state.template_type == 'pptx':
                     image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
                     field_types[token] = "Image"
+                    
                 elif current_type == "Map" and st.session_state.template_type == 'pptx':
                     saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
                     if saved_map_img:
                         image_data[token] = saved_map_img
                         st.caption("Map attached.")
-                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True):
-                        save_form_data_to_session()
-                        st.session_state.active_map_editor_token = token
+                    
+                    # --- ENHANCED MAP BUTTON WITH EXPLICIT AUTOSAVE ---
+                    def save_all_and_navigate(token_key):
+                        # Save all current values from session state to temp_form_data
+                        for t in st.session_state.tokens:
+                            val_key = f"val_{t}"
+                            if val_key in st.session_state:
+                                current_type_check = st.session_state.custom_mapping.get(t, "Text")
+                                if current_type_check != "Image":
+                                    st.session_state.temp_form_data[t] = st.session_state[val_key]
+                        
+                        # Write to disk
+                        if st.session_state.saved_template_name:
+                            temp_path = get_temp_config_path(st.session_state.saved_template_name)
+                            try:
+                                with open(temp_path, 'w', encoding='utf-8') as f:
+                                    json.dump(st.session_state.temp_form_data, f, indent=4)
+                            except Exception:
+                                pass
+                        
+                        # Set navigation flag
+                        st.session_state.active_map_editor_token = token_key
                         st.rerun()
+                    
+                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True, 
+                                 on_click=save_all_and_navigate, args=(token,)):
+                        pass  # on_click handles everything
+                    
                     field_types[token] = "Image"
+                    
                 else:
                     if current_type in ["Image", "Map"] and st.session_state.template_type != 'pptx':
                         st.warning("Images/Maps are only supported in PPTX files.")
                     
-                    # Capture user typing interactions seamlessly using standard callback hooks
-                    text_data[token] = st.text_input("", key=f"val_{token}", label_visibility="collapsed", placeholder="Enter value...", on_change=save_form_data_to_session)
+                    # --- ENHANCED TEXT INPUT WITH AUTOSAVE ---
+                    # Get current value from session state or temp data
+                    current_value = ""
+                    if f"val_{token}" in st.session_state:
+                        current_value = st.session_state[f"val_{token}"]
+                    elif token in st.session_state.temp_form_data:
+                        current_value = st.session_state.temp_form_data[token]
+                        # Sync to session state
+                        st.session_state[f"val_{token}"] = current_value
+                    
+                    # Render text input without on_change callback
+                    new_value = st.text_input(
+                        "",
+                        value=current_value,
+                        key=f"val_{token}",
+                        label_visibility="collapsed",
+                        placeholder="Enter value..."
+                    )
+                    
+                    # --- AUTOSAVE: Save immediately if value changed ---
+                    if new_value != current_value:
+                        # Update session state
+                        st.session_state[f"val_{token}"] = new_value
+                        
+                        # Update temp_form_data
+                        st.session_state.temp_form_data[token] = new_value
+                        
+                        # Save to disk immediately
+                        if st.session_state.saved_template_name:
+                            temp_path = get_temp_config_path(st.session_state.saved_template_name)
+                            try:
+                                with open(temp_path, 'w', encoding='utf-8') as f:
+                                    json.dump(st.session_state.temp_form_data, f, indent=4)
+                            except Exception:
+                                pass  # Silent fail, but data is in session state
+                    
+                    # Store in text_data for final document generation
+                    text_data[token] = new_value
                     field_types[token] = "Text"
+                    
                 st.markdown('<div style="margin-bottom:14px;"></div>', unsafe_allow_html=True)
                 
         st.markdown('</div>', unsafe_allow_html=True)
