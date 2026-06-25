@@ -150,7 +150,7 @@ MINIMAL_CRE_SYSTEM = """
         font-size: 14px !important;
     }
     
-    /* CTA preset styles */
+    /* CTA preset styles - Simplified */
     .cta-preset-container {
         background-color: #F0F7FF !important;
         border: 1px solid #003366 !important;
@@ -164,33 +164,8 @@ MINIMAL_CRE_SYSTEM = """
         color: #003366 !important;
         margin-bottom: 8px !important;
     }
-    .cta-preset-row {
-        display: flex !important;
-        gap: 12px !important;
-        align-items: center !important;
+    .cta-multi-select {
         margin-bottom: 8px !important;
-        padding: 8px !important;
-        background: #FFFFFF !important;
-        border-radius: 4px !important;
-        border: 1px solid #E0E0E0 !important;
-    }
-    .cta-preset-row:last-child {
-        margin-bottom: 0 !important;
-    }
-    .cta-preset-row .cta-label {
-        font-weight: 500 !important;
-        font-size: 12px !important;
-        color: #003366 !important;
-        min-width: 60px !important;
-    }
-    .cta-preset-row .cta-select {
-        flex: 1 !important;
-    }
-    .cta-preset-row .cta-button {
-        min-width: 100px !important;
-    }
-    .cta-preset-row .cta-checkbox {
-        min-width: 30px !important;
     }
     
     @media (max-width: 768px) {
@@ -200,13 +175,6 @@ MINIMAL_CRE_SYSTEM = """
         .map-controls-row {
             flex-direction: column !important;
             align-items: stretch !important;
-        }
-        .cta-preset-row {
-            flex-direction: column !important;
-            align-items: stretch !important;
-        }
-        .cta-preset-row .cta-button {
-            min-width: auto !important;
         }
     }
 </style>
@@ -390,19 +358,17 @@ def apply_cta_preset(cta_num, advisor_name):
     
     return True
 
-def apply_all_cta_presets(advisor_name):
-    """Apply CTA preset to all detected CTA sets"""
+def apply_cta_presets_to_selected(advisor_name, selected_ctas):
+    """Apply CTA preset to selected CTA sets"""
     if advisor_name not in contacts_database:
-        return False
+        return False, []
     
-    cta_sets = detect_cta_sets()
-    success_count = 0
-    
-    for cta_num in cta_sets.keys():
+    success_list = []
+    for cta_num in selected_ctas:
         if apply_cta_preset(cta_num, advisor_name):
-            success_count += 1
+            success_list.append(cta_num)
     
-    return success_count > 0
+    return len(success_list) > 0, success_list
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12, radius_km=0, polygon_coords=None):
@@ -1344,68 +1310,50 @@ else:
         tokens = st.session_state.tokens
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
         
-        # --- CTA PRESET SECTION ---
+        # --- SIMPLIFIED CTA PRESET SECTION ---
         cta_sets = detect_cta_sets()
         if cta_sets:
             st.markdown('<div class="cta-preset-container">', unsafe_allow_html=True)
             st.markdown('<div class="cta-preset-label">Quick Fill CTA Information</div>', unsafe_allow_html=True)
             
-            # Show single dropdown and apply all with checkboxes
+            # Get list of CTA numbers for multi-select
+            cta_numbers = sorted(cta_sets.keys())
+            cta_options = [f"CTA{num}" for num in cta_numbers]
+            
+            # Multi-select for CTA sets
+            selected_ctas_display = st.multiselect(
+                "Select CTA sets to fill",
+                options=cta_options,
+                default=cta_options,  # Select all by default
+                key="cta_multi_select",
+                label_visibility="collapsed"
+            )
+            
+            # Convert display names back to numbers
+            selected_cta_numbers = [int(item.replace("CTA", "")) for item in selected_ctas_display]
+            
+            # Advisor selector and apply button in one row
             col_advisor, col_apply = st.columns([3, 1])
             with col_advisor:
                 advisor_names = list(contacts_database.keys())
                 selected_advisor = st.selectbox(
-                    "Select Advisor for all CTA sets",
+                    "Select Advisor",
                     options=advisor_names,
-                    key="cta_advisor_select_all",
+                    key="cta_advisor_select_simple",
                     label_visibility="collapsed"
                 )
             with col_apply:
-                if st.button("Apply to All CTA", key="apply_cta_all", use_container_width=True):
-                    if apply_all_cta_presets(selected_advisor):
-                        st.success(f"Applied {selected_advisor}'s information to all CTA sets")
-                        st.rerun()
-                    else:
-                        st.error("Failed to apply CTA presets")
-            
-            # Show individual CTA sets with checkboxes
-            st.markdown("<div style='margin-top: 8px;'><small>Individual CTA sets:</small></div>", unsafe_allow_html=True)
-            
-            # Create a row for each CTA set with checkbox and apply button
-            for cta_num in sorted(cta_sets.keys()):
-                st.markdown(f'<div class="cta-preset-row">', unsafe_allow_html=True)
-                st.markdown(f'<div class="cta-label">CTA{cta_num}</div>', unsafe_allow_html=True)
-                
-                col1, col2, col3 = st.columns([1, 2, 1])
-                
-                with col1:
-                    # Checkbox to select this CTA
-                    selected = st.checkbox(
-                        "Select",
-                        key=f"cta_checkbox_{cta_num}",
-                        value=True
-                    )
-                
-                with col2:
-                    # Dropdown for this specific CTA
-                    advisor_names = list(contacts_database.keys())
-                    cta_advisor = st.selectbox(
-                        f"Advisor for CTA{cta_num}",
-                        options=advisor_names,
-                        key=f"cta_advisor_select_{cta_num}",
-                        label_visibility="collapsed",
-                        disabled=not selected
-                    )
-                
-                with col3:
-                    if st.button(f"Apply CTA{cta_num}", key=f"apply_cta_{cta_num}", use_container_width=True, disabled=not selected):
-                        if apply_cta_preset(cta_num, cta_advisor):
-                            st.success(f"Applied {cta_advisor}'s information to CTA{cta_num}")
+                if st.button("Apply to Selected", key="apply_cta_selected", use_container_width=True):
+                    if selected_cta_numbers:
+                        success, applied_list = apply_cta_presets_to_selected(selected_advisor, selected_cta_numbers)
+                        if success:
+                            applied_ctas = ", ".join([f"CTA{num}" for num in applied_list])
+                            st.success(f"Applied {selected_advisor}'s information to: {applied_ctas}")
                             st.rerun()
                         else:
-                            st.error(f"Failed to apply CTA{cta_num} preset")
-                
-                st.markdown('</div>', unsafe_allow_html=True)
+                            st.error("Failed to apply CTA presets")
+                    else:
+                        st.warning("Please select at least one CTA set")
             
             st.markdown('</div>', unsafe_allow_html=True)
         
