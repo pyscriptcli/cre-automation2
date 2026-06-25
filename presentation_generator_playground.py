@@ -23,6 +23,17 @@ from folium.plugins import Draw
 from streamlit_folium import st_folium
 import requests
 
+# --- CONTACTS DATABASE FOR CTA PRESETS ---
+contacts_database = {
+    "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
+    "Meliza Zapata": {"phone": "0996 880 5399", "email": "meliza.zapata@primephilippines.com"},
+    "Dykstra Pineda": {"phone": "0920 986 2748", "email": "dykstra.pineda@primephilippines.com"},
+    "Cedtrix Rena": {"phone": "0977 653 1494", "email": "cedtriz.rena@primephilippines.com"},
+    "Carlo Medina": {"phone": "0920 986 2763", "email": "carlo.medina@primephilippines.com"},
+    "Dave Policarpio": {"phone": "0908 865 8945", "email": "dave.policarpio@primephilippines.com"},
+    "Irish Rima": {"phone": "0917 000 0000", "email": "irish.rima@primephilippines.com"}
+}
+
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
 _config_file = os.path.join(_config_dir, "config.toml")
@@ -137,6 +148,21 @@ MINIMAL_CRE_SYSTEM = """
         text-align: center !important;
         font-weight: 600 !important;
         font-size: 14px !important;
+    }
+    
+    /* CTA preset styles */
+    .cta-preset-container {
+        background-color: #F0F7FF !important;
+        border: 1px solid #003366 !important;
+        border-radius: 6px !important;
+        padding: 12px !important;
+        margin-bottom: 16px !important;
+    }
+    .cta-preset-label {
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        color: #003366 !important;
+        margin-bottom: 8px !important;
     }
     
     @media (max-width: 768px) {
@@ -264,9 +290,55 @@ def auto_save_config():
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
+# --- CTA PRESET FUNCTIONS ---
+def apply_cta_preset(advisor_name):
+    """Apply CTA preset values to all CTA-related placeholders"""
+    if advisor_name not in contacts_database:
+        return False
+    
+    contact_info = contacts_database[advisor_name]
+    
+    # Find all CTA-related tokens and fill them
+    for token in st.session_state.tokens:
+        clean_label = token.replace("{", "").replace("}", "").lower()
+        val_key = f"val_{token}"
+        
+        if "advisor name" in clean_label or "cta name" in clean_label:
+            st.session_state[val_key] = advisor_name
+            st.session_state.temp_form_data[token] = advisor_name
+            
+        elif "advisor contact" in clean_label or "cta phone" in clean_label or "cta contact" in clean_label:
+            st.session_state[val_key] = contact_info["phone"]
+            st.session_state.temp_form_data[token] = contact_info["phone"]
+            
+        elif "advisor email" in clean_label or "cta email" in clean_label:
+            st.session_state[val_key] = contact_info["email"]
+            st.session_state.temp_form_data[token] = contact_info["email"]
+    
+    # Save to disk
+    if st.session_state.saved_template_name:
+        temp_path = get_temp_config_path(st.session_state.saved_template_name)
+        try:
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(st.session_state.temp_form_data, f, indent=4)
+            return True
+        except Exception:
+            return False
+    
+    return True
+
+def get_cta_tokens():
+    """Get all CTA-related tokens from the current template"""
+    cta_tokens = []
+    for token in st.session_state.tokens:
+        clean_label = token.replace("{", "").replace("}", "").lower()
+        if "cta" in clean_label or "advisor" in clean_label:
+            cta_tokens.append(token)
+    return cta_tokens
+
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12):
-    """Generates high-res map with pin included - supports street highlighted styles"""
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12, radius_km=0):
+    """Generates high-res map with pin included - supports street highlighted styles and radius circle"""
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
@@ -341,13 +413,92 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     if bottom <= top: bottom = top + 100
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # --- DRAW PIN ON THE CROPPED IMAGE ---
+    # --- DRAW PIN AND RADIUS ON THE CROPPED IMAGE ---
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
+    
+    # --- DRAW RADIUS CIRCLE IF SPECIFIED ---
+    if radius_km > 0:
+        # Calculate radius in pixels at this zoom level
+        # 1 degree latitude approximately 111.32 km
+        lat_deg_per_km = 1.0 / 111.32
+        radius_deg = radius_km * lat_deg_per_km
+        
+        # Get pixel coordinates for a point at the radius distance
+        radius_lat = pin_lat + radius_deg
+        radius_px_x, radius_px_y = num2px(radius_lat, pin_lon, zoom)
+        radius_local_x = int(radius_px_x - base_x) - left
+        radius_local_y = int(radius_px_y - base_y) - top
+        
+        # Calculate radius in pixels
+        radius_pixels = abs(radius_local_y - pin_local_y)
+        
+        # Draw the radius circle with semi-transparent fill
+        # Create a temporary image for the circle to handle transparency properly
+        circle_layer = Image.new('RGBA', cropped.size, (0, 0, 0, 0))
+        circle_draw = ImageDraw.Draw(circle_layer)
+        
+        # Draw filled circle with transparency
+        circle_draw.ellipse(
+            [pin_local_x - radius_pixels, pin_local_y - radius_pixels,
+             pin_local_x + radius_pixels, pin_local_y + radius_pixels],
+            fill=(*hex_to_rgb(pin_color), 40),  # 40 = approximately 15% opacity
+            outline=pin_color,
+            width=max(2, int(radius_pixels * 0.02))
+        )
+        
+        # Composite the circle onto the main image
+        cropped = Image.alpha_composite(cropped, circle_layer)
+        
+        # Draw a distance label at the right edge of the circle
+        label_x = pin_local_x + int(radius_pixels * 0.6)
+        label_y = pin_local_y - 15
+        
+        # Draw label background
+        label_text = f"{radius_km} km"
+        from PIL import ImageFont
+        try:
+            # Try to use a default font
+            font = ImageFont.truetype("arial.ttf", int(radius_pixels * 0.08) + 10)
+        except:
+            font = ImageFont.load_default()
+        
+        # Get text size
+        bbox = draw.textbbox((0, 0), label_text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        
+        # Draw label background
+        padding = 6
+        draw.rectangle(
+            [label_x - padding, label_y - padding,
+             label_x + text_width + padding, label_y + text_height + padding],
+            fill=(255, 255, 255, 220),
+            outline=pin_color,
+            width=2
+        )
+        
+        # Draw label text
+        draw.text((label_x, label_y), label_text, fill="#1A1A1A", font=font)
+        
+        # Draw small tick marks at cardinal points
+        tick_length = max(6, int(radius_pixels * 0.05))
+        for angle in [0, 90, 180, 270]:
+            rad = math.radians(angle)
+            tick_x = pin_local_x + radius_pixels * math.cos(rad)
+            tick_y = pin_local_y + radius_pixels * math.sin(rad)
+            draw.line(
+                [tick_x - tick_length * math.cos(rad), 
+                 tick_y - tick_length * math.sin(rad),
+                 tick_x + tick_length * math.cos(rad), 
+                 tick_y + tick_length * math.sin(rad)],
+                fill=pin_color,
+                width=2
+            )
     
     # Scale pin size specifically to respect high-res canvas magnification
     radius = int((pin_size / 2) * scale_factor)
@@ -384,6 +535,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     img_byte_arr.seek(0)
     return img_byte_arr
 
+def hex_to_rgb(hex_color):
+    """Convert hex color to RGB tuple"""
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
 # --- ISOLATED FULL-SCREEN MAP EDITOR PAGE ---
 def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
@@ -404,6 +560,36 @@ def render_isolated_map_editor():
                 color: #1A1A1A !important;
                 margin-bottom: 8px !important;
                 line-height: 1.2;
+            }
+            /* Radius control styles */
+            .radius-control-container {
+                display: flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+                background: #f8f9fa !important;
+                padding: 4px 12px !important;
+                border-radius: 4px !important;
+                border: 1px solid #e0e0e0 !important;
+            }
+            .radius-control-container label {
+                font-size: 12px !important;
+                font-weight: 500 !important;
+                color: #333 !important;
+                white-space: nowrap !important;
+                margin-right: 4px !important;
+            }
+            .radius-control-container input {
+                width: 80px !important;
+                padding: 4px 8px !important;
+                border: 1px solid #ccc !important;
+                border-radius: 3px !important;
+                font-size: 13px !important;
+            }
+            .radius-control-container .km-indicator {
+                font-size: 13px !important;
+                font-weight: 600 !important;
+                color: #003366 !important;
+                margin-left: 4px !important;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -444,17 +630,23 @@ def render_isolated_map_editor():
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
     size_key = f"map_size_{token_key}"
+    radius_key = f"map_radius_{token_key}"
+    radius_units_key = f"map_radius_units_{token_key}"
     dragged_key = f"map_dragged_{token_key}"
     image_key = f"map_bytes_holder_{token_key}"
     marker_key = f"map_marker_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
+    radius_center_key = f"map_radius_center_{token_key}"
     
     # Initialize all keys
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
-    if size_key not in st.session_state: st.session_state[size_key] = 20  # Default pin size 12
+    if size_key not in st.session_state: st.session_state[size_key] = 20
+    if radius_key not in st.session_state: st.session_state[radius_key] = 1.0
+    if radius_units_key not in st.session_state: st.session_state[radius_units_key] = "km"
+    if radius_center_key not in st.session_state: st.session_state[radius_center_key] = None
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
@@ -476,7 +668,7 @@ def render_isolated_map_editor():
     ]
 
     # --- FLAT SLICK HORIZONTAL CONTROLS MATRIX WITH TOP LABELS ---
-    c_btn, c_style, c_color, c_size, c_coord = st.columns([1.6, 2.0, 0.8, 1.2, 3.4])
+    c_btn, c_style, c_color, c_size, c_radius, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 1.2, 2.8])
     
     with c_btn:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
@@ -492,13 +684,27 @@ def render_isolated_map_editor():
         pin_color = st.color_picker(label="Pin Color", key=color_key, label_visibility="collapsed")
         
     with c_size:
+        st.markdown('<div class="manual-picker-label">Pin Size</div>', unsafe_allow_html=True)
         pin_size = st.number_input(
             label="Pin Size", 
             min_value=8, 
             max_value=64, 
             step=1, 
             value=st.session_state[size_key],
-            key=size_key
+            key=size_key,
+            label_visibility="collapsed"
+        )
+        
+    with c_radius:
+        st.markdown('<div class="manual-picker-label">Radius (km)</div>', unsafe_allow_html=True)
+        radius_km = st.number_input(
+            label="Radius (km)",
+            min_value=0.1,
+            max_value=100.0,
+            step=0.1,
+            value=float(st.session_state[radius_key]),
+            key=radius_key,
+            label_visibility="collapsed"
         )
         
     with c_coord:
@@ -511,6 +717,20 @@ def render_isolated_map_editor():
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
+    # --- Calculate radius in degrees for the circle ---
+    def km_to_degrees(lat, km):
+        """Convert kilometers to degrees at a given latitude"""
+        # 1 degree latitude approximately 111.32 km
+        lat_deg = km / 111.32
+        # 1 degree longitude approximately 111.32 * cos(lat) km
+        lon_deg = km / (111.32 * math.cos(math.radians(lat)))
+        return lat_deg, lon_deg
+
+    radius_lat_deg, radius_lon_deg = km_to_degrees(plat, radius_km)
+    
+    # Store radius center for export
+    st.session_state[radius_center_key] = (plat, plon)
+
     # --- LOADING & COMPILING WORKFLOW EXPLICIT CHECK ---
     if st.session_state[export_trigger_key]:
         with st.spinner("Compiling ultra high-resolution map asset... Please wait"):
@@ -521,8 +741,10 @@ def render_isolated_map_editor():
                     n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
                     e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
             if n is None:
-                n, s = plat + 0.005, plat - 0.005
-                e, w = plon + 0.005, plon - 0.005
+                # Include radius in bounds if radius is active
+                radius_buffer = max(radius_lat_deg, radius_lon_deg) * 1.2
+                n, s = plat + radius_buffer, plat - radius_buffer
+                e, w = plon + radius_buffer, plon - radius_buffer
             
             # Generate with the selected style and pin size
             map_img_bytes = generate_static_map_bounds(
@@ -530,15 +752,18 @@ def render_isolated_map_editor():
                 pin_lat=plat, pin_lon=plon, 
                 style=basemap_style, 
                 pin_color=pin_color, 
-                pin_size=int(pin_size)
+                pin_size=int(pin_size),
+                radius_km=radius_km
             )
             
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
+            st.session_state[f"radius_{token_key}"] = radius_km
             
             # Save map data to temp form data
             if st.session_state.temp_form_data:
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
+                st.session_state.temp_form_data[f"{token_key}_radius"] = radius_km
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
                 with open(temp_path, 'w', encoding='utf-8') as f:
                     json.dump(st.session_state.temp_form_data, f, indent=4)
@@ -546,7 +771,7 @@ def render_isolated_map_editor():
             st.session_state[export_trigger_key] = False
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
-            st.success("Map attached successfully!")
+            st.success(f"Map attached successfully! Radius: {radius_km}km")
             time.sleep(0.5)
             st.rerun()
 
@@ -578,6 +803,64 @@ def render_isolated_map_editor():
         zoom_control=True
     )
     
+    # --- ADD RADIUS CIRCLE WITH DISTANCE LABEL ---
+    if radius_km > 0:
+        # Create circle with semi-transparent fill
+        folium.Circle(
+            location=[plat, plon],
+            radius=radius_km * 1000,  # Convert km to meters
+            color=pin_color,
+            fill=True,
+            fill_color=pin_color,
+            fill_opacity=0.15,
+            weight=2,
+            popup=f"Radius: {radius_km} km",
+            tooltip=f"{radius_km} km radius"
+        ).add_to(m)
+        
+        # Add a distance label at the edge of the circle
+        # Calculate position at the right edge of the circle
+        label_lat = plat
+        label_lon = plon + radius_lon_deg * 0.7  # Position label inside the circle edge
+        
+        # Add HTML label showing distance
+        label_html = f"""
+        <div style="
+            background: rgba(255,255,255,0.9);
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 2px solid {pin_color};
+            font-weight: bold;
+            font-size: 13px;
+            color: #1A1A1A;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            white-space: nowrap;
+        ">
+            {radius_km} km
+        </div>
+        """
+        
+        folium.Marker(
+            [label_lat, label_lon],
+            icon=folium.DivIcon(html=label_html),
+            draggable=False
+        ).add_to(m)
+        
+        # Add small tick marks around the circle at cardinal points
+        for angle in [0, 90, 180, 270]:
+            rad = math.radians(angle)
+            tick_lat = plat + radius_lat_deg * math.sin(rad)
+            tick_lon = plon + radius_lon_deg * math.cos(rad)
+            folium.CircleMarker(
+                [tick_lat, tick_lon],
+                radius=3,
+                color=pin_color,
+                fill=True,
+                fill_color=pin_color,
+                fill_opacity=0.8,
+                weight=1
+            ).add_to(m)
+    
     # Create blue circle with white star marker
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
@@ -603,7 +886,7 @@ def render_isolated_map_editor():
         edit_options={'edit':True}
     ).add_to(m)
     
-    st.info("Use the Rectangle tool to frame your export area. Drag the pin to move it. Select different map styles to highlight streets.")
+    st.info(f"Pin at {plat:.5f}, {plon:.5f} | Radius: {radius_km} km | Use Rectangle tool for export area")
     map_data = st_folium(
         m, 
         height=600, 
@@ -971,6 +1254,31 @@ else:
         tokens = st.session_state.tokens
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
         
+        # --- CTA PRESET SECTION ---
+        cta_tokens = get_cta_tokens()
+        if cta_tokens:
+            st.markdown('<div class="cta-preset-container">', unsafe_allow_html=True)
+            st.markdown('<div class="cta-preset-label">Quick Fill CTA Information</div>', unsafe_allow_html=True)
+            
+            col_cta1, col_cta2 = st.columns([2, 1])
+            with col_cta1:
+                advisor_names = list(contacts_database.keys())
+                selected_advisor = st.selectbox(
+                    "Select Advisor",
+                    options=advisor_names,
+                    key="cta_advisor_select",
+                    label_visibility="collapsed"
+                )
+            with col_cta2:
+                if st.button("Apply CTA Preset", key="apply_cta_preset", use_container_width=True):
+                    if apply_cta_preset(selected_advisor):
+                        st.success(f"Applied {selected_advisor}\'s contact information")
+                        st.rerun()
+                    else:
+                        st.error("Failed to apply CTA preset")
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+        
         with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field.")
             cols = st.columns(3)
@@ -1003,7 +1311,13 @@ else:
                 clean_label = token.replace("{", "").replace("}", "")
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                st.markdown(f'<div class="placeholder-label">{clean_label}</div>', unsafe_allow_html=True)
+                # Check if this is a CTA token and add a small indicator
+                is_cta = "cta" in clean_label.lower() or "advisor" in clean_label.lower()
+                label_text = clean_label
+                if is_cta:
+                    label_text = clean_label + " (CTA)"
+                
+                st.markdown(f'<div class="placeholder-label">{label_text}</div>', unsafe_allow_html=True)
                 
                 if current_type == "Image" and st.session_state.template_type == 'pptx':
                     image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
