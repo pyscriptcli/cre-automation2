@@ -16,15 +16,13 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 import traceback
 import time
+from streamlit_sortables import sort_items
 
 # --- MAP SPECIFIC DEPENDENCIES ---
 import folium
 from folium.plugins import Draw
 from streamlit_folium import st_folium
 import requests
-
-# --- ADVANCED SORTABLE UI ---
-from streamlit_sortables import sort_items
 
 # --- CONTACTS DATABASE FOR CTA PRESETS ---
 contacts_database = {
@@ -94,6 +92,7 @@ MINIMAL_CRE_SYSTEM = """
         margin-bottom: 4px;
     }
     
+    /* Type mapping section */
     .type-mapping-section {
         background-color: #F8F9FA !important;
         border: 1px solid #E0E0E0 !important;
@@ -108,6 +107,7 @@ MINIMAL_CRE_SYSTEM = """
         margin-top: 8px !important;
     }
     
+    /* Map editor controls */
     .map-controls-row {
         display: flex !important;
         gap: 12px !important;
@@ -127,6 +127,7 @@ MINIMAL_CRE_SYSTEM = """
         white-space: nowrap !important;
     }
     
+    /* CTA preset styles */
     .cta-preset-container {
         background-color: #F0F7FF !important;
         border: 1px solid #003366 !important;
@@ -139,6 +140,28 @@ MINIMAL_CRE_SYSTEM = """
         font-size: 13px !important;
         color: #003366 !important;
         margin-bottom: 8px !important;
+    }
+    
+    /* Reorder handle styling */
+    .reorder-item {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 8px 12px !important;
+        background: #F8F9FA !important;
+        border: 1px solid #E0E0E0 !important;
+        border-radius: 4px !important;
+        margin-bottom: 6px !important;
+        cursor: grab !important;
+    }
+    .reorder-item:hover {
+        background: #F0F7FF !important;
+        border-color: #003366 !important;
+    }
+    .reorder-handle {
+        color: #999 !important;
+        font-size: 18px !important;
+        cursor: grab !important;
     }
 </style>
 """
@@ -258,6 +281,7 @@ def auto_save_config():
 
 # --- CTA PRESET FUNCTIONS ---
 def detect_cta_sets():
+    """Detect CTA sets in the template placeholders"""
     cta_sets = {}
     for token in st.session_state.tokens:
         clean_label = token.replace("{", "").replace("}", "").upper()
@@ -274,34 +298,41 @@ def detect_cta_sets():
             cta_sets[cta_num]['fields'].add(field_type)
     return cta_sets
 
-def handle_cta_autofill(cta_num, key_name):
-    """Callback execution framework to instantly map CTA database details"""
-    selected_advisor = st.session_state[key_name]
-    if selected_advisor in contacts_database:
-        contact_info = contacts_database[selected_advisor]
-        cta_sets = detect_cta_sets()
-        if cta_num in cta_sets:
-            tokens = cta_sets[cta_num]['tokens']
-            if 'NAME' in tokens:
-                st.session_state[f"val_{tokens['NAME']}"] = selected_advisor
-                st.session_state.temp_form_data[tokens['NAME']] = selected_advisor
-            if 'CONTACT_NUMBER' in tokens:
-                st.session_state[f"val_{tokens['CONTACT_NUMBER']}"] = contact_info["phone"]
-                st.session_state.temp_form_data[tokens['CONTACT_NUMBER']] = contact_info["phone"]
-            if 'EMAIL' in tokens:
-                st.session_state[f"val_{tokens['EMAIL']}"] = contact_info["email"]
-                st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
-            
-            if st.session_state.saved_template_name:
-                temp_path = get_temp_config_path(st.session_state.saved_template_name)
-                try:
-                    with open(temp_path, 'w', encoding='utf-8') as f:
-                        json.dump(st.session_state.temp_form_data, f, indent=4)
-                except Exception:
-                    pass
+def apply_cta_preset_autofill(cta_num, advisor_name):
+    """Auto-fill CTA preset values to a specific CTA set"""
+    if advisor_name not in contacts_database:
+        return False
+    
+    contact_info = contacts_database[advisor_name]
+    cta_sets = detect_cta_sets()
+    
+    if cta_num not in cta_sets:
+        return False
+    
+    tokens = cta_sets[cta_num]['tokens']
+    if 'NAME' in tokens:
+        st.session_state[f"val_{tokens['NAME']}"] = advisor_name
+        st.session_state.temp_form_data[tokens['NAME']] = advisor_name
+    if 'CONTACT_NUMBER' in tokens:
+        st.session_state[f"val_{tokens['CONTACT_NUMBER']}"] = contact_info["phone"]
+        st.session_state.temp_form_data[tokens['CONTACT_NUMBER']] = contact_info["phone"]
+    if 'EMAIL' in tokens:
+        st.session_state[f"val_{tokens['EMAIL']}"] = contact_info["email"]
+        st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
+        
+    if st.session_state.saved_template_name:
+        temp_path = get_temp_config_path(st.session_state.saved_template_name)
+        try:
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(st.session_state.temp_form_data, f, indent=4)
+            return True
+        except Exception:
+            return False
+    return True
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12, radius_km=0, polygon_coords=None):
+    """Generates high-res map with pin included - supports street highlighted styles, radius circle"""
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
@@ -381,16 +412,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     pin_local_y = int(pin_px_y - base_y) - top
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
-    
-    # --- DRAW POLYGON IF PROVIDED (OUTLINE ONLY TO PREVENT BLANKET COVERAGE) ---
-    if polygon_coords and len(polygon_coords) > 2:
-        polygon_points = []
-        for coord in polygon_coords:
-            px, py = num2px(coord['lat'], coord['lng'], zoom)
-            local_x = int(px - base_x) - left
-            local_y = int(py - base_y) - top
-            polygon_points.append((local_x, local_y))
-        draw.polygon(polygon_points, fill=None, outline=pin_color, width=3)
     
     # --- DRAW RADIUS CIRCLE IF SPECIFIED ---
     if radius_km > 0:
@@ -545,8 +566,6 @@ def render_isolated_map_editor():
     image_key = f"map_bytes_holder_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
-    polygon_key = f"map_polygon_{token_key}"
-    draw_objects_key = f"map_draw_objects_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid with Streets"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
@@ -557,8 +576,6 @@ def render_isolated_map_editor():
     if image_key not in st.session_state: st.session_state[image_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
-    if polygon_key not in st.session_state: st.session_state[polygon_key] = None
-    if draw_objects_key not in st.session_state: st.session_state[draw_objects_key] = None
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -626,10 +643,9 @@ def render_isolated_map_editor():
                 n, s = plat + radius_buffer, plat - radius_buffer
                 e, w = plon + radius_buffer, plon - radius_buffer
             
-            polygon_coords = st.session_state.get(polygon_key)
             map_img_bytes = generate_static_map_bounds(
                 n=n, s=s, e=e, w=w, pin_lat=plat, pin_lon=plon, style=basemap_style, pin_color=pin_color, pin_size=int(pin_size),
-                radius_km=radius_km if show_radius else 0, polygon_coords=polygon_coords
+                radius_km=radius_km if show_radius else 0
             )
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
@@ -678,7 +694,7 @@ def render_isolated_map_editor():
         for angle in [0, 90, 180, 270]:
             rad = math.radians(angle)
             folium.CircleMarker([plat + radius_lat_deg * math.sin(rad), plon + radius_lon_deg * math.cos(rad)], radius=3, color=pin_color, fill=True, fill_color=pin_color, fill_opacity=0.8, weight=1).add_to(m)
-        
+    
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40" style="width: 100%; height: 100%;">
@@ -692,45 +708,30 @@ def render_isolated_map_editor():
     """
     folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
     
-    # --- UI MAP DRAW CONFIG: REMOVE OUTLINE SHAPES FOR RECTANGLE EXPORT FRAMING ---
+    # Draw tool with ONLY rectangle for crop boundary (no polygon)
     Draw(
         export=False, 
-        position='topleft', 
+        position='topleft',
         draw_options={
-            'polyline': False, 
-            'polygon': True, 
-            'circle': False, 
-            'marker': False, 
-            'circlemarker': False, 
-            'rectangle': {
-                'shapeOptions': {
-                    'stroke': False,
-                    'fill': False,
-                    'clickable': False
-                }
-            }
-        }, 
+            'polyline': False,
+            'polygon': False,  # Disabled - only use rectangle for cropping
+            'circle': False,
+            'marker': False,
+            'circlemarker': False,
+            'rectangle': True  # Only rectangle for crop area
+        },
         edit_options={'edit': True}
     ).add_to(m)
     
-    st.info("Drag Rectangle for crop selection box boundaries | Custom Polygon tool outlines target sites | Markers can be repositioned.")
-    map_data = st_folium(m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", returned_objects=["last_active_drawing", "bounds", "last_marker_moved", "all_drawings"])
+    st.info("Draw a rectangle to define crop area | Click 'Add Radius' for distance circles | Drag pin to reposition")
+    map_data = st_folium(
+        m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", 
+        returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
+    )
 
     if isinstance(map_data, dict):
         if map_data.get("bounds"):
             st.session_state[bounds_key] = map_data["bounds"]
-        if map_data.get("all_drawings"):
-            drawings = map_data["all_drawings"]
-            if drawings and len(drawings) > 0:
-                last_drawing = drawings[-1]
-                if last_drawing and "geometry" in last_drawing:
-                    geom = last_drawing["geometry"]
-                    if geom and "type" in geom and geom["type"] == "Polygon":
-                        # If drawing properties verify it's a structural polygon and not an item created via Rectangle layout tool
-                        is_rectangle = last_drawing.get("properties", {}).get("type") == "rectangle"
-                        if "coordinates" in geom and len(geom["coordinates"]) > 0 and not is_rectangle:
-                            coords = geom["coordinates"][0]
-                            st.session_state[polygon_key] = [{"lat": c[1], "lng": c[0]} for c in coords]
         if map_data.get("last_marker_moved"):
             moved = map_data["last_marker_moved"]
             if moved:
@@ -857,6 +858,23 @@ def get_download_filename(template_name, file_type):
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
     return f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_type}"
 
+def autosave_current_form_data():
+    if not st.session_state.saved_template_name or not st.session_state.tokens:
+        return False
+    for token in st.session_state.tokens:
+        val_key = f"val_{token}"
+        if val_key in st.session_state:
+            current_type = st.session_state.custom_mapping.get(token, "Text")
+            if current_type != "Image":
+                st.session_state.temp_form_data[token] = st.session_state[val_key]
+    temp_path = get_temp_config_path(st.session_state.saved_template_name)
+    try:
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            json.dump(st.session_state.temp_form_data, f, indent=4)
+        return True
+    except Exception:
+        return False
+
 def restore_form_data_from_session():
     if not st.session_state.saved_template_name:
         return False
@@ -914,7 +932,7 @@ if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = F
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
-if "sorted_tokens" not in st.session_state: st.session_state.sorted_tokens = []
+if "placeholder_order" not in st.session_state: st.session_state.placeholder_order = []
 
 # --- APP ROUTER ---
 if st.session_state.active_map_editor_token:
@@ -966,8 +984,8 @@ else:
                         st.session_state.saved_template_name = None
                         st.session_state.template_loaded = False
                         st.session_state.tokens = []
-                        st.session_state.sorted_tokens = []
                         st.session_state.temp_form_data = {}
+                        st.session_state.placeholder_order = []
                         st.session_state.show_delete_confirm = False
                         st.session_state.template_to_delete = None
                         st.rerun()
@@ -986,6 +1004,7 @@ else:
                     if template_bytes:
                         if st.session_state.saved_template_name != template_name:
                             st.session_state.temp_form_data = {}
+                            st.session_state.placeholder_order = []
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
                         st.session_state.template_loaded = True
@@ -993,8 +1012,8 @@ else:
                         config_data = load_config_from_file(template_name.replace('.pptx', '').replace('.docx', '') + '_config.json')
                         if config_data: st.session_state.custom_mapping = config_data
                         st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
-                        if not st.session_state.sorted_tokens or set(st.session_state.sorted_tokens) != set(st.session_state.tokens):
-                            st.session_state.sorted_tokens = list(st.session_state.tokens)
+                        if not st.session_state.placeholder_order:
+                            st.session_state.placeholder_order = st.session_state.tokens.copy()
                         restore_form_data_from_session()
                     break
 
@@ -1010,7 +1029,7 @@ else:
             st.session_state.template_loaded = True
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
-            st.session_state.sorted_tokens = list(st.session_state.tokens)
+            st.session_state.placeholder_order = st.session_state.tokens.copy()
             st.session_state.temp_form_data = {}
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
@@ -1036,51 +1055,45 @@ else:
 
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
-        st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
         
-        # --- SIMPLE DROP-DOWN AUTOMATIC ACTIONLESS CTA PRESET SECTION ---
+        # --- SIMPLE CTA PRESET SECTION WITH AUTO-FILL DROPDOWNS ---
         cta_sets = detect_cta_sets()
         if cta_sets:
             st.markdown('<div class="cta-preset-container">', unsafe_allow_html=True)
-            st.markdown('<div class="cta-preset-label">Quick Fill CTA Information (Autofills Instantly)</div>', unsafe_allow_html=True)
+            st.markdown('<div class="cta-preset-label">CTA Information (Auto-fill)</div>', unsafe_allow_html=True)
             
-            cta_keys = sorted(list(cta_sets.keys()))
-            cta_cols = st.columns(max(2, len(cta_keys)))
+            # Create a row for each CTA set with just a dropdown that auto-fills
+            for cta_num in sorted(cta_sets.keys()):
+                col_label, col_dropdown = st.columns([1, 3])
+                with col_label:
+                    st.markdown(f"**CTA{cta_num}**")
+                with col_dropdown:
+                    # Get current selected advisor for this CTA
+                    cta_name_token = cta_sets[cta_num]['tokens'].get('NAME')
+                    current_advisor = ""
+                    if cta_name_token and f"val_{cta_name_token}" in st.session_state:
+                        current_advisor = st.session_state[f"val_{cta_name_token}"]
+                    
+                    # Dropdown that auto-fills on change
+                    selected_advisor = st.selectbox(
+                        f"Select Advisor for CTA{cta_num}",
+                        options=[""] + list(contacts_database.keys()),
+                        index=list(contacts_database.keys()).index(current_advisor) + 1 if current_advisor in contacts_database else 0,
+                        key=f"cta_autofill_{cta_num}",
+                        label_visibility="collapsed"
+                    )
+                    
+                    # Auto-fill when selection changes
+                    if selected_advisor and selected_advisor != current_advisor:
+                        apply_cta_preset_autofill(cta_num, selected_advisor)
+                        st.rerun()
             
-            for index, cta_num in enumerate(cta_keys):
-                if index < len(cta_cols):
-                    with cta_cols[index]:
-                        # Dynamically find current matching profile name index for state restoration
-                        tokens_map = cta_sets[cta_num]['tokens']
-                        current_saved_name = ""
-                        if 'NAME' in tokens_map:
-                            current_saved_name = st.session_state.get(f"val_{tokens_map['NAME']}", "")
-                        
-                        db_options = ["Select Advisor..."] + list(contacts_database.keys())
-                        default_idx = db_options.index(current_saved_name) if current_saved_name in db_options else 0
-                        
-                        st.selectbox(
-                            f"CTA Set {cta_num}",
-                            options=db_options,
-                            index=default_idx,
-                            key=f"autofill_cta_select_{cta_num}",
-                            on_change=handle_cta_autofill,
-                            args=(cta_num, f"autofill_cta_select_{cta_num}")
-                        )
             st.markdown('</div>', unsafe_allow_html=True)
         
-        # --- DRAG AND DROP REORDER SECTION ---
-        with st.expander("Reorder & Manage Mappings", expanded=False):
-            st.markdown("#### Drag and drop rows to customize fields arrangement sequence:")
-            reordered = sort_items(st.session_state.sorted_tokens, direction="vertical", key="tokens_reorder_component")
-            if reordered != st.session_state.sorted_tokens:
-                st.session_state.sorted_tokens = reordered
-                st.rerun()
-                
-            st.markdown("---")
-            st.markdown("#### Data Type Mapping")
+        with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
+            st.markdown("Configure the data type for each placeholder field.")
             cols = st.columns(3)
-            for idx, token in enumerate(st.session_state.sorted_tokens):
+            for idx, token in enumerate(tokens):
                 with cols[idx % 3]:
                     clean_label = token.replace("{", "").replace("}", "")
                     current_type = st.session_state.custom_mapping.get(token, "Text")
@@ -1094,9 +1107,33 @@ else:
                             st.rerun()
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:12px; color:#666; margin-bottom:12px;">Drag the ↕ handle to reorder placeholders</p>', unsafe_allow_html=True)
         
-        # --- RENDER VALUES BASED ON CUSTOM SORT SEQUENCE ---
-        for idx, token in enumerate(st.session_state.sorted_tokens):
+        # --- DRAG AND REORDER PLACEHOLDERS ---
+        # Create display items for sorting
+        display_items = []
+        for token in st.session_state.placeholder_order:
+            clean_label = token.replace("{", "").replace("}", "")
+            display_items.append(f"{clean_label}")
+        
+        # Use sort_items for drag-and-drop reordering
+        if display_items:
+            reordered_items = sort_items(display_items, key="placeholder_reorder")
+            
+            # Update the order if changed
+            if reordered_items != display_items:
+                # Map back to tokens
+                new_order = []
+                for item in reordered_items:
+                    for token in st.session_state.tokens:
+                        if token.replace("{", "").replace("}", "") == item:
+                            new_order.append(token)
+                            break
+                st.session_state.placeholder_order = new_order
+                st.rerun()
+        
+        # --- RENDER FIELDS IN THE REORDERED ORDER ---
+        for idx, token in enumerate(st.session_state.placeholder_order):
             col_target = idx % 2
             if col_target == 0:
                 ui_col_1, ui_col_2 = st.columns(2)
