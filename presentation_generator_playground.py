@@ -187,7 +187,10 @@ MINIMAL_CRE_SYSTEM = """
         flex: 1 !important;
     }
     .cta-preset-row .cta-button {
-        min-width: 120px !important;
+        min-width: 100px !important;
+    }
+    .cta-preset-row .cta-checkbox {
+        min-width: 30px !important;
     }
     
     @media (max-width: 768px) {
@@ -387,20 +390,19 @@ def apply_cta_preset(cta_num, advisor_name):
     
     return True
 
-def get_cta_sets_info():
-    """Get information about all CTA sets in the template"""
+def apply_all_cta_presets(advisor_name):
+    """Apply CTA preset to all detected CTA sets"""
+    if advisor_name not in contacts_database:
+        return False
+    
     cta_sets = detect_cta_sets()
-    result = {}
+    success_count = 0
     
-    for cta_num, cta_data in cta_sets.items():
-        result[cta_num] = {
-            'has_name': 'NAME' in cta_data['fields'],
-            'has_phone': 'CONTACT_NUMBER' in cta_data['fields'],
-            'has_email': 'EMAIL' in cta_data['fields'],
-            'tokens': cta_data['tokens']
-        }
+    for cta_num in cta_sets.keys():
+        if apply_cta_preset(cta_num, advisor_name):
+            success_count += 1
     
-    return result
+    return success_count > 0
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12, radius_km=0, polygon_coords=None):
@@ -639,18 +641,6 @@ def render_isolated_map_editor():
                 margin-bottom: 8px !important;
                 line-height: 1.2;
             }
-            .map-controls-row {
-                display: flex !important;
-                gap: 12px !important;
-                align-items: center !important;
-                flex-wrap: wrap !important;
-                margin-bottom: 12px !important;
-            }
-            .map-control-item {
-                display: flex !important;
-                align-items: center !important;
-                gap: 6px !important;
-            }
         </style>
     """, unsafe_allow_html=True)
 
@@ -756,8 +746,10 @@ def render_isolated_map_editor():
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # --- RADIUS CONTROLS ---
+    # --- RADIUS CONTROLS (Inside map controls) ---
     st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+    
+    # Use columns for radius controls inline with map
     col_radius1, col_radius2, col_radius3 = st.columns([2, 1, 1])
     
     with col_radius1:
@@ -979,7 +971,7 @@ def render_isolated_map_editor():
         edit_options={'edit': True}
     ).add_to(m)
     
-    st.info("Use the Rectangle tool for export area | Use Polygon tool to draw custom shapes | Add Radius for distance circles")
+    st.info("Use Rectangle tool for export area | Use Polygon tool to draw custom shapes | Click 'Add Radius' for distance circles")
     map_data = st_folium(
         m, 
         height=600, 
@@ -1358,25 +1350,57 @@ else:
             st.markdown('<div class="cta-preset-container">', unsafe_allow_html=True)
             st.markdown('<div class="cta-preset-label">Quick Fill CTA Information</div>', unsafe_allow_html=True)
             
+            # Show single dropdown and apply all with checkboxes
+            col_advisor, col_apply = st.columns([3, 1])
+            with col_advisor:
+                advisor_names = list(contacts_database.keys())
+                selected_advisor = st.selectbox(
+                    "Select Advisor for all CTA sets",
+                    options=advisor_names,
+                    key="cta_advisor_select_all",
+                    label_visibility="collapsed"
+                )
+            with col_apply:
+                if st.button("Apply to All CTA", key="apply_cta_all", use_container_width=True):
+                    if apply_all_cta_presets(selected_advisor):
+                        st.success(f"Applied {selected_advisor}'s information to all CTA sets")
+                        st.rerun()
+                    else:
+                        st.error("Failed to apply CTA presets")
+            
+            # Show individual CTA sets with checkboxes
+            st.markdown("<div style='margin-top: 8px;'><small>Individual CTA sets:</small></div>", unsafe_allow_html=True)
+            
+            # Create a row for each CTA set with checkbox and apply button
             for cta_num in sorted(cta_sets.keys()):
                 st.markdown(f'<div class="cta-preset-row">', unsafe_allow_html=True)
                 st.markdown(f'<div class="cta-label">CTA{cta_num}</div>', unsafe_allow_html=True)
                 
-                col1, col2 = st.columns([2, 1])
+                col1, col2, col3 = st.columns([1, 2, 1])
                 
                 with col1:
-                    advisor_names = list(contacts_database.keys())
-                    selected_advisor = st.selectbox(
-                        f"Select Advisor for CTA{cta_num}",
-                        options=advisor_names,
-                        key=f"cta_advisor_select_{cta_num}",
-                        label_visibility="collapsed"
+                    # Checkbox to select this CTA
+                    selected = st.checkbox(
+                        "Select",
+                        key=f"cta_checkbox_{cta_num}",
+                        value=True
                     )
                 
                 with col2:
-                    if st.button(f"Apply CTA{cta_num}", key=f"apply_cta_{cta_num}", use_container_width=True):
-                        if apply_cta_preset(cta_num, selected_advisor):
-                            st.success(f"Applied {selected_advisor}'s information to CTA{cta_num}")
+                    # Dropdown for this specific CTA
+                    advisor_names = list(contacts_database.keys())
+                    cta_advisor = st.selectbox(
+                        f"Advisor for CTA{cta_num}",
+                        options=advisor_names,
+                        key=f"cta_advisor_select_{cta_num}",
+                        label_visibility="collapsed",
+                        disabled=not selected
+                    )
+                
+                with col3:
+                    if st.button(f"Apply CTA{cta_num}", key=f"apply_cta_{cta_num}", use_container_width=True, disabled=not selected):
+                        if apply_cta_preset(cta_num, cta_advisor):
+                            st.success(f"Applied {cta_advisor}'s information to CTA{cta_num}")
                             st.rerun()
                         else:
                             st.error(f"Failed to apply CTA{cta_num} preset")
