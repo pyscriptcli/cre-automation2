@@ -164,6 +164,31 @@ MINIMAL_CRE_SYSTEM = """
         color: #003366 !important;
         margin-bottom: 8px !important;
     }
+    .cta-preset-row {
+        display: flex !important;
+        gap: 12px !important;
+        align-items: center !important;
+        margin-bottom: 8px !important;
+        padding: 8px !important;
+        background: #FFFFFF !important;
+        border-radius: 4px !important;
+        border: 1px solid #E0E0E0 !important;
+    }
+    .cta-preset-row:last-child {
+        margin-bottom: 0 !important;
+    }
+    .cta-preset-row .cta-label {
+        font-weight: 500 !important;
+        font-size: 12px !important;
+        color: #003366 !important;
+        min-width: 60px !important;
+    }
+    .cta-preset-row .cta-select {
+        flex: 1 !important;
+    }
+    .cta-preset-row .cta-button {
+        min-width: 120px !important;
+    }
     
     @media (max-width: 768px) {
         .type-mapping-grid {
@@ -172,6 +197,13 @@ MINIMAL_CRE_SYSTEM = """
         .map-controls-row {
             flex-direction: column !important;
             align-items: stretch !important;
+        }
+        .cta-preset-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+        }
+        .cta-preset-row .cta-button {
+            min-width: auto !important;
         }
     }
 </style>
@@ -291,29 +323,57 @@ def auto_save_config():
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
 # --- CTA PRESET FUNCTIONS ---
-def apply_cta_preset(advisor_name):
-    """Apply CTA preset values to all CTA-related placeholders"""
+def detect_cta_sets():
+    """Detect CTA sets in the template placeholders"""
+    cta_sets = {}
+    
+    for token in st.session_state.tokens:
+        clean_label = token.replace("{", "").replace("}", "").upper()
+        
+        # Check for CTA pattern: CTA1_NAME, CTA2_NAME, etc.
+        match = re.match(r'CTA(\d+)_(NAME|CONTACT_NUMBER|EMAIL)', clean_label)
+        if match:
+            cta_num = int(match.group(1))
+            field_type = match.group(2)
+            
+            if cta_num not in cta_sets:
+                cta_sets[cta_num] = {
+                    'tokens': {},
+                    'fields': set()
+                }
+            
+            # Store the token with its field type
+            cta_sets[cta_num]['tokens'][field_type] = token
+            cta_sets[cta_num]['fields'].add(field_type)
+    
+    return cta_sets
+
+def apply_cta_preset(cta_num, advisor_name):
+    """Apply CTA preset values to a specific CTA set"""
     if advisor_name not in contacts_database:
         return False
     
     contact_info = contacts_database[advisor_name]
+    cta_sets = detect_cta_sets()
     
-    # Find all CTA-related tokens and fill them
-    for token in st.session_state.tokens:
-        clean_label = token.replace("{", "").replace("}", "").lower()
-        val_key = f"val_{token}"
-        
-        if "advisor name" in clean_label or "cta name" in clean_label:
-            st.session_state[val_key] = advisor_name
-            st.session_state.temp_form_data[token] = advisor_name
-            
-        elif "advisor contact" in clean_label or "cta phone" in clean_label or "cta contact" in clean_label:
-            st.session_state[val_key] = contact_info["phone"]
-            st.session_state.temp_form_data[token] = contact_info["phone"]
-            
-        elif "advisor email" in clean_label or "cta email" in clean_label:
-            st.session_state[val_key] = contact_info["email"]
-            st.session_state.temp_form_data[token] = contact_info["email"]
+    if cta_num not in cta_sets:
+        return False
+    
+    # Get the tokens for this CTA set
+    tokens = cta_sets[cta_num]['tokens']
+    
+    # Fill the placeholders
+    if 'NAME' in tokens:
+        st.session_state[f"val_{tokens['NAME']}"] = advisor_name
+        st.session_state.temp_form_data[tokens['NAME']] = advisor_name
+    
+    if 'CONTACT_NUMBER' in tokens:
+        st.session_state[f"val_{tokens['CONTACT_NUMBER']}"] = contact_info["phone"]
+        st.session_state.temp_form_data[tokens['CONTACT_NUMBER']] = contact_info["phone"]
+    
+    if 'EMAIL' in tokens:
+        st.session_state[f"val_{tokens['EMAIL']}"] = contact_info["email"]
+        st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
     
     # Save to disk
     if st.session_state.saved_template_name:
@@ -327,14 +387,20 @@ def apply_cta_preset(advisor_name):
     
     return True
 
-def get_cta_tokens():
-    """Get all CTA-related tokens from the current template"""
-    cta_tokens = []
-    for token in st.session_state.tokens:
-        clean_label = token.replace("{", "").replace("}", "").lower()
-        if "cta" in clean_label or "advisor" in clean_label:
-            cta_tokens.append(token)
-    return cta_tokens
+def get_cta_sets_info():
+    """Get information about all CTA sets in the template"""
+    cta_sets = detect_cta_sets()
+    result = {}
+    
+    for cta_num, cta_data in cta_sets.items():
+        result[cta_num] = {
+            'has_name': 'NAME' in cta_data['fields'],
+            'has_phone': 'CONTACT_NUMBER' in cta_data['fields'],
+            'has_email': 'EMAIL' in cta_data['fields'],
+            'tokens': cta_data['tokens']
+        }
+    
+    return result
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12, radius_km=0):
@@ -1255,27 +1321,40 @@ else:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
         
         # --- CTA PRESET SECTION ---
-        cta_tokens = get_cta_tokens()
-        if cta_tokens:
+        cta_sets = detect_cta_sets()
+        if cta_sets:
             st.markdown('<div class="cta-preset-container">', unsafe_allow_html=True)
             st.markdown('<div class="cta-preset-label">Quick Fill CTA Information</div>', unsafe_allow_html=True)
             
-            col_cta1, col_cta2 = st.columns([2, 1])
-            with col_cta1:
-                advisor_names = list(contacts_database.keys())
-                selected_advisor = st.selectbox(
-                    "Select Advisor",
-                    options=advisor_names,
-                    key="cta_advisor_select",
-                    label_visibility="collapsed"
-                )
-            with col_cta2:
-                if st.button("Apply CTA Preset", key="apply_cta_preset", use_container_width=True):
-                    if apply_cta_preset(selected_advisor):
-                        st.success(f"Applied {selected_advisor}\'s contact information")
-                        st.rerun()
-                    else:
-                        st.error("Failed to apply CTA preset")
+            # Sort CTA sets by number
+            for cta_num in sorted(cta_sets.keys()):
+                cta_data = cta_sets[cta_num]
+                
+                # Create a row for each CTA set
+                st.markdown(f'<div class="cta-preset-row">', unsafe_allow_html=True)
+                st.markdown(f'<div class="cta-label">CTA{cta_num}</div>', unsafe_allow_html=True)
+                
+                # Use columns for the row
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    advisor_names = list(contacts_database.keys())
+                    selected_advisor = st.selectbox(
+                        f"Select Advisor for CTA{cta_num}",
+                        options=advisor_names,
+                        key=f"cta_advisor_select_{cta_num}",
+                        label_visibility="collapsed"
+                    )
+                
+                with col2:
+                    if st.button(f"Apply CTA{cta_num}", key=f"apply_cta_{cta_num}", use_container_width=True):
+                        if apply_cta_preset(cta_num, selected_advisor):
+                            st.success(f"Applied {selected_advisor}'s information to CTA{cta_num}")
+                            st.rerun()
+                        else:
+                            st.error(f"Failed to apply CTA{cta_num} preset")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown('</div>', unsafe_allow_html=True)
         
@@ -1311,11 +1390,15 @@ else:
                 clean_label = token.replace("{", "").replace("}", "")
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                # Check if this is a CTA token and add a small indicator
-                is_cta = "cta" in clean_label.lower() or "advisor" in clean_label.lower()
+                # Check if this is a CTA token and add indicator
+                clean_upper = clean_label.upper()
+                cta_match = re.match(r'CTA(\d+)_(NAME|CONTACT_NUMBER|EMAIL)', clean_upper)
+                is_cta = cta_match is not None
+                
                 label_text = clean_label
                 if is_cta:
-                    label_text = clean_label + " (CTA)"
+                    cta_num = cta_match.group(1)
+                    label_text = f"{clean_label} (CTA{cta_num})"
                 
                 st.markdown(f'<div class="placeholder-label">{label_text}</div>', unsafe_allow_html=True)
                 
