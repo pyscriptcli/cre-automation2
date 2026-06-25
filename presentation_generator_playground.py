@@ -265,7 +265,7 @@ def auto_save_config():
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#003366", pin_size=12):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12):
     """Generates high-res map with pin included - supports street highlighted styles"""
     lon_span = e - w
     lat_span = n - s
@@ -298,14 +298,14 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
     headers = {"User-Agent": "Mozilla/5.0"}
     
-    # Map styles with street highlighting options - removed "Satellite with Streets"
+    # Map styles with street highlighting options
     styles = {
         "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
         "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
         "Street Map": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         "Terrain": "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
-        "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "Carto Light": "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
         "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
     }
     url_template = styles.get(style, styles["Hybrid with Streets"])
@@ -349,24 +349,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
-    # Calculate scale based on image dimensions and pin size
-    img_width = cropped.width
-    img_height = cropped.height
-    # Base scale relative to image size
-    base_scale = min(img_width, img_height) / 600.0
-    # Pin size scaling - use the exact pin_size from editor
-    # The pin_size is the diameter in points, we need to scale it appropriately
-    scale = max(0.5, (pin_size / 12.0) * base_scale * 1.8)
-    radius = int(16 * scale)
-    
-    # Ensure minimum visibility
-    if radius < 4:
-        radius = 4
+    # Scale pin size specifically to respect high-res canvas magnification
+    radius = int((pin_size / 2) * scale_factor)
     
     # Draw shadow
-    shadow_offset = int(2 * scale)
-    if shadow_offset < 1:
-        shadow_offset = 1
+    shadow_offset = max(1, int(radius * 0.15))
     draw.ellipse([
         pin_local_x - radius - shadow_offset, 
         pin_local_y - radius - shadow_offset, 
@@ -380,12 +367,10 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
         pin_local_y - radius,
         pin_local_x + radius,
         pin_local_y + radius
-    ], fill=pin_color, outline=(255, 255, 255), width=max(1, int(2 * scale)))
+    ], fill=pin_color, outline=(255, 255, 255), width=max(1, int(radius * 0.1)))
     
     # Draw white star in the center
     star_size = int(radius * 0.55)
-    if star_size < 2:
-        star_size = 2
     star_points = []
     for i in range(10):
         angle = math.radians(i * 36 - 90)
@@ -448,7 +433,7 @@ def render_isolated_map_editor():
     if style_key not in st.session_state: st.session_state[style_key] = "Hybrid with Streets"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
-    if size_key not in st.session_state: st.session_state[size_key] = 12
+    if size_key not in st.session_state: st.session_state[size_key] = 12  # Default pin size 12
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
@@ -458,7 +443,7 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    # Map style options - removed "Satellite with Streets"
+    # Map style options
     map_styles = [
         "Hybrid with Streets",
         "Hybrid", 
@@ -518,13 +503,13 @@ def render_isolated_map_editor():
                 n, s = plat + 0.005, plat - 0.005
                 e, w = plon + 0.005, plon - 0.005
             
-            # Generate with the selected style and pin size - use EXACT same values as editor
+            # Generate with the selected style and pin size
             map_img_bytes = generate_static_map_bounds(
                 n=n, s=s, e=e, w=w, 
                 pin_lat=plat, pin_lon=plon, 
                 style=basemap_style, 
                 pin_color=pin_color, 
-                pin_size=int(pin_size)  # Use the exact pin size from editor
+                pin_size=int(pin_size)
             )
             
             st.session_state[image_key] = map_img_bytes
@@ -543,14 +528,14 @@ def render_isolated_map_editor():
             time.sleep(0.5)
             st.rerun()
 
-    # Map tile URLs - removed "Satellite with Streets"
+    # Map tile URLs
     tiles_dict = {
         "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
         "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
         "Street Map": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         "Terrain": "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
-        "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "Carto Light": "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
         "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
     }
     attr_dict = {
@@ -571,10 +556,10 @@ def render_isolated_map_editor():
         zoom_control=True
     )
     
-    # Create blue circle with white star marker - use EXACT pin size from editor
+    # Create blue circle with white star marker
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
-        <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40">
+        <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40" style="width: 100%; height: 100%;">
             <defs>
                 <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
                     <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
