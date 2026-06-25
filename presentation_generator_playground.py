@@ -265,7 +265,8 @@ def auto_save_config():
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin_color="#DC3545", pin_size=32):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12):
+    """Generates high-res map with pin included - supports street highlighted styles"""
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
@@ -274,12 +275,14 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     zoom = max(13, min(20, zoom))
     if lon_span < 0.01 and lat_span < 0.01:
         zoom = min(20, zoom + 2)
+    
     def deg2num(lat_deg, lon_deg, z):
         lat_rad = math.radians(lat_deg)
         n_tiles = 2.0 ** z
         xtile = int((lon_deg + 180.0) / 360.0 * n_tiles)
         ytile = int((1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n_tiles)
         return (xtile, ytile)
+    
     x_min, y_min = deg2num(n, w, zoom)
     x_max, y_max = deg2num(s, e, zoom)
     if x_max == x_min: x_max += 1
@@ -294,13 +297,20 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     scale_factor = 2
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
     headers = {"User-Agent": "Mozilla/5.0"}
+    
+    # Map styles with street highlighting options
     styles = {
-        "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
+        "Satellite with Streets": "https://mt1.google.com/vt/lyrs=y&s=Google&x={x}&y={y}&z={z}",
         "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
+        "Street Map": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        "Terrain": "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
+        "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
     }
-    url_template = styles.get(style, styles["Hybrid"])
+    url_template = styles.get(style, styles["Hybrid with Streets"])
+    
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             url = url_template.format(z=zoom, x=x, y=y)
@@ -312,12 +322,14 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
                     stitched.paste(img, ((x - x_min) * tile_size * scale_factor, (y - y_min) * tile_size * scale_factor))
             except Exception:
                 pass
+    
     def num2px(lat_deg, lon_deg, z):
         lat_rad = math.radians(lat_deg)
         n_tiles = 2.0 ** z
         px_x = (lon_deg + 180.0) / 360.0 * n_tiles * tile_size * scale_factor
         px_y = (1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n_tiles * tile_size * scale_factor
         return px_x, px_y
+    
     px_w, py_n = num2px(n, w, zoom)
     px_e, py_s = num2px(s, e, zoom)
     base_x = x_min * tile_size * scale_factor
@@ -329,27 +341,48 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid", pin
     if right <= left: right = left + 100
     if bottom <= top: bottom = top + 100
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
+    
+    # --- DRAW PIN ON THE CROPPED IMAGE ---
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
+    
     img_width = cropped.width
     img_height = cropped.height
     base_scale = min(img_width, img_height) / 600.0
-    scale = max(1.5, (pin_size / 32.0) * base_scale * 2.0)
-    radius = int(20 * scale)
-    shadow_offset = int(3 * scale)
-    draw.ellipse([pin_local_x - radius - shadow_offset, pin_local_y - radius - shadow_offset, pin_local_x + radius + shadow_offset, pin_local_y + radius + shadow_offset], fill=(0, 0, 0, 60))
-    draw.ellipse([pin_local_x - radius, pin_local_y - radius, pin_local_x + radius, pin_local_y + radius], fill=pin_color, outline=(255, 255, 255), width=int(3 * scale))
-    star_size = int(radius * 0.6)
+    # Use pin_size directly with a minimum scale
+    scale = max(0.8, (pin_size / 12.0) * base_scale * 1.5)
+    radius = int(16 * scale)
+    
+    # Draw shadow
+    shadow_offset = int(2 * scale)
+    draw.ellipse([
+        pin_local_x - radius - shadow_offset, 
+        pin_local_y - radius - shadow_offset, 
+        pin_local_x + radius + shadow_offset, 
+        pin_local_y + radius + shadow_offset
+    ], fill=(0, 0, 0, 60))
+    
+    # Draw blue circle background
+    draw.ellipse([
+        pin_local_x - radius,
+        pin_local_y - radius,
+        pin_local_x + radius,
+        pin_local_y + radius
+    ], fill=pin_color, outline=(255, 255, 255), width=int(2 * scale))
+    
+    # Draw white star in the center
+    star_size = int(radius * 0.55)
     star_points = []
     for i in range(10):
         angle = math.radians(i * 36 - 90)
         r = star_size if i % 2 == 0 else star_size * 0.4
         star_points.append((pin_local_x + r * math.cos(angle), pin_local_y + r * math.sin(angle)))
     draw.polygon(star_points, fill=(255, 255, 255))
+    
     final_img = cropped.convert("RGB")
     img_byte_arr = io.BytesIO()
     final_img.save(img_byte_arr, format='PNG', quality=100, optimize=True)
@@ -363,16 +396,13 @@ def render_isolated_map_editor():
     # Custom CSS adjustments to normalize structural alignment with visible labels
     st.markdown("""
         <style>
-            /* Ensures that elements with varying native heights snap predictably */
             div[data-testid="stHorizontalBlock"] {
                 align-items: flex-end !important;
                 gap: 12px !important;
             }
-            /* Match element inner wrapper boundaries cleanly */
             div[data-baseweb="input"], div[data-baseweb="select"], .stColorPicker div {
                 height: 38px !important;
             }
-            /* Clean formatting alignment for the manual color picker label */
             .manual-picker-label {
                 font-family: 'Segoe UI', Arial, sans-serif !important;
                 font-size: 14px !important;
@@ -404,11 +434,11 @@ def render_isolated_map_editor():
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
     
-    if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
+    # Initialize all keys
+    if style_key not in st.session_state: st.session_state[style_key] = "Hybrid with Streets"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
-    # FIXED: Default pin size baseline updated to 24
-    if size_key not in st.session_state: st.session_state[size_key] = 24
+    if size_key not in st.session_state: st.session_state[size_key] = 12  # Default pin size 12
     if image_key not in st.session_state: st.session_state[image_key] = None
     if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
@@ -417,6 +447,18 @@ def render_isolated_map_editor():
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
+
+    # Map style options with street highlighting
+    map_styles = [
+        "Hybrid with Streets",
+        "Hybrid", 
+        "Satellite with Streets",
+        "Satellite",
+        "Street Map",
+        "Terrain",
+        "Carto Light",
+        "OSM"
+    ]
 
     # --- FLAT SLICK HORIZONTAL CONTROLS MATRIX WITH TOP LABELS ---
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.6, 2.0, 0.8, 1.2, 3.4])
@@ -428,7 +470,7 @@ def render_isolated_map_editor():
             st.session_state[export_trigger_key] = True
         
     with c_style:
-        basemap_style = st.selectbox(label="Basemap Layer", options=["Hybrid", "Satellite", "Carto Light", "OSM"], key=style_key)
+        basemap_style = st.selectbox(label="Basemap Layer", options=map_styles, key=style_key)
         
     with c_color:
         st.markdown('<div class="manual-picker-label">Pin Color</div>', unsafe_allow_html=True)
@@ -437,9 +479,10 @@ def render_isolated_map_editor():
     with c_size:
         pin_size = st.number_input(
             label="Pin Size", 
-            min_value=16, 
+            min_value=8, 
             max_value=64, 
-            step=2, 
+            step=1, 
+            value=st.session_state[size_key],
             key=size_key
         )
         
@@ -466,11 +509,13 @@ def render_isolated_map_editor():
                 n, s = plat + 0.005, plat - 0.005
                 e, w = plon + 0.005, plon - 0.005
             
-            # Explicit dynamic parameters routing into the generator engine
+            # Generate with the selected style and pin size
             map_img_bytes = generate_static_map_bounds(
                 n=n, s=s, e=e, w=w, 
                 pin_lat=plat, pin_lon=plon, 
-                style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
+                style=basemap_style, 
+                pin_color=pin_color, 
+                pin_size=int(pin_size)
             )
             
             st.session_state[image_key] = map_img_bytes
@@ -489,16 +534,37 @@ def render_isolated_map_editor():
             time.sleep(0.5)
             st.rerun()
 
+    # Map tile URLs with street highlighting
     tiles_dict = {
-        "OSM": "OpenStreetMap",
-        "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
+        "Satellite with Streets": "https://mt1.google.com/vt/lyrs=y&s=Google&x={x}&y={y}&z={z}",
         "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
+        "Street Map": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        "Terrain": "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
+        "Carto Light": "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
     }
-    attr_dict = {"OSM": "OpenStreetMap", "Carto Light": "CartoDB", "Satellite": "Google Maps", "Hybrid": "Google Maps"}
+    attr_dict = {
+        "Hybrid with Streets": "Google Maps",
+        "Hybrid": "Google Maps",
+        "Satellite with Streets": "Google Maps",
+        "Satellite": "Google Maps",
+        "Street Map": "Google Maps",
+        "Terrain": "Google Maps",
+        "Carto Light": "CartoDB",
+        "OSM": "OpenStreetMap"
+    }
     
-    m = folium.Map(location=[plat, plon], zoom_start=15, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style], zoom_control=True)
+    m = folium.Map(
+        location=[plat, plon], 
+        zoom_start=15,
+        tiles=tiles_dict[basemap_style],
+        attr=attr_dict[basemap_style],
+        zoom_control=True
+    )
     
+    # Create blue circle with white star marker
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40">
@@ -514,11 +580,24 @@ def render_isolated_map_editor():
         </svg>
     </div>
     """
-    folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
-    Draw(export=False, position='topleft', draw_options={'polyline':False, 'polygon':False, 'circle':False, 'marker':False, 'circlemarker':False, 'rectangle':True}, edit_options={'edit':True}).add_to(m)
     
-    st.info("Use the Rectangle tool to frame your export area. Drag the pin to move it.")
-    map_data = st_folium(m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", returned_objects=["last_active_drawing", "bounds", "last_marker_moved"])
+    folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
+    Draw(
+        export=False, 
+        position='topleft',
+        draw_options={'polyline':False, 'polygon':False, 'circle':False, 'marker':False, 'circlemarker':False, 'rectangle':True},
+        edit_options={'edit':True}
+    ).add_to(m)
+    
+    st.info("Use the Rectangle tool to frame your export area. Drag the pin to move it. Select different map styles to highlight streets.")
+    map_data = st_folium(
+        m, 
+        height=600, 
+        width=1300, 
+        use_container_width=True, 
+        key=f"int_map_{token_key}", 
+        returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
+    )
 
     if isinstance(map_data, dict) and map_data.get("bounds"):
         st.session_state[bounds_key] = map_data["bounds"]
