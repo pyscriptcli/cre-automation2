@@ -91,7 +91,6 @@ MINIMAL_CRE_SYSTEM = """
         margin-bottom: 4px;
     }
     
-    /* Type mapping section */
     .type-mapping-section {
         background-color: #F8F9FA !important;
         border: 1px solid #E0E0E0 !important;
@@ -106,7 +105,6 @@ MINIMAL_CRE_SYSTEM = """
         margin-top: 8px !important;
     }
     
-    /* Map editor controls */
     .map-controls-row {
         display: flex !important;
         gap: 12px !important;
@@ -126,59 +124,36 @@ MINIMAL_CRE_SYSTEM = """
         white-space: nowrap !important;
     }
     
-    /* Mode selection buttons */
     .mode-button-group {
         display: flex !important;
         gap: 4px !important;
         margin-bottom: 8px !important;
     }
-    .mode-button {
-        padding: 4px 12px !important;
-        font-size: 11px !important;
+    .mode-button-small {
+        padding: 2px 10px !important;
+        font-size: 10px !important;
         font-weight: 500 !important;
-        border-radius: 4px !important;
+        border-radius: 3px !important;
         border: 1px solid #CCCCCC !important;
         background: #FFFFFF !important;
         color: #333333 !important;
         cursor: pointer !important;
         transition: all 0.2s !important;
-        min-height: 28px !important;
+        min-height: 24px !important;
+        width: auto !important;
     }
-    .mode-button:hover {
+    .mode-button-small:hover {
         background: #F0F0F0 !important;
     }
-    .mode-button.active {
+    .mode-button-small.active {
         background: #003366 !important;
         color: #FFFFFF !important;
         border-color: #003366 !important;
     }
-    .mode-button-small {
-        font-size: 10px !important;
-        padding: 2px 10px !important;
-        min-height: 24px !important;
-    }
-    
-    /* Frame overlay */
-    .frame-overlay {
-        position: relative !important;
-        display: inline-block !important;
-    }
-    .frame-overlay::after {
-        content: '' !important;
-        position: absolute !important;
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) !important;
-        border: 2px dashed rgba(0, 51, 102, 0.6) !important;
-        pointer-events: none !important;
-    }
-    .frame-square::after {
-        width: 60% !important;
-        height: 60% !important;
-    }
-    .frame-landscape::after {
-        width: 75% !important;
-        height: 45% !important;
+    .mode-label {
+        font-size: 11px !important;
+        color: #666 !important;
+        margin-left: 8px !important;
     }
 </style>
 """
@@ -298,7 +273,6 @@ def auto_save_config():
 
 # --- CTA PRESET FUNCTIONS ---
 def detect_cta_sets():
-    """Detect CTA sets in the template placeholders"""
     cta_sets = {}
     for token in st.session_state.tokens:
         clean_label = token.replace("{", "").replace("}", "").upper()
@@ -316,7 +290,6 @@ def detect_cta_sets():
     return cta_sets
 
 def apply_cta_preset_autofill(cta_num, advisor_name):
-    """Auto-fill CTA preset values to a specific CTA set"""
     if advisor_name not in contacts_database:
         return False
     
@@ -347,7 +320,7 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
             return False
     return True
 
-# --- BASEMAP CONFIGURATION WITH IMPROVED RELIABILITY ---
+# --- BASEMAP CONFIGURATION ---
 BASEMAP_CONFIG = {
     "Satellite (Streets)": {
         "urls": [
@@ -396,19 +369,16 @@ BASEMAP_CONFIG = {
 }
 
 def get_tile_urls(style_name):
-    """Get list of tile URLs with failover support"""
     config = BASEMAP_CONFIG.get(style_name)
     if not config:
         return BASEMAP_CONFIG["Street Map"]["urls"]
     return config["urls"]
 
 def get_attribution(style_name):
-    """Get attribution for a basemap style"""
     config = BASEMAP_CONFIG.get(style_name)
     return config["attribution"] if config else ""
 
 def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
-    """Fetch a tile with retry logic and multiple URL fallbacks"""
     for attempt in range(max_retries):
         url = url_template.format(z=zoom, x=x, y=y)
         try:
@@ -416,15 +386,13 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
             if resp.status_code == 200:
                 return resp.content
             elif resp.status_code == 418:
-                # Blocked - try different URL
                 continue
         except Exception:
             continue
     return None
 
-# --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
+# --- MAP GENERATION FUNCTIONS ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#DC3545", pin_size=12):
-    """Generates high-res map with pin included - NO radius"""
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
@@ -456,13 +424,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
     headers = {"User-Agent": "Mozilla/5.0 (compatible; MapGenerator/1.0; +https://example.com)"}
     
-    # Get tile URLs with failover support
     tile_urls = get_tile_urls(style)
     
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             tile_data = None
-            # Try each URL in order
             for url_template in tile_urls:
                 tile_data = fetch_tile_with_retry(url_template, zoom, x, y, headers)
                 if tile_data is not None:
@@ -502,7 +468,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
-    # --- DRAW PIN (always included) ---
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
     draw.ellipse([
@@ -533,11 +498,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     img_byte_arr.seek(0)
     return img_byte_arr
 
-def hex_to_rgb(hex_color):
-    hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-
-# --- ISOLATED FULL-SCREEN MAP EDITOR PAGE ---
+# --- SIMPLIFIED MAP EDITOR ---
 def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
     
@@ -556,12 +517,6 @@ def render_isolated_map_editor():
                 color: #1A1A1A !important;
                 margin-bottom: 8px !important;
                 line-height: 1.2;
-            }
-            .mode-selector-label {
-                font-size: 11px !important;
-                font-weight: 500 !important;
-                color: #666 !important;
-                margin-right: 6px !important;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -588,14 +543,14 @@ def render_isolated_map_editor():
             st.session_state.active_map_editor_token = None
             st.rerun()
         
-        if st.button("← Back", key="back_from_map", on_click=return_to_main):
+        if st.button("Back", key="back_from_map", on_click=return_to_main):
             pass
             
     with col_title:
         st.markdown(f"### Map Editor: {token_key}")
     st.markdown("</div><br>", unsafe_allow_html=True)
 
-    # Initialize session state variables
+    # Initialize session state
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
@@ -605,7 +560,6 @@ def render_isolated_map_editor():
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
     mode_key = f"map_mode_{token_key}"
-    frame_bounds_key = f"frame_bounds_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Satellite (Streets)"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
@@ -615,7 +569,6 @@ def render_isolated_map_editor():
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
     if mode_key not in st.session_state: st.session_state[mode_key] = "Square"
-    if frame_bounds_key not in st.session_state: st.session_state[frame_bounds_key] = None
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -624,64 +577,54 @@ def render_isolated_map_editor():
     map_styles = ["Satellite (Streets)", "Satellite (Labels + Streets)", "Satellite (Clean)", 
                   "Street Map", "OSM Carto Light", "Open Street Map"]
 
-    # --- MODE SELECTION (Small buttons) ---
-    st.markdown('<div style="margin-bottom: 8px;">', unsafe_allow_html=True)
-    mode_cols = st.columns([0.3, 0.3, 0.3, 3.1])
+    # Mode selection - simple buttons
+    st.markdown('<div style="margin-bottom: 8px; display: flex; gap: 4px; align-items: center;">', unsafe_allow_html=True)
     
-    with mode_cols[0]:
-        is_square = st.session_state[mode_key] == "Square"
-        if st.button("⬜ Square", key=f"mode_square_{token_key}", 
-                     use_container_width=True,
-                     type="primary" if is_square else "secondary"):
-            st.session_state[mode_key] = "Square"
-            st.session_state[frame_bounds_key] = None
+    modes = [
+        ("Square", "1:1"),
+        ("Landscape", "16:9"),
+        ("Advanced", "Custom")
+    ]
+    
+    for mode_name, mode_label in modes:
+        is_active = st.session_state[mode_key] == mode_name
+        button_style = "active" if is_active else ""
+        if st.button(
+            f"{mode_label}", 
+            key=f"mode_{mode_name}_{token_key}",
+            use_container_width=False,
+            type="primary" if is_active else "secondary"
+        ):
+            st.session_state[mode_key] = mode_name
+            st.session_state[bounds_key] = None
             st.rerun()
     
-    with mode_cols[1]:
-        is_landscape = st.session_state[mode_key] == "Landscape"
-        if st.button("⬛ Landscape", key=f"mode_landscape_{token_key}",
-                     use_container_width=True,
-                     type="primary" if is_landscape else "secondary"):
-            st.session_state[mode_key] = "Landscape"
-            st.session_state[frame_bounds_key] = None
-            st.rerun()
-    
-    with mode_cols[2]:
-        is_advanced = st.session_state[mode_key] == "Advanced"
-        if st.button("✏️ Advanced", key=f"mode_advanced_{token_key}",
-                     use_container_width=True,
-                     type="primary" if is_advanced else "secondary"):
-            st.session_state[mode_key] = "Advanced"
-            st.rerun()
-    
-    with mode_cols[3]:
-        mode_desc = {
-            "Square": "1:1 aspect ratio",
-            "Landscape": "16:9 aspect ratio",
-            "Advanced": "Draw custom rectangle"
-        }[st.session_state[mode_key]]
-        st.markdown(f'<span style="font-size: 11px; color: #666; margin-left: 12px;">{mode_desc}</span>', unsafe_allow_html=True)
-    
+    mode_desc = {
+        "Square": "1:1 aspect ratio centered on pin",
+        "Landscape": "16:9 aspect ratio centered on pin",
+        "Advanced": "Draw custom rectangle"
+    }[st.session_state[mode_key]]
+    st.markdown(f'<span class="mode-label">{mode_desc}</span>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- CONTROLS ROW ---
+    # Controls
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
     with c_btn:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
-        export_clicked = st.button("✅ Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
+        export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
         if export_clicked:
             st.session_state[export_trigger_key] = True
         
     with c_style:
-        basemap_style = st.selectbox(label="Basemap", options=map_styles, key=style_key)
+        basemap_style = st.selectbox(label="Basemap Layer", options=map_styles, key=style_key)
     with c_color:
-        st.markdown('<div class="manual-picker-label">Pin</div>', unsafe_allow_html=True)
+        st.markdown('<div class="manual-picker-label">Pin Color</div>', unsafe_allow_html=True)
         pin_color = st.color_picker(label="Pin Color", key=color_key, label_visibility="collapsed")
     with c_size:
-        st.markdown('<div class="manual-picker-label">Size</div>', unsafe_allow_html=True)
+        st.markdown('<div class="manual-picker-label">Pin Size</div>', unsafe_allow_html=True)
         pin_size = st.number_input(label="Pin Size", min_value=8, max_value=64, step=1, value=st.session_state[size_key], key=size_key, label_visibility="collapsed")
     with c_coord:
-        coord_input = st.text_input(label="📍 Coordinates", key=coord_key, placeholder="Lat, Lon")
+        coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
     
@@ -690,48 +633,45 @@ def render_isolated_map_editor():
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
-    # --- EXPORT LOGIC ---
+    # Export logic
     if st.session_state[export_trigger_key]:
-        with st.spinner("Generating high-resolution map asset..."):
-            bounds = None
+        with st.spinner("Generating high-resolution map..."):
+            # Get bounds based on mode
+            n, s, e, w = None, None, None, None
             
-            # Determine bounds based on mode
             if st.session_state[mode_key] == "Advanced":
                 # Use drawn rectangle bounds
                 if st.session_state.get(bounds_key):
                     b = st.session_state[bounds_key]
-                    if b and "_northEast" in b and "_southWest" in b:
-                        n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
-                        e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
-                        bounds = (n, s, e, w)
+                    if isinstance(b, dict) and "_northEast" in b and "_southWest" in b:
+                        n = b["_northEast"]["lat"]
+                        s = b["_southWest"]["lat"]
+                        e = b["_northEast"]["lng"]
+                        w = b["_southWest"]["lng"]
             
-            if bounds is None:
-                # Use frame-based bounds (Square or Landscape)
-                if st.session_state[mode_key] in ["Square", "Landscape"]:
-                    # Calculate frame bounds around the pin
-                    # Square: 1:1, Landscape: 16:9
-                    aspect_ratio = 1.0 if st.session_state[mode_key] == "Square" else 16.0/9.0
-                    
-                    # Start with a base buffer
-                    base_buffer = 0.02
-                    
-                    # Adjust buffer based on zoom level (approximate)
-                    # For more zoomed in, use smaller buffer
-                    lat_buffer = base_buffer
-                    lon_buffer = base_buffer * aspect_ratio
-                    
+            # If no bounds yet, use frame-based
+            if n is None:
+                if st.session_state[mode_key] == "Square":
+                    # 1:1 aspect ratio
+                    buffer_size = 0.015
+                    n, s = plat + buffer_size, plat - buffer_size
+                    e, w = plon + buffer_size, plon - buffer_size
+                elif st.session_state[mode_key] == "Landscape":
+                    # 16:9 aspect ratio - wider horizontally
+                    lat_buffer = 0.015
+                    lon_buffer = 0.0267  # 16/9 * lat_buffer
                     n, s = plat + lat_buffer, plat - lat_buffer
                     e, w = plon + lon_buffer, plon - lon_buffer
                 else:
                     # Fallback
-                    buffer = 0.01
-                    n, s = plat + buffer, plat - buffer
-                    e, w = plon + buffer, plon - buffer
+                    buffer_size = 0.01
+                    n, s = plat + buffer_size, plat - buffer_size
+                    e, w = plon + buffer_size, plon - buffer_size
             
-            # Generate map with pin included
+            # Generate map
             map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w, 
-                pin_lat=plat, pin_lon=plon, 
+                n=n, s=s, e=e, w=w,
+                pin_lat=plat, pin_lon=plon,
                 style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
             )
             st.session_state[image_key] = map_img_bytes
@@ -746,11 +686,11 @@ def render_isolated_map_editor():
             st.session_state[export_trigger_key] = False
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
-            st.success(f"✅ Map generated successfully!")
+            st.success("Map generated successfully!")
             time.sleep(0.5)
             st.rerun()
 
-    # --- BUILD MAP ---
+    # Build map
     tiles_dict = {}
     attr_dict = {}
     for style in map_styles:
@@ -759,14 +699,14 @@ def render_isolated_map_editor():
         attr_dict[style] = get_attribution(style)
     
     m = folium.Map(
-        location=[plat, plon], 
-        zoom_start=15, 
-        tiles=tiles_dict[basemap_style], 
-        attr=attr_dict[basemap_style], 
+        location=[plat, plon],
+        zoom_start=15,
+        tiles=tiles_dict[basemap_style],
+        attr=attr_dict[basemap_style],
         zoom_control=True
     )
     
-    # --- ADD PIN MARKER ---
+    # Add pin
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40" style="width: 100%; height: 100%;">
@@ -780,10 +720,10 @@ def render_isolated_map_editor():
     """
     folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
     
-    # --- DRAW TOOL: ONLY FOR ADVANCED MODE ---
+    # Add draw tool only for Advanced mode
     if st.session_state[mode_key] == "Advanced":
         Draw(
-            export=False, 
+            export=False,
             position='topleft',
             draw_options={
                 'polyline': False,
@@ -795,31 +735,26 @@ def render_isolated_map_editor():
             },
             edit_options={'edit': True}
         ).add_to(m)
-        st.info("📐 Draw a rectangle to define the crop area")
+        st.info("Draw a rectangle to define the crop area")
     else:
-        # Show frame overlay hint for Square/Landscape modes
-        aspect_text = "1:1" if st.session_state[mode_key] == "Square" else "16:9"
-        st.info(f"📐 {st.session_state[mode_key]} mode ({aspect_text}) - Map will be cropped to this aspect ratio centered on pin")
+        st.info(f"{st.session_state[mode_key]} mode - Map will be cropped to {mode_desc}")
     
-    # --- DISPLAY MAP ---
+    # Display map
     map_data = st_folium(
-        m, height=600, width=1300, use_container_width=True, 
-        key=f"int_map_{token_key}", 
+        m, height=600, width=1300, use_container_width=True,
+        key=f"int_map_{token_key}",
         returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
     )
 
-    # --- PROCESS MAP INTERACTIONS ---
+    # Process interactions
     if isinstance(map_data, dict):
-        # Handle rectangle drawing for Advanced mode
         if st.session_state[mode_key] == "Advanced" and map_data.get("last_active_drawing"):
             st.session_state[bounds_key] = map_data["last_active_drawing"]
-            st.success("✅ Rectangle captured!")
+            st.success("Rectangle captured!")
         
-        # Handle bounds for all modes
         if map_data.get("bounds"):
             st.session_state[bounds_key] = map_data["bounds"]
         
-        # Handle marker drag
         if map_data.get("last_marker_moved"):
             moved = map_data["last_marker_moved"]
             if moved:
@@ -883,33 +818,25 @@ def extract_placeholders(template_bytes, template_type):
     return []
 
 def clean_empty_placeholders(text):
-    """Remove any {{...}} placeholders that remain empty and clean up whitespace"""
     if not text:
         return text
-    # Remove any {{...}} pattern that might be left
     cleaned = re.sub(r'\{\{[^}]*\}\}', '', text)
-    # Clean up extra whitespace and newlines
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
-    """Replace text in paragraph, removing empty placeholders"""
-    # Process each run
     for run in paragraph.runs:
         current_text = run.text
         for token, value in text_inputs.items():
             if token in current_text:
-                if value and str(value).strip():  # Value exists and is not empty
+                if value and str(value).strip():
                     current_text = current_text.replace(token, str(value))
-                else:  # Value is empty, remove the placeholder
+                else:
                     current_text = current_text.replace(token, '')
-        # Clean up any remaining placeholders and extra whitespace
         run.text = clean_empty_placeholders(current_text)
     
-    # Handle paragraph text if no runs exist or if there are still placeholders
     if hasattr(paragraph, 'text') and paragraph.text:
         current_text = paragraph.text
-        # Check if any placeholders remain
         has_placeholder = any(token in current_text for token in text_inputs.keys())
         if has_placeholder:
             for token, value in text_inputs.items():
@@ -923,7 +850,6 @@ def replace_text_in_paragraph(paragraph, text_inputs):
             if not paragraph.runs:
                 paragraph.add_run(current_text)
             else:
-                # Update the first run with cleaned text
                 for run in paragraph.runs:
                     if any(token in run.text for token in text_inputs.keys()):
                         run.text = current_text
@@ -1096,7 +1022,7 @@ else:
                 template_display = selected_template.split(' (')[0].strip()
                 for t in saved_templates:
                     if t['display_name'] == template_display:
-                        if t['source'] == 'stored' and st.button("🗑️", key="delete_template"):
+                        if t['source'] == 'stored' and st.button("Delete", key="delete_template"):
                             st.session_state.show_delete_confirm = True
                             st.session_state.template_to_delete = t['name']
                             st.rerun()
@@ -1155,7 +1081,7 @@ else:
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.temp_form_data = {}
             
-            if st.button("💾 Save Template", key="save_template_btn", use_container_width=True):
+            if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 save_template_to_file(template_bytes, uploaded_template.name)
                 if st.session_state.custom_mapping:
                     save_config_to_file(st.session_state.custom_mapping, uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json')
@@ -1179,10 +1105,10 @@ else:
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
         
-        # --- CTA PRESETS USING STREAMLIT NATIVE COMPONENTS ---
+        # CTA PRESETS
         cta_sets = detect_cta_sets()
         if cta_sets:
-            st.subheader("📞 Call to Action Presets")
+            st.subheader("Call to Action Presets")
             st.caption("Select an advisor to auto-fill CTA fields")
             
             num_ctas = len(cta_sets)
@@ -1209,7 +1135,7 @@ else:
                         apply_cta_preset_autofill(cta_num, selected_advisor)
                         st.rerun()
         
-        with st.expander("🔧 Data Type Mapping", expanded=st.session_state.show_type_mapping):
+        with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field.")
             cols = st.columns(3)
             for idx, token in enumerate(tokens):
@@ -1225,9 +1151,9 @@ else:
                             auto_save_config()
                             st.rerun()
         
-        st.markdown('<div class="section-header">📝 Placeholder Values</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
-        # --- RENDER FIELDS IN ORIGINAL ORDER ---
+        # RENDER FIELDS
         for idx, token in enumerate(tokens):
             col_target = idx % 2
             if col_target == 0:
@@ -1259,7 +1185,7 @@ else:
                     saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
                     if saved_map_img:
                         image_data[token] = saved_map_img
-                        st.caption("✅ Map attached.")
+                        st.caption("Map attached.")
                     
                     def save_all_and_navigate(token_key):
                         for t in st.session_state.tokens:
@@ -1279,7 +1205,7 @@ else:
                         st.session_state.active_map_editor_token = token_key
                         st.rerun()
                     
-                    if st.button("🗺️ Open Map Editor", key=f"btn_map_{token}", use_container_width=True, on_click=save_all_and_navigate, args=(token,)):
+                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True, on_click=save_all_and_navigate, args=(token,)):
                         pass
                     
                     field_types[token] = "Image"
@@ -1315,10 +1241,10 @@ else:
                     
                 st.markdown('<div style="margin-bottom:14px;"></div>', unsafe_allow_html=True)
 
-    # --- DOWNLOAD & CLEANUP SECTION ---
+    # DOWNLOAD SECTION
     if st.session_state.template_bytes is not None:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">📥 Download Document</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
         
         base_template_name = re.sub(r'\.(pptx|docx)$', '', st.session_state.saved_template_name or "Generated_Document")
         col1, col2 = st.columns(2)
@@ -1330,7 +1256,7 @@ else:
                 try:
                     pptx_data = generate_pptx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="📊 Download PPTX", data=pptx_data, file_name=get_download_filename(base_template_name, "pptx"),
+                        label="Download PPTX", data=pptx_data, file_name=get_download_filename(base_template_name, "pptx"),
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                         use_container_width=True, key="download_pptx", on_click=purge_all_temporary_data
                     )
@@ -1344,7 +1270,7 @@ else:
                 try:
                     docx_data = generate_docx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="📄 Download DOCX", data=docx_data, file_name=get_download_filename(base_template_name, "docx"),
+                        label="Download DOCX", data=docx_data, file_name=get_download_filename(base_template_name, "docx"),
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True, key="download_docx", on_click=purge_all_temporary_data
                     )
@@ -1352,4 +1278,4 @@ else:
                     st.error(f"Error generating document: {str(e)}")
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("📂 Please upload or select a template to begin")
+        st.info("Please upload or select a template to begin")
