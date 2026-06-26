@@ -1042,37 +1042,49 @@ else:
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
         
-        # --- SIMPLE CTA PRESET - ONE ROW WITH ALL CTA DROPDOWNS ---
-        cta_sets = detect_cta_sets()
-        if cta_sets:
-            st.markdown('<div class="cta-preset-container">', unsafe_allow_html=True)
-            st.markdown('<div class="cta-preset-label">Quick Fill CTA Information (Auto-fill on selection)</div>', unsafe_allow_html=True)
+# --- SIMPLE CTA PRESET - ONE ROW WITH ALL CTA DROPDOWNS ---
+cta_sets = detect_cta_sets()
+if cta_sets:
+    st.markdown('<div class="cta-preset-container">', unsafe_allow_html=True)
+    st.markdown('<div class="cta-preset-label">Quick Fill CTA Information (Auto-fill on selection)</div>', unsafe_allow_html=True)
+    
+    # Create a single row with all CTA dropdowns
+    # Determine if we have multiple CTAs to add labels
+    num_ctas = len(cta_sets)
+    
+    # Adjust column widths and add section headers
+    if num_ctas > 2:
+        # For 3+ CTAs, use smaller columns
+        cols = st.columns(num_ctas)
+    else:
+        cols = st.columns(num_ctas)
+    
+    for idx, cta_num in enumerate(sorted(cta_sets.keys())):
+        with cols[idx]:
+            # Get current selected advisor for this CTA
+            cta_name_token = cta_sets[cta_num]['tokens'].get('NAME')
+            current_advisor = ""
+            if cta_name_token and f"val_{cta_name_token}" in st.session_state:
+                current_advisor = st.session_state[f"val_{cta_name_token}"]
             
-            # Create a single row with all CTA dropdowns
-            cols = st.columns(len(cta_sets))
-            for idx, cta_num in enumerate(sorted(cta_sets.keys())):
-                with cols[idx]:
-                    # Get current selected advisor for this CTA
-                    cta_name_token = cta_sets[cta_num]['tokens'].get('NAME')
-                    current_advisor = ""
-                    if cta_name_token and f"val_{cta_name_token}" in st.session_state:
-                        current_advisor = st.session_state[f"val_{cta_name_token}"]
-                    
-                    # Dropdown that auto-fills on change
-                    selected_advisor = st.selectbox(
-                        f"CTA{cta_num}",
-                        options=[""] + list(contacts_database.keys()),
-                        index=list(contacts_database.keys()).index(current_advisor) + 1 if current_advisor in contacts_database else 0,
-                        key=f"cta_autofill_{cta_num}",
-                        label_visibility="collapsed"
-                    )
-                    
-                    # Auto-fill when selection changes
-                    if selected_advisor and selected_advisor != current_advisor:
-                        apply_cta_preset_autofill(cta_num, selected_advisor)
-                        st.rerun()
+            # Add label showing which CTA this is
+            st.markdown(f'<span style="font-size:13px; font-weight:600; color:#003366;">CTA{cta_num}</span>', unsafe_allow_html=True)
             
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Dropdown that auto-fills on change
+            selected_advisor = st.selectbox(
+                f"cta_autofill_{cta_num}",  # Unique key
+                options=[""] + list(contacts_database.keys()),
+                index=list(contacts_database.keys()).index(current_advisor) + 1 if current_advisor in contacts_database else 0,
+                key=f"cta_autofill_{cta_num}",
+                label_visibility="collapsed"
+            )
+            
+            # Auto-fill when selection changes
+            if selected_advisor and selected_advisor != current_advisor:
+                apply_cta_preset_autofill(cta_num, selected_advisor)
+                st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
         
         with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field.")
