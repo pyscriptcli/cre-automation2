@@ -727,18 +727,52 @@ def extract_placeholders(template_bytes, template_type):
     if template_type == 'docx': return extract_placeholders_from_docx(template_bytes)
     return []
 
+def clean_empty_placeholders(text):
+    """Remove any {{...}} placeholders that remain empty and clean up whitespace"""
+    if not text:
+        return text
+    # Remove any {{...}} pattern that might be left
+    cleaned = re.sub(r'\{\{[^}]*\}\}', '', text)
+    # Clean up extra whitespace and newlines
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned
+
 def replace_text_in_paragraph(paragraph, text_inputs):
+    """Replace text in paragraph, removing empty placeholders"""
+    # Process each run
     for run in paragraph.runs:
+        current_text = run.text
         for token, value in text_inputs.items():
-            if token in run.text:
-                run.text = run.text.replace(token, str(value) if value is not None else '')
+            if token in current_text:
+                if value and str(value).strip():  # Value exists and is not empty
+                    current_text = current_text.replace(token, str(value))
+                else:  # Value is empty, remove the placeholder
+                    current_text = current_text.replace(token, '')
+        # Clean up any remaining placeholders and extra whitespace
+        run.text = clean_empty_placeholders(current_text)
+    
+    # Handle paragraph text if no runs exist or if there are still placeholders
     if hasattr(paragraph, 'text') and paragraph.text:
-        for token, value in text_inputs.items():
-            if token in paragraph.text:
-                if not paragraph.runs: paragraph.add_run()
+        current_text = paragraph.text
+        # Check if any placeholders remain
+        has_placeholder = any(token in current_text for token in text_inputs.keys())
+        if has_placeholder:
+            for token, value in text_inputs.items():
+                if token in current_text:
+                    if value and str(value).strip():
+                        current_text = current_text.replace(token, str(value))
+                    else:
+                        current_text = current_text.replace(token, '')
+            current_text = clean_empty_placeholders(current_text)
+            
+            if not paragraph.runs:
+                paragraph.add_run(current_text)
+            else:
+                # Update the first run with cleaned text
                 for run in paragraph.runs:
-                    if token in run.text:
-                        run.text = run.text.replace(token, str(value) if value is not None else '')
+                    if any(token in run.text for token in text_inputs.keys()):
+                        run.text = current_text
+                        break
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
@@ -754,21 +788,25 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
         for shape in slide.shapes:
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
-                    for paragraph in shape.text_frame.paragraphs: replace_text_in_paragraph(paragraph, text_inputs)
+                    for paragraph in shape.text_frame.paragraphs: 
+                        replace_text_in_paragraph(paragraph, text_inputs)
                 if hasattr(shape, 'table') and shape.table:
                     for row in shape.table.rows:
                         for cell in row.cells:
                             if cell.text_frame:
-                                for paragraph in cell.text_frame.paragraphs: replace_text_in_paragraph(paragraph, text_inputs)
+                                for paragraph in cell.text_frame.paragraphs: 
+                                    replace_text_in_paragraph(paragraph, text_inputs)
         for img_file, left, top, width, height in images_to_add:
             try:
                 slide.shapes.add_picture(smart_crop_to_fit(img_file, width, height), left, top, width=width, height=height)
-            except Exception: pass
+            except Exception: 
+                pass
         for old_shape in shapes_to_delete:
             try:
                 sp = old_shape._element
                 sp.getparent().remove(sp)
-            except Exception: pass
+            except Exception: 
+                pass
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
     return pptx_stream.getvalue()
@@ -781,7 +819,9 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                for paragraph in cell.paragraphs: replace_text_in_paragraph(paragraph, text_inputs)
+                if cell.paragraphs:
+                    for paragraph in cell.paragraphs:
+                        replace_text_in_paragraph(paragraph, text_inputs)
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
     return doc_stream.getvalue()
@@ -831,7 +871,8 @@ def restore_form_data_from_session():
                     if current_type != "Image" and f"val_{token}" not in st.session_state:
                         st.session_state[f"val_{token}"] = value
                 return True
-        except Exception: pass
+        except Exception: 
+            pass
     return False
 
 def purge_all_temporary_data():
