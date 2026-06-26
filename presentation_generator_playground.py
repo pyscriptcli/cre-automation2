@@ -292,54 +292,83 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
             return False
     return True
 
-# --- BASEMAP CONFIGURATION WITH FAILOVER ---
+# --- BASEMAP CONFIGURATION WITH IMPROVED RELIABILITY ---
 BASEMAP_CONFIG = {
     "Satellite (Streets)": {
-        "primary": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-        "fallback": "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+            "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+        ],
         "attribution": "Google"
     },
     "Satellite (Labels + Streets)": {
-        "primary": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
-        "fallback": "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
+            "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
+        ],
         "attribution": "Google"
     },
     "Satellite (Clean)": {
-        "primary": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        "fallback": "https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+            "https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+        ],
         "attribution": "Google"
     },
     "Street Map": {
-        "primary": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-        "fallback": "https://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+            "https://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+        ],
         "attribution": "Google"
     },
     "OSM Carto Light": {
-        "primary": "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "fallback": "https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png",
+        "urls": [
+            "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+            "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+            "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+        ],
         "attribution": "CartoDB"
     },
     "Open Street Map": {
-        "primary": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "fallback": "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "urls": [
+            "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        ],
         "attribution": "OpenStreetMap"
     }
 }
 
-def get_tile_url(style_name, use_fallback=False):
-    """Get tile URL with failover support"""
+def get_tile_urls(style_name):
+    """Get list of tile URLs with failover support"""
     config = BASEMAP_CONFIG.get(style_name)
     if not config:
-        return BASEMAP_CONFIG["Street Map"]["primary"]
-    return config["fallback"] if use_fallback else config["primary"]
+        return BASEMAP_CONFIG["Street Map"]["urls"]
+    return config["urls"]
 
 def get_attribution(style_name):
     """Get attribution for a basemap style"""
     config = BASEMAP_CONFIG.get(style_name)
     return config["attribution"] if config else ""
 
+def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
+    """Fetch a tile with retry logic and multiple URL fallbacks"""
+    for attempt in range(max_retries):
+        url = url_template.format(z=zoom, x=x, y=y)
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                return resp.content
+            elif resp.status_code == 418:
+                # Blocked - try different URL
+                continue
+        except Exception:
+            continue
+    return None
+
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#DC3545", pin_size=12, use_fallback=False):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#DC3545", pin_size=12):
     """Generates high-res map with pin included - NO radius"""
     lon_span = e - w
     lat_span = n - s
@@ -370,34 +399,27 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     tile_size = 256
     scale_factor = 2
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; MapGenerator/1.0; +https://example.com)"}
     
-    # Get tile URL with failover support
-    url_template = get_tile_url(style, use_fallback)
+    # Get tile URLs with failover support
+    tile_urls = get_tile_urls(style)
     
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
-            url = url_template.format(z=zoom, x=x, y=y)
-            try:
-                resp = requests.get(url, headers=headers, timeout=5)
-                if resp.status_code == 200:
-                    img = Image.open(io.BytesIO(resp.content))
+            tile_data = None
+            # Try each URL in order
+            for url_template in tile_urls:
+                tile_data = fetch_tile_with_retry(url_template, zoom, x, y, headers)
+                if tile_data is not None:
+                    break
+            
+            if tile_data is not None:
+                try:
+                    img = Image.open(io.BytesIO(tile_data))
                     img = img.resize((tile_size * scale_factor, tile_size * scale_factor), Image.Resampling.LANCZOS)
                     stitched.paste(img, ((x - x_min) * tile_size * scale_factor, (y - y_min) * tile_size * scale_factor))
-            except Exception:
-                # Try fallback if primary fails
-                if not use_fallback:
-                    fallback_url = get_tile_url(style, True)
-                    if fallback_url != url_template:
-                        try:
-                            resp = requests.get(fallback_url.format(z=zoom, x=x, y=y), headers=headers, timeout=5)
-                            if resp.status_code == 200:
-                                img = Image.open(io.BytesIO(resp.content))
-                                img = img.resize((tile_size * scale_factor, tile_size * scale_factor), Image.Resampling.LANCZOS)
-                                stitched.paste(img, ((x - x_min) * tile_size * scale_factor, (y - y_min) * tile_size * scale_factor))
-                        except Exception:
-                            pass
-                pass
+                except Exception:
+                    pass
     
     def num2px(lat_deg, lon_deg, z):
         lat_rad = math.radians(lat_deg)
@@ -595,11 +617,12 @@ def render_isolated_map_editor():
             time.sleep(0.5)
             st.rerun()
 
-    # Build tiles dict for folium
+    # Build tiles dict for folium - use first URL from each config
     tiles_dict = {}
     attr_dict = {}
     for style in map_styles:
-        tiles_dict[style] = get_tile_url(style, False)
+        urls = get_tile_urls(style)
+        tiles_dict[style] = urls[0] if urls else ""
         attr_dict[style] = get_attribution(style)
     
     m = folium.Map(location=[plat, plon], zoom_start=15, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style], zoom_control=True)
@@ -618,7 +641,7 @@ def render_isolated_map_editor():
     """
     folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
     
-    # --- DRAW TOOL: ONLY RECTANGLE FOR CROP AREA (visible on map for guidance) ---
+    # --- DRAW TOOL: ONLY RECTANGLE FOR CROP AREA ---
     Draw(
         export=False, 
         position='topleft',
@@ -960,19 +983,17 @@ else:
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
         
-        # --- CTA PRESETS USING STREAMLIT NATIVE COMPONENTS (Option 3) ---
+        # --- CTA PRESETS USING STREAMLIT NATIVE COMPONENTS ---
         cta_sets = detect_cta_sets()
         if cta_sets:
             st.subheader("Call to Action Presets")
             st.caption("Select an advisor to auto-fill CTA fields")
             
-            # Create a single row with all CTA dropdowns
             num_ctas = len(cta_sets)
             cols = st.columns(num_ctas)
             
             for idx, cta_num in enumerate(sorted(cta_sets.keys())):
                 with cols[idx]:
-                    # Get current selected advisor for this CTA
                     cta_name_token = cta_sets[cta_num]['tokens'].get('NAME')
                     current_advisor = ""
                     if cta_name_token and f"val_{cta_name_token}" in st.session_state:
@@ -980,7 +1001,6 @@ else:
                     
                     st.markdown(f"**CTA{cta_num}**")
                     
-                    # Dropdown that auto-fills on change
                     selected_advisor = st.selectbox(
                         f"Select advisor",
                         options=[""] + list(contacts_database.keys()),
@@ -989,7 +1009,6 @@ else:
                         label_visibility="collapsed"
                     )
                     
-                    # Auto-fill when selection changes
                     if selected_advisor and selected_advisor != current_advisor:
                         apply_cta_preset_autofill(cta_num, selected_advisor)
                         st.rerun()
