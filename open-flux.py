@@ -23,6 +23,17 @@ from folium.plugins import Draw
 from streamlit_folium import st_folium
 import requests
 
+# --- CONTACTS DATABASE FOR CTA PRESETS ---
+contacts_database = {
+    "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
+    "Meliza Zapata": {"phone": "0996 880 5399", "email": "meliza.zapata@primephilippines.com"},
+    "Dykstra Pineda": {"phone": "0920 986 2748", "email": "dykstra.pineda@primephilippines.com"},
+    "Cedtrix Rena": {"phone": "0977 653 1494", "email": "cedtriz.rena@primephilippines.com"},
+    "Carlo Medina": {"phone": "0920 986 2763", "email": "carlo.medina@primephilippines.com"},
+    "Dave Policarpio": {"phone": "0908 865 8945", "email": "dave.policarpio@primephilippines.com"},
+    "Irish Rima": {"phone": "0918 622 5346", "email": "irish.rima@primephilippines.com"}
+}
+
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
 _config_file = os.path.join(_config_dir, "config.toml")
@@ -113,40 +124,6 @@ MINIMAL_CRE_SYSTEM = """
         font-weight: 500 !important;
         color: #333 !important;
         white-space: nowrap !important;
-    }
-    .size-control {
-        display: flex !important;
-        align-items: center !important;
-        gap: 4px !important;
-    }
-    .size-control button {
-        min-width: 28px !important;
-        height: 28px !important;
-        padding: 0 8px !important;
-        font-size: 14px !important;
-        background: #f0f0f0 !important;
-        border: 1px solid #ccc !important;
-        border-radius: 4px !important;
-        cursor: pointer !important;
-    }
-    .size-control button:hover {
-        background: #e0e0e0 !important;
-    }
-    .size-control span {
-        min-width: 30px !important;
-        text-align: center !important;
-        font-weight: 600 !important;
-        font-size: 14px !important;
-    }
-    
-    @media (max-width: 768px) {
-        .type-mapping-grid {
-            grid-template-columns: 1fr !important;
-        }
-        .map-controls-row {
-            flex-direction: column !important;
-            align-items: stretch !important;
-        }
     }
 </style>
 """
@@ -264,9 +241,135 @@ def auto_save_config():
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
 
+# --- CTA PRESET FUNCTIONS ---
+def detect_cta_sets():
+    """Detect CTA sets in the template placeholders"""
+    cta_sets = {}
+    for token in st.session_state.tokens:
+        clean_label = token.replace("{", "").replace("}", "").upper()
+        match = re.match(r'CTA(\d+)_(NAME|CONTACT_NUMBER|EMAIL)', clean_label)
+        if match:
+            cta_num = int(match.group(1))
+            field_type = match.group(2)
+            if cta_num not in cta_sets:
+                cta_sets[cta_num] = {
+                    'tokens': {},
+                    'fields': set()
+                }
+            cta_sets[cta_num]['tokens'][field_type] = token
+            cta_sets[cta_num]['fields'].add(field_type)
+    return cta_sets
+
+def apply_cta_preset_autofill(cta_num, advisor_name):
+    """Auto-fill CTA preset values to a specific CTA set"""
+    if advisor_name not in contacts_database:
+        return False
+    
+    contact_info = contacts_database[advisor_name]
+    cta_sets = detect_cta_sets()
+    
+    if cta_num not in cta_sets:
+        return False
+    
+    tokens = cta_sets[cta_num]['tokens']
+    if 'NAME' in tokens:
+        st.session_state[f"val_{tokens['NAME']}"] = advisor_name
+        st.session_state.temp_form_data[tokens['NAME']] = advisor_name
+    if 'CONTACT_NUMBER' in tokens:
+        st.session_state[f"val_{tokens['CONTACT_NUMBER']}"] = contact_info["phone"]
+        st.session_state.temp_form_data[tokens['CONTACT_NUMBER']] = contact_info["phone"]
+    if 'EMAIL' in tokens:
+        st.session_state[f"val_{tokens['EMAIL']}"] = contact_info["email"]
+        st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
+        
+    if st.session_state.saved_template_name:
+        temp_path = get_temp_config_path(st.session_state.saved_template_name)
+        try:
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(st.session_state.temp_form_data, f, indent=4)
+            return True
+        except Exception:
+            return False
+    return True
+
+# --- BASEMAP CONFIGURATION WITH IMPROVED RELIABILITY ---
+BASEMAP_CONFIG = {
+    "Satellite (Streets)": {
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+            "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+        ],
+        "attribution": "Google"
+    },
+    "Satellite (Labels + Streets)": {
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
+            "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
+        ],
+        "attribution": "Google"
+    },
+    "Satellite (Clean)": {
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+            "https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+        ],
+        "attribution": "Google"
+    },
+    "Street Map": {
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+            "https://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+        ],
+        "attribution": "Google"
+    },
+    "OSM Carto Light": {
+        "urls": [
+            "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+            "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+            "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+        ],
+        "attribution": "CartoDB"
+    },
+    "Open Street Map": {
+        "urls": [
+            "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        ],
+        "attribution": "OpenStreetMap"
+    }
+}
+
+def get_tile_urls(style_name):
+    """Get list of tile URLs with failover support"""
+    config = BASEMAP_CONFIG.get(style_name)
+    if not config:
+        return BASEMAP_CONFIG["Street Map"]["urls"]
+    return config["urls"]
+
+def get_attribution(style_name):
+    """Get attribution for a basemap style"""
+    config = BASEMAP_CONFIG.get(style_name)
+    return config["attribution"] if config else ""
+
+def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
+    """Fetch a tile with retry logic and multiple URL fallbacks"""
+    for attempt in range(max_retries):
+        url = url_template.format(z=zoom, x=x, y=y)
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                return resp.content
+            elif resp.status_code == 418:
+                # Blocked - try different URL
+                continue
+        except Exception:
+            continue
+    return None
+
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with Streets", pin_color="#DC3545", pin_size=12):
-    """Generates high-res map with pin included - supports street highlighted styles"""
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#DC3545", pin_size=12):
+    """Generates high-res map with pin included - NO radius"""
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
@@ -296,31 +399,27 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     tile_size = 256
     scale_factor = 2
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; MapGenerator/1.0; +https://example.com)"}
     
-    # Map styles with street highlighting options
-    styles = {
-        "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
-        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        "Street Map": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-        "Terrain": "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
-        "Carto Light": "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-    }
-    url_template = styles.get(style, styles["Hybrid with Streets"])
+    # Get tile URLs with failover support
+    tile_urls = get_tile_urls(style)
     
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
-            url = url_template.format(z=zoom, x=x, y=y)
-            try:
-                resp = requests.get(url, headers=headers, timeout=5)
-                if resp.status_code == 200:
-                    img = Image.open(io.BytesIO(resp.content))
+            tile_data = None
+            # Try each URL in order
+            for url_template in tile_urls:
+                tile_data = fetch_tile_with_retry(url_template, zoom, x, y, headers)
+                if tile_data is not None:
+                    break
+            
+            if tile_data is not None:
+                try:
+                    img = Image.open(io.BytesIO(tile_data))
                     img = img.resize((tile_size * scale_factor, tile_size * scale_factor), Image.Resampling.LANCZOS)
                     stitched.paste(img, ((x - x_min) * tile_size * scale_factor, (y - y_min) * tile_size * scale_factor))
-            except Exception:
-                pass
+                except Exception:
+                    pass
     
     def num2px(lat_deg, lon_deg, z):
         lat_rad = math.radians(lat_deg)
@@ -341,7 +440,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     if bottom <= top: bottom = top + 100
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # --- DRAW PIN ON THE CROPPED IMAGE ---
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
@@ -349,10 +447,8 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
-    # Scale pin size specifically to respect high-res canvas magnification
+    # --- DRAW PIN (always included) ---
     radius = int((pin_size / 2) * scale_factor)
-    
-    # Draw shadow
     shadow_offset = max(1, int(radius * 0.15))
     draw.ellipse([
         pin_local_x - radius - shadow_offset, 
@@ -361,7 +457,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
         pin_local_y + radius + shadow_offset
     ], fill=(0, 0, 0, 60))
     
-    # Draw circle background
     draw.ellipse([
         pin_local_x - radius,
         pin_local_y - radius,
@@ -369,7 +464,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
         pin_local_y + radius
     ], fill=pin_color, outline=(255, 255, 255), width=max(1, int(radius * 0.1)))
     
-    # Draw white star in the center
     star_size = int(radius * 0.55)
     star_points = []
     for i in range(10):
@@ -384,11 +478,14 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Hybrid with 
     img_byte_arr.seek(0)
     return img_byte_arr
 
+def hex_to_rgb(hex_color):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
 # --- ISOLATED FULL-SCREEN MAP EDITOR PAGE ---
 def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
     
-    # Custom CSS adjustments to normalize structural alignment with visible labels
     st.markdown("""
         <style>
             div[data-testid="stHorizontalBlock"] {
@@ -411,9 +508,7 @@ def render_isolated_map_editor():
     st.markdown('<div class="editor-card">', unsafe_allow_html=True)
     col_back, col_title = st.columns([1, 4])
     with col_back:
-        # --- IMPROVED BACK BUTTON WITH EXPLICIT RESTORE ---
         def return_to_main():
-            # Explicitly restore form data from disk before returning
             if st.session_state.saved_template_name:
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
                 if os.path.exists(temp_path):
@@ -421,7 +516,6 @@ def render_isolated_map_editor():
                         with open(temp_path, 'r', encoding='utf-8') as f:
                             loaded_data = json.load(f)
                             st.session_state.temp_form_data = loaded_data
-                            # Restore to individual session state keys
                             for token, value in loaded_data.items():
                                 current_type = st.session_state.custom_mapping.get(token, "Text")
                                 if current_type != "Image":
@@ -434,7 +528,7 @@ def render_isolated_map_editor():
             st.rerun()
         
         if st.button("Back to Document", key="back_from_map", on_click=return_to_main):
-            pass  # on_click handles everything
+            pass
             
     with col_title:
         st.markdown(f"### Map Editor: {token_key}")
@@ -446,17 +540,14 @@ def render_isolated_map_editor():
     size_key = f"map_size_{token_key}"
     dragged_key = f"map_dragged_{token_key}"
     image_key = f"map_bytes_holder_{token_key}"
-    marker_key = f"map_marker_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
     
-    # Initialize all keys
-    if style_key not in st.session_state: st.session_state[style_key] = "Hybrid"
+    if style_key not in st.session_state: st.session_state[style_key] = "Satellite (Streets)"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
     if color_key not in st.session_state: st.session_state[color_key] = "#003366"
-    if size_key not in st.session_state: st.session_state[size_key] = 20  # Default pin size 12
+    if size_key not in st.session_state: st.session_state[size_key] = 20
     if image_key not in st.session_state: st.session_state[image_key] = None
-    if marker_key not in st.session_state: st.session_state[marker_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
     
@@ -464,20 +555,10 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    # Map style options
-    map_styles = [
-        "Hybrid with Streets",
-        "Hybrid", 
-        "Satellite",
-        "Street Map",
-        "Terrain",
-        "Carto Light",
-        "OSM"
-    ]
+    map_styles = ["Satellite (Streets)", "Satellite (Labels + Streets)", "Satellite (Clean)", 
+                  "Street Map", "OSM Carto Light", "Open Street Map"]
 
-    # --- FLAT SLICK HORIZONTAL CONTROLS MATRIX WITH TOP LABELS ---
-    c_btn, c_style, c_color, c_size, c_coord = st.columns([1.6, 2.0, 0.8, 1.2, 3.4])
-    
+    c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
     with c_btn:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
         export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
@@ -486,57 +567,43 @@ def render_isolated_map_editor():
         
     with c_style:
         basemap_style = st.selectbox(label="Basemap Layer", options=map_styles, key=style_key)
-        
     with c_color:
         st.markdown('<div class="manual-picker-label">Pin Color</div>', unsafe_allow_html=True)
         pin_color = st.color_picker(label="Pin Color", key=color_key, label_visibility="collapsed")
-        
     with c_size:
-        pin_size = st.number_input(
-            label="Pin Size", 
-            min_value=8, 
-            max_value=64, 
-            step=1, 
-            value=st.session_state[size_key],
-            key=size_key
-        )
-        
+        st.markdown('<div class="manual-picker-label">Pin Size</div>', unsafe_allow_html=True)
+        pin_size = st.number_input(label="Pin Size", min_value=8, max_value=64, step=1, value=st.session_state[size_key], key=size_key, label_visibility="collapsed")
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
-    
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
-    # --- LOADING & COMPILING WORKFLOW EXPLICIT CHECK ---
     if st.session_state[export_trigger_key]:
-        with st.spinner("Compiling ultra high-resolution map asset... Please wait"):
+        with st.spinner("Compiling ultra high-resolution map asset with pin... Please wait"):
             n, s, e, w = None, None, None, None
             if st.session_state.get(bounds_key):
                 b = st.session_state[bounds_key]
                 if b and "_northEast" in b and "_southWest" in b:
                     n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
                     e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+            
             if n is None:
-                n, s = plat + 0.005, plat - 0.005
-                e, w = plon + 0.005, plon - 0.005
+                buffer = 0.01
+                n, s = plat + buffer, plat - buffer
+                e, w = plon + buffer, plon - buffer
             
-            # Generate with the selected style and pin size
+            # Generate map with pin included
             map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w, 
-                pin_lat=plat, pin_lon=plon, 
-                style=basemap_style, 
-                pin_color=pin_color, 
-                pin_size=int(pin_size)
+                n=n, s=s, e=e, w=w, pin_lat=plat, pin_lon=plon, 
+                style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
             )
-            
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
             
-            # Save map data to temp form data
             if st.session_state.temp_form_data:
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
@@ -546,47 +613,25 @@ def render_isolated_map_editor():
             st.session_state[export_trigger_key] = False
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
-            st.success("Map attached successfully!")
+            st.success(f"Map with pin attached successfully!")
             time.sleep(0.5)
             st.rerun()
 
-    # Map tile URLs
-    tiles_dict = {
-        "Hybrid with Streets": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-        "Hybrid": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
-        "Satellite": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
-        "Street Map": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-        "Terrain": "https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}",
-        "Carto Light": "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "OSM": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-    }
-    attr_dict = {
-        "Hybrid with Streets": "Google Maps",
-        "Hybrid": "Google Maps",
-        "Satellite": "Google Maps",
-        "Street Map": "Google Maps",
-        "Terrain": "Google Maps",
-        "Carto Light": "CartoDB",
-        "OSM": "OpenStreetMap"
-    }
+    # Build tiles dict for folium - use first URL from each config
+    tiles_dict = {}
+    attr_dict = {}
+    for style in map_styles:
+        urls = get_tile_urls(style)
+        tiles_dict[style] = urls[0] if urls else ""
+        attr_dict[style] = get_attribution(style)
     
-    m = folium.Map(
-        location=[plat, plon], 
-        zoom_start=15,
-        tiles=tiles_dict[basemap_style],
-        attr=attr_dict[basemap_style],
-        zoom_control=True
-    )
+    m = folium.Map(location=[plat, plon], zoom_start=15, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style], zoom_control=True)
     
-    # Create blue circle with white star marker
+    # --- ADD PIN MARKER ---
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40" style="width: 100%; height: 100%;">
-            <defs>
-                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
-                </filter>
-            </defs>
+            <defs><filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/></filter></defs>
             <g filter="url(#shadow)">
                 <circle cx="20" cy="20" r="18" fill="{pin_color}" stroke="white" stroke-width="2"/>
                 <polygon points="20,6 23.5,14.5 32,15 25.5,21 27.5,30 20,25 12.5,30 14.5,21 8,15 16.5,14.5" fill="white"/>
@@ -594,36 +639,40 @@ def render_isolated_map_editor():
         </svg>
     </div>
     """
-    
     folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
+    
+    # --- DRAW TOOL: ONLY RECTANGLE FOR CROP AREA ---
     Draw(
         export=False, 
         position='topleft',
-        draw_options={'polyline':False, 'polygon':False, 'circle':False, 'marker':False, 'circlemarker':False, 'rectangle':True},
-        edit_options={'edit':True}
+        draw_options={
+            'polyline': False,
+            'polygon': False,
+            'circle': False,
+            'marker': False,
+            'circlemarker': False,
+            'rectangle': True
+        },
+        edit_options={'edit': True}
     ).add_to(m)
     
-    st.info("Use the Rectangle tool to frame your export area. Drag the pin to move it. Select different map styles to highlight streets.")
+    st.info("Draw a rectangle to define crop area (visible for guidance only, not in export) | Drag pin to reposition")
     map_data = st_folium(
-        m, 
-        height=600, 
-        width=1300, 
-        use_container_width=True, 
-        key=f"int_map_{token_key}", 
+        m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", 
         returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
     )
 
-    if isinstance(map_data, dict) and map_data.get("bounds"):
-        st.session_state[bounds_key] = map_data["bounds"]
+    if isinstance(map_data, dict):
+        if map_data.get("bounds"):
+            st.session_state[bounds_key] = map_data["bounds"]
+        if map_data.get("last_marker_moved"):
+            moved = map_data["last_marker_moved"]
+            if moved:
+                new_coord = f"{round(moved['lat'], 5)}, {round(moved['lng'], 5)}"
+                if new_coord != st.session_state.get(coord_key, ""):
+                    st.session_state[dragged_key] = new_coord
+                    st.rerun()
 
-    if isinstance(map_data, dict) and map_data.get("last_marker_moved"):
-        moved = map_data["last_marker_moved"]
-        if moved:
-            new_coord = f"{round(moved['lat'], 5)}, {round(moved['lng'], 5)}"
-            if new_coord != st.session_state.get(coord_key, ""):
-                st.session_state[dragged_key] = new_coord
-                st.rerun()
-                
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     try:
@@ -742,21 +791,15 @@ def get_download_filename(template_name, file_type):
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
     return f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_type}"
 
-# --- ENHANCED FORM DATA LIVE PERSISTENCE ---
 def autosave_current_form_data():
-    """Universal autosave function that can be called anywhere - saves all current form data"""
     if not st.session_state.saved_template_name or not st.session_state.tokens:
         return False
-    
-    # Gather all current values from session state
     for token in st.session_state.tokens:
         val_key = f"val_{token}"
         if val_key in st.session_state:
             current_type = st.session_state.custom_mapping.get(token, "Text")
-            if current_type != "Image":  # Don't save file objects
+            if current_type != "Image":
                 st.session_state.temp_form_data[token] = st.session_state[val_key]
-    
-    # Write to disk
     temp_path = get_temp_config_path(st.session_state.saved_template_name)
     try:
         with open(temp_path, 'w', encoding='utf-8') as f:
@@ -765,40 +808,18 @@ def autosave_current_form_data():
     except Exception:
         return False
 
-def save_form_data_to_session():
-    """Legacy function - kept for backward compatibility, now calls autosave"""
-    return autosave_current_form_data()
-
 def restore_form_data_from_session():
-    """Enhanced restore with proper priority: session state > temp data > disk"""
     if not st.session_state.saved_template_name:
         return False
-    
-    # 1. First try: Session state already has values (most recent)
-    has_session_data = False
-    for token in st.session_state.tokens:
-        if f"val_{token}" in st.session_state:
-            has_session_data = True
-            break
-    
+    has_session_data = any(f"val_{token}" in st.session_state for token in st.session_state.tokens)
     if has_session_data:
-        # Session state is the source of truth
-        for token in st.session_state.tokens:
-            current_type = st.session_state.custom_mapping.get(token, "Text")
-            if current_type != "Image" and f"val_{token}" in st.session_state:
-                # Already set, do nothing
-                pass
         return True
-    
-    # 2. Second try: temp_form_data in session state
     if st.session_state.temp_form_data:
         for token, value in st.session_state.temp_form_data.items():
             current_type = st.session_state.custom_mapping.get(token, "Text")
             if current_type != "Image" and f"val_{token}" not in st.session_state:
                 st.session_state[f"val_{token}"] = value
         return True
-    
-    # 3. Third try: Load from disk
     temp_path = get_temp_config_path(st.session_state.saved_template_name)
     if os.path.exists(temp_path):
         try:
@@ -810,27 +831,19 @@ def restore_form_data_from_session():
                     if current_type != "Image" and f"val_{token}" not in st.session_state:
                         st.session_state[f"val_{token}"] = value
                 return True
-        except Exception:
-            pass
-    
+        except Exception: pass
     return False
 
 def purge_all_temporary_data():
-    """Triggered post-download loop completion to cleanly wipe runtime configuration files."""
     if st.session_state.saved_template_name:
         temp_path = get_temp_config_path(st.session_state.saved_template_name)
         if os.path.exists(temp_path):
             try: os.remove(temp_path)
             except Exception: pass
-            
-    # Wipe references out of live session runtime memory blocks
     if st.session_state.tokens:
         for token in st.session_state.tokens:
-            if f"val_{token}" in st.session_state: 
-                del st.session_state[f"val_{token}"]
-            if f"map_bytes_holder_{token}" in st.session_state: 
-                del st.session_state[f"map_bytes_holder_{token}"]
-            
+            if f"val_{token}" in st.session_state: del st.session_state[f"val_{token}"]
+            if f"map_bytes_holder_{token}" in st.session_state: del st.session_state[f"map_bytes_holder_{token}"]
     st.session_state.temp_form_data = {}
 
 # --- INIT APP ---
@@ -863,7 +876,7 @@ else:
         
     st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Template Setup</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Templates</div>', unsafe_allow_html=True)
 
     col_template1, col_template2 = st.columns(2)
     with col_template1:
@@ -969,7 +982,36 @@ else:
 
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
-        st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
+        
+        # --- CTA PRESETS USING STREAMLIT NATIVE COMPONENTS ---
+        cta_sets = detect_cta_sets()
+        if cta_sets:
+            st.subheader("Call to Action Presets")
+            st.caption("Select an advisor to auto-fill CTA fields")
+            
+            num_ctas = len(cta_sets)
+            cols = st.columns(num_ctas)
+            
+            for idx, cta_num in enumerate(sorted(cta_sets.keys())):
+                with cols[idx]:
+                    cta_name_token = cta_sets[cta_num]['tokens'].get('NAME')
+                    current_advisor = ""
+                    if cta_name_token and f"val_{cta_name_token}" in st.session_state:
+                        current_advisor = st.session_state[f"val_{cta_name_token}"]
+                    
+                    st.markdown(f"**CTA{cta_num}**")
+                    
+                    selected_advisor = st.selectbox(
+                        f"Select advisor",
+                        options=[""] + list(contacts_database.keys()),
+                        index=list(contacts_database.keys()).index(current_advisor) + 1 if current_advisor in contacts_database else 0,
+                        key=f"cta_autofill_{cta_num}",
+                        label_visibility="collapsed"
+                    )
+                    
+                    if selected_advisor and selected_advisor != current_advisor:
+                        apply_cta_preset_autofill(cta_num, selected_advisor)
+                        st.rerun()
         
         with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field.")
@@ -989,9 +1031,8 @@ else:
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
-        # --- ROBUST 2-COLUMN INPUT FIELDS LAYOUT ---
+        # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
-            # Alternate fields between two dynamic UI columns to ensure layout stability without squishing
             col_target = idx % 2
             if col_target == 0:
                 ui_col_1, ui_col_2 = st.columns(2)
@@ -1003,7 +1044,16 @@ else:
                 clean_label = token.replace("{", "").replace("}", "")
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                st.markdown(f'<div class="placeholder-label">{clean_label}</div>', unsafe_allow_html=True)
+                clean_upper = clean_label.upper()
+                cta_match = re.match(r'CTA(\d+)_(NAME|CONTACT_NUMBER|EMAIL)', clean_upper)
+                is_cta = cta_match is not None
+                
+                label_text = clean_label
+                if is_cta:
+                    cta_num = cta_match.group(1)
+                    label_text = f"{clean_label} (CTA{cta_num})"
+                
+                st.markdown(f'<div class="placeholder-label">{label_text}</div>', unsafe_allow_html=True)
                 
                 if current_type == "Image" and st.session_state.template_type == 'pptx':
                     image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
@@ -1015,9 +1065,7 @@ else:
                         image_data[token] = saved_map_img
                         st.caption("Map attached.")
                     
-                    # --- ENHANCED MAP BUTTON WITH EXPLICIT AUTOSAVE ---
                     def save_all_and_navigate(token_key):
-                        # Save all current values from session state to temp_form_data
                         for t in st.session_state.tokens:
                             val_key = f"val_{t}"
                             if val_key in st.session_state:
@@ -1025,22 +1073,18 @@ else:
                                 if current_type_check != "Image":
                                     st.session_state.temp_form_data[t] = st.session_state[val_key]
                         
-                        # Write to disk
                         if st.session_state.saved_template_name:
                             temp_path = get_temp_config_path(st.session_state.saved_template_name)
                             try:
                                 with open(temp_path, 'w', encoding='utf-8') as f:
                                     json.dump(st.session_state.temp_form_data, f, indent=4)
-                            except Exception:
-                                pass
+                            except Exception: pass
                         
-                        # Set navigation flag
                         st.session_state.active_map_editor_token = token_key
                         st.rerun()
                     
-                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True, 
-                                 on_click=save_all_and_navigate, args=(token,)):
-                        pass  # on_click handles everything
+                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True, on_click=save_all_and_navigate, args=(token,)):
+                        pass
                     
                     field_types[token] = "Image"
                     
@@ -1048,49 +1092,32 @@ else:
                     if current_type in ["Image", "Map"] and st.session_state.template_type != 'pptx':
                         st.warning("Images/Maps are only supported in PPTX files.")
                     
-                    # --- ENHANCED TEXT INPUT WITH AUTOSAVE ---
-                    # Get current value from session state or temp data
                     current_value = ""
                     if f"val_{token}" in st.session_state:
                         current_value = st.session_state[f"val_{token}"]
                     elif token in st.session_state.temp_form_data:
                         current_value = st.session_state.temp_form_data[token]
-                        # Sync to session state
                         st.session_state[f"val_{token}"] = current_value
                     
-                    # Render text input without on_change callback
                     new_value = st.text_input(
-                        "",
-                        value=current_value,
-                        key=f"val_{token}",
-                        label_visibility="collapsed",
-                        placeholder="Enter value..."
+                        "", value=current_value, key=f"val_{token}", label_visibility="collapsed", placeholder="Enter value..."
                     )
                     
-                    # --- AUTOSAVE: Save immediately if value changed ---
                     if new_value != current_value:
-                        # Update session state
                         st.session_state[f"val_{token}"] = new_value
-                        
-                        # Update temp_form_data
                         st.session_state.temp_form_data[token] = new_value
                         
-                        # Save to disk immediately
                         if st.session_state.saved_template_name:
                             temp_path = get_temp_config_path(st.session_state.saved_template_name)
                             try:
                                 with open(temp_path, 'w', encoding='utf-8') as f:
                                     json.dump(st.session_state.temp_form_data, f, indent=4)
-                            except Exception:
-                                pass  # Silent fail, but data is in session state
+                            except Exception: pass
                     
-                    # Store in text_data for final document generation
                     text_data[token] = new_value
                     field_types[token] = "Text"
                     
                 st.markdown('<div style="margin-bottom:14px;"></div>', unsafe_allow_html=True)
-                
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # --- DOWNLOAD & CLEANUP SECTION ---
     if st.session_state.template_bytes is not None:
@@ -1107,11 +1134,9 @@ else:
                 try:
                     pptx_data = generate_pptx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="Download PPTX", data=pptx_data,
-                        file_name=get_download_filename(base_template_name, "pptx"),
+                        label="Download PPTX", data=pptx_data, file_name=get_download_filename(base_template_name, "pptx"),
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        use_container_width=True, key="download_pptx",
-                        on_click=purge_all_temporary_data
+                        use_container_width=True, key="download_pptx", on_click=purge_all_temporary_data
                     )
                 except Exception as e:
                     st.error(f"Error generating PPTX: {str(e)}")
@@ -1123,11 +1148,9 @@ else:
                 try:
                     docx_data = generate_docx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="Download DOCX", data=docx_data,
-                        file_name=get_download_filename(base_template_name, "docx"),
+                        label="Download DOCX", data=docx_data, file_name=get_download_filename(base_template_name, "docx"),
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True, key="download_docx",
-                        on_click=purge_all_temporary_data
+                        use_container_width=True, key="download_docx", on_click=purge_all_temporary_data
                     )
                 except Exception as e:
                     st.error(f"Error generating document: {str(e)}")
