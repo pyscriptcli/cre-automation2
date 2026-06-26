@@ -42,7 +42,7 @@ if not os.path.exists(_config_file):
     with open(_config_file, "w", encoding="utf-8") as f:
         f.write("[theme]\nbase=\"light\"\n")
 
-# --- MOBILE-OPTIMIZED UI CSS ---
+# --- MINIMAL UI CSS ---
 MINIMAL_CRE_SYSTEM = """
 <style>
     #MainMenu {visibility: hidden;}
@@ -51,117 +51,62 @@ MINIMAL_CRE_SYSTEM = """
     .stDeployButton {display: none;}
     .stStatusWidget {display: none;}
     
-    /* Mobile-first responsive design */
     .stApp { background-color: #FFFFFF !important; color: #1A1A1A !important; font-family: 'Segoe UI', Arial, sans-serif !important; }
     div[data-testid="stHeader"] { background-color: #FFFFFF !important; display: none !important; }
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; max-width: 1300px !important; }
     
-    /* Larger touch targets for mobile */
     div[data-baseweb="input"], div[data-baseweb="base-input"], div[role="textbox"], div[data-baseweb="select"], textarea {
         background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important;
         color: #1A1A1A !important;
-        min-height: 44px !important; /* Better touch target */
     }
     div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, textarea:focus { border-color: #003366 !important; box-shadow: none !important; }
-    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { 
-        color: #1A1A1A !important; 
-        font-size: 16px !important; /* Better for mobile readability */ 
-        padding: 10px 12px !important;
-    }
+    input[type="text"], .stTextInput input, div[data-baseweb="select"] div, textarea { color: #1A1A1A !important; font-size: 14px !important; }
     
-    div[data-baseweb="select"] { min-height: 44px !important; }
-    div[data-baseweb="select"] > div { min-height: 44px !important; padding: 0 12px !important; }
-    div[data-baseweb="select"] select { font-size: 16px !important; padding: 8px 12px !important; }
+    div[data-baseweb="select"] { min-height: 32px !important; }
+    div[data-baseweb="select"] > div { min-height: 32px !important; padding: 0 8px !important; }
+    div[data-baseweb="select"] select { font-size: 13px !important; padding: 2px 8px !important; }
     
-    /* Mobile-friendly buttons */
+    section[data-testid="stFileUploader"] { background-color: #F8F8F8 !important; border: 1px solid #CCCCCC !important; border-radius: 4px !important; padding: 4px 12px !important; }
+    .workspace-card { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
+    .editor-card { background-color: #F8F9FA; border: 2px solid #003366; border-radius: 6px; padding: 20px; }
+    
     div.stButton > button { 
-        background-color: #003366 !important; 
-        color: #FFFFFF !important; 
-        font-weight: 600 !important; 
-        font-size: 16px !important; /* Larger for mobile */
-        border: none !important; 
-        border-radius: 8px !important; 
-        padding: 12px 20px !important; /* More padding for touch */
-        width: 100% !important; 
-        min-height: 48px !important; /* Better touch target */
-        touch-action: manipulation !important; /* Optimize for touch */
+        background-color: #003366 !important; color: #FFFFFF !important; font-weight: 600 !important; font-size: 12px !important; 
+        border: none !important; border-radius: 4px !important; padding: 6px 14px !important; width: 100% !important; min-height: 32px !important;
     }
     div.stButton > button:hover { background-color: #002244 !important; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0, 51, 102, 0.2); }
     div.stButton > button:disabled { background-color: #666666 !important; opacity: 0.6; cursor: not-allowed; }
-    div.stButton > button:active { transform: scale(0.98) !important; } /* Touch feedback */
     
-    /* Mobile-optimized cards */
-    .workspace-card { 
-        background-color: #FFFFFF; 
-        border: 1px solid #E0E0E0; 
-        border-radius: 12px; /* Rounded for mobile */
-        padding: 16px; 
-        margin-bottom: 12px; 
-    }
-    .editor-card { 
-        background-color: #F8F9FA; 
-        border: 2px solid #003366; 
-        border-radius: 12px; 
-        padding: 16px; 
-    }
-    
-    /* Touch-friendly field labels */
-    .field-label { 
-        font-size: 15px !important; 
-        font-weight: 600 !important; 
-        color: #1A1A1A !important; 
-        padding-top: 8px; 
-        margin-bottom: 4px;
-    }
-    .section-header { 
-        font-size: 18px !important; 
-        font-weight: 700 !important; 
-        color: #1A1A1A !important; 
-        margin-bottom: 12px; 
-    }
-    
-    .saved-indicator { 
-        background-color: #E8F5E9; 
-        padding: 10px 14px; 
-        border-radius: 8px; 
-        font-size: 14px; 
-        color: #2E7D32; 
-        border-left: 4px solid #2E7D32; 
-        margin-top: 8px; 
-    }
-    
+    .field-label { font-size: 13px !important; font-weight: 600 !important; color: #1A1A1A !important; padding-top: 6px; }
+    .section-header { font-size: 15px !important; font-weight: 700 !important; color: #1A1A1A !important; margin-bottom: 10px; }
+    .saved-indicator { background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 6px; }
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
-    div[data-testid="stForm"] { 
-        border: 1px solid #E0E0E0 !important; 
-        border-radius: 12px !important; 
-        padding: 1rem !important; 
-        background-color: #FFFFFF; 
-    }
+    div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
     
     .placeholder-label {
         font-weight: 600 !important;
-        font-size: 15px !important;
+        font-size: 13px !important;
         color: #1A1A1A !important;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
     
-    /* Mobile-optimized expander */
-    .streamlit-expanderHeader {
-        font-size: 16px !important;
+    /* Type mapping section */
+    .type-mapping-section {
+        background-color: #F8F9FA !important;
+        border: 1px solid #E0E0E0 !important;
+        border-radius: 6px !important;
         padding: 12px !important;
+        margin: 8px 0 12px 0 !important;
+    }
+    .type-mapping-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr 1fr !important;
+        gap: 6px 16px !important;
+        margin-top: 8px !important;
     }
     
-    /* File uploader improvements for mobile */
-    section[data-testid="stFileUploader"] { 
-        background-color: #F8F8F8 !important; 
-        border: 2px dashed #CCCCCC !important; 
-        border-radius: 12px !important; 
-        padding: 16px !important; 
-        min-height: 60px !important;
-    }
-    
-    /* Map editor controls - responsive grid */
+    /* Map editor controls */
     .map-controls-row {
         display: flex !important;
         gap: 12px !important;
@@ -172,54 +117,25 @@ MINIMAL_CRE_SYSTEM = """
     .map-control-item {
         display: flex !important;
         align-items: center !important;
-        gap: 8px !important;
-        flex: 1 !important;
-        min-width: 120px !important;
+        gap: 6px !important;
     }
     .map-control-item label {
-        font-size: 14px !important;
+        font-size: 12px !important;
         font-weight: 500 !important;
         color: #333 !important;
         white-space: nowrap !important;
     }
     
-    /* Mobile-optimized columns */
-    @media (max-width: 768px) {
-        .stColumns {
-            flex-direction: column !important;
-            gap: 12px !important;
-        }
-        .stColumns > div {
-            width: 100% !important;
-            flex: none !important;
-        }
-        .block-container {
-            padding: 0.5rem 0.5rem !important;
-        }
-        .workspace-card, .editor-card {
-            padding: 12px !important;
-            border-radius: 8px !important;
-        }
-        div.stButton > button {
-            font-size: 15px !important;
-            padding: 14px !important;
-            min-height: 52px !important;
-        }
-        input[type="text"], .stTextInput input {
-            font-size: 16px !important;
-            padding: 12px !important;
-        }
+    .map-preview-container {
+        border: 2px solid #003366;
+        border-radius: 6px;
+        padding: 10px;
+        margin: 10px 0;
+        background-color: #F8F9FA;
     }
-    
-    /* Touch feedback for interactive elements */
-    .stSelectbox, .stTextInput, .stNumberInput {
-        touch-action: manipulation !important;
-    }
-    
-    /* Map container responsive */
-    .folium-map {
-        border-radius: 12px !important;
-        overflow: hidden !important;
+    .map-preview-container img {
+        border-radius: 4px;
+        width: 100%;
     }
 </style>
 """
@@ -388,73 +304,7 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
             return False
     return True
 
-# --- GPS AND SEARCH FUNCTIONS ---
-def geocode_address(address):
-    """Convert address to coordinates using OSM Nominatim"""
-    if not address or not address.strip():
-        return None, None
-    
-    try:
-        # Try OSM Nominatim (free, no API key required)
-        url = "https://nominatim.openstreetmap.org/search"
-        params = {
-            "q": address,
-            "format": "json",
-            "limit": 1
-        }
-        headers = {
-            "User-Agent": "MapGenerator/1.0"
-        }
-        
-        response = requests.get(url, params=params, headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if data:
-                lat = float(data[0]['lat'])
-                lon = float(data[0]['lon'])
-                return lat, lon
-    except Exception:
-        pass
-    return None, None
-
-def reverse_geocode(lat, lon):
-    """Get address from coordinates using OSM Nominatim"""
-    try:
-        url = "https://nominatim.openstreetmap.org/reverse"
-        params = {
-            "lat": lat,
-            "lon": lon,
-            "format": "json"
-        }
-        headers = {
-            "User-Agent": "MapGenerator/1.0"
-        }
-        
-        response = requests.get(url, params=params, headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if data and 'display_name' in data:
-                return data['display_name']
-    except Exception:
-        pass
-    return None
-
-def get_current_location():
-    """Attempt to get device location via IP geolocation"""
-    try:
-        # Use free IP geolocation service
-        response = requests.get("https://ipapi.co/json/", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if 'latitude' in data and 'longitude' in data:
-                return data['latitude'], data['longitude']
-    except Exception:
-        pass
-    
-    # Fallback to a popular location if IP geolocation fails
-    return 14.5995, 120.9842  # Manila, Philippines
-
-# --- BASEMAP CONFIGURATION ---
+# --- BASEMAP CONFIGURATION WITH IMPROVED RELIABILITY ---
 BASEMAP_CONFIG = {
     "Satellite (Streets)": {
         "urls": [
@@ -523,14 +373,71 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
             if resp.status_code == 200:
                 return resp.content
             elif resp.status_code == 418:
+                # Blocked - try different URL
                 continue
         except Exception:
             continue
     return None
 
+# --- MAP UTILITY FUNCTIONS ---
+def get_rectangle_bounds(drawing_data):
+    """Extract bounding box from drawn rectangle"""
+    if not drawing_data:
+        return None
+    
+    # Handle different drawing data formats
+    if isinstance(drawing_data, dict):
+        coords = drawing_data.get("geometry", {}).get("coordinates", [[]])
+    else:
+        return None
+    
+    if not coords or not coords[0]:
+        return None
+    
+    # Rectangle corners - typically [[[lng1, lat1], [lng2, lat2], [lng3, lat3], [lng4, lat4]]]
+    points = coords[0]
+    if len(points) < 4:
+        return None
+    
+    # Extract min/max lat/lng
+    lats = [p[1] for p in points]
+    lngs = [p[0] for p in points]
+    
+    return {
+        'north': max(lats),
+        'south': min(lats),
+        'east': max(lngs),
+        'west': min(lngs)
+    }
+
+def apply_padding_to_bounds(bounds, padding_factor=0.05):
+    """Add padding to bounds"""
+    if not bounds:
+        return bounds
+    
+    lat_span = bounds['north'] - bounds['south']
+    lng_span = bounds['east'] - bounds['west']
+    
+    # If bounds are too small, use minimum span
+    min_span = 0.001
+    if lat_span < min_span:
+        lat_span = min_span
+    if lng_span < min_span:
+        lng_span = min_span
+    
+    padding_lat = lat_span * padding_factor
+    padding_lng = lng_span * padding_factor
+    
+    return {
+        'north': bounds['north'] + padding_lat,
+        'south': bounds['south'] - padding_lat,
+        'east': bounds['east'] + padding_lng,
+        'west': bounds['west'] - padding_lng
+    }
+
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#DC3545", pin_size=12):
-    """Generates high-res map with pin included"""
+    """Generates high-res map with pin included - NO radius"""
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
@@ -562,11 +469,13 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
     headers = {"User-Agent": "Mozilla/5.0 (compatible; MapGenerator/1.0; +https://example.com)"}
     
+    # Get tile URLs with failover support
     tile_urls = get_tile_urls(style)
     
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             tile_data = None
+            # Try each URL in order
             for url_template in tile_urls:
                 tile_data = fetch_tile_with_retry(url_template, zoom, x, y, headers)
                 if tile_data is not None:
@@ -606,7 +515,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
-    # Draw PIN
+    # --- DRAW PIN (always included) ---
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
     draw.ellipse([
@@ -647,45 +556,37 @@ def render_isolated_map_editor():
     
     st.markdown("""
         <style>
-            /* Mobile-optimized map editor */
             div[data-testid="stHorizontalBlock"] {
                 align-items: flex-end !important;
                 gap: 12px !important;
-                flex-wrap: wrap !important;
             }
             div[data-baseweb="input"], div[data-baseweb="select"], .stColorPicker div {
-                min-height: 44px !important;
+                height: 38px !important;
             }
             .manual-picker-label {
                 font-family: 'Segoe UI', Arial, sans-serif !important;
-                font-size: 15px !important;
+                font-size: 14px !important;
                 color: #1A1A1A !important;
                 margin-bottom: 8px !important;
                 line-height: 1.2;
             }
-            .location-search-container {
-                display: flex !important;
-                gap: 8px !important;
-                width: 100% !important;
+            .map-preview-container {
+                border: 2px solid #003366;
+                border-radius: 6px;
+                padding: 15px;
+                margin: 15px 0;
+                background-color: #F8F9FA;
             }
-            .location-search-container > div {
-                flex: 1 !important;
+            .map-preview-container img {
+                border-radius: 4px;
+                width: 100%;
             }
-            .gps-button {
-                min-width: 48px !important;
-                max-width: 48px !important;
-                padding: 0 !important;
-                font-size: 20px !important;
-            }
-            @media (max-width: 768px) {
-                .location-search-container {
-                    flex-direction: column !important;
-                }
-                .gps-button {
-                    min-width: 100% !important;
-                    max-width: 100% !important;
-                    padding: 10px !important;
-                }
+            .rectangle-info {
+                background-color: #E3F2FD;
+                border-left: 4px solid #003366;
+                padding: 10px 15px;
+                margin: 10px 0;
+                border-radius: 4px;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -712,14 +613,13 @@ def render_isolated_map_editor():
             st.session_state.active_map_editor_token = None
             st.rerun()
         
-        if st.button("← Back", key="back_from_map", on_click=return_to_main):
+        if st.button("Back to Document", key="back_from_map", on_click=return_to_main):
             pass
             
     with col_title:
-        st.markdown(f"### 🗺️ Map Editor")
+        st.markdown(f"### Map Editor: {token_key}")
     st.markdown("</div><br>", unsafe_allow_html=True)
 
-    # Initialize session state keys
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
@@ -728,8 +628,9 @@ def render_isolated_map_editor():
     image_key = f"map_bytes_holder_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
-    search_key = f"map_search_{token_key}"
-    gps_trigger_key = f"map_gps_trigger_{token_key}"
+    rectangle_bounds_key = f"map_rectangle_bounds_{token_key}"
+    padding_key = f"map_padding_{token_key}"
+    preview_key = f"map_preview_generated_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Satellite (Streets)"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
@@ -738,8 +639,9 @@ def render_isolated_map_editor():
     if image_key not in st.session_state: st.session_state[image_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
-    if search_key not in st.session_state: st.session_state[search_key] = ""
-    if gps_trigger_key not in st.session_state: st.session_state[gps_trigger_key] = False
+    if rectangle_bounds_key not in st.session_state: st.session_state[rectangle_bounds_key] = None
+    if padding_key not in st.session_state: st.session_state[padding_key] = 5
+    if preview_key not in st.session_state: st.session_state[preview_key] = False
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -748,127 +650,47 @@ def render_isolated_map_editor():
     map_styles = ["Satellite (Streets)", "Satellite (Labels + Streets)", "Satellite (Clean)", 
                   "Street Map", "OSM Carto Light", "Open Street Map"]
 
-    # --- Mobile-optimized controls ---
-    # Row 1: Basemap and Confirm button
-    c_btn, c_style = st.columns([1, 2])
+    # --- Controls Row ---
+    c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
     with c_btn:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
-        export_clicked = st.button("✅ Confirm Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
+        export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
         if export_clicked:
             st.session_state[export_trigger_key] = True
         
     with c_style:
-        basemap_style = st.selectbox(label="Basemap", options=map_styles, key=style_key, label_visibility="collapsed")
-    
-    # Row 2: Pin settings
-    c_color, c_size = st.columns(2)
+        basemap_style = st.selectbox(label="Basemap Layer", options=map_styles, key=style_key)
     with c_color:
         st.markdown('<div class="manual-picker-label">Pin Color</div>', unsafe_allow_html=True)
         pin_color = st.color_picker(label="Pin Color", key=color_key, label_visibility="collapsed")
     with c_size:
         st.markdown('<div class="manual-picker-label">Pin Size</div>', unsafe_allow_html=True)
         pin_size = st.number_input(label="Pin Size", min_value=8, max_value=64, step=1, value=st.session_state[size_key], key=size_key, label_visibility="collapsed")
+    with c_coord:
+        coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # Row 3: Location - Search with GPS button (mobile-optimized)
-    st.markdown('<div class="manual-picker-label">📍 Location</div>', unsafe_allow_html=True)
-    
-    # Create a responsive location input row
-    col_search, col_gps = st.columns([4, 1])
-    with col_search:
-        search_input = st.text_input(
-            label="Search address", 
-            value=st.session_state.get(search_key, ""),
-            key=search_key,
-            placeholder="Search location...",
-            label_visibility="collapsed"
+    # --- Padding Control ---
+    st.markdown("---")
+    col_pad1, col_pad2 = st.columns([1, 3])
+    with col_pad1:
+        padding_percent = st.slider(
+            "Padding around rectangle", 
+            min_value=0, max_value=20, value=st.session_state[padding_key],
+            step=1, key=f"padding_slider_{token_key}",
+            help="Add padding around the captured rectangle area"
         )
-    with col_gps:
-        # GPS button with emoji
-        if st.button("📍", key=f"gps_btn_{token_key}", use_container_width=True, help="Use my current location"):
-            st.session_state[gps_trigger_key] = True
-            st.rerun()
-    
-    # Process GPS trigger
-    if st.session_state.get(gps_trigger_key, False):
-        with st.spinner("📍 Getting your location..."):
-            lat, lon = get_current_location()
-            if lat and lon:
-                st.session_state[coord_key] = f"{lat}, {lon}"
-                # Try to get address for display
-                address = reverse_geocode(lat, lon)
-                if address:
-                    st.session_state[search_key] = address[:100]  # Truncate for display
-                st.success("📍 Location found!")
-            else:
-                st.warning("⚠️ Could not get location. Using default.")
-            st.session_state[gps_trigger_key] = False
-            time.sleep(0.5)
-            st.rerun()
-    
-    # Process search
-    if search_input and search_input.strip() and search_input != st.session_state.get(search_key, ""):
-        st.session_state[search_key] = search_input
-        with st.spinner("🔍 Searching..."):
-            lat, lon = geocode_address(search_input)
-            if lat and lon:
-                st.session_state[coord_key] = f"{lat}, {lon}"
-                st.success(f"📍 Found: {search_input}")
-            else:
-                st.warning("⚠️ Location not found. Please try again.")
-    
-    # Coord input
-    coord_input = st.text_input(
-        label="Coordinates", 
-        value=st.session_state.get(coord_key, "14.5995, 120.9842"),
-        key=coord_key,
-        placeholder="Latitude, Longitude",
-        label_visibility="collapsed"
-    )
+        st.session_state[padding_key] = padding_percent
+    with col_pad2:
+        st.caption("💡 Draw a rectangle on the map to define the area to capture. The pin will be included in the export.")
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     
-    # Parse coordinates
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
-    # Handle export
-    if st.session_state[export_trigger_key]:
-        with st.spinner("🔄 Compiling map with pin... Please wait"):
-            n, s, e, w = None, None, None, None
-            if st.session_state.get(bounds_key):
-                b = st.session_state[bounds_key]
-                if b and "_northEast" in b and "_southWest" in b:
-                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
-                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
-            
-            if n is None:
-                buffer = 0.01
-                n, s = plat + buffer, plat - buffer
-                e, w = plon + buffer, plon - buffer
-            
-            map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w, pin_lat=plat, pin_lon=plon, 
-                style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
-            )
-            st.session_state[image_key] = map_img_bytes
-            st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
-            
-            if st.session_state.temp_form_data:
-                st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
-                temp_path = get_temp_config_path(st.session_state.saved_template_name)
-                with open(temp_path, 'w', encoding='utf-8') as f:
-                    json.dump(st.session_state.temp_form_data, f, indent=4)
-            
-            st.session_state[export_trigger_key] = False
-            st.session_state.restore_form_data = True
-            st.session_state.active_map_editor_token = None
-            st.success("✅ Map attached successfully!")
-            time.sleep(0.5)
-            st.rerun()
-
-    # --- Map display ---
+    # Build tiles dict for folium - use first URL from each config
     tiles_dict = {}
     attr_dict = {}
     for style in map_styles:
@@ -878,7 +700,7 @@ def render_isolated_map_editor():
     
     m = folium.Map(location=[plat, plon], zoom_start=15, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style], zoom_control=True)
     
-    # Pin marker
+    # --- ADD PIN MARKER ---
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40" style="width: 100%; height: 100%;">
@@ -892,7 +714,7 @@ def render_isolated_map_editor():
     """
     folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
     
-    # Draw tool
+    # --- DRAW TOOL: ONLY RECTANGLE FOR CROP AREA ---
     Draw(
         export=False, 
         position='topleft',
@@ -907,26 +729,145 @@ def render_isolated_map_editor():
         edit_options={'edit': True}
     ).add_to(m)
     
-    # Mobile-optimized info with emojis
-    st.info("📍 Draw rectangle to crop | 👆 Drag pin to reposition | 🔍 Search above for locations")
+    st.info("✏️ Draw a rectangle to define crop area | Drag pin to reposition | Rectangle bounds will be used for export")
     
     map_data = st_folium(
-        m, height=500, width=None, use_container_width=True, key=f"int_map_{token_key}", 
+        m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", 
         returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
     )
 
+    # --- Process Drawing Rectangle ---
     if isinstance(map_data, dict):
         if map_data.get("bounds"):
             st.session_state[bounds_key] = map_data["bounds"]
+        
+        # Handle rectangle drawing
+        if map_data.get("last_active_drawing"):
+            drawing = map_data["last_active_drawing"]
+            bounds = get_rectangle_bounds(drawing)
+            
+            if bounds:
+                st.session_state[rectangle_bounds_key] = bounds
+                
+                # Show rectangle info
+                st.markdown(f"""
+                <div class="rectangle-info">
+                    <strong>✅ Rectangle Captured!</strong><br>
+                    North: {bounds['north']:.5f}° | South: {bounds['south']:.5f}°<br>
+                    East: {bounds['east']:.5f}° | West: {bounds['west']:.5f}°<br>
+                    Size: {bounds['north'] - bounds['south']:.5f}° × {bounds['east'] - bounds['west']:.5f}°
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Generate preview with padding
+                padding_factor = st.session_state[padding_key] / 100.0
+                padded_bounds = apply_padding_to_bounds(bounds, padding_factor)
+                
+                if padded_bounds:
+                    with st.spinner("Generating preview..."):
+                        preview_img_bytes = generate_static_map_bounds(
+                            n=padded_bounds['north'], 
+                            s=padded_bounds['south'],
+                            e=padded_bounds['east'], 
+                            w=padded_bounds['west'],
+                            pin_lat=plat, 
+                            pin_lon=plon,
+                            style=basemap_style, 
+                            pin_color=pin_color, 
+                            pin_size=int(pin_size)
+                        )
+                        
+                        if preview_img_bytes:
+                            st.markdown('<div class="map-preview-container">', unsafe_allow_html=True)
+                            st.image(preview_img_bytes, caption=f"Preview of captured area (Padding: {padding_percent}%)", use_container_width=True)
+                            st.markdown('</div>', unsafe_allow_html=True)
+                            
+                            # Store preview for export
+                            st.session_state[image_key] = preview_img_bytes
+                            st.session_state[preview_key] = True
+        else:
+            # No rectangle drawn yet
+            if not st.session_state.get(preview_key):
+                st.info("👆 Draw a rectangle on the map to see a preview of what will be exported")
+
         if map_data.get("last_marker_moved"):
             moved = map_data["last_marker_moved"]
             if moved:
                 new_coord = f"{round(moved['lat'], 5)}, {round(moved['lng'], 5)}"
                 if new_coord != st.session_state.get(coord_key, ""):
                     st.session_state[dragged_key] = new_coord
+                    # Clear preview when pin moves
+                    st.session_state[preview_key] = False
                     st.rerun()
 
-# --- CORE UTILITIES (keep existing functions unchanged) ---
+    # --- Export Logic ---
+    if st.session_state[export_trigger_key]:
+        with st.spinner("Compiling ultra high-resolution map asset with pin... Please wait"):
+            # Get rectangle bounds or fallback to viewport
+            bounds = st.session_state.get(rectangle_bounds_key)
+            
+            if bounds:
+                # Use rectangle bounds with padding
+                padding_factor = st.session_state[padding_key] / 100.0
+                padded_bounds = apply_padding_to_bounds(bounds, padding_factor)
+                
+                if padded_bounds:
+                    n, s = padded_bounds['north'], padded_bounds['south']
+                    e, w = padded_bounds['east'], padded_bounds['west']
+                    st.info(f"Exporting with {padding_percent}% padding around rectangle")
+                else:
+                    n, s = bounds['north'], bounds['south']
+                    e, w = bounds['east'], bounds['west']
+            else:
+                # Fallback to viewport bounds
+                b = st.session_state.get(bounds_key)
+                if b and "_northEast" in b and "_southWest" in b:
+                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
+                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+                    st.warning("No rectangle drawn - using viewport bounds")
+                else:
+                    # Ultimate fallback
+                    buffer = 0.01
+                    n, s = plat + buffer, plat - buffer
+                    e, w = plon + buffer, plon - buffer
+                    st.warning("Using default bounds - please draw a rectangle for precise control")
+            
+            # Generate final map with pin included
+            map_img_bytes = generate_static_map_bounds(
+                n=n, s=s, e=e, w=w, 
+                pin_lat=plat, pin_lon=plon, 
+                style=basemap_style, 
+                pin_color=pin_color, 
+                pin_size=int(pin_size)
+            )
+            
+            if map_img_bytes:
+                st.session_state[image_key] = map_img_bytes
+                st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
+                
+                if st.session_state.temp_form_data:
+                    st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
+                    temp_path = get_temp_config_path(st.session_state.saved_template_name)
+                    with open(temp_path, 'w', encoding='utf-8') as f:
+                        json.dump(st.session_state.temp_form_data, f, indent=4)
+                
+                st.session_state[export_trigger_key] = False
+                st.session_state.restore_form_data = True
+                st.session_state.active_map_editor_token = None
+                
+                # Show success with final image
+                st.markdown('<div class="map-preview-container">', unsafe_allow_html=True)
+                st.image(map_img_bytes, caption="✅ Final Exported Map", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                st.success(f"✅ Map exported successfully! Bounds: {n:.5f}°N to {s:.5f}°S, {e:.5f}°E to {w:.5f}°W")
+                time.sleep(2)
+                st.rerun()
+            else:
+                st.error("Failed to generate map. Please try again.")
+                st.session_state[export_trigger_key] = False
+
+# --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
     try:
         img = Image.open(img_file)
@@ -984,24 +925,30 @@ def clean_empty_placeholders(text):
     """Remove any {{...}} placeholders that remain empty and clean up whitespace"""
     if not text:
         return text
+    # Remove any {{...}} pattern that might be left
     cleaned = re.sub(r'\{\{[^}]*\}\}', '', text)
+    # Clean up extra whitespace and newlines
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """Replace text in paragraph, removing empty placeholders"""
+    # Process each run
     for run in paragraph.runs:
         current_text = run.text
         for token, value in text_inputs.items():
             if token in current_text:
-                if value and str(value).strip():
+                if value and str(value).strip():  # Value exists and is not empty
                     current_text = current_text.replace(token, str(value))
-                else:
+                else:  # Value is empty, remove the placeholder
                     current_text = current_text.replace(token, '')
+        # Clean up any remaining placeholders and extra whitespace
         run.text = clean_empty_placeholders(current_text)
     
+    # Handle paragraph text if no runs exist or if there are still placeholders
     if hasattr(paragraph, 'text') and paragraph.text:
         current_text = paragraph.text
+        # Check if any placeholders remain
         has_placeholder = any(token in current_text for token in text_inputs.keys())
         if has_placeholder:
             for token, value in text_inputs.items():
@@ -1015,6 +962,7 @@ def replace_text_in_paragraph(paragraph, text_inputs):
             if not paragraph.runs:
                 paragraph.add_run(current_text)
             else:
+                # Update the first run with cleaned text
                 for run in paragraph.runs:
                     if any(token in run.text for token in text_inputs.keys()):
                         run.text = current_text
@@ -1163,7 +1111,7 @@ else:
         
     st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">📄 Templates</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Templates</div>', unsafe_allow_html=True)
 
     col_template1, col_template2 = st.columns(2)
     with col_template1:
@@ -1187,7 +1135,7 @@ else:
                 template_display = selected_template.split(' (')[0].strip()
                 for t in saved_templates:
                     if t['display_name'] == template_display:
-                        if t['source'] == 'stored' and st.button("🗑️", key="delete_template"):
+                        if t['source'] == 'stored' and st.button("Delete", key="delete_template"):
                             st.session_state.show_delete_confirm = True
                             st.session_state.template_to_delete = t['name']
                             st.rerun()
@@ -1246,7 +1194,7 @@ else:
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.temp_form_data = {}
             
-            if st.button("💾 Save Template", key="save_template_btn", use_container_width=True):
+            if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 save_template_to_file(template_bytes, uploaded_template.name)
                 if st.session_state.custom_mapping:
                     save_config_to_file(st.session_state.custom_mapping, uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json')
@@ -1262,7 +1210,7 @@ else:
     if st.session_state.template_bytes is not None:
         template_name = st.session_state.saved_template_name or "Unsaved Template"
         is_github = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), template_name))
-        st.markdown(f'<div class="saved-indicator">✅ Active: {template_name}{" (GitHub)" if is_github else " (Stored)"} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="saved-indicator">Active: {template_name}{" (GitHub)" if is_github else " (Stored)"} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     text_data, image_data, field_types = {}, {}, {}
@@ -1270,10 +1218,10 @@ else:
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
         
-        # --- CTA PRESETS ---
+        # --- CTA PRESETS USING STREAMLIT NATIVE COMPONENTS ---
         cta_sets = detect_cta_sets()
         if cta_sets:
-            st.subheader("👤 Call to Action Presets")
+            st.subheader("Call to Action Presets")
             st.caption("Select an advisor to auto-fill CTA fields")
             
             num_ctas = len(cta_sets)
@@ -1300,7 +1248,7 @@ else:
                         apply_cta_preset_autofill(cta_num, selected_advisor)
                         st.rerun()
         
-        with st.expander("⚙️ Data Type Mapping", expanded=st.session_state.show_type_mapping):
+        with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field.")
             cols = st.columns(3)
             for idx, token in enumerate(tokens):
@@ -1316,9 +1264,9 @@ else:
                             auto_save_config()
                             st.rerun()
         
-        st.markdown('<div class="section-header">📝 Placeholder Values</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
-        # --- RENDER FIELDS ---
+        # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
             col_target = idx % 2
             if col_target == 0:
@@ -1350,7 +1298,7 @@ else:
                     saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
                     if saved_map_img:
                         image_data[token] = saved_map_img
-                        st.caption("🗺️ Map attached.")
+                        st.caption("Map attached.")
                     
                     def save_all_and_navigate(token_key):
                         for t in st.session_state.tokens:
@@ -1370,7 +1318,7 @@ else:
                         st.session_state.active_map_editor_token = token_key
                         st.rerun()
                     
-                    if st.button("🗺️ Open Map Editor", key=f"btn_map_{token}", use_container_width=True, on_click=save_all_and_navigate, args=(token,)):
+                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True, on_click=save_all_and_navigate, args=(token,)):
                         pass
                     
                     field_types[token] = "Image"
@@ -1406,22 +1354,22 @@ else:
                     
                 st.markdown('<div style="margin-bottom:14px;"></div>', unsafe_allow_html=True)
 
-    # --- DOWNLOAD SECTION ---
+    # --- DOWNLOAD & CLEANUP SECTION ---
     if st.session_state.template_bytes is not None:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">📥 Download Document</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
         
         base_template_name = re.sub(r'\.(pptx|docx)$', '', st.session_state.saved_template_name or "Generated_Document")
         col1, col2 = st.columns(2)
         
         with col1:
             if st.session_state.template_type != 'pptx':
-                st.button("📊 Download PPTX", disabled=True, use_container_width=True)
+                st.button("Download PPTX", disabled=True, use_container_width=True)
             else:
                 try:
                     pptx_data = generate_pptx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="📊 Download PPTX", data=pptx_data, file_name=get_download_filename(base_template_name, "pptx"),
+                        label="Download PPTX", data=pptx_data, file_name=get_download_filename(base_template_name, "pptx"),
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                         use_container_width=True, key="download_pptx", on_click=purge_all_temporary_data
                     )
@@ -1430,12 +1378,12 @@ else:
                     
         with col2:
             if st.session_state.template_type != 'docx':
-                st.button("📄 Download DOCX", disabled=True, use_container_width=True)
+                st.button("Download DOCX", disabled=True, use_container_width=True)
             else:
                 try:
                     docx_data = generate_docx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="📄 Download DOCX", data=docx_data, file_name=get_download_filename(base_template_name, "docx"),
+                        label="Download DOCX", data=docx_data, file_name=get_download_filename(base_template_name, "docx"),
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True, key="download_docx", on_click=purge_all_temporary_data
                     )
@@ -1443,4 +1391,4 @@ else:
                     st.error(f"Error generating document: {str(e)}")
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("📂 Please upload or select a template to begin")
+        st.info("Please upload or select a template to begin")
