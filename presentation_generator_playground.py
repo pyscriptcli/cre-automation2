@@ -935,7 +935,7 @@ else:
         
     st.markdown("<hr style='margin: 4px 0 12px 0;'>", unsafe_allow_html=True)
     st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Template Setup</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Templates</div>', unsafe_allow_html=True)
 
     col_template1, col_template2 = st.columns(2)
     with col_template1:
@@ -1046,7 +1046,7 @@ else:
     cta_sets = detect_cta_sets()
     if cta_sets:
         st.markdown('<div class="cta-preset-container">', unsafe_allow_html=True)
-        st.markdown('<div class="cta-preset-label">Quick Fill CTA Information (Auto-fill on selection)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="cta-preset-label">Call to Action Presets</div>', unsafe_allow_html=True)
         
         # Create a single row with all CTA dropdowns
         # Determine if we have multiple CTAs to add labels
