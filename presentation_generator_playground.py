@@ -126,16 +126,59 @@ MINIMAL_CRE_SYSTEM = """
         white-space: nowrap !important;
     }
     
-    .map-preview-container {
-        border: 2px solid #003366;
-        border-radius: 6px;
-        padding: 10px;
-        margin: 10px 0;
-        background-color: #F8F9FA;
+    /* Mode selection buttons */
+    .mode-button-group {
+        display: flex !important;
+        gap: 4px !important;
+        margin-bottom: 8px !important;
     }
-    .map-preview-container img {
-        border-radius: 4px;
-        width: 100%;
+    .mode-button {
+        padding: 4px 12px !important;
+        font-size: 11px !important;
+        font-weight: 500 !important;
+        border-radius: 4px !important;
+        border: 1px solid #CCCCCC !important;
+        background: #FFFFFF !important;
+        color: #333333 !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+        min-height: 28px !important;
+    }
+    .mode-button:hover {
+        background: #F0F0F0 !important;
+    }
+    .mode-button.active {
+        background: #003366 !important;
+        color: #FFFFFF !important;
+        border-color: #003366 !important;
+    }
+    .mode-button-small {
+        font-size: 10px !important;
+        padding: 2px 10px !important;
+        min-height: 24px !important;
+    }
+    
+    /* Frame overlay */
+    .frame-overlay {
+        position: relative !important;
+        display: inline-block !important;
+    }
+    .frame-overlay::after {
+        content: '' !important;
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        border: 2px dashed rgba(0, 51, 102, 0.6) !important;
+        pointer-events: none !important;
+    }
+    .frame-square::after {
+        width: 60% !important;
+        height: 60% !important;
+    }
+    .frame-landscape::after {
+        width: 75% !important;
+        height: 45% !important;
     }
 </style>
 """
@@ -379,62 +422,6 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
             continue
     return None
 
-# --- MAP UTILITY FUNCTIONS ---
-def get_rectangle_bounds(drawing_data):
-    """Extract bounding box from drawn rectangle"""
-    if not drawing_data:
-        return None
-    
-    # Handle different drawing data formats
-    if isinstance(drawing_data, dict):
-        coords = drawing_data.get("geometry", {}).get("coordinates", [[]])
-    else:
-        return None
-    
-    if not coords or not coords[0]:
-        return None
-    
-    # Rectangle corners - typically [[[lng1, lat1], [lng2, lat2], [lng3, lat3], [lng4, lat4]]]
-    points = coords[0]
-    if len(points) < 4:
-        return None
-    
-    # Extract min/max lat/lng
-    lats = [p[1] for p in points]
-    lngs = [p[0] for p in points]
-    
-    return {
-        'north': max(lats),
-        'south': min(lats),
-        'east': max(lngs),
-        'west': min(lngs)
-    }
-
-def apply_padding_to_bounds(bounds, padding_factor=0.05):
-    """Add padding to bounds"""
-    if not bounds:
-        return bounds
-    
-    lat_span = bounds['north'] - bounds['south']
-    lng_span = bounds['east'] - bounds['west']
-    
-    # If bounds are too small, use minimum span
-    min_span = 0.001
-    if lat_span < min_span:
-        lat_span = min_span
-    if lng_span < min_span:
-        lng_span = min_span
-    
-    padding_lat = lat_span * padding_factor
-    padding_lng = lng_span * padding_factor
-    
-    return {
-        'north': bounds['north'] + padding_lat,
-        'south': bounds['south'] - padding_lat,
-        'east': bounds['east'] + padding_lng,
-        'west': bounds['west'] - padding_lng
-    }
-
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#DC3545", pin_size=12):
     """Generates high-res map with pin included - NO radius"""
@@ -570,23 +557,11 @@ def render_isolated_map_editor():
                 margin-bottom: 8px !important;
                 line-height: 1.2;
             }
-            .map-preview-container {
-                border: 2px solid #003366;
-                border-radius: 6px;
-                padding: 15px;
-                margin: 15px 0;
-                background-color: #F8F9FA;
-            }
-            .map-preview-container img {
-                border-radius: 4px;
-                width: 100%;
-            }
-            .rectangle-info {
-                background-color: #E3F2FD;
-                border-left: 4px solid #003366;
-                padding: 10px 15px;
-                margin: 10px 0;
-                border-radius: 4px;
+            .mode-selector-label {
+                font-size: 11px !important;
+                font-weight: 500 !important;
+                color: #666 !important;
+                margin-right: 6px !important;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -613,13 +588,14 @@ def render_isolated_map_editor():
             st.session_state.active_map_editor_token = None
             st.rerun()
         
-        if st.button("Back to Document", key="back_from_map", on_click=return_to_main):
+        if st.button("← Back", key="back_from_map", on_click=return_to_main):
             pass
             
     with col_title:
         st.markdown(f"### Map Editor: {token_key}")
     st.markdown("</div><br>", unsafe_allow_html=True)
 
+    # Initialize session state variables
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
@@ -628,9 +604,8 @@ def render_isolated_map_editor():
     image_key = f"map_bytes_holder_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
-    rectangle_bounds_key = f"map_rectangle_bounds_{token_key}"
-    padding_key = f"map_padding_{token_key}"
-    preview_key = f"map_preview_generated_{token_key}"
+    mode_key = f"map_mode_{token_key}"
+    frame_bounds_key = f"frame_bounds_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Satellite (Streets)"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
@@ -639,9 +614,8 @@ def render_isolated_map_editor():
     if image_key not in st.session_state: st.session_state[image_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
-    if rectangle_bounds_key not in st.session_state: st.session_state[rectangle_bounds_key] = None
-    if padding_key not in st.session_state: st.session_state[padding_key] = 5
-    if preview_key not in st.session_state: st.session_state[preview_key] = False
+    if mode_key not in st.session_state: st.session_state[mode_key] = "Square"
+    if frame_bounds_key not in st.session_state: st.session_state[frame_bounds_key] = None
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -650,47 +624,133 @@ def render_isolated_map_editor():
     map_styles = ["Satellite (Streets)", "Satellite (Labels + Streets)", "Satellite (Clean)", 
                   "Street Map", "OSM Carto Light", "Open Street Map"]
 
-    # --- Controls Row ---
+    # --- MODE SELECTION (Small buttons) ---
+    st.markdown('<div style="margin-bottom: 8px;">', unsafe_allow_html=True)
+    mode_cols = st.columns([0.3, 0.3, 0.3, 3.1])
+    
+    with mode_cols[0]:
+        is_square = st.session_state[mode_key] == "Square"
+        if st.button("⬜ Square", key=f"mode_square_{token_key}", 
+                     use_container_width=True,
+                     type="primary" if is_square else "secondary"):
+            st.session_state[mode_key] = "Square"
+            st.session_state[frame_bounds_key] = None
+            st.rerun()
+    
+    with mode_cols[1]:
+        is_landscape = st.session_state[mode_key] == "Landscape"
+        if st.button("⬛ Landscape", key=f"mode_landscape_{token_key}",
+                     use_container_width=True,
+                     type="primary" if is_landscape else "secondary"):
+            st.session_state[mode_key] = "Landscape"
+            st.session_state[frame_bounds_key] = None
+            st.rerun()
+    
+    with mode_cols[2]:
+        is_advanced = st.session_state[mode_key] == "Advanced"
+        if st.button("✏️ Advanced", key=f"mode_advanced_{token_key}",
+                     use_container_width=True,
+                     type="primary" if is_advanced else "secondary"):
+            st.session_state[mode_key] = "Advanced"
+            st.rerun()
+    
+    with mode_cols[3]:
+        mode_desc = {
+            "Square": "1:1 aspect ratio",
+            "Landscape": "16:9 aspect ratio",
+            "Advanced": "Draw custom rectangle"
+        }[st.session_state[mode_key]]
+        st.markdown(f'<span style="font-size: 11px; color: #666; margin-left: 12px;">{mode_desc}</span>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- CONTROLS ROW ---
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
     with c_btn:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
-        export_clicked = st.button("Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
+        export_clicked = st.button("✅ Confirm and Export", type="primary", key=f"export_map_{token_key}", use_container_width=True)
         if export_clicked:
             st.session_state[export_trigger_key] = True
         
     with c_style:
-        basemap_style = st.selectbox(label="Basemap Layer", options=map_styles, key=style_key)
+        basemap_style = st.selectbox(label="Basemap", options=map_styles, key=style_key)
     with c_color:
-        st.markdown('<div class="manual-picker-label">Pin Color</div>', unsafe_allow_html=True)
+        st.markdown('<div class="manual-picker-label">Pin</div>', unsafe_allow_html=True)
         pin_color = st.color_picker(label="Pin Color", key=color_key, label_visibility="collapsed")
     with c_size:
-        st.markdown('<div class="manual-picker-label">Pin Size</div>', unsafe_allow_html=True)
+        st.markdown('<div class="manual-picker-label">Size</div>', unsafe_allow_html=True)
         pin_size = st.number_input(label="Pin Size", min_value=8, max_value=64, step=1, value=st.session_state[size_key], key=size_key, label_visibility="collapsed")
     with c_coord:
-        coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
+        coord_input = st.text_input(label="📍 Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # --- Padding Control ---
-    st.markdown("---")
-    col_pad1, col_pad2 = st.columns([1, 3])
-    with col_pad1:
-        padding_percent = st.slider(
-            "Padding around rectangle", 
-            min_value=0, max_value=20, value=st.session_state[padding_key],
-            step=1, key=f"padding_slider_{token_key}",
-            help="Add padding around the captured rectangle area"
-        )
-        st.session_state[padding_key] = padding_percent
-    with col_pad2:
-        st.caption("💡 Draw a rectangle on the map to define the area to capture. The pin will be included in the export.")
-    
-    st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
     
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
-    # Build tiles dict for folium - use first URL from each config
+    # --- EXPORT LOGIC ---
+    if st.session_state[export_trigger_key]:
+        with st.spinner("Generating high-resolution map asset..."):
+            bounds = None
+            
+            # Determine bounds based on mode
+            if st.session_state[mode_key] == "Advanced":
+                # Use drawn rectangle bounds
+                if st.session_state.get(bounds_key):
+                    b = st.session_state[bounds_key]
+                    if b and "_northEast" in b and "_southWest" in b:
+                        n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
+                        e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+                        bounds = (n, s, e, w)
+            
+            if bounds is None:
+                # Use frame-based bounds (Square or Landscape)
+                if st.session_state[mode_key] in ["Square", "Landscape"]:
+                    # Calculate frame bounds around the pin
+                    # Square: 1:1, Landscape: 16:9
+                    aspect_ratio = 1.0 if st.session_state[mode_key] == "Square" else 16.0/9.0
+                    
+                    # Start with a base buffer
+                    base_buffer = 0.02
+                    
+                    # Adjust buffer based on zoom level (approximate)
+                    # For more zoomed in, use smaller buffer
+                    lat_buffer = base_buffer
+                    lon_buffer = base_buffer * aspect_ratio
+                    
+                    n, s = plat + lat_buffer, plat - lat_buffer
+                    e, w = plon + lon_buffer, plon - lon_buffer
+                else:
+                    # Fallback
+                    buffer = 0.01
+                    n, s = plat + buffer, plat - buffer
+                    e, w = plon + buffer, plon - buffer
+            
+            # Generate map with pin included
+            map_img_bytes = generate_static_map_bounds(
+                n=n, s=s, e=e, w=w, 
+                pin_lat=plat, pin_lon=plon, 
+                style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
+            )
+            st.session_state[image_key] = map_img_bytes
+            st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
+            
+            if st.session_state.temp_form_data:
+                st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
+                temp_path = get_temp_config_path(st.session_state.saved_template_name)
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(st.session_state.temp_form_data, f, indent=4)
+            
+            st.session_state[export_trigger_key] = False
+            st.session_state.restore_form_data = True
+            st.session_state.active_map_editor_token = None
+            st.success(f"✅ Map generated successfully!")
+            time.sleep(0.5)
+            st.rerun()
+
+    # --- BUILD MAP ---
     tiles_dict = {}
     attr_dict = {}
     for style in map_styles:
@@ -698,7 +758,13 @@ def render_isolated_map_editor():
         tiles_dict[style] = urls[0] if urls else ""
         attr_dict[style] = get_attribution(style)
     
-    m = folium.Map(location=[plat, plon], zoom_start=15, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style], zoom_control=True)
+    m = folium.Map(
+        location=[plat, plon], 
+        zoom_start=15, 
+        tiles=tiles_dict[basemap_style], 
+        attr=attr_dict[basemap_style], 
+        zoom_control=True
+    )
     
     # --- ADD PIN MARKER ---
     icon_html = f"""
@@ -714,158 +780,53 @@ def render_isolated_map_editor():
     """
     folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
     
-    # --- DRAW TOOL: ONLY RECTANGLE FOR CROP AREA ---
-    Draw(
-        export=False, 
-        position='topleft',
-        draw_options={
-            'polyline': False,
-            'polygon': False,
-            'circle': False,
-            'marker': False,
-            'circlemarker': False,
-            'rectangle': True
-        },
-        edit_options={'edit': True}
-    ).add_to(m)
+    # --- DRAW TOOL: ONLY FOR ADVANCED MODE ---
+    if st.session_state[mode_key] == "Advanced":
+        Draw(
+            export=False, 
+            position='topleft',
+            draw_options={
+                'polyline': False,
+                'polygon': False,
+                'circle': False,
+                'marker': False,
+                'circlemarker': False,
+                'rectangle': True
+            },
+            edit_options={'edit': True}
+        ).add_to(m)
+        st.info("📐 Draw a rectangle to define the crop area")
+    else:
+        # Show frame overlay hint for Square/Landscape modes
+        aspect_text = "1:1" if st.session_state[mode_key] == "Square" else "16:9"
+        st.info(f"📐 {st.session_state[mode_key]} mode ({aspect_text}) - Map will be cropped to this aspect ratio centered on pin")
     
-    st.info("✏️ Draw a rectangle to define crop area | Drag pin to reposition | Rectangle bounds will be used for export")
-    
+    # --- DISPLAY MAP ---
     map_data = st_folium(
-        m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", 
+        m, height=600, width=1300, use_container_width=True, 
+        key=f"int_map_{token_key}", 
         returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
     )
 
-    # --- Process Drawing Rectangle ---
+    # --- PROCESS MAP INTERACTIONS ---
     if isinstance(map_data, dict):
+        # Handle rectangle drawing for Advanced mode
+        if st.session_state[mode_key] == "Advanced" and map_data.get("last_active_drawing"):
+            st.session_state[bounds_key] = map_data["last_active_drawing"]
+            st.success("✅ Rectangle captured!")
+        
+        # Handle bounds for all modes
         if map_data.get("bounds"):
             st.session_state[bounds_key] = map_data["bounds"]
         
-        # Handle rectangle drawing
-        if map_data.get("last_active_drawing"):
-            drawing = map_data["last_active_drawing"]
-            bounds = get_rectangle_bounds(drawing)
-            
-            if bounds:
-                st.session_state[rectangle_bounds_key] = bounds
-                
-                # Show rectangle info
-                st.markdown(f"""
-                <div class="rectangle-info">
-                    <strong>✅ Rectangle Captured!</strong><br>
-                    North: {bounds['north']:.5f}° | South: {bounds['south']:.5f}°<br>
-                    East: {bounds['east']:.5f}° | West: {bounds['west']:.5f}°<br>
-                    Size: {bounds['north'] - bounds['south']:.5f}° × {bounds['east'] - bounds['west']:.5f}°
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Generate preview with padding
-                padding_factor = st.session_state[padding_key] / 100.0
-                padded_bounds = apply_padding_to_bounds(bounds, padding_factor)
-                
-                if padded_bounds:
-                    with st.spinner("Generating preview..."):
-                        preview_img_bytes = generate_static_map_bounds(
-                            n=padded_bounds['north'], 
-                            s=padded_bounds['south'],
-                            e=padded_bounds['east'], 
-                            w=padded_bounds['west'],
-                            pin_lat=plat, 
-                            pin_lon=plon,
-                            style=basemap_style, 
-                            pin_color=pin_color, 
-                            pin_size=int(pin_size)
-                        )
-                        
-                        if preview_img_bytes:
-                            st.markdown('<div class="map-preview-container">', unsafe_allow_html=True)
-                            st.image(preview_img_bytes, caption=f"Preview of captured area (Padding: {padding_percent}%)", use_container_width=True)
-                            st.markdown('</div>', unsafe_allow_html=True)
-                            
-                            # Store preview for export
-                            st.session_state[image_key] = preview_img_bytes
-                            st.session_state[preview_key] = True
-        else:
-            # No rectangle drawn yet
-            if not st.session_state.get(preview_key):
-                st.info("👆 Draw a rectangle on the map to see a preview of what will be exported")
-
+        # Handle marker drag
         if map_data.get("last_marker_moved"):
             moved = map_data["last_marker_moved"]
             if moved:
                 new_coord = f"{round(moved['lat'], 5)}, {round(moved['lng'], 5)}"
                 if new_coord != st.session_state.get(coord_key, ""):
                     st.session_state[dragged_key] = new_coord
-                    # Clear preview when pin moves
-                    st.session_state[preview_key] = False
                     st.rerun()
-
-    # --- Export Logic ---
-    if st.session_state[export_trigger_key]:
-        with st.spinner("Compiling ultra high-resolution map asset with pin... Please wait"):
-            # Get rectangle bounds or fallback to viewport
-            bounds = st.session_state.get(rectangle_bounds_key)
-            
-            if bounds:
-                # Use rectangle bounds with padding
-                padding_factor = st.session_state[padding_key] / 100.0
-                padded_bounds = apply_padding_to_bounds(bounds, padding_factor)
-                
-                if padded_bounds:
-                    n, s = padded_bounds['north'], padded_bounds['south']
-                    e, w = padded_bounds['east'], padded_bounds['west']
-                    st.info(f"Exporting with {padding_percent}% padding around rectangle")
-                else:
-                    n, s = bounds['north'], bounds['south']
-                    e, w = bounds['east'], bounds['west']
-            else:
-                # Fallback to viewport bounds
-                b = st.session_state.get(bounds_key)
-                if b and "_northEast" in b and "_southWest" in b:
-                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
-                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
-                    st.warning("No rectangle drawn - using viewport bounds")
-                else:
-                    # Ultimate fallback
-                    buffer = 0.01
-                    n, s = plat + buffer, plat - buffer
-                    e, w = plon + buffer, plon - buffer
-                    st.warning("Using default bounds - please draw a rectangle for precise control")
-            
-            # Generate final map with pin included
-            map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w, 
-                pin_lat=plat, pin_lon=plon, 
-                style=basemap_style, 
-                pin_color=pin_color, 
-                pin_size=int(pin_size)
-            )
-            
-            if map_img_bytes:
-                st.session_state[image_key] = map_img_bytes
-                st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
-                
-                if st.session_state.temp_form_data:
-                    st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
-                    temp_path = get_temp_config_path(st.session_state.saved_template_name)
-                    with open(temp_path, 'w', encoding='utf-8') as f:
-                        json.dump(st.session_state.temp_form_data, f, indent=4)
-                
-                st.session_state[export_trigger_key] = False
-                st.session_state.restore_form_data = True
-                st.session_state.active_map_editor_token = None
-                
-                # Show success with final image
-                st.markdown('<div class="map-preview-container">', unsafe_allow_html=True)
-                st.image(map_img_bytes, caption="✅ Final Exported Map", use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                st.success(f"✅ Map exported successfully! Bounds: {n:.5f}°N to {s:.5f}°S, {e:.5f}°E to {w:.5f}°W")
-                time.sleep(2)
-                st.rerun()
-            else:
-                st.error("Failed to generate map. Please try again.")
-                st.session_state[export_trigger_key] = False
 
 # --- CORE UTILITIES ---
 def smart_crop_to_fit(img_file, target_w_emu, target_h_emu):
@@ -1135,7 +1096,7 @@ else:
                 template_display = selected_template.split(' (')[0].strip()
                 for t in saved_templates:
                     if t['display_name'] == template_display:
-                        if t['source'] == 'stored' and st.button("Delete", key="delete_template"):
+                        if t['source'] == 'stored' and st.button("🗑️", key="delete_template"):
                             st.session_state.show_delete_confirm = True
                             st.session_state.template_to_delete = t['name']
                             st.rerun()
@@ -1194,7 +1155,7 @@ else:
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.temp_form_data = {}
             
-            if st.button("Save Template", key="save_template_btn", use_container_width=True):
+            if st.button("💾 Save Template", key="save_template_btn", use_container_width=True):
                 save_template_to_file(template_bytes, uploaded_template.name)
                 if st.session_state.custom_mapping:
                     save_config_to_file(st.session_state.custom_mapping, uploaded_template.name.replace('.pptx', '').replace('.docx', '') + '_config.json')
@@ -1221,7 +1182,7 @@ else:
         # --- CTA PRESETS USING STREAMLIT NATIVE COMPONENTS ---
         cta_sets = detect_cta_sets()
         if cta_sets:
-            st.subheader("Call to Action Presets")
+            st.subheader("📞 Call to Action Presets")
             st.caption("Select an advisor to auto-fill CTA fields")
             
             num_ctas = len(cta_sets)
@@ -1248,7 +1209,7 @@ else:
                         apply_cta_preset_autofill(cta_num, selected_advisor)
                         st.rerun()
         
-        with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
+        with st.expander("🔧 Data Type Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field.")
             cols = st.columns(3)
             for idx, token in enumerate(tokens):
@@ -1264,7 +1225,7 @@ else:
                             auto_save_config()
                             st.rerun()
         
-        st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">📝 Placeholder Values</div>', unsafe_allow_html=True)
         
         # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
@@ -1298,7 +1259,7 @@ else:
                     saved_map_img = st.session_state.get(f"map_bytes_holder_{token}")
                     if saved_map_img:
                         image_data[token] = saved_map_img
-                        st.caption("Map attached.")
+                        st.caption("✅ Map attached.")
                     
                     def save_all_and_navigate(token_key):
                         for t in st.session_state.tokens:
@@ -1318,7 +1279,7 @@ else:
                         st.session_state.active_map_editor_token = token_key
                         st.rerun()
                     
-                    if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True, on_click=save_all_and_navigate, args=(token,)):
+                    if st.button("🗺️ Open Map Editor", key=f"btn_map_{token}", use_container_width=True, on_click=save_all_and_navigate, args=(token,)):
                         pass
                     
                     field_types[token] = "Image"
@@ -1357,7 +1318,7 @@ else:
     # --- DOWNLOAD & CLEANUP SECTION ---
     if st.session_state.template_bytes is not None:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">📥 Download Document</div>', unsafe_allow_html=True)
         
         base_template_name = re.sub(r'\.(pptx|docx)$', '', st.session_state.saved_template_name or "Generated_Document")
         col1, col2 = st.columns(2)
@@ -1369,7 +1330,7 @@ else:
                 try:
                     pptx_data = generate_pptx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="Download PPTX", data=pptx_data, file_name=get_download_filename(base_template_name, "pptx"),
+                        label="📊 Download PPTX", data=pptx_data, file_name=get_download_filename(base_template_name, "pptx"),
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                         use_container_width=True, key="download_pptx", on_click=purge_all_temporary_data
                     )
@@ -1383,7 +1344,7 @@ else:
                 try:
                     docx_data = generate_docx_bytes(st.session_state.template_bytes, text_data, image_data)
                     st.download_button(
-                        label="Download DOCX", data=docx_data, file_name=get_download_filename(base_template_name, "docx"),
+                        label="📄 Download DOCX", data=docx_data, file_name=get_download_filename(base_template_name, "docx"),
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True, key="download_docx", on_click=purge_all_temporary_data
                     )
@@ -1391,4 +1352,4 @@ else:
                     st.error(f"Error generating document: {str(e)}")
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("Please upload or select a template to begin")
+        st.info("📂 Please upload or select a template to begin")
