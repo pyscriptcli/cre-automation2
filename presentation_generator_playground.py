@@ -23,6 +23,9 @@ from folium.plugins import Draw
 from streamlit_folium import st_folium
 import requests
 
+# --- AI GENERATION DEPENDENCIES ---
+import requests as ai_requests
+
 # --- CONTACTS DATABASE FOR CTA PRESETS ---
 contacts_database = {
     "Sondi Tuazon": {"phone": "0917 843 6128", "email": "sondi.tuazon@primephilippines.com"},
@@ -33,6 +36,156 @@ contacts_database = {
     "Dave Policarpio": {"phone": "0908 865 8945", "email": "dave.policarpio@primephilippines.com"},
     "Irish Rima": {"phone": "0918 622 5346", "email": "irish.rima@primephilippines.com"}
 }
+
+# --- AI GENERATION FUNCTIONS ---
+def generate_with_huggingface(prompt, max_length=200, temperature=0.7):
+    """
+    Generate text using Hugging Face's free inference API.
+    Uses google/flan-t5-base model which is good for text generation tasks.
+    """
+    # You can change the model to any supported one:
+    # - "google/flan-t5-base" (good for instructions, fast)
+    # - "google/flan-t5-large" (better quality, slower)
+    # - "microsoft/DialoGPT-medium" (conversational)
+    # - "gpt2" (general text generation)
+    
+    api_url = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+    
+    # Alternative models you can try:
+    # api_url = "https://api-inference.huggingface.co/models/google/flan-t5-large"
+    # api_url = "https://api-inference.huggingface.co/models/gpt2"
+    
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_length": max_length,
+            "temperature": temperature,
+            "do_sample": True,
+            "top_p": 0.95
+        }
+    }
+    
+    try:
+        response = ai_requests.post(api_url, json=payload, timeout=30)
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                return result[0].get('generated_text', '').strip()
+            elif isinstance(result, dict):
+                return result.get('generated_text', '').strip()
+        return None
+    except Exception as e:
+        st.error(f"AI generation error: {str(e)}")
+        return None
+
+def generate_property_features(property_data):
+    """
+    Generate property features based on the provided data.
+    property_data: dict containing property attributes like size, frontage, location, etc.
+    """
+    # Build a comprehensive prompt
+    prompt = f"""Generate a compelling property feature list for a property with these details:
+
+Size: {property_data.get('Size', 'Not specified')}
+Frontage: {property_data.get('Frontage', 'Not specified')}
+Location: {property_data.get('Location', 'Not specified')}
+Property Type: {property_data.get('Property Type', 'Not specified')}
+Bedrooms: {property_data.get('Bedrooms', 'Not specified')}
+Bathrooms: {property_data.get('Bathrooms', 'Not specified')}
+Parking: {property_data.get('Parking', 'Not specified')}
+Additional Features: {property_data.get('Additional Features', 'Not specified')}
+
+Generate a professional, marketing-friendly list of key features (bullet points) that would attract buyers. 
+Focus on the most compelling aspects based on the size, location, and amenities.
+Keep it concise and impactful."""
+
+    # Try to generate with AI
+    result = generate_with_huggingface(prompt, max_length=250, temperature=0.7)
+    
+    if result:
+        # Clean up the result
+        # Remove any "Generated:" or similar prefixes if present
+        result = re.sub(r'^Generated:?\s*', '', result)
+        result = re.sub(r'^Features?:?\s*', '', result)
+        return result
+    else:
+        # Fallback to a template-based generation if AI fails
+        return generate_fallback_features(property_data)
+
+def generate_fallback_features(property_data):
+    """Generate features using templates if AI is unavailable"""
+    features = []
+    
+    # Size-based features
+    size = property_data.get('Size', '')
+    if size and size.strip():
+        features.append(f"Spacious {size} property with excellent space utilization")
+    
+    # Frontage-based features
+    frontage = property_data.get('Frontage', '')
+    if frontage and frontage.strip():
+        features.append(f"Wide {frontage} frontage providing great street presence")
+    
+    # Location-based features
+    location = property_data.get('Location', '')
+    if location and location.strip():
+        features.append(f"Prime location in {location} with excellent accessibility")
+    
+    # Property type features
+    prop_type = property_data.get('Property Type', '')
+    if prop_type and prop_type.strip():
+        features.append(f"Well-designed {prop_type} with modern amenities")
+    
+    # Bedroom features
+    bedrooms = property_data.get('Bedrooms', '')
+    if bedrooms and bedrooms.strip():
+        features.append(f"{bedrooms} generously sized bedrooms with ample natural light")
+    
+    # Bathroom features
+    bathrooms = property_data.get('Bathrooms', '')
+    if bathrooms and bathrooms.strip():
+        features.append(f"{bathrooms} well-appointed bathrooms with premium fixtures")
+    
+    # Parking features
+    parking = property_data.get('Parking', '')
+    if parking and parking.strip():
+        features.append(f"Secure parking with {parking} spaces")
+    
+    # Additional features
+    additional = property_data.get('Additional Features', '')
+    if additional and additional.strip():
+        # Split additional features and add them
+        for feature in additional.split(','):
+            feature = feature.strip()
+            if feature:
+                features.append(feature)
+    
+    # If no features were generated, add a default
+    if not features:
+        features.append("Excellent property with great potential")
+        features.append("Convenient location with easy access to amenities")
+    
+    return "\n".join(f"• {feature}" for feature in features)
+
+def collect_property_data():
+    """Collect property data from session state or input fields"""
+    property_data = {}
+    
+    # Common property fields to check
+    property_fields = [
+        'Size', 'Frontage', 'Location', 'Property Type', 
+        'Bedrooms', 'Bathrooms', 'Parking', 'Additional Features'
+    ]
+    
+    for field in property_fields:
+        # Check if the field exists in session state
+        val_key = f"val_{field}"
+        if val_key in st.session_state and st.session_state[val_key]:
+            property_data[field] = st.session_state[val_key]
+        elif field in st.session_state.temp_form_data:
+            property_data[field] = st.session_state.temp_form_data[field]
+    
+    return property_data
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -91,6 +244,7 @@ MINIMAL_CRE_SYSTEM = """
         margin-bottom: 4px;
     }
     
+    /* Type mapping section */
     .type-mapping-section {
         background-color: #F8F9FA !important;
         border: 1px solid #E0E0E0 !important;
@@ -105,6 +259,7 @@ MINIMAL_CRE_SYSTEM = """
         margin-top: 8px !important;
     }
     
+    /* Map editor controls */
     .map-controls-row {
         display: flex !important;
         gap: 12px !important;
@@ -124,36 +279,32 @@ MINIMAL_CRE_SYSTEM = """
         white-space: nowrap !important;
     }
     
-    .mode-button-group {
-        display: flex !important;
-        gap: 4px !important;
-        margin-bottom: 8px !important;
+    /* AI Button styling */
+    .ai-button {
+        background-color: #6C63FF !important;
+        color: white !important;
+        font-weight: 600 !important;
     }
-    .mode-button-small {
-        padding: 2px 10px !important;
-        font-size: 10px !important;
-        font-weight: 500 !important;
-        border-radius: 3px !important;
-        border: 1px solid #CCCCCC !important;
-        background: #FFFFFF !important;
-        color: #333333 !important;
-        cursor: pointer !important;
-        transition: all 0.2s !important;
-        min-height: 24px !important;
-        width: auto !important;
+    .ai-button:hover {
+        background-color: #5A52D5 !important;
     }
-    .mode-button-small:hover {
-        background: #F0F0F0 !important;
+    
+    /* AI Features output */
+    .ai-features-box {
+        background-color: #F8F9FA;
+        border: 2px solid #6C63FF;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 10px 0;
+        font-family: 'Segoe UI', Arial, sans-serif;
     }
-    .mode-button-small.active {
-        background: #003366 !important;
-        color: #FFFFFF !important;
-        border-color: #003366 !important;
+    .ai-features-box ul {
+        margin: 8px 0;
+        padding-left: 20px;
     }
-    .mode-label {
-        font-size: 11px !important;
-        color: #666 !important;
-        margin-left: 8px !important;
+    .ai-features-box li {
+        margin: 4px 0;
+        line-height: 1.6;
     }
 </style>
 """
@@ -273,6 +424,7 @@ def auto_save_config():
 
 # --- CTA PRESET FUNCTIONS ---
 def detect_cta_sets():
+    """Detect CTA sets in the template placeholders"""
     cta_sets = {}
     for token in st.session_state.tokens:
         clean_label = token.replace("{", "").replace("}", "").upper()
@@ -290,6 +442,7 @@ def detect_cta_sets():
     return cta_sets
 
 def apply_cta_preset_autofill(cta_num, advisor_name):
+    """Auto-fill CTA preset values to a specific CTA set"""
     if advisor_name not in contacts_database:
         return False
     
@@ -320,7 +473,7 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
             return False
     return True
 
-# --- BASEMAP CONFIGURATION ---
+# --- BASEMAP CONFIGURATION WITH IMPROVED RELIABILITY ---
 BASEMAP_CONFIG = {
     "Satellite (Streets)": {
         "urls": [
@@ -369,16 +522,19 @@ BASEMAP_CONFIG = {
 }
 
 def get_tile_urls(style_name):
+    """Get list of tile URLs with failover support"""
     config = BASEMAP_CONFIG.get(style_name)
     if not config:
         return BASEMAP_CONFIG["Street Map"]["urls"]
     return config["urls"]
 
 def get_attribution(style_name):
+    """Get attribution for a basemap style"""
     config = BASEMAP_CONFIG.get(style_name)
     return config["attribution"] if config else ""
 
 def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
+    """Fetch a tile with retry logic and multiple URL fallbacks"""
     for attempt in range(max_retries):
         url = url_template.format(z=zoom, x=x, y=y)
         try:
@@ -391,8 +547,9 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
             continue
     return None
 
-# --- MAP GENERATION FUNCTIONS ---
+# --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#DC3545", pin_size=12):
+    """Generates high-res map with pin included - NO radius"""
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
@@ -498,7 +655,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     img_byte_arr.seek(0)
     return img_byte_arr
 
-# --- SIMPLIFIED MAP EDITOR ---
+def hex_to_rgb(hex_color):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+# --- ISOLATED FULL-SCREEN MAP EDITOR PAGE ---
 def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
     
@@ -543,14 +704,13 @@ def render_isolated_map_editor():
             st.session_state.active_map_editor_token = None
             st.rerun()
         
-        if st.button("Back", key="back_from_map", on_click=return_to_main):
+        if st.button("Back to Document", key="back_from_map", on_click=return_to_main):
             pass
             
     with col_title:
         st.markdown(f"### Map Editor: {token_key}")
     st.markdown("</div><br>", unsafe_allow_html=True)
 
-    # Initialize session state
     style_key = f"map_style_{token_key}"
     coord_key = f"map_coord_{token_key}"
     color_key = f"map_color_{token_key}"
@@ -559,7 +719,6 @@ def render_isolated_map_editor():
     image_key = f"map_bytes_holder_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
-    mode_key = f"map_mode_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Satellite (Streets)"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
@@ -568,7 +727,6 @@ def render_isolated_map_editor():
     if image_key not in st.session_state: st.session_state[image_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
-    if mode_key not in st.session_state: st.session_state[mode_key] = "Square"
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -577,37 +735,6 @@ def render_isolated_map_editor():
     map_styles = ["Satellite (Streets)", "Satellite (Labels + Streets)", "Satellite (Clean)", 
                   "Street Map", "OSM Carto Light", "Open Street Map"]
 
-    # Mode selection - simple buttons
-    st.markdown('<div style="margin-bottom: 8px; display: flex; gap: 4px; align-items: center;">', unsafe_allow_html=True)
-    
-    modes = [
-        ("Square", "1:1"),
-        ("Landscape", "16:9"),
-        ("Advanced", "Custom")
-    ]
-    
-    for mode_name, mode_label in modes:
-        is_active = st.session_state[mode_key] == mode_name
-        button_style = "active" if is_active else ""
-        if st.button(
-            f"{mode_label}", 
-            key=f"mode_{mode_name}_{token_key}",
-            use_container_width=False,
-            type="primary" if is_active else "secondary"
-        ):
-            st.session_state[mode_key] = mode_name
-            st.session_state[bounds_key] = None
-            st.rerun()
-    
-    mode_desc = {
-        "Square": "1:1 aspect ratio centered on pin",
-        "Landscape": "16:9 aspect ratio centered on pin",
-        "Advanced": "Draw custom rectangle"
-    }[st.session_state[mode_key]]
-    st.markdown(f'<span class="mode-label">{mode_desc}</span>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # Controls
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
     with c_btn:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
@@ -626,52 +753,28 @@ def render_isolated_map_editor():
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
-    
+    st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
         plat, plon = map(float, coord_input.split(","))
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
-    # Export logic
     if st.session_state[export_trigger_key]:
-        with st.spinner("Generating high-resolution map..."):
-            # Get bounds based on mode
+        with st.spinner("Compiling ultra high-resolution map asset with pin... Please wait"):
             n, s, e, w = None, None, None, None
+            if st.session_state.get(bounds_key):
+                b = st.session_state[bounds_key]
+                if b and "_northEast" in b and "_southWest" in b:
+                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
+                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
             
-            if st.session_state[mode_key] == "Advanced":
-                # Use drawn rectangle bounds
-                if st.session_state.get(bounds_key):
-                    b = st.session_state[bounds_key]
-                    if isinstance(b, dict) and "_northEast" in b and "_southWest" in b:
-                        n = b["_northEast"]["lat"]
-                        s = b["_southWest"]["lat"]
-                        e = b["_northEast"]["lng"]
-                        w = b["_southWest"]["lng"]
-            
-            # If no bounds yet, use frame-based
             if n is None:
-                if st.session_state[mode_key] == "Square":
-                    # 1:1 aspect ratio
-                    buffer_size = 0.015
-                    n, s = plat + buffer_size, plat - buffer_size
-                    e, w = plon + buffer_size, plon - buffer_size
-                elif st.session_state[mode_key] == "Landscape":
-                    # 16:9 aspect ratio - wider horizontally
-                    lat_buffer = 0.015
-                    lon_buffer = 0.0267  # 16/9 * lat_buffer
-                    n, s = plat + lat_buffer, plat - lat_buffer
-                    e, w = plon + lon_buffer, plon - lon_buffer
-                else:
-                    # Fallback
-                    buffer_size = 0.01
-                    n, s = plat + buffer_size, plat - buffer_size
-                    e, w = plon + buffer_size, plon - buffer_size
+                buffer = 0.01
+                n, s = plat + buffer, plat - buffer
+                e, w = plon + buffer, plon - buffer
             
-            # Generate map
             map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w,
-                pin_lat=plat, pin_lon=plon,
+                n=n, s=s, e=e, w=w, pin_lat=plat, pin_lon=plon, 
                 style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
             )
             st.session_state[image_key] = map_img_bytes
@@ -686,11 +789,10 @@ def render_isolated_map_editor():
             st.session_state[export_trigger_key] = False
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
-            st.success("Map generated successfully!")
+            st.success(f"Map with pin attached successfully!")
             time.sleep(0.5)
             st.rerun()
 
-    # Build map
     tiles_dict = {}
     attr_dict = {}
     for style in map_styles:
@@ -698,15 +800,8 @@ def render_isolated_map_editor():
         tiles_dict[style] = urls[0] if urls else ""
         attr_dict[style] = get_attribution(style)
     
-    m = folium.Map(
-        location=[plat, plon],
-        zoom_start=15,
-        tiles=tiles_dict[basemap_style],
-        attr=attr_dict[basemap_style],
-        zoom_control=True
-    )
+    m = folium.Map(location=[plat, plon], zoom_start=15, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style], zoom_control=True)
     
-    # Add pin
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40" style="width: 100%; height: 100%;">
@@ -720,41 +815,29 @@ def render_isolated_map_editor():
     """
     folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
     
-    # Add draw tool only for Advanced mode
-    if st.session_state[mode_key] == "Advanced":
-        Draw(
-            export=False,
-            position='topleft',
-            draw_options={
-                'polyline': False,
-                'polygon': False,
-                'circle': False,
-                'marker': False,
-                'circlemarker': False,
-                'rectangle': True
-            },
-            edit_options={'edit': True}
-        ).add_to(m)
-        st.info("Draw a rectangle to define the crop area")
-    else:
-        st.info(f"{st.session_state[mode_key]} mode - Map will be cropped to {mode_desc}")
+    Draw(
+        export=False, 
+        position='topleft',
+        draw_options={
+            'polyline': False,
+            'polygon': False,
+            'circle': False,
+            'marker': False,
+            'circlemarker': False,
+            'rectangle': True
+        },
+        edit_options={'edit': True}
+    ).add_to(m)
     
-    # Display map
+    st.info("Draw a rectangle to define crop area (visible for guidance only, not in export) | Drag pin to reposition")
     map_data = st_folium(
-        m, height=600, width=1300, use_container_width=True,
-        key=f"int_map_{token_key}",
+        m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", 
         returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
     )
 
-    # Process interactions
     if isinstance(map_data, dict):
-        if st.session_state[mode_key] == "Advanced" and map_data.get("last_active_drawing"):
-            st.session_state[bounds_key] = map_data["last_active_drawing"]
-            st.success("Rectangle captured!")
-        
         if map_data.get("bounds"):
             st.session_state[bounds_key] = map_data["bounds"]
-        
         if map_data.get("last_marker_moved"):
             moved = map_data["last_marker_moved"]
             if moved:
@@ -818,6 +901,7 @@ def extract_placeholders(template_bytes, template_type):
     return []
 
 def clean_empty_placeholders(text):
+    """Remove any {{...}} placeholders that remain empty and clean up whitespace"""
     if not text:
         return text
     cleaned = re.sub(r'\{\{[^}]*\}\}', '', text)
@@ -825,6 +909,7 @@ def clean_empty_placeholders(text):
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
+    """Replace text in paragraph, removing empty placeholders"""
     for run in paragraph.runs:
         current_text = run.text
         for token, value in text_inputs.items():
@@ -1105,7 +1190,55 @@ else:
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
         
-        # CTA PRESETS
+        # --- AI FEATURE GENERATOR SECTION ---
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 20px; 
+                    border-radius: 10px; 
+                    margin: 10px 0 20px 0;
+                    color: white;">
+            <h3 style="margin: 0 0 8px 0; color: white;">AI Property Feature Generator</h3>
+            <p style="margin: 0; opacity: 0.9;">Generate professional property features based on your filled data</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_ai1, col_ai2 = st.columns([3, 1])
+        with col_ai1:
+            ai_target_field = st.selectbox(
+                "Select target field for AI-generated features",
+                options=[token for token in tokens if st.session_state.custom_mapping.get(token, "Text") == "Text"],
+                key="ai_target_field"
+            )
+        with col_ai2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Generate Features with AI", key="ai_generate_btn", use_container_width=True):
+                # Collect property data from all filled fields
+                property_data = collect_property_data()
+                
+                # Check if we have enough data
+                if not property_data:
+                    st.warning("Please fill in some property details first (Size, Location, etc.)")
+                else:
+                    with st.spinner("AI is generating property features... This may take a few seconds."):
+                        generated_features = generate_property_features(property_data)
+                        if generated_features:
+                            # Show the generated features
+                            st.session_state[f"val_{ai_target_field}"] = generated_features
+                            st.session_state.temp_form_data[ai_target_field] = generated_features
+                            
+                            # Display the generated features
+                            st.markdown("""
+                            <div class="ai-features-box">
+                                <h4 style="color: #6C63FF; margin-top: 0;">Generated Features</h4>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            st.markdown(generated_features)
+                            st.success("Features generated and applied to the field!")
+                            st.rerun()
+                        else:
+                            st.error("AI generation failed. Please try again or enter features manually.")
+        
+        # --- CTA PRESETS USING STREAMLIT NATIVE COMPONENTS ---
         cta_sets = detect_cta_sets()
         if cta_sets:
             st.subheader("Call to Action Presets")
@@ -1153,7 +1286,7 @@ else:
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
-        # RENDER FIELDS
+        # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
             col_target = idx % 2
             if col_target == 0:
@@ -1221,8 +1354,23 @@ else:
                         current_value = st.session_state.temp_form_data[token]
                         st.session_state[f"val_{token}"] = current_value
                     
-                    new_value = st.text_input(
-                        "", value=current_value, key=f"val_{token}", label_visibility="collapsed", placeholder="Enter value..."
+                    # Check if this is the AI target field and has AI-generated content
+                    is_ai_field = (token == st.session_state.get("ai_target_field", ""))
+                    if is_ai_field and current_value:
+                        # Show AI-generated content in a special box
+                        st.markdown(f"""
+                        <div style="background-color: #F0F0FF; border-left: 4px solid #6C63FF; padding: 8px 12px; border-radius: 4px; margin-bottom: 8px;">
+                            <span style="font-size: 12px; color: #6C63FF; font-weight: 600;">AI Generated</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    new_value = st.text_area(
+                        "", 
+                        value=current_value, 
+                        key=f"val_{token}", 
+                        label_visibility="collapsed", 
+                        placeholder=f"Enter {clean_label}...",
+                        height=100 if is_ai_field else 38
                     )
                     
                     if new_value != current_value:
@@ -1241,7 +1389,7 @@ else:
                     
                 st.markdown('<div style="margin-bottom:14px;"></div>', unsafe_allow_html=True)
 
-    # DOWNLOAD SECTION
+    # --- DOWNLOAD & CLEANUP SECTION ---
     if st.session_state.template_bytes is not None:
         st.markdown('<div class="workspace-card">', unsafe_allow_html=True)
         st.markdown('<div class="section-header">Download Document</div>', unsafe_allow_html=True)
