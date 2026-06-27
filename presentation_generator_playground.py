@@ -139,12 +139,26 @@ def collect_property_data():
         'Bedrooms', 'Bathrooms', 'Parking'
     ]
     
+    # Try to get data from various sources
     for field in property_fields:
+        # Check session state
         val_key = f"val_{field}"
         if val_key in st.session_state and st.session_state[val_key]:
             property_data[field] = st.session_state[val_key]
+        # Check temp form data
         elif field in st.session_state.temp_form_data:
             property_data[field] = st.session_state.temp_form_data[field]
+        # Check if field exists in tokens and has value
+        elif field in st.session_state.tokens:
+            val_key = f"val_{field}"
+            if val_key in st.session_state:
+                property_data[field] = st.session_state[val_key]
+    
+    # Also check for common variations
+    if 'LEASABLE_AREA' in st.session_state.temp_form_data:
+        property_data['Size'] = st.session_state.temp_form_data['LEASABLE_AREA']
+    if 'PROPERTY_ADDRESS' in st.session_state.temp_form_data:
+        property_data['Location'] = st.session_state.temp_form_data['PROPERTY_ADDRESS']
     
     return property_data
 
@@ -153,7 +167,7 @@ def check_property_data_ready():
     property_data = collect_property_data()
     required_fields = ['Size', 'Location', 'Frontage']
     filled_count = sum(1 for field in required_fields if property_data.get(field, '').strip())
-    return filled_count >= 2, property_data  # Return True if at least 2 of 3 are filled
+    return filled_count >= 2, property_data
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -210,33 +224,41 @@ MINIMAL_CRE_SYSTEM = """
         font-size: 13px !important;
         color: #1A1A1A !important;
         margin-bottom: 4px;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
     }
     
-    /* AI link styling */
-    .ai-link {
-        color: #6C63FF;
-        text-decoration: none;
-        font-size: 12px;
-        font-weight: 500;
-        cursor: pointer;
-        border-bottom: 1px dashed #6C63FF;
-        margin-left: 8px;
+    /* AI button styling */
+    .ai-generate-btn {
+        background-color: #6C63FF !important;
+        color: white !important;
+        font-weight: 500 !important;
+        font-size: 11px !important;
+        padding: 2px 10px !important;
+        border-radius: 12px !important;
+        border: none !important;
+        cursor: pointer !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        transition: all 0.2s ease !important;
     }
-    .ai-link:hover {
-        color: #5A52D5;
-        border-bottom: 1px solid #5A52D5;
+    .ai-generate-btn:hover {
+        background-color: #5A52D5 !important;
+        transform: scale(1.02) !important;
     }
-    .ai-ready {
+    .ai-generate-btn:disabled {
+        background-color: #999999 !important;
+        cursor: not-allowed !important;
+    }
+    .ai-ready-badge {
+        background-color: #E8F5E9;
         color: #2E7D32;
-        font-size: 12px;
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 10px;
         font-weight: 500;
-        margin-left: 8px;
-    }
-    .ai-loading {
-        color: #F57C00;
-        font-size: 12px;
-        font-weight: 500;
-        margin-left: 8px;
     }
     
     /* Type mapping section */
@@ -440,9 +462,10 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
         st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
     
     # Restore all other values
+    cta_tokens = set(tokens.values())
     for token, value in current_values.items():
         val_key = f"val_{token}"
-        if token not in tokens.values():  # Only restore if not a CTA field
+        if token not in cta_tokens:
             if val_key not in st.session_state or st.session_state[val_key] != value:
                 st.session_state[val_key] = value
                 st.session_state.temp_form_data[token] = value
@@ -1225,6 +1248,10 @@ else:
         # Check if property data is ready for AI generation
         is_ready, property_data = check_property_data_ready()
         
+        # Show AI status message if ready
+        if is_ready:
+            st.markdown('<div style="background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32;">✅ AI feature generation ready - look for [AI Generate] buttons on feature fields</div>', unsafe_allow_html=True)
+        
         # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
             col_target = idx % 2
@@ -1248,28 +1275,32 @@ else:
                     label_text = f"{clean_label} (CTA{cta_num})"
                 
                 # Check if this is a property feature field
-                is_feature_field = "FEATURE" in clean_upper or "DESCRIPTION" in clean_upper
+                is_feature_field = "FEATURE" in clean_upper or "DESCRIPTION" in clean_upper or "AMENITIES" in clean_upper
                 
-                # Create label with AI link if applicable
+                # Create label with AI button if applicable
                 label_html = f'<div class="placeholder-label">{label_text}'
                 
                 if is_feature_field and is_ready and current_type == "Text":
-                    # Show AI generate link
-                    label_html += f' <a href="#" class="ai-link" onclick="return false;" id="ai_generate_{idx}">[AI Generate]</a>'
-                    
-                    # Handle AI generation for this specific field
-                    if st.button("Generate", key=f"ai_gen_{token}", help="Generate features using AI"):
-                        with st.spinner("AI is generating features..."):
-                            features = generate_property_features(property_data)
-                            if features:
-                                st.session_state[f"val_{token}"] = features
-                                st.session_state.temp_form_data[token] = features
-                                st.rerun()
-                            else:
-                                st.error("AI generation failed. Please try again.")
+                    # Show AI generate button
+                    label_html += f' <span style="font-size:11px; color:#666;">|</span>'
+                    label_html += f' <span style="font-size:11px; color:#6C63FF; font-weight:500;">AI Generate</span>'
                 
                 label_html += '</div>'
                 st.markdown(label_html, unsafe_allow_html=True)
+                
+                # Show AI button as a separate small button right after the label
+                if is_feature_field and is_ready and current_type == "Text":
+                    col_ai_btn, col_ai_status = st.columns([1, 4])
+                    with col_ai_btn:
+                        if st.button("✨ Generate", key=f"ai_gen_{token}", help="Generate property features using AI"):
+                            with st.spinner("AI is generating features..."):
+                                features = generate_property_features(property_data)
+                                if features:
+                                    st.session_state[f"val_{token}"] = features
+                                    st.session_state.temp_form_data[token] = features
+                                    st.rerun()
+                                else:
+                                    st.error("AI generation failed. Please try again.")
                 
                 if current_type == "Image" and st.session_state.template_type == 'pptx':
                     image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
