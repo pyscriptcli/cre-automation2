@@ -43,17 +43,7 @@ def generate_with_huggingface(prompt, max_length=200, temperature=0.7):
     Generate text using Hugging Face's free inference API.
     Uses google/flan-t5-base model which is good for text generation tasks.
     """
-    # You can change the model to any supported one:
-    # - "google/flan-t5-base" (good for instructions, fast)
-    # - "google/flan-t5-large" (better quality, slower)
-    # - "microsoft/DialoGPT-medium" (conversational)
-    # - "gpt2" (general text generation)
-    
     api_url = "https://api-inference.huggingface.co/models/google/flan-t5-base"
-    
-    # Alternative models you can try:
-    # api_url = "https://api-inference.huggingface.co/models/google/flan-t5-large"
-    # api_url = "https://api-inference.huggingface.co/models/gpt2"
     
     payload = {
         "inputs": prompt,
@@ -75,15 +65,10 @@ def generate_with_huggingface(prompt, max_length=200, temperature=0.7):
                 return result.get('generated_text', '').strip()
         return None
     except Exception as e:
-        st.error(f"AI generation error: {str(e)}")
         return None
 
 def generate_property_features(property_data):
-    """
-    Generate property features based on the provided data.
-    property_data: dict containing property attributes like size, frontage, location, etc.
-    """
-    # Build a comprehensive prompt
+    """Generate property features based on the provided data."""
     prompt = f"""Generate a compelling property feature list for a property with these details:
 
 Size: {property_data.get('Size', 'Not specified')}
@@ -93,74 +78,52 @@ Property Type: {property_data.get('Property Type', 'Not specified')}
 Bedrooms: {property_data.get('Bedrooms', 'Not specified')}
 Bathrooms: {property_data.get('Bathrooms', 'Not specified')}
 Parking: {property_data.get('Parking', 'Not specified')}
-Additional Features: {property_data.get('Additional Features', 'Not specified')}
 
 Generate a professional, marketing-friendly list of key features (bullet points) that would attract buyers. 
 Focus on the most compelling aspects based on the size, location, and amenities.
 Keep it concise and impactful."""
 
-    # Try to generate with AI
     result = generate_with_huggingface(prompt, max_length=250, temperature=0.7)
     
     if result:
-        # Clean up the result
-        # Remove any "Generated:" or similar prefixes if present
         result = re.sub(r'^Generated:?\s*', '', result)
         result = re.sub(r'^Features?:?\s*', '', result)
         return result
     else:
-        # Fallback to a template-based generation if AI fails
         return generate_fallback_features(property_data)
 
 def generate_fallback_features(property_data):
     """Generate features using templates if AI is unavailable"""
     features = []
     
-    # Size-based features
     size = property_data.get('Size', '')
     if size and size.strip():
         features.append(f"Spacious {size} property with excellent space utilization")
     
-    # Frontage-based features
     frontage = property_data.get('Frontage', '')
     if frontage and frontage.strip():
         features.append(f"Wide {frontage} frontage providing great street presence")
     
-    # Location-based features
     location = property_data.get('Location', '')
     if location and location.strip():
         features.append(f"Prime location in {location} with excellent accessibility")
     
-    # Property type features
     prop_type = property_data.get('Property Type', '')
     if prop_type and prop_type.strip():
         features.append(f"Well-designed {prop_type} with modern amenities")
     
-    # Bedroom features
     bedrooms = property_data.get('Bedrooms', '')
     if bedrooms and bedrooms.strip():
         features.append(f"{bedrooms} generously sized bedrooms with ample natural light")
     
-    # Bathroom features
     bathrooms = property_data.get('Bathrooms', '')
     if bathrooms and bathrooms.strip():
         features.append(f"{bathrooms} well-appointed bathrooms with premium fixtures")
     
-    # Parking features
     parking = property_data.get('Parking', '')
     if parking and parking.strip():
         features.append(f"Secure parking with {parking} spaces")
     
-    # Additional features
-    additional = property_data.get('Additional Features', '')
-    if additional and additional.strip():
-        # Split additional features and add them
-        for feature in additional.split(','):
-            feature = feature.strip()
-            if feature:
-                features.append(feature)
-    
-    # If no features were generated, add a default
     if not features:
         features.append("Excellent property with great potential")
         features.append("Convenient location with easy access to amenities")
@@ -171,14 +134,12 @@ def collect_property_data():
     """Collect property data from session state or input fields"""
     property_data = {}
     
-    # Common property fields to check
     property_fields = [
         'Size', 'Frontage', 'Location', 'Property Type', 
-        'Bedrooms', 'Bathrooms', 'Parking', 'Additional Features'
+        'Bedrooms', 'Bathrooms', 'Parking'
     ]
     
     for field in property_fields:
-        # Check if the field exists in session state
         val_key = f"val_{field}"
         if val_key in st.session_state and st.session_state[val_key]:
             property_data[field] = st.session_state[val_key]
@@ -186,6 +147,13 @@ def collect_property_data():
             property_data[field] = st.session_state.temp_form_data[field]
     
     return property_data
+
+def check_property_data_ready():
+    """Check if enough property data is filled to generate features"""
+    property_data = collect_property_data()
+    required_fields = ['Size', 'Location', 'Frontage']
+    filled_count = sum(1 for field in required_fields if property_data.get(field, '').strip())
+    return filled_count >= 2, property_data  # Return True if at least 2 of 3 are filled
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -244,6 +212,33 @@ MINIMAL_CRE_SYSTEM = """
         margin-bottom: 4px;
     }
     
+    /* AI link styling */
+    .ai-link {
+        color: #6C63FF;
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        border-bottom: 1px dashed #6C63FF;
+        margin-left: 8px;
+    }
+    .ai-link:hover {
+        color: #5A52D5;
+        border-bottom: 1px solid #5A52D5;
+    }
+    .ai-ready {
+        color: #2E7D32;
+        font-size: 12px;
+        font-weight: 500;
+        margin-left: 8px;
+    }
+    .ai-loading {
+        color: #F57C00;
+        font-size: 12px;
+        font-weight: 500;
+        margin-left: 8px;
+    }
+    
     /* Type mapping section */
     .type-mapping-section {
         background-color: #F8F9FA !important;
@@ -277,34 +272,6 @@ MINIMAL_CRE_SYSTEM = """
         font-weight: 500 !important;
         color: #333 !important;
         white-space: nowrap !important;
-    }
-    
-    /* AI Button styling */
-    .ai-button {
-        background-color: #6C63FF !important;
-        color: white !important;
-        font-weight: 600 !important;
-    }
-    .ai-button:hover {
-        background-color: #5A52D5 !important;
-    }
-    
-    /* AI Features output */
-    .ai-features-box {
-        background-color: #F8F9FA;
-        border: 2px solid #6C63FF;
-        border-radius: 8px;
-        padding: 16px;
-        margin: 10px 0;
-        font-family: 'Segoe UI', Arial, sans-serif;
-    }
-    .ai-features-box ul {
-        margin: 8px 0;
-        padding-left: 20px;
-    }
-    .ai-features-box li {
-        margin: 4px 0;
-        line-height: 1.6;
     }
 </style>
 """
@@ -453,6 +420,15 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
         return False
     
     tokens = cta_sets[cta_num]['tokens']
+    
+    # Store current values for all tokens before modifying
+    current_values = {}
+    for token in st.session_state.tokens:
+        val_key = f"val_{token}"
+        if val_key in st.session_state:
+            current_values[token] = st.session_state[val_key]
+    
+    # Apply CTA values
     if 'NAME' in tokens:
         st.session_state[f"val_{tokens['NAME']}"] = advisor_name
         st.session_state.temp_form_data[tokens['NAME']] = advisor_name
@@ -462,6 +438,14 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
     if 'EMAIL' in tokens:
         st.session_state[f"val_{tokens['EMAIL']}"] = contact_info["email"]
         st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
+    
+    # Restore all other values
+    for token, value in current_values.items():
+        val_key = f"val_{token}"
+        if token not in tokens.values():  # Only restore if not a CTA field
+            if val_key not in st.session_state or st.session_state[val_key] != value:
+                st.session_state[val_key] = value
+                st.session_state.temp_form_data[token] = value
         
     if st.session_state.saved_template_name:
         temp_path = get_temp_config_path(st.session_state.saved_template_name)
@@ -1190,54 +1174,6 @@ else:
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
         
-        # --- AI FEATURE GENERATOR SECTION ---
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    padding: 20px; 
-                    border-radius: 10px; 
-                    margin: 10px 0 20px 0;
-                    color: white;">
-            <h3 style="margin: 0 0 8px 0; color: white;">AI Property Feature Generator</h3>
-            <p style="margin: 0; opacity: 0.9;">Generate professional property features based on your filled data</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col_ai1, col_ai2 = st.columns([3, 1])
-        with col_ai1:
-            ai_target_field = st.selectbox(
-                "Select target field for AI-generated features",
-                options=[token for token in tokens if st.session_state.custom_mapping.get(token, "Text") == "Text"],
-                key="ai_target_field"
-            )
-        with col_ai2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Generate Features with AI", key="ai_generate_btn", use_container_width=True):
-                # Collect property data from all filled fields
-                property_data = collect_property_data()
-                
-                # Check if we have enough data
-                if not property_data:
-                    st.warning("Please fill in some property details first (Size, Location, etc.)")
-                else:
-                    with st.spinner("AI is generating property features... This may take a few seconds."):
-                        generated_features = generate_property_features(property_data)
-                        if generated_features:
-                            # Show the generated features
-                            st.session_state[f"val_{ai_target_field}"] = generated_features
-                            st.session_state.temp_form_data[ai_target_field] = generated_features
-                            
-                            # Display the generated features
-                            st.markdown("""
-                            <div class="ai-features-box">
-                                <h4 style="color: #6C63FF; margin-top: 0;">Generated Features</h4>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            st.markdown(generated_features)
-                            st.success("Features generated and applied to the field!")
-                            st.rerun()
-                        else:
-                            st.error("AI generation failed. Please try again or enter features manually.")
-        
         # --- CTA PRESETS USING STREAMLIT NATIVE COMPONENTS ---
         cta_sets = detect_cta_sets()
         if cta_sets:
@@ -1286,6 +1222,9 @@ else:
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
+        # Check if property data is ready for AI generation
+        is_ready, property_data = check_property_data_ready()
+        
         # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
             col_target = idx % 2
@@ -1308,7 +1247,29 @@ else:
                     cta_num = cta_match.group(1)
                     label_text = f"{clean_label} (CTA{cta_num})"
                 
-                st.markdown(f'<div class="placeholder-label">{label_text}</div>', unsafe_allow_html=True)
+                # Check if this is a property feature field
+                is_feature_field = "FEATURE" in clean_upper or "DESCRIPTION" in clean_upper
+                
+                # Create label with AI link if applicable
+                label_html = f'<div class="placeholder-label">{label_text}'
+                
+                if is_feature_field and is_ready and current_type == "Text":
+                    # Show AI generate link
+                    label_html += f' <a href="#" class="ai-link" onclick="return false;" id="ai_generate_{idx}">[AI Generate]</a>'
+                    
+                    # Handle AI generation for this specific field
+                    if st.button("Generate", key=f"ai_gen_{token}", help="Generate features using AI"):
+                        with st.spinner("AI is generating features..."):
+                            features = generate_property_features(property_data)
+                            if features:
+                                st.session_state[f"val_{token}"] = features
+                                st.session_state.temp_form_data[token] = features
+                                st.rerun()
+                            else:
+                                st.error("AI generation failed. Please try again.")
+                
+                label_html += '</div>'
+                st.markdown(label_html, unsafe_allow_html=True)
                 
                 if current_type == "Image" and st.session_state.template_type == 'pptx':
                     image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
@@ -1354,24 +1315,24 @@ else:
                         current_value = st.session_state.temp_form_data[token]
                         st.session_state[f"val_{token}"] = current_value
                     
-                    # Check if this is the AI target field and has AI-generated content
-                    is_ai_field = (token == st.session_state.get("ai_target_field", ""))
-                    if is_ai_field and current_value:
-                        # Show AI-generated content in a special box
-                        st.markdown(f"""
-                        <div style="background-color: #F0F0FF; border-left: 4px solid #6C63FF; padding: 8px 12px; border-radius: 4px; margin-bottom: 8px;">
-                            <span style="font-size: 12px; color: #6C63FF; font-weight: 600;">AI Generated</span>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    new_value = st.text_area(
-                        "", 
-                        value=current_value, 
-                        key=f"val_{token}", 
-                        label_visibility="collapsed", 
-                        placeholder=f"Enter {clean_label}...",
-                        height=100 if is_ai_field else 38
-                    )
+                    # Use text_area for feature fields, text_input for others
+                    if is_feature_field and current_type == "Text":
+                        new_value = st.text_area(
+                            "", 
+                            value=current_value, 
+                            key=f"val_{token}", 
+                            label_visibility="collapsed", 
+                            placeholder=f"Enter {clean_label}...",
+                            height=100
+                        )
+                    else:
+                        new_value = st.text_input(
+                            "", 
+                            value=current_value, 
+                            key=f"val_{token}", 
+                            label_visibility="collapsed", 
+                            placeholder=f"Enter {clean_label}..."
+                        )
                     
                     if new_value != current_value:
                         st.session_state[f"val_{token}"] = new_value
