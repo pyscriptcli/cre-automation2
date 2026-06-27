@@ -1,1713 +1,1580 @@
 import streamlit as st
+import folium
+from streamlit_folium import folium_static
 import requests
-import re
 import json
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import re
+import time
+from branca.colormap import LinearColormap
+from folium.plugins import Fullscreen, MarkerCluster, BeautifyIcon
+import base64
+from pathlib import Path
 import os
 import hashlib
-import time
-import math
-import traceback
-from datetime import datetime
+from typing import List, Dict, Any, Optional, Tuple
+import random
 
-# --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
-_config_dir = ".streamlit"
-_config_file = os.path.join(_config_dir, "config.toml")
-if not os.path.exists(_config_file):
-    os.makedirs(_config_dir, exist_ok=True)
-    with open(_config_file, "w", encoding="utf-8") as f:
-        f.write("[theme]\nbase=\"light\"\n")
-
-# -----------------------------------------------------------------------------
-# ENHANCED LOGGING SYSTEM
-# -----------------------------------------------------------------------------
-if 'event_logs' not in st.session_state:
-    st.session_state.event_logs = []
-
-def log_event(event_type, event_name, event_data=None, level="INFO"):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-    
-    log_entry = {
-        "timestamp": timestamp,
-        "event_type": event_type,
-        "event_name": event_name,
-        "level": level,
-        "session_state": {
-            "scanned_records_count": len(st.session_state.get('scanned_records', [])),
-            "scan_active": st.session_state.get('scan_active_loading', False)
-        }
-    }
-    
-    if event_data:
-        log_entry["event_data"] = event_data
-    
-    st.session_state.event_logs.append(log_entry)
-    add_api_log(f"[{event_type}] {event_name}", level)
-    
-    if len(st.session_state.event_logs) > 200:
-        st.session_state.event_logs = st.session_state.event_logs[-200:]
-    
-    return log_entry
-
-# -----------------------------------------------------------------------------
-# 1. BRANDED THEME & STRUCTURAL FULL OVERRIDES
-# -----------------------------------------------------------------------------
+# Page configuration
 st.set_page_config(
     page_title="Open Node",
+    page_icon="📍",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# Custom CSS
 st.markdown("""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
-
-        :root {
-            --brand-midnight: #003366 !important;
-            --brand-gold: #C9AB4C !important;
-            --white-clean: #ffffff !important;
-            --bg-offwhite: #f8fafc !important;
-            --text-muted: #888780 !important;
-            --soft-shadow: 0 4px 12px rgba(0, 51, 102, 0.08) !important;
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
+    
+    .main {
+        padding: 0rem 0rem;
+    }
+    .stApp {
+        background-color: #f5f5f5;
+    }
+    .css-1d391kg {
+        padding-top: 0rem;
+    }
+    
+    /* Brand Header */
+    .brand-header {
+        background: linear-gradient(135deg, #003366 0%, #001a33 100%);
+        padding: 20px 20px 15px 20px;
+        border-radius: 8px 8px 0 0;
+        margin: -10px -20px 20px -20px;
+        text-align: center;
+        border-bottom: 3px solid #C9AB4C;
+    }
+    .brand-title {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 32px;
+        font-weight: 600;
+        color: #C9AB4C;
+        margin: 0;
+        letter-spacing: 2px;
+    }
+    .brand-subtitle {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 12px;
+        color: #88aacc;
+        letter-spacing: 4px;
+        margin-top: 4px;
+    }
+    
+    /* Sidebar styling */
+    .css-1kyxreq {
+        background-color: #ffffff;
+        border-right: 1px solid #e0e0e0;
+    }
+    .sidebar-section {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        border-left: 3px solid #003366;
+    }
+    .section-title {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: #003366;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,51,102,0.2);
+    }
+    .primary-btn > button {
+        background-color: #003366;
+        color: white;
+        border: none;
+    }
+    .primary-btn > button:hover {
+        background-color: #004488;
+    }
+    .gold-btn > button {
+        background-color: #C9AB4C;
+        color: white;
+        border: none;
+    }
+    .gold-btn > button:hover {
+        background-color: #d4b85a;
+    }
+    
+    /* Stats */
+    .stat-box {
+        background: white;
+        padding: 10px;
+        border-radius: 4px;
+        text-align: center;
+        border: 1px solid #e0e0e0;
+        margin: 5px 0;
+    }
+    .stat-number {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 24px;
+        font-weight: 700;
+        color: #003366;
+    }
+    .stat-label {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 11px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    /* Logs */
+    .log-container {
+        background: #1a1a1a;
+        color: #00ff00;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        max-height: 200px;
+        overflow-y: auto;
+        margin-top: 10px;
+    }
+    .log-entry {
+        padding: 2px 0;
+        border-bottom: 1px solid #2a2a2a;
+    }
+    .log-time {
+        color: #888;
+        margin-right: 8px;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #003366;
+        border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #004488;
+    }
+    
+    /* Map container */
+    .map-container {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        background: white;
+        padding: 10px;
+        margin: 10px 0;
+    }
+    
+    /* Search bar */
+    .search-input > div > div > input {
+        font-family: 'Montserrat', sans-serif;
+        border-radius: 4px;
+        border: 2px solid #003366;
+        padding: 10px;
+    }
+    .search-input > div > div > input:focus {
+        border-color: #C9AB4C;
+        box-shadow: 0 0 0 2px rgba(201,171,76,0.2);
+    }
+    
+    /* Tags */
+    .tag {
+        display: inline-block;
+        background: #e8edf2;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        color: #003366;
+        margin: 2px;
+        font-family: 'Montserrat', sans-serif;
+    }
+    .tag-gold {
+        background: #C9AB4C;
+        color: white;
+    }
+    
+    /* Status indicators */
+    .status-online {
+        color: #00cc44;
+        font-weight: 600;
+    }
+    .status-offline {
+        color: #ff4444;
+        font-weight: 600;
+    }
+    .status-unknown {
+        color: #ffaa00;
+        font-weight: 600;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .brand-title {
+            font-size: 24px;
         }
-        
-        html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main, .block-container {
-            background-color: var(--white-clean) !important;
-            color: var(--brand-midnight) !important;
-            font-family: 'Montserrat', sans-serif !important;
+        .sidebar-section {
+            padding: 10px;
         }
-        
-        [data-testid="stSidebar"] {
-            background-color: var(--bg-offwhite) !important;
-            color: var(--brand-midnight) !important;
-            border-right: 1px solid rgba(0, 51, 102, 0.08) !important;
-            width: 280px !important;
-            min-width: 280px !important;
-            max-width: 280px !important;
-            transform: none !important;
-            visibility: visible !important;
-            overflow: hidden !important;
-            box-shadow: 2px 0 15px rgba(0,0,0,0.03) !important;
-            transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, margin-left 0.3s ease, opacity 0.3s ease !important;
-            position: relative !important;
-            z-index: 100 !important;
-            flex-shrink: 0 !important;
-        }
-        
-        /* Sidebar collapsed state - dynamic */
-        .sidebar-collapsed [data-testid="stSidebar"] {
-            width: 0px !important;
-            min-width: 0px !important;
-            max-width: 0px !important;
-            margin-left: -280px !important;
-            padding: 0 !important;
-            border-right: none !important;
-            overflow: hidden !important;
-            opacity: 0 !important;
-        }
-        .sidebar-collapsed [data-testid="stMain"] {
-            width: 100vw !important;
-            margin-left: 0 !important;
-        }
-        
-        /* Sidebar toggle button - floating on left edge */
-        .sidebar-toggle-btn {
-            position: fixed;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 99999;
-            background: rgba(0, 51, 102, 0.85);
-            color: #ffffff;
-            border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 4px;
-            padding: 8px 4px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 7px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            cursor: pointer;
-            backdrop-filter: blur(4px);
-            transition: all 0.25s ease;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-            writing-mode: vertical-rl;
-            text-orientation: mixed;
-            line-height: 1.2;
-            min-height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .sidebar-toggle-btn:hover {
-            background: rgba(201, 171, 76, 0.9);
-            border-color: rgba(255,255,255,0.25);
-            transform: translateY(-50%) scale(1.05);
-        }
-        .sidebar-toggle-btn.sidebar-hidden {
-            left: 12px;
-        }
-        
-        /* Hide Streamlit's default sidebar toggle */
-        [data-testid="stSidebarCollapseButton"], 
-        [data-testid="collapsedControl"],
-        .st-emotion-cache-1cypcdb,
-        .st-emotion-cache-6qob1r {
-            display: none !important;
-        }
-        
-        ::-webkit-scrollbar { width: 0px !important; background: transparent !important; }
-        * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
-        
-        p, label, h1, h2, h3, h4, h5, h6, .stMarkdown, [data-testid="stExpander"] summary p {
-            color: var(--brand-midnight) !important;
-            font-family: 'Montserrat', sans-serif !important;
-        }
-        
-        [data-testid="stHeader"], header, #stDecoration { display: none !important; }
-        
-        [data-testid="stAppViewContainer"] { 
-            display: flex !important; 
-            flex-direction: row !important; 
-            width: 100vw !important; 
-            height: 100vh !important; 
-            overflow: hidden !important; 
-        }
-        [data-testid="stMain"] { 
-            flex-grow: 1 !important; 
-            width: calc(100vw - 280px) !important; 
-            height: 100vh !important; 
-            overflow: hidden !important; 
-            margin: 0px !important; 
-            padding: 0px !important; 
-            transition: width 0.3s ease, margin-left 0.3s ease !important;
-        }
-        .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer { 
-            padding: 0px !important; 
-            margin: 0px !important; 
-            max-width: 100% !important; 
-            gap: 0rem !important; 
-        }
-        iframe { 
-            height: 100vh !important; 
-            width: 100% !important; 
-            border: none !important; 
-            display: block !important; 
-        }
-        
-        div[data-baseweb="input"], div[data-baseweb="select"] { 
-            background-color: transparent !important; 
-            border: none !important; 
-            border-bottom: 1px solid rgba(201, 171, 76, 0.5) !important; 
-            border-radius: 0px !important; 
-            box-shadow: none !important; 
-        }
-        
-        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button { 
-            background-color: var(--brand-midnight) !important; 
-            border: 1px solid var(--brand-midnight) !important; 
-            border-radius: 2px !important; 
-            width: 100% !important; 
-            padding: 4px !important; 
-            box-shadow: var(--soft-shadow) !important; 
-        }
-        div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover { 
-            background-color: var(--brand-gold) !important; 
-            border-color: var(--brand-gold) !important; 
-        }
-        div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p { 
-            color: var(--white-clean) !important; 
-            font-weight: 700 !important; 
-            font-size: 9px !important; 
-            text-transform: uppercase !important; 
-            letter-spacing: 1px; 
-        }
-        
-        div.stDownloadButton > button { 
-            background-color: var(--brand-midnight) !important; 
-            border: none !important; 
-            border-radius: 2px !important; 
-            width: 100% !important; 
-            padding: 4px !important; 
-        }
-        div.stDownloadButton > button:hover { 
-            background-color: var(--brand-gold) !important; 
-        }
-        
-        div.stButton > button[kind="primary"] { 
-            background: transparent !important; 
-            border: none !important; 
-            color: var(--text-muted) !important; 
-            padding: 0 !important; 
-            margin-top: 2px; 
-        }
-        div.stButton > button[kind="primary"] p { 
-            color: var(--text-muted) !important; 
-            font-size: 9px !important; 
-            font-weight: 600; 
-            text-transform: uppercase; 
-        }
-        
-        [data-testid="stSidebar"] .st-expander { 
-            border: 1px solid rgba(0, 51, 102, 0.05) !important; 
-            background-color: var(--white-clean) !important; 
-            border-radius: 2px !important; 
-            margin-bottom: 2px !important; 
-        }
-        
-        .stCheckbox { 
-            display: flex !important; 
-            align-items: center !important; 
-            margin-bottom: 2px !important; 
-        }
-        .stCheckbox label { 
-            display: inline-flex !important; 
-            align-items: center !important; 
-            gap: 6px !important; 
-            margin: 0px !important; 
-            padding: 0px !important; 
-        }
-        .stCheckbox label p { 
-            font-size: 10px !important; 
-            font-weight: 500 !important; 
-            color: var(--brand-midnight) !important; 
-            display: inline-block !important; 
-            margin: 0 !important; 
-            line-height: 1.2 !important; 
-        }
-        div[data-baseweb="checkbox"] { 
-            align-self: center !important; 
-        }
-        
-        div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] { 
-            background-color: #003366 !important; 
-            border-color: #003366 !important; 
-        }
-        div[data-baseweb="checkbox"] input:checked + div, 
-        div[data-baseweb="checkbox"] div[aria-checked="true"], 
-        div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] > div { 
-            background-color: #003366 !important; 
-            border-color: #003366 !important; 
-        }
-        
-        .brand-title { 
-            font-family: 'Cormorant Garamond', serif !important; 
-            font-style: italic; 
-            color: var(--brand-midnight); 
-            font-size: 30px; 
-            text-align: center; 
-            border-bottom: 1px solid var(--brand-gold); 
-            padding-bottom: 6px; 
-            margin-bottom: 10px; 
-        }
-        .stTextInput label p, .stNumberInput label p { 
-            font-size: 9px !important; 
-            font-weight: 500 !important; 
-            color: var(--text-muted) !important; 
-        }
-
-        /* Python Engine Core Centered Progress Stopwatch HUD Panel Overlay */
-        .py-loading-container {
-            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            width: 340px; background: #ffffff; padding: 24px; border-radius: 4px;
-            border: 1px solid rgba(0, 51, 102, 0.15); box-shadow: 0 10px 30px rgba(0, 51, 102, 0.15);
-            text-align: center; z-index: 999999; font-family: 'Montserrat', sans-serif;
-        }
-        .py-spinner {
-            width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1);
-            border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
-            margin: 0 auto 16px auto;
-        }
-        .py-loading-title { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
-        .py-loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* API LOG PANEL - Minimal */
-        .api-log-container {
-            position: absolute; bottom: 12px; right: 12px; width: 340px; max-height: 220px;
-            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); border-radius: 4px;
-            border-left: 2px solid #C9AB4C; z-index: 10000; font-family: 'Monaco', monospace;
-            font-size: 9px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            transition: all 0.2s ease; color: #e0e0e0;
-        }
-        .api-log-header {
-            padding: 4px 8px; background: rgba(0,0,0,0.6); border-radius: 4px 4px 0 0;
-            font-weight: 600; font-size: 8px; letter-spacing: 0.5px; text-transform: uppercase;
-            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-            color: #C9AB4C; border-bottom: 1px solid rgba(201, 171, 76, 0.2);
-        }
-        .api-log-content {
-            overflow-y: auto; padding: 4px; flex-grow: 1; max-height: 170px;
-            scrollbar-width: thin;
-        }
-        .api-log-entry {
-            border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 4px;
-            font-family: monospace; font-size: 8px; word-break: break-word;
-        }
-        .api-log-time { color: #C9AB4C; font-weight: 600; margin-right: 6px; }
-        .api-log-info { color: #88ffaa; }
-        .api-log-error { color: #ff8888; }
-        .api-log-warning { color: #ffaa66; }
-        .api-log-close { cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
-        .api-log-close:hover { color: #ff8888; }
-        
-        /* Workspace header */
-        .workspace-header {
-            background: #003366;
-            color: #ffffff;
-            padding: 6px 10px;
-            font-size: 9px;
-            font-weight: 800;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            text-transform: uppercase;
-            border-bottom: 2px solid #C9AB4C;
-            letter-spacing: 1px;
-            flex-shrink: 0;
-        }
-        .workspace-header .workspace-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .workspace-header .workspace-title .count-badge {
-            background: rgba(201, 171, 76, 0.3);
-            padding: 1px 6px;
-            border-radius: 2px;
-            font-size: 8px;
-            color: #C9AB4C;
-        }
-        
-        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; max-height: calc(100vh - 280px); }
-        .layer-category-block { border-bottom: 1px solid #f0f0f0; }
-        .layer-category-header { background: #ffffff; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
-        .layer-header-left { display: flex; align-items: center; gap: 4px; font-size: 8px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
-        .layer-category-items { padding: 0; background: #f8fafc; }
-        .layer-category-items.collapsed { display: none !important; }
-        .results-item { padding: 3px 6px 3px 12px; font-size: 8px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
-        .results-item:hover { background: #ffffff; color: #003366; }
-        .action-icon-trigger { cursor: pointer; padding: 1px; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 2px; transition: all 0.15s; }
-        .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
-        .action-icon-trigger svg { fill: #888780; width: 10px; height: 10px; }
-        .action-icon-trigger:hover svg { fill: #003366; }
-        .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
-        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 1px 3px; border-radius: 2px; font-size: __LABEL_SIZE__px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .hide-labels .poi-text-label { display: none !important; }
-        .color-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
-        .config-block-wrapper { padding: 4px 8px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.05); display: flex; flex-direction: column; gap: 3px; }
-        .config-headline { font-size: 7px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
-        .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 8px; font-weight: 600; color: #003366; gap: 4px; }
-        .config-flex-row select, .config-flex-row input { font-size: 8px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 2px; outline: none; }
-        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 3px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
-        .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 8px; border-radius: 50%; background: #003366; cursor: pointer; }
-        .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 3px; border-bottom: 1px solid rgba(0,51,102,0.08); }
-        .group-cluster-header { background: #e2e8f0; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-        .group-cluster-title { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 4px; }
-        .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
-        .cluster-popover-modal.active { display: block; }
-        .cluster-selection-row { display: flex; align-items: center; gap: 6px; font-size: 8px; padding: 3px 0; color: #003366; font-weight: 600; }
-        
-        /* Label size slider in basemap controller - smaller */
-        .label-size-row {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 1px 0 1px 18px;
-            font-size: 6px;
-            font-weight: 600;
-            color: #888780;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-        .label-size-row input[type="range"] {
-            flex-grow: 1;
-            height: 2px;
-            -webkit-appearance: none;
-            background: rgba(0,51,102,0.15);
-            border-radius: 1px;
-            outline: none;
-            margin: 0;
-            max-width: 60px;
-        }
-        .label-size-row input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: #003366;
-            cursor: pointer;
-        }
-        .label-size-row input[type="range"]::-moz-range-thumb {
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: #003366;
-            cursor: pointer;
-            border: none;
-        }
-        .label-size-row .label-size-value {
-            color: #003366;
-            font-weight: 700;
-            min-width: 10px;
-            text-align: center;
-            font-size: 6px;
-        }
-        
-        /* Full screen mode - hide workspace panel and API log, show only map */
-        .fullscreen-mode #scan-results-panel {
-            display: none !important;
-        }
-        .fullscreen-mode #apiLogPanel {
-            display: none !important;
-        }
-        .fullscreen-mode #mapFullscreenBtn {
-            background: rgba(0, 51, 102, 0.9) !important;
-            color: #ffffff !important;
-            border-color: rgba(255,255,255,0.3) !important;
-        }
-        
-        /* Fullscreen toggle button on map - top left */
-        .map-fullscreen-btn {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            z-index: 9999;
-            background: rgba(255,255,255,0.92);
-            color: #003366;
-            border: 1px solid rgba(0, 51, 102, 0.15);
-            border-radius: 3px;
-            padding: 0;
-            width: 28px;
-            height: 28px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 11px;
-            font-weight: 700;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-        }
-        .map-fullscreen-btn:hover {
-            background: #003366;
-            color: #ffffff;
-            border-color: #003366;
-        }
-        
-        /* Minimal Session Logs */
-        .session-log-container {
-            font-size: 8px;
-        }
-        .session-log-container .stButton button {
-            font-size: 7px !important;
-            padding: 2px 6px !important;
-            min-height: 20px !important;
-            height: 20px !important;
-            line-height: 1 !important;
-        }
-        .session-log-container .stButton button p {
-            font-size: 7px !important;
-        }
-        .session-log-container .stExpander {
-            border: 1px solid rgba(0, 51, 102, 0.05) !important;
-        }
-        .session-log-container .stExpander summary {
-            font-size: 8px !important;
-        }
-        .session-log-container .stExpander summary p {
-            font-size: 8px !important;
-        }
-        .session-log-container code {
-            font-size: 7px !important;
-        }
-        .session-log-container .stInfo {
-            font-size: 8px !important;
-            padding: 4px 8px !important;
-        }
-        .session-log-container .stInfo p {
-            font-size: 8px !important;
-        }
-    </style>
+    }
+</style>
 """, unsafe_allow_html=True)
 
-# -----------------------------------------------------------------------------
-# GLOBAL HELPER DEFINITIONS
-# -----------------------------------------------------------------------------
-def compile_features_kml(features):
-    kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
-    for f in features:
-        if not f.get('visible', True): continue
-        name = f.get('name', 'Asset').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        class_type = f.get('type', 'Node').replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
-    return kml + '</Document></kml>'
+# ============================================================================
+# SESSION STATE INITIALIZATION
+# ============================================================================
 
-# -----------------------------------------------------------------------------
-# GITHUB POI DATA LOADER & FALLBACK
-# -----------------------------------------------------------------------------
-GITHUB_POI_BASE = "https://raw.githubusercontent.com/pyscriptcli/osm-repository/main/data/provinces"
-
-PROVINCE_BOUNDS = {
-    "metro_manila": [120.90, 14.40, 121.10, 14.80],
-    "cavite": [120.60, 14.10, 121.00, 14.50],
-    "laguna": [121.00, 14.00, 121.60, 14.50],
-    "bulacan": [120.70, 14.70, 121.20, 15.30],
-    "batangas": [120.70, 13.60, 121.40, 14.20],
-    "rizal": [121.00, 14.40, 121.60, 14.90],
-    "pampanga": [120.50, 14.90, 121.00, 15.40],
-    "nueva_ecija": [120.60, 15.20, 121.50, 16.00],
-    "zambales": [119.80, 14.60, 120.60, 15.80],
-    "tarlac": [120.30, 15.30, 121.00, 15.90],
-    "pangasinan": [119.80, 15.60, 121.00, 16.50],
-    "la_union": [120.20, 16.40, 120.80, 17.00],
-    "ilocos_norte": [120.30, 17.80, 121.00, 18.70],
-    "ilocos_sur": [120.20, 16.90, 120.80, 17.80],
-    "cebu": [123.00, 9.40, 124.20, 11.20],
-    "leyte": [124.30, 9.80, 125.60, 11.50],
-    "bohol": [123.70, 9.50, 124.60, 10.10],
-    "negros_oriental": [122.80, 9.00, 123.50, 10.50],
-    "negros_occidental": [122.30, 9.30, 123.40, 11.00],
-    "samar": [124.80, 11.00, 125.80, 12.50],
-    "biliran": [124.30, 11.40, 124.60, 11.70],
-    "siquijor": [123.40, 9.10, 123.70, 9.30],
-    "davao_city": [125.40, 6.90, 125.70, 7.40],
-    "davao_del_sur": [125.00, 6.00, 125.80, 7.00],
-    "davao_oriental": [126.00, 6.50, 126.80, 7.80],
-    "north_cotabato": [124.50, 6.80, 125.30, 7.80],
-    "south_cotabato": [124.50, 5.80, 125.30, 6.80],
-    "sultan_kudarat": [123.80, 6.20, 124.80, 7.20],
-    "zamboanga_del_sur": [122.00, 7.00, 123.80, 8.20],
-    "zamboanga_del_norte": [121.80, 7.50, 123.00, 8.80],
-    "misamis_oriental": [124.00, 8.00, 125.20, 9.30],
-    "misamis_occidental": [123.30, 7.80, 124.00, 8.70],
-    "bukidnon": [124.30, 7.00, 125.50, 8.50],
-    "agusan_del_norte": [125.00, 8.20, 126.00, 9.30],
-    "agusan_del_sur": [125.00, 7.60, 126.20, 8.80],
-    "surigao_del_norte": [125.20, 9.30, 126.30, 10.20],
-    "surigao_del_sur": [125.80, 8.00, 126.50, 9.00],
-    "lanao_del_norte": [123.50, 7.50, 124.50, 8.30],
-    "lanao_del_sur": [123.80, 7.00, 124.80, 8.20],
-    "basilan": [121.80, 6.30, 122.50, 6.80],
-    "sulu": [120.80, 5.50, 121.50, 6.30],
-    "tawi_tawi": [119.50, 4.50, 120.50, 5.50],
-    "dinagat_islands": [125.30, 9.80, 125.80, 10.50],
-    "zamboanga": [121.80, 6.80, 123.80, 8.50],
-}
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def get_province_list():
-    url = f"{GITHUB_POI_BASE}/index.json"
-    try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return list(data.get('provinces', {}).keys())
-        return []
-    except:
-        return list(PROVINCE_BOUNDS.keys())
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def load_province_pois(province_name):
-    url = f"{GITHUB_POI_BASE}/{province_name}.json"
-    try:
-        response = requests.get(url, timeout=15)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            add_api_log(f"Failed to load {province_name}: HTTP {response.status_code}", "ERROR")
-            return None
-    except Exception as e:
-        add_api_log(f"Error loading {province_name}: {str(e)[:100]}", "ERROR")
-        return None
-
-def get_province_from_coords(lat, lon):
-    for province, bbox in PROVINCE_BOUNDS.items():
-        if bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]:
-            return province
-    return None
-
-def filter_pois_by_radius(pois, center_lat, center_lon, radius_meters):
-    def haversine(lat1, lon1, lat2, lon2):
-        R = 6371000
-        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-        c = 2 * math.asin(math.sqrt(a))
-        return R * c
+def init_session_state():
+    """Initialize all session state variables"""
+    defaults = {
+        'scanned_records': [],
+        'layer_meta': {},
+        'layer_groups': {},
+        'search_history': [],
+        'map_viewport': {'center': [14.5995, 120.9842], 'zoom': 13},
+        'geo_coords': "14.5995, 120.9842",
+        'geo_radius': 1000,
+        'label_size': 9,
+        'marker_style': "modern-pin",
+        'marker_size': 16,
+        'marker_color': "#003366",
+        'fullscreen_active': False,
+        'sidebar_collapsed': False,
+        'poi_visibility': {},
+        'current_query': "",
+        'session_logs': [],
+        'last_scan_time': None,
+        'poi_count': 0,
+        'map_click_coords': None,
+        'selected_poi': None,
+        'imported_state': None,
+        'overpass_status': {},
+        'active_endpoint': None,
+        'query_time': None,
+        'retry_count': 0
+    }
     
-    filtered = []
-    for poi in pois:
-        dist = haversine(center_lat, center_lon, poi['lat'], poi['lon'])
-        if dist <= radius_meters:
-            poi_copy = poi.copy()
-            poi_copy['distance_m'] = round(dist)
-            filtered.append(poi_copy)
-    return filtered
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-def filter_pois_by_tags(pois, selected_tags):
-    if not selected_tags:
-        return pois
+init_session_state()
+
+# ============================================================================
+# OVERPASS API CONFIGURATION
+# ============================================================================
+
+class OverpassAPI:
+    """Handles Overpass API queries with multi-endpoint support"""
     
-    filtered = []
-    for poi in pois:
-        poi_type = poi.get('type', '').lower()
-        for tag in selected_tags:
-            tag_clean = tag.replace('"', '').lower()
-            if '=' in tag_clean:
-                key, value = tag_clean.split('=', 1)
-                if key in poi_type or value in poi_type:
-                    filtered.append(poi)
-                    break
+    # Comprehensive list of Overpass endpoints
+    ENDPOINTS = [
+        {
+            'url': 'https://overpass-api.de/api/interpreter',
+            'name': 'Overpass API (Germany)',
+            'priority': 1,
+            'timeout': 30,
+            'max_retries': 3
+        },
+        {
+            'url': 'https://overpass.kumi.systems/api/interpreter',
+            'name': 'Overpass API (Kumi)',
+            'priority': 2,
+            'timeout': 30,
+            'max_retries': 3
+        },
+        {
+            'url': 'https://overpass.openstreetmap.fr/api/interpreter',
+            'name': 'Overpass API (France)',
+            'priority': 3,
+            'timeout': 30,
+            'max_retries': 3
+        },
+        {
+            'url': 'https://overpass.osm.ch/api/interpreter',
+            'name': 'Overpass API (Switzerland)',
+            'priority': 4,
+            'timeout': 30,
+            'max_retries': 3
+        },
+        {
+            'url': 'https://overpass.omniscale.net/api/interpreter',
+            'name': 'Overpass API (Omniscale)',
+            'priority': 5,
+            'timeout': 30,
+            'max_retries': 3
+        },
+        {
+            'url': 'https://overpass.private.coffee/api/interpreter',
+            'name': 'Overpass API (Private Coffee)',
+            'priority': 6,
+            'timeout': 30,
+            'max_retries': 3
+        }
+    ]
+    
+    def __init__(self):
+        self.endpoints = self.ENDPOINTS.copy()
+        self.active_endpoint = None
+        self.status = {}
+        self.query_times = []
+        
+        # Initialize status tracking
+        for endpoint in self.endpoints:
+            self.status[endpoint['url']] = {
+                'online': None,
+                'last_check': None,
+                'response_time': None,
+                'error_count': 0,
+                'success_count': 0
+            }
+    
+    def get_headers(self):
+        """Get headers for API requests"""
+        return {
+            'User-Agent': 'OpenNode-POI-Explorer/1.0 (https://github.com/opennode)',
+            'Accept': 'application/json',
+            'Accept-Encoding': 'gzip, deflate'
+        }
+    
+    def test_endpoint(self, endpoint: Dict) -> bool:
+        """Test if an endpoint is responsive"""
+        try:
+            # Simple test query (just get a single node)
+            test_query = """
+            [out:json][timeout:5];
+            node(1);
+            out body;
+            """
+            
+            response = requests.post(
+                endpoint['url'],
+                data={'data': test_query},
+                headers=self.get_headers(),
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                self.status[endpoint['url']]['online'] = True
+                self.status[endpoint['url']]['last_check'] = datetime.now()
+                self.status[endpoint['url']]['response_time'] = response.elapsed.total_seconds()
+                return True
             else:
-                if tag_clean in poi_type:
-                    filtered.append(poi)
-                    break
-    return filtered
-
-# -----------------------------------------------------------------------------
-# API LOGGING SYSTEM
-# -----------------------------------------------------------------------------
-if 'api_logs' not in st.session_state:
-    st.session_state.api_logs = []
-
-def add_api_log(message, level="INFO"):
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    st.session_state.api_logs.append({
-        "time": timestamp,
-        "message": message,
-        "level": level
-    })
-    if len(st.session_state.api_logs) > 100:
-        st.session_state.api_logs = st.session_state.api_logs[-100:]
-
-def clear_api_logs():
-    st.session_state.api_logs = []
-
-# -----------------------------------------------------------------------------
-# OVERPASS API FALLBACK FOR POIS
-# -----------------------------------------------------------------------------
-OVERPASS_ENDPOINTS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-    "https://overpass.openstreetmap.ru/api/interpreter",
-]
-
-def build_ql(lat, lon, radius, tags):
-    statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
-    return f"[out:json][timeout:90];(\n{statements}\n);out center;"
-
-def query_overpass_robust(ql, max_retries=2, timeout=90):
-    for endpoint in OVERPASS_ENDPOINTS:
-        add_api_log(f"Trying endpoint: {endpoint}", "INFO")
+                self.status[endpoint['url']]['online'] = False
+                return False
+                
+        except Exception as e:
+            self.status[endpoint['url']]['online'] = False
+            self.status[endpoint['url']]['error_count'] += 1
+            return False
+    
+    def get_best_endpoint(self) -> Optional[Dict]:
+        """Get the best available endpoint based on status and priority"""
+        # First check if we have a working endpoint
+        working_endpoints = []
+        
+        for endpoint in self.endpoints:
+            if self.status[endpoint['url']].get('online', False):
+                # Check if it's been tested recently (within last 5 minutes)
+                last_check = self.status[endpoint['url']].get('last_check')
+                if last_check:
+                    time_diff = (datetime.now() - last_check).total_seconds()
+                    if time_diff < 300:  # 5 minutes
+                        working_endpoints.append(endpoint)
+        
+        # If we have working endpoints, return the highest priority one
+        if working_endpoints:
+            return min(working_endpoints, key=lambda x: x['priority'])
+        
+        # Otherwise, test endpoints in priority order
+        for endpoint in sorted(self.endpoints, key=lambda x: x['priority']):
+            if self.test_endpoint(endpoint):
+                return endpoint
+        
+        # If all endpoints fail, return the first one (will fail but at least try)
+        return self.endpoints[0] if self.endpoints else None
+    
+    def execute_query(self, query: str, max_retries: int = 3) -> Tuple[Optional[List[Dict]], str]:
+        """
+        Execute a query against the Overpass API with retry logic
+        
+        Returns: (data, endpoint_used)
+        """
+        # Get best endpoint
+        endpoint = self.get_best_endpoint()
+        if not endpoint:
+            return None, "No endpoints available"
+        
+        # Try the query with retries
         for attempt in range(max_retries):
             try:
-                start_time = time.time()
-                add_api_log(f"POST request to {endpoint} (attempt {attempt+1})", "INFO")
-                res = requests.post(endpoint, data={"data": ql}, headers={"User-Agent": "OpenNode/3.5"}, timeout=timeout)
-                elapsed = time.time() - start_time
-                if res.status_code == 200:
-                    add_api_log(f"Success! Status 200 in {elapsed:.2f}s", "INFO")
-                    data = res.json()
-                    if data.get("elements"):
-                        add_api_log(f"Retrieved {len(data['elements'])} elements", "INFO")
-                        return data["elements"]
-                    else:
-                        add_api_log("No elements in response", "WARNING")
-                        return []
-                elif res.status_code == 429:
-                    add_api_log(f"Rate limited (429), retrying in {2**attempt}s", "WARNING")
-                    time.sleep(2 ** attempt)
-                    continue
+                add_log(f"Querying {endpoint['name']} (attempt {attempt + 1}/{max_retries})", "INFO")
+                
+                response = requests.post(
+                    endpoint['url'],
+                    data={'data': query},
+                    headers=self.get_headers(),
+                    timeout=endpoint.get('timeout', 30)
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Update status
+                    self.status[endpoint['url']]['online'] = True
+                    self.status[endpoint['url']]['last_check'] = datetime.now()
+                    self.status[endpoint['url']]['response_time'] = response.elapsed.total_seconds()
+                    self.status[endpoint['url']]['success_count'] += 1
+                    
+                    self.active_endpoint = endpoint['url']
+                    self.query_times.append(response.elapsed.total_seconds())
+                    if len(self.query_times) > 100:
+                        self.query_times = self.query_times[-100:]
+                    
+                    add_log(f"Query successful: {len(data.get('elements', []))} elements found", "SUCCESS")
+                    return data, endpoint['name']
+                    
+                elif response.status_code == 429:
+                    # Rate limited - wait and retry
+                    wait_time = 2 ** attempt
+                    add_log(f"Rate limited, waiting {wait_time}s", "WARNING")
+                    time.sleep(wait_time)
+                    
+                elif response.status_code == 504:
+                    # Gateway timeout - try next endpoint
+                    add_log(f"Gateway timeout, trying next endpoint", "WARNING")
+                    self.status[endpoint['url']]['online'] = False
+                    endpoint = self.get_best_endpoint()
+                    if not endpoint:
+                        break
+                    
                 else:
-                    add_api_log(f"HTTP {res.status_code} from endpoint", "ERROR")
+                    add_log(f"API returned {response.status_code}", "WARNING")
+                    self.status[endpoint['url']]['error_count'] += 1
+                    
+                    # If too many errors, mark as offline
+                    if self.status[endpoint['url']]['error_count'] > 5:
+                        self.status[endpoint['url']]['online'] = False
+                    
+                    # Try next endpoint
+                    endpoint = self.get_best_endpoint()
+                    if not endpoint:
+                        break
+                    
             except requests.exceptions.Timeout:
-                add_api_log(f"Timeout after {timeout}s", "ERROR")
-                timeout = timeout * 0.7
-                continue
+                add_log(f"Timeout with {endpoint['name']}", "WARNING")
+                self.status[endpoint['url']]['error_count'] += 1
+                if self.status[endpoint['url']]['error_count'] > 3:
+                    self.status[endpoint['url']]['online'] = False
+                endpoint = self.get_best_endpoint()
+                
+            except requests.exceptions.ConnectionError:
+                add_log(f"Connection error with {endpoint['name']}", "ERROR")
+                self.status[endpoint['url']]['online'] = False
+                endpoint = self.get_best_endpoint()
+                
             except Exception as e:
-                add_api_log(f"Exception: {str(e)[:100]}", "ERROR")
+                add_log(f"Error: {str(e)}", "ERROR")
+                endpoint = self.get_best_endpoint()
+            
+            # Small delay between retries
+            if attempt < max_retries - 1:
+                time.sleep(1)
+        
+        return None, "All endpoints failed"
+
+# Initialize Overpass API
+overpass_api = OverpassAPI()
+
+# ============================================================================
+# LOGGING SYSTEM
+# ============================================================================
+
+def add_log(message: str, level: str = "INFO"):
+    """Add a log entry to session state"""
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    log_entry = {
+        'time': timestamp,
+        'message': message,
+        'level': level
+    }
+    st.session_state.session_logs.insert(0, log_entry)
+    # Keep only last 100 logs
+    if len(st.session_state.session_logs) > 100:
+        st.session_state.session_logs = st.session_state.session_logs[:100]
+
+# ============================================================================
+# SEARCH QUERY PARSING
+# ============================================================================
+
+def parse_search_query(query: str) -> List[str]:
+    """Parse comma-separated OSM tags into a list"""
+    if not query or not query.strip():
+        return []
+    
+    # Split by comma and clean
+    tags = [tag.strip() for tag in query.split(',') if tag.strip()]
+    
+    # Validate tag format (key=value)
+    valid_tags = []
+    for tag in tags:
+        if '=' in tag:
+            valid_tags.append(tag)
+        else:
+            add_log(f"Invalid tag format: {tag} (expected key=value)", "WARNING")
+    
+    return valid_tags
+
+def build_overpass_query(tags: List[str], center_lat: float, center_lon: float, radius: int) -> str:
+    """Build Overpass QL query from tags with optimized structure"""
+    if not tags:
+        return None
+    
+    # Build filter conditions with proper escaping
+    filters = []
+    for tag in tags:
+        key, value = tag.split('=', 1)
+        # Handle wildcard values
+        if '*' in value:
+            # Use regex for wildcard
+            regex_pattern = value.replace('*', '.*')
+            filters.append(f'[~"{key}"~"{regex_pattern}"]')
+        else:
+            # Escape special characters in value
+            escaped_value = value.replace('"', '\\"')
+            filters.append(f'["{key}"="{escaped_value}"]')
+    
+    # Build optimized query with bbox for efficiency
+    # Calculate bbox from center and radius
+    lat_offset = radius / 111000.0  # Rough conversion
+    lon_offset = radius / (111000.0 * np.cos(np.radians(center_lat)))
+    
+    bbox = (
+        center_lat - lat_offset,
+        center_lon - lon_offset,
+        center_lat + lat_offset,
+        center_lon + lon_offset
+    )
+    
+    filter_str = ''.join(filters)
+    
+    # Build query with bbox and around for maximum results
+    query = f"""
+    [out:json][timeout:25];
+    (
+      node{filter_str}({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
+      way{filter_str}({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
+      rel{filter_str}({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
+    );
+    out body;
+    >;
+    out skel qt;
+    """
+    
+    # Alternative query using around for better precision
+    query_around = f"""
+    [out:json][timeout:25];
+    (
+      node{filter_str}(around:{radius},{center_lat},{center_lon});
+      way{filter_str}(around:{radius},{center_lat},{center_lon});
+      rel{filter_str}(around:{radius},{center_lat},{center_lon});
+    );
+    out body;
+    >;
+    out skel qt;
+    """
+    
+    # Use around query for better results
+    return query_around.strip()
+
+def build_advanced_overpass_query(tags: List[str], center_lat: float, center_lon: float, radius: int) -> str:
+    """Build an advanced Overpass QL query with multiple strategies"""
+    if not tags:
+        return None
+    
+    # Build filter conditions
+    filters = []
+    for tag in tags:
+        key, value = tag.split('=', 1)
+        if '*' in value:
+            regex_pattern = value.replace('*', '.*')
+            filters.append(f'[~"{key}"~"{regex_pattern}"]')
+        else:
+            escaped_value = value.replace('"', '\\"')
+            filters.append(f'["{key}"="{escaped_value}"]')
+    
+    filter_str = ''.join(filters)
+    
+    # Calculate bbox
+    lat_offset = radius / 111000.0
+    lon_offset = radius / (111000.0 * np.cos(np.radians(center_lat)))
+    
+    bbox = (
+        center_lat - lat_offset,
+        center_lon - lon_offset,
+        center_lat + lat_offset,
+        center_lon + lon_offset
+    )
+    
+    # Build comprehensive query
+    query = f"""
+    [out:json][timeout:45];
+    (
+      // Query nodes
+      node{filter_str}({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
+      
+      // Query ways
+      way{filter_str}({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
+      
+      // Query relations
+      rel{filter_str}({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
+      
+      // Also query nodes within ways
+      way{filter_str}(around:{radius},{center_lat},{center_lon});
+      (._;>;);
+      
+      // Also query surrounding nodes for completeness
+      node{filter_str}(around:{radius},{center_lat},{center_lon});
+    );
+    out body;
+    >;
+    out skel qt;
+    """
+    
+    return query.strip()
+
+# ============================================================================
+# DATA PROCESSING
+# ============================================================================
+
+def process_overpass_results(data: Dict, tags: List[str]) -> List[Dict]:
+    """Process Overpass API results into standardized POI format"""
+    if not data or 'elements' not in data:
+        return []
+    
+    elements = data['elements']
+    pois = []
+    seen_ids = set()
+    
+    # Process each element
+    for elem in elements:
+        elem_id = elem.get('id')
+        elem_type = elem.get('type')
+        
+        # Skip if already seen
+        if elem_id in seen_ids:
+            continue
+        seen_ids.add(elem_id)
+        
+        # Only process nodes for now (ways and relations need special handling)
+        if elem_type != 'node':
+            continue
+        
+        lat = elem.get('lat')
+        lon = elem.get('lon')
+        
+        if lat is None or lon is None:
+            continue
+        
+        tags_dict = elem.get('tags', {})
+        
+        # Extract name
+        name = tags_dict.get('name', '')
+        if not name:
+            # Try to create name from tags
+            for key in ['brand', 'operator', 'shop', 'amenity', 'tourism', 'leisure']:
+                if key in tags_dict:
+                    name = f"{key}: {tags_dict[key]}"
+                    break
+            if not name:
+                name = 'Unnamed POI'
+        
+        # Determine primary type
+        primary_type = 'unknown'
+        for tag in tags:
+            key, value = tag.split('=', 1)
+            if key in tags_dict:
+                primary_type = key
                 break
-        add_api_log(f"Endpoint {endpoint} failed, trying next", "WARNING")
-    add_api_log("All endpoints exhausted, returning empty", "ERROR")
-    return []
-
-def adaptive_radius_query(lat, lon, radius, tags, max_chunk=2000):
-    if radius <= max_chunk:
-        add_api_log(f"Single query (radius {radius}m <= {max_chunk}m)", "INFO")
-        return query_overpass_robust(build_ql(lat, lon, radius, tags))
-    offset = radius / (2 * math.sqrt(2) * 111320)
-    quadrants = [(lat + offset, lon + offset), (lat + offset, lon - offset), (lat - offset, lon + offset), (lat - offset, lon - offset)]
-    add_api_log(f"Adaptive split: {radius}m -> 4 quadrants", "INFO")
-    all_results, seen_ids = [], set()
-    for idx, (q_lat, q_lon) in enumerate(quadrants):
-        add_api_log(f"Querying quadrant {idx+1}/4", "INFO")
-        chunk_results = query_overpass_robust(build_ql(q_lat, q_lon, radius // 2, tags))
-        for el in chunk_results:
-            if el.get("id") not in seen_ids:
-                seen_ids.add(el["id"])
-                all_results.append(el)
-    add_api_log(f"Merged {len(all_results)} unique elements from quadrants", "INFO")
-    return all_results
-
-def load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags):
-    records = []
-    
-    all_province_pois = load_province_pois(province_name)
-    
-    if all_province_pois:
-        add_api_log(f"Loaded {len(all_province_pois)} POIs from GitHub for {province_name}", "INFO")
         
-        radius_filtered = filter_pois_by_radius(all_province_pois, lat_coord, lon_coord, radius_val)
-        add_api_log(f"After radius filter: {len(radius_filtered)} POIs within {radius_val}m", "INFO")
-        
-        tag_filtered = filter_pois_by_tags(radius_filtered, selected_tags)
-        add_api_log(f"After tag filter: {len(tag_filtered)} POIs match selected categories", "INFO")
-        
-        for idx, poi in enumerate(tag_filtered):
-            records.append({
-                "lat": poi['lat'],
-                "lon": poi['lon'],
-                "name": poi.get('name', 'Unknown'),
-                "type": poi.get('type', 'poi'),
-                "source": "github",
-                "has_footprint": False,
-                "footprint_geojson": None,
-                "visible": True,
-                "uid": idx
-            })
-        return records
-    
-    add_api_log(f"No GitHub data for {province_name}, falling back to Overpass API", "WARNING")
-    elements = adaptive_radius_query(lat_coord, lon_coord, radius_val, selected_tags)
-    add_api_log(f"Overpass returned {len(elements)} raw elements", "INFO")
-    
-    for idx, el in enumerate(elements):
-        e_lat = el.get('lat') or el.get('center', {}).get('lat')
-        e_lon = el.get('lon') or el.get('center', {}).get('lon')
-        if e_lat and e_lon:
-            tags = el.get('tags', {})
-            name = tags.get('name', 'Unknown')
-            if not name or str(name).strip().lower() in ['unknown', '', 'nan', 'none']:
-                continue
-            records.append({
-                "lat": e_lat,
-                "lon": e_lon,
-                "name": name,
-                "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                "source": "overpass",
-                "has_footprint": False,
-                "footprint_geojson": None,
-                "visible": True,
-                "uid": idx
-            })
-    
-    add_api_log(f"Final record count from Overpass: {len(records)} POIs", "INFO")
-    return records
-
-# -----------------------------------------------------------------------------
-# 2. STATE PERSISTENCE & DATA CONFIGURATIONS
-# -----------------------------------------------------------------------------
-DEFAULT_COORDS = "14.5995, 120.9842"
-DEFAULT_RADIUS = 1000
-
-if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
-if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
-if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
-if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
-if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
-if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
-if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
-if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
-if 'network_stats' not in st.session_state: st.session_state.network_stats = None
-if 'query_cache' not in st.session_state: st.session_state.query_cache = {}
-
-if 'target_config' not in st.session_state: st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
-if 'radius_config' not in st.session_state: st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
-if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "modern-pin"
-if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 16
-if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
-if 'label_size' not in st.session_state: st.session_state.label_size = 9
-if 'fullscreen_active' not in st.session_state: st.session_state.fullscreen_active = False
-if 'sidebar_collapsed' not in st.session_state: st.session_state.sidebar_collapsed = False
-
-POI_CONFIG = {
-    "COMMERCIAL & OFFICES": [['Corporate Office', '"building"~"office|commercial",i'], ['IT/Tech Center', '"office"~"it|telecommunication",i'], ['Business Center', '"building"="commercial"'], ['Bank', '"amenity"="bank"'], ['ATM', '"amenity"="atm"'], ['Office', '"office"="yes"']],
-    "RETAIL": [['Mall/Department Store', '"shop"~"mall|department_store",i'], ['Supermarket', '"shop"~"market|grocery",i'], ['Convenience Store', '"shop"="convenience"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Hardware', '"shop"~"hardware|doityourself",i'], ['General Shops', '"shop"~"boutique|clothes|shoes",i'], ['Beauty', '"shop"="beauty"'], ['Bicycle', '"shop"="bicycle"'], ['Books/Stationary', '"shop"~"books|stationary",i'], ['Car', '"shop"="car"'], ['Chemist', '"shop"="chemist"'], ['Clothes', '"shop"="clothes"'], ['Copyshop', '"shop"="copyshop"'], ['Cosmetics', '"shop"="cosmetics"'], ['Department store', '"shop"="department_store"'], ['DIY/hardware', '"shop"~"hardware|doityourself",i'], ['Garden centre', '"shop"="garden_centre"'], ['General', '"shop"="general"'], ['Gift', '"shop"="gift"'], ['Hairdresser', '"shop"="hairdresser"'], ['Jewelry', '"shop"="jewelry"'], ['Kiosk', '"shop"="kiosk"'], ['Leather', '"shop"="leather"'], ['Marketplace', '"amenity"="marketplace"'], ['Musical instrument', '"shop"="musical_instrument"'], ['Optician', '"shop"="optician"'], ['Pets', '"shop"="pets"'], ['Phone', '"shop"="mobile_phone"'], ['Photo', '"shop"="photo"'], ['Shoes', '"shop"="shoes"'], ['Shopping centre', '"shop"="mall"'], ['Textiles', '"shop"="textiles"'], ['Toys', '"shop"="toys"'], ['Travel agency', '"shop"="travel_agency"']],
-    "FOOD, BEVERAGE & HOSPITALITY": [['Restaurant', '"amenity"="restaurant"'], ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], ['Fast Food', '"amenity"="fast_food"'], ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], ['Bakery/Pastry', '"shop"="bakery"'], ['BBQ', '"amenity"="bbq"'], ['Biergarten', '"amenity"="biergarten"'], ['Food court', '"amenity"="food_court"'], ['Ice cream', '"amenity"="ice_cream"'], ['Pub', '"amenity"="pub"'], ['Hotel', '"tourism"="hotel"'], ['Motel', '"tourism"="motel"'], ['Alpine Hut', '"tourism"="alpine_hut"'], ['Apartment', '"tourism"="apartment"'], ['Camp Site', '"tourism"="camp_site"'], ['Chalet', '"tourism"="chalet"'], ['Guest House', '"tourism"="guest_house"'], ['Hostel', '"tourism"="hostel"'], ['Casino', '"amenity"="casino"']],
-    "RESIDENTIAL": [['Apartments', '"building"="apartments"'], ['House', '"building"="house"'], ['Residential Area', '"landuse"="residential"'], ['Condominium', '"building"="residential"'], ['City', '"place"="city"'], ['Town', '"place"="town"'], ['Village', '"place"="village"'], ['Hamlet', '"place"="hamlet"'], ['Suburb', '"place"="suburb"'], ['Construction', '"landuse"="construction"']],
-    "INDUSTRIAL & LOGISTICS": [['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], ['Ports & Terminals', '"industrial"="port"'], ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], ['Cold Storage Facilities', '"warehouse"~"cold_store|cold_storage",i'], ['Industrial Parks/Estates', '"landuse"~"industrial|industrial_estate",i'], ['Warehouses & Depots', '"building"~"warehouse|depot",i'], ['Storage Facilities', '"building"="storage"'], ['Truck Access Routes (HGV)', '"hgv"~"designated|yes",i']],
-    "HEALTH & EMERGENCY SERVICES": [['Hospital', '"amenity"~"hospital|clinic",i'], ['Clinic', '"amenity"="clinic"'], ['Pharmacy', '"amenity"="pharmacy"'], ['Police Station', '"amenity"="police"'], ['Fire Station', '"amenity"="fire_station"'], ['Firestation', '"amenity"="fire_station"'], ['Police', '"amenity"="police"'], ['Hospital Adv', '"amenity"="hospital"'], ['Defibrillator - AED', '"emergency"="defibrillator"'], ['Fire hose/extinguisher', '"emergency"~"fire_hose|fire_extinguisher",i']],
-    "GOVERNMENT, EDUCATION & INFRASTRUCTURE": [['City Hall', '"amenity"="townhall"'], ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i'], ['University/College', '"amenity"~"university|college",i'], ['K-12 School', '"amenity"="school"'], ['Vocational/Other', '"amenity"="learning_centre"'], ['Embassy', '"amenity"="embassy"'], ['Library', '"amenity"="library"'], ['Music School', '"amenity"="music_school"'], ['Letter Box', '"amenity"="letter_box"'], ['Post Office', '"amenity"="post_office"'], ['School/College', '"amenity"~"school|college",i'], ['University', '"amenity"="university"'], ['Kindergarten', '"amenity"="kindergarten"'], ['Public camera', '"man_made"="surveillance"']],
-    "LEISURE, SPORTS & PUBLIC SPACES": [['Church', '"religion"="christian"'], ['Mosque', '"religion"="muslim"'], ['Buddhist Temple', '"religion"="buddhist"'], ['Hindu Temple', '"religion"="hindu"'], ['Synagogue', '"religion"="jewish"'], ['Cemetery', '"landuse"="cemetery"'], ['Spa', '"leisure"="spa"'], ['Sauna', '"leisure"="sauna"'], ['Bench', '"amenity"="bench"'], ['Bicycle Parking', '"amenity"="bicycle_parking"'], ['Bicycle Rental', '"amenity"="bicycle_rental"'], ['Cinema', '"amenity"="cinema"'], ['Fuel', '"amenity"="fuel"'], ['Parking', '"amenity"="parking"'], ['Taxi', '"amenity"="taxi"'], ['Theatre', '"amenity"="theatre"'], ['Toilets', '"amenity"="toilets"'], ['American football', '"sport"="american_football"'], ['Baseball', '"sport"="baseball"'], ['Basketball', '"sport"="basketball"'], ['Cycling', '"sport"="cycling"'], ['Gymnastics', '"sport"="gymnastics"'], ['Golf', '"sport"="golf"'], ['Hockey', '"sport"="hockey"'], ['Horse racing', '"sport"="horse_racing"'], ['Ice hockey', '"sport"="ice_hockey"'], ['Soccer', '"sport"="soccer"'], ['Sports centre', '"leisure"="sports_centre"'], ['Surfing', '"sport"="surfing"'], ['Swimming', '"sport"="swimming"'], ['Tennis', '"sport"="tennis"'], ['Volleyball', '"sport"="volleyball"'], ['Busstop', '"highway"="bus_stop"'], ['E-bike charging', '"amenity"="charging_station"'], ['Recycling', '"amenity"="recycling"'], ['Fixme', '"fixme"~".",i'], ['Note-Node', '"type"="node"'], ['Note-Way', '"type"="way"'], ['Image', '"image"~".",i']]
-}
-
-ADVANCED_CONFIG = {}
-
-# -----------------------------------------------------------------------------
-# 3. SIDEBAR CONTROLS & GEOPROCESSING
-# -----------------------------------------------------------------------------
-# Sidebar toggle button - floating on left edge
-# Use JavaScript to handle the toggle with proper state management
-st.markdown("""
-    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebarDynamic()">SIDEBAR</button>
-    <script>
-        function toggleSidebarDynamic() {
-            const container = document.querySelector('[data-testid="stAppViewContainer"]');
-            const btn = document.getElementById('sidebarToggleBtn');
-            
-            // Toggle the class
-            container.classList.toggle('sidebar-collapsed');
-            
-            // Update button text
-            if (container.classList.contains('sidebar-collapsed')) {
-                btn.textContent = 'OPEN';
-                btn.style.background = 'rgba(201, 171, 76, 0.9)';
-            } else {
-                btn.textContent = 'SIDEBAR';
-                btn.style.background = 'rgba(0, 51, 102, 0.85)';
-            }
-            
-            // Store state in a data attribute for persistence
-            const isCollapsed = container.classList.contains('sidebar-collapsed');
-            container.dataset.sidebarCollapsed = isCollapsed ? 'true' : 'false';
-            
-            // Trigger a Streamlit rerun to persist state
-            // We'll use a hidden input to communicate with Python
-            const hiddenInput = document.getElementById('sidebar_state_input');
-            if (hiddenInput) {
-                hiddenInput.value = isCollapsed ? 'collapsed' : 'expanded';
-                hiddenInput.dispatchEvent(new Event('change'));
-            }
+        # Create POI entry
+        poi = {
+            'lat': lat,
+            'lon': lon,
+            'name': name,
+            'type': primary_type,
+            'tags': tags_dict,
+            'uid': f"{elem_type}_{elem_id}",
+            'source': 'overpass',
+            'elevation': tags_dict.get('ele'),
+            'address': tags_dict.get('addr:full', '')
         }
         
-        // Check for saved state on load
-        document.addEventListener('DOMContentLoaded', function() {
-            const container = document.querySelector('[data-testid="stAppViewContainer"]');
-            const savedState = container.dataset.sidebarCollapsed;
-            const btn = document.getElementById('sidebarToggleBtn');
+        # Add additional metadata if available
+        if 'opening_hours' in tags_dict:
+            poi['opening_hours'] = tags_dict['opening_hours']
+        if 'phone' in tags_dict:
+            poi['phone'] = tags_dict['phone']
+        if 'website' in tags_dict:
+            poi['website'] = tags_dict['website']
+        
+        pois.append(poi)
+    
+    return pois
+
+# ============================================================================
+# DATA FETCHING
+# ============================================================================
+
+def fetch_pois(query: str, center_lat: float, center_lon: float, radius: int) -> List[Dict]:
+    """Main function to fetch POIs from Overpass API with multi-endpoint support"""
+    all_pois = []
+    
+    # Parse query
+    tags = parse_search_query(query)
+    if not tags:
+        add_log("No valid tags found in query", "WARNING")
+        return []
+    
+    add_log(f"Fetching POIs for tags: {', '.join(tags)}", "INFO")
+    add_log(f"Center: {center_lat:.6f}, {center_lon:.6f}, Radius: {radius}m", "INFO")
+    
+    start_time = time.time()
+    
+    # Try primary query
+    primary_query = build_overpass_query(tags, center_lat, center_lon, radius)
+    
+    if primary_query:
+        data, endpoint = overpass_api.execute_query(primary_query)
+        
+        if data:
+            pois = process_overpass_results(data, tags)
+            all_pois.extend(pois)
+            add_log(f"Primary query found {len(pois)} POIs from {endpoint}", "INFO")
+    
+    # If not enough results, try advanced query
+    if len(all_pois) < 20:
+        add_log("Limited results, trying advanced query", "INFO")
+        advanced_query = build_advanced_overpass_query(tags, center_lat, center_lon, radius)
+        
+        if advanced_query:
+            data, endpoint = overpass_api.execute_query(advanced_query, max_retries=2)
             
-            // Check if we have a saved state
-            if (savedState === 'true') {
-                container.classList.add('sidebar-collapsed');
-                if (btn) {
-                    btn.textContent = 'OPEN';
-                    btn.style.background = 'rgba(201, 171, 76, 0.9)';
-                }
-            }
-        });
-    </script>
-""", unsafe_allow_html=True)
+            if data:
+                additional_pois = process_overpass_results(data, tags)
+                # Merge with existing, avoiding duplicates
+                existing_ids = {poi['uid'] for poi in all_pois}
+                for poi in additional_pois:
+                    if poi['uid'] not in existing_ids:
+                        all_pois.append(poi)
+                        existing_ids.add(poi['uid'])
+                
+                add_log(f"Advanced query added {len(additional_pois)} additional POIs", "INFO")
+    
+    # If still not enough, try expanding radius
+    if len(all_pois) < 10 and radius < 5000:
+        expanded_radius = min(radius * 2, 50000)
+        add_log(f"Expanding radius to {expanded_radius}m", "INFO")
+        
+        expanded_query = build_overpass_query(tags, center_lat, center_lon, expanded_radius)
+        if expanded_query:
+            data, endpoint = overpass_api.execute_query(expanded_query, max_retries=2)
+            
+            if data:
+                expanded_pois = process_overpass_results(data, tags)
+                existing_ids = {poi['uid'] for poi in all_pois}
+                for poi in expanded_pois:
+                    if poi['uid'] not in existing_ids:
+                        all_pois.append(poi)
+                        existing_ids.add(poi['uid'])
+                
+                add_log(f"Expanded radius found {len(expanded_pois)} additional POIs", "INFO")
+    
+    elapsed_time = time.time() - start_time
+    st.session_state.query_time = elapsed_time
+    st.session_state.retry_count = overpass_api.status.get(overpass_api.active_endpoint, {}).get('error_count', 0)
+    
+    add_log(f"Total {len(all_pois)} POIs fetched in {elapsed_time:.2f}s", "SUCCESS")
+    
+    # Update endpoint status in session
+    st.session_state.active_endpoint = overpass_api.active_endpoint
+    st.session_state.overpass_status = overpass_api.status
+    
+    return all_pois
 
-# Hidden input to communicate sidebar state to Python
-sidebar_state = st.text_input("", key="sidebar_state_input", label_visibility="collapsed", placeholder="sidebar_state")
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """Calculate distance between two points in meters"""
+    R = 6371000  # Earth radius in meters
+    phi1 = np.radians(lat1)
+    phi2 = np.radians(lat2)
+    delta_phi = np.radians(lat2 - lat1)
+    delta_lambda = np.radians(lon2 - lon1)
+    
+    a = np.sin(delta_phi/2)**2 + np.cos(phi1) * np.cos(phi2) * np.sin(delta_lambda/2)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    return R * c
 
-# Update Python state based on hidden input
-if sidebar_state == "collapsed":
-    st.session_state.sidebar_collapsed = True
-elif sidebar_state == "expanded":
-    st.session_state.sidebar_collapsed = False
+# ============================================================================
+# STATE EXPORT/IMPORT
+# ============================================================================
 
-# Apply sidebar collapsed class if state is set
-if st.session_state.sidebar_collapsed:
+def export_state() -> Dict:
+    """Export complete application state"""
+    export_data = {
+        "version": "1.0",
+        "timestamp": datetime.now().isoformat(),
+        "metadata": {
+            "app_name": "Open Node",
+            "export_type": "complete_state",
+            "exported_by": "user",
+            "source": "overpass_api"
+        },
+        "viewport": {
+            "center": st.session_state.map_viewport.get('center', [14.5995, 120.9842]),
+            "zoom": st.session_state.map_viewport.get('zoom', 13),
+            "bounds": st.session_state.map_viewport.get('bounds', [])
+        },
+        "pois": st.session_state.scanned_records,
+        "layers": st.session_state.layer_meta,
+        "clusters": st.session_state.layer_groups,
+        "settings": {
+            "label_size": st.session_state.label_size,
+            "marker_style": st.session_state.marker_style,
+            "marker_size": st.session_state.marker_size,
+            "marker_color": st.session_state.marker_color,
+            "basemap": st.session_state.get('basemap', 'osm')
+        },
+        "search_history": st.session_state.search_history,
+        "current_query": st.session_state.current_query,
+        "geo_coords": st.session_state.geo_coords,
+        "geo_radius": st.session_state.geo_radius,
+        "poi_count": st.session_state.poi_count,
+        "visibility": st.session_state.poi_visibility,
+        "query_metadata": {
+            "query_time": st.session_state.get('query_time'),
+            "active_endpoint": st.session_state.get('active_endpoint'),
+            "retry_count": st.session_state.get('retry_count', 0)
+        }
+    }
+    return export_data
+
+def import_state(import_data: Dict) -> bool:
+    """Import complete application state"""
+    try:
+        # Validate import data
+        if not import_data or 'version' not in import_data:
+            add_log("Invalid import data", "ERROR")
+            return False
+        
+        # Restore state
+        if 'pois' in import_data:
+            st.session_state.scanned_records = import_data['pois']
+        
+        if 'layers' in import_data:
+            st.session_state.layer_meta = import_data['layers']
+        
+        if 'clusters' in import_data:
+            st.session_state.layer_groups = import_data['clusters']
+        
+        if 'settings' in import_data:
+            settings = import_data['settings']
+            st.session_state.label_size = settings.get('label_size', 9)
+            st.session_state.marker_style = settings.get('marker_style', 'modern-pin')
+            st.session_state.marker_size = settings.get('marker_size', 16)
+            st.session_state.marker_color = settings.get('marker_color', '#003366')
+            st.session_state.basemap = settings.get('basemap', 'osm')
+        
+        if 'search_history' in import_data:
+            st.session_state.search_history = import_data['search_history']
+        
+        if 'current_query' in import_data:
+            st.session_state.current_query = import_data['current_query']
+        
+        if 'geo_coords' in import_data:
+            st.session_state.geo_coords = import_data['geo_coords']
+        
+        if 'geo_radius' in import_data:
+            st.session_state.geo_radius = import_data['geo_radius']
+        
+        if 'poi_count' in import_data:
+            st.session_state.poi_count = import_data['poi_count']
+        
+        if 'visibility' in import_data:
+            st.session_state.poi_visibility = import_data['visibility']
+        
+        if 'viewport' in import_data:
+            st.session_state.map_viewport = import_data['viewport']
+        
+        if 'query_metadata' in import_data:
+            metadata = import_data['query_metadata']
+            st.session_state.query_time = metadata.get('query_time')
+            st.session_state.active_endpoint = metadata.get('active_endpoint')
+            st.session_state.retry_count = metadata.get('retry_count', 0)
+        
+        add_log(f"State imported successfully from {import_data.get('timestamp', 'unknown date')}", "INFO")
+        return True
+        
+    except Exception as e:
+        add_log(f"Error importing state: {str(e)}", "ERROR")
+        return False
+
+# ============================================================================
+# MAP GENERATION
+# ============================================================================
+
+def create_map():
+    """Create the main map with all POIs"""
+    center_lat, center_lon = parse_coordinates(st.session_state.geo_coords)
+    
+    # Create base map
+    m = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=st.session_state.map_viewport.get('zoom', 13),
+        tiles='OpenStreetMap',
+        control_scale=True
+    )
+    
+    # Add basemap options
+    folium.TileLayer(
+        tiles='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        name='OpenStreetMap',
+        attr='OpenStreetMap'
+    ).add_to(m)
+    
+    folium.TileLayer(
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        name='Satellite',
+        attr='Esri'
+    ).add_to(m)
+    
+    folium.TileLayer(
+        tiles='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        name='Carto Light',
+        attr='CartoDB'
+    ).add_to(m)
+    
+    folium.TileLayer(
+        tiles='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        name='Carto Dark',
+        attr='CartoDB'
+    ).add_to(m)
+    
+    # Add fullscreen button
+    Fullscreen(
+        position='topright',
+        title='Fullscreen',
+        title_cancel='Exit Fullscreen'
+    ).add_to(m)
+    
+    # Add radius circle
+    folium.Circle(
+        location=[center_lat, center_lon],
+        radius=st.session_state.geo_radius,
+        color='#003366',
+        fill=True,
+        fill_color='#003366',
+        fill_opacity=0.05,
+        weight=2,
+        popup=f"Search Radius: {st.session_state.geo_radius}m"
+    ).add_to(m)
+    
+    # Add target marker
+    folium.Marker(
+        location=[center_lat, center_lon],
+        icon=folium.Icon(color='red', icon='target', prefix='fa'),
+        popup='Scan Center'
+    ).add_to(m)
+    
+    # Add POIs
+    if st.session_state.scanned_records:
+        pois = st.session_state.scanned_records
+        
+        # Group by type for layer management
+        poi_types = {}
+        for poi in pois:
+            poi_type = poi.get('type', 'unknown')
+            if poi_type not in poi_types:
+                poi_types[poi_type] = []
+            poi_types[poi_type].append(poi)
+        
+        # Create markers for each type
+        for poi_type, type_pois in poi_types.items():
+            # Get layer configuration
+            layer_config = st.session_state.layer_meta.get(poi_type, {})
+            color = layer_config.get('color', st.session_state.marker_color)
+            style = layer_config.get('style', st.session_state.marker_style)
+            size = layer_config.get('size', st.session_state.marker_size)
+            visible = layer_config.get('visible', True)
+            
+            if not visible:
+                continue
+            
+            # Create feature group for this type
+            fg = folium.FeatureGroup(name=poi_type.title())
+            
+            for poi in type_pois:
+                lat = poi.get('lat')
+                lon = poi.get('lon')
+                name = poi.get('name', 'Unnamed')
+                
+                if lat is None or lon is None:
+                    continue
+                
+                # Create popup content
+                popup_content = f"""
+                <div style="font-family: Montserrat, sans-serif; padding: 10px; max-width: 300px;">
+                    <h4 style="color: #003366; margin: 0 0 5px 0;">{name}</h4>
+                    <hr style="margin: 5px 0; border-color: #C9AB4C;">
+                    <div style="font-size: 12px;">
+                        <b>Type:</b> {poi_type.title()}<br>
+                        <b>Location:</b> {lat:.6f}, {lon:.6f}<br>
+                """
+                
+                # Add additional info
+                if 'address' in poi and poi['address']:
+                    popup_content += f"<b>Address:</b> {poi['address']}<br>"
+                
+                if 'opening_hours' in poi and poi['opening_hours']:
+                    popup_content += f"<b>Hours:</b> {poi['opening_hours']}<br>"
+                
+                if 'phone' in poi and poi['phone']:
+                    popup_content += f"<b>Phone:</b> {poi['phone']}<br>"
+                
+                # Add tags
+                tags = poi.get('tags', {})
+                if tags:
+                    popup_content += "<b>Tags:</b><br>"
+                    for key, value in list(tags.items())[:5]:
+                        popup_content += f"&nbsp;&nbsp;{key}: {value}<br>"
+                
+                popup_content += """
+                        <hr style="margin: 5px 0;">
+                        <button onclick="window.parent.postMessage({type: 'poi_click', data: {name: '%s'}}, '*')" 
+                                style="background: #003366; color: white; border: none; padding: 4px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">
+                            Select
+                        </button>
+                    </div>
+                """ % name
+                
+                # Create marker based on style
+                if style == "dot":
+                    icon = folium.plugins.BeautifyIcon(
+                        icon='circle',
+                        icon_shape='circle',
+                        border_color=color,
+                        background_color=color,
+                        border_width=2,
+                        inner_icon_style=f'font-size:{size}px;',
+                        opacity=0.8
+                    )
+                elif style == "pin":
+                    icon = folium.Icon(
+                        color='blue' if color == '#003366' else 'red',
+                        icon='info-sign',
+                        prefix='glyphicon'
+                    )
+                else:  # modern-pin
+                    icon = folium.plugins.BeautifyIcon(
+                        icon='map-marker',
+                        icon_shape='marker',
+                        border_color=color,
+                        background_color=color,
+                        border_width=2,
+                        inner_icon_style=f'font-size:{size}px;color:white;',
+                        text_color='white'
+                    )
+                
+                # Create marker with popup
+                marker = folium.Marker(
+                    location=[lat, lon],
+                    popup=folium.Popup(popup_content, max_width=350),
+                    tooltip=name,
+                    icon=icon
+                )
+                
+                marker.add_to(fg)
+            
+            fg.add_to(m)
+    
+    # Add layer control
+    folium.LayerControl(position='topright').add_to(m)
+    
+    return m
+
+def parse_coordinates(coord_str: str) -> Tuple[float, float]:
+    """Parse coordinate string to lat/lon"""
+    try:
+        parts = coord_str.replace(' ', '').split(',')
+        if len(parts) == 2:
+            lat = float(parts[0])
+            lon = float(parts[1])
+            if -90 <= lat <= 90 and -180 <= lon <= 180:
+                return lat, lon
+    except:
+        pass
+    return 14.5995, 120.9842  # Default to Manila
+
+# ============================================================================
+# SIDEBAR COMPONENTS
+# ============================================================================
+
+def render_sidebar():
+    """Render the sidebar panel"""
     st.markdown("""
-        <script>
-            const container = document.querySelector('[data-testid="stAppViewContainer"]');
-            if (!container.classList.contains('sidebar-collapsed')) {
-                container.classList.add('sidebar-collapsed');
-                const btn = document.getElementById('sidebarToggleBtn');
-                if (btn) {
-                    btn.textContent = 'OPEN';
-                    btn.style.background = 'rgba(201, 171, 76, 0.9)';
-                }
-                container.dataset.sidebarCollapsed = 'true';
+    <div class="brand-header">
+        <div class="brand-title">Open Node</div>
+        <div class="brand-subtitle">Geospatial POI Explorer</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Search Section
+    with st.expander("🔍 SEARCH & SCAN", expanded=True):
+        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+        
+        # Search input
+        st.markdown('<div class="section-title">Query Tags</div>', unsafe_allow_html=True)
+        search_query = st.text_input(
+            "OSM Tags",
+            value=st.session_state.current_query,
+            placeholder="amenity=restaurant, shop=supermarket",
+            help="Comma-separated OSM tags (e.g., amenity=restaurant, shop=supermarket)",
+            key="search_input"
+        )
+        st.session_state.current_query = search_query
+        
+        # Search history
+        if st.session_state.search_history:
+            with st.popover("📜 Search History"):
+                for q in st.session_state.search_history[-10:]:
+                    if st.button(q, key=f"hist_{q}", use_container_width=True):
+                        st.session_state.current_query = q
+                        st.rerun()
+        
+        # Tag suggestions
+        with st.popover("💡 Common Tags"):
+            common_tags = [
+                "amenity=restaurant", "amenity=cafe", "amenity=bar",
+                "shop=supermarket", "shop=clothing", "shop=electronics",
+                "tourism=hotel", "tourism=museum", "tourism=attraction",
+                "leisure=park", "leisure=cinema", "leisure=garden",
+                "sport=soccer", "sport=tennis", "sport=golf",
+                "amenity=hospital", "amenity=school", "amenity=library"
+            ]
+            cols = st.columns(2)
+            for i, tag in enumerate(common_tags):
+                col = cols[i % 2]
+                if col.button(tag, key=f"sug_{tag}", use_container_width=True):
+                    if st.session_state.current_query:
+                        st.session_state.current_query += f", {tag}"
+                    else:
+                        st.session_state.current_query = tag
+                    st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Scan area
+        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Scan Area</div>', unsafe_allow_html=True)
+        
+        coord_input = st.text_input(
+            "Coordinates",
+            value=st.session_state.geo_coords,
+            placeholder="14.5995, 120.9842",
+            help="Latitude, Longitude"
+        )
+        st.session_state.geo_coords = coord_input
+        
+        radius = st.slider(
+            "Radius (meters)",
+            min_value=100,
+            max_value=50000,
+            value=st.session_state.geo_radius,
+            step=100,
+            format="%d m"
+        )
+        st.session_state.geo_radius = radius
+        
+        # Scan button
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            if st.button("🔍 SCAN AREA", type="primary", use_container_width=True):
+                scan_area()
+        with col2:
+            if st.button("🗑️", help="Clear all POIs"):
+                clear_all()
+        
+        # API status
+        if st.session_state.active_endpoint:
+            status_color = "status-online"
+            status_text = "Online"
+            if st.session_state.retry_count > 0:
+                status_color = "status-unknown"
+                status_text = f"Degraded ({st.session_state.retry_count} retries)"
+            st.markdown(f"""
+            <div style="font-size:11px;margin-top:8px;text-align:center;">
+                <span class="{status_color}">●</span> 
+                API: {status_text}
+                {f'({st.session_state.query_time:.1f}s)' if st.session_state.query_time else ''}
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Stats Section
+    with st.expander("📊 STATISTICS", expanded=True):
+        cols = st.columns(3)
+        with cols[0]:
+            st.markdown(f"""
+            <div class="stat-box">
+                <div class="stat-number">{st.session_state.poi_count}</div>
+                <div class="stat-label">POIs Found</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with cols[1]:
+            st.markdown(f"""
+            <div class="stat-box">
+                <div class="stat-number">{len(st.session_state.layer_meta)}</div>
+                <div class="stat-label">Layer Types</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with cols[2]:
+            last_scan = st.session_state.last_scan_time
+            if last_scan:
+                time_str = last_scan.strftime("%H:%M:%S")
+            else:
+                time_str = "Never"
+            st.markdown(f"""
+            <div class="stat-box">
+                <div class="stat-number" style="font-size:16px;">{time_str}</div>
+                <div class="stat-label">Last Scan</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Export Section
+    with st.expander("💾 EXPORT / IMPORT", expanded=True):
+        # Export buttons
+        if st.button("📤 Export State", use_container_width=True, type="primary"):
+            export_data = export_state()
+            json_str = json.dumps(export_data, indent=2)
+            
+            # Create download button
+            b64 = base64.b64encode(json_str.encode()).decode()
+            href = f'<a href="data:application/json;base64,{b64}" download="opennode_state_{datetime.now().strftime("%Y%m%d_%H%M%S")}.opennode" style="text-decoration:none;color:white;background:#003366;padding:8px 16px;border-radius:4px;display:inline-block;width:100%;text-align:center;">Download .opennode</a>'
+            st.markdown(href, unsafe_allow_html=True)
+            add_log("State exported successfully", "INFO")
+        
+        # Import
+        uploaded_file = st.file_uploader(
+            "Import .opennode file",
+            type=['opennode', 'json'],
+            help="Upload a previously exported Open Node state file"
+        )
+        
+        if uploaded_file is not None:
+            try:
+                import_data = json.load(uploaded_file)
+                if import_state(import_data):
+                    st.success("✅ State imported successfully!")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to import state")
+            except Exception as e:
+                st.error(f"Error importing file: {str(e)}")
+    
+    # Logs Section
+    with st.expander("📋 SESSION LOGS"):
+        st.markdown('<div class="log-container">', unsafe_allow_html=True)
+        for log in st.session_state.session_logs[:50]:
+            level_color = {
+                'INFO': '#00ff00',
+                'WARNING': '#ffff00',
+                'ERROR': '#ff0000',
+                'SUCCESS': '#00ff88'
+            }.get(log['level'], '#ffffff')
+            st.markdown(
+                f'<div class="log-entry"><span class="log-time">[{log["time"]}]</span>'
+                f'<span style="color:{level_color};">{log["message"]}</span></div>',
+                unsafe_allow_html=True
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        if st.button("Clear Logs", use_container_width=True):
+            st.session_state.session_logs = []
+            st.rerun()
+    
+    # Layer Management
+    if st.session_state.scanned_records:
+        with st.expander("🎨 LAYER MANAGEMENT", expanded=True):
+            # Get unique types
+            poi_types = set()
+            for poi in st.session_state.scanned_records:
+                poi_types.add(poi.get('type', 'unknown'))
+            
+            for poi_type in sorted(poi_types):
+                st.markdown(f'<div style="font-size:13px;font-weight:600;color:#003366;margin-top:5px;">{poi_type.title()}</div>', unsafe_allow_html=True)
+                
+                cols = st.columns([2, 1, 1])
+                with cols[0]:
+                    # Color picker
+                    current_color = st.session_state.layer_meta.get(poi_type, {}).get('color', st.session_state.marker_color)
+                    new_color = st.color_picker(
+                        "Color",
+                        value=current_color,
+                        key=f"color_{poi_type}",
+                        label_visibility="collapsed"
+                    )
+                    if new_color != current_color:
+                        if poi_type not in st.session_state.layer_meta:
+                            st.session_state.layer_meta[poi_type] = {}
+                        st.session_state.layer_meta[poi_type]['color'] = new_color
+                
+                with cols[1]:
+                    # Visibility toggle
+                    visible = st.session_state.layer_meta.get(poi_type, {}).get('visible', True)
+                    if st.button("👁️" if visible else "🚫", key=f"vis_{poi_type}", help="Toggle visibility"):
+                        if poi_type not in st.session_state.layer_meta:
+                            st.session_state.layer_meta[poi_type] = {}
+                        st.session_state.layer_meta[poi_type]['visible'] = not visible
+                        st.rerun()
+                
+                with cols[2]:
+                    # Style selector
+                    current_style = st.session_state.layer_meta.get(poi_type, {}).get('style', 'modern-pin')
+                    new_style = st.selectbox(
+                        "Style",
+                        ['dot', 'pin', 'modern-pin'],
+                        index=['dot', 'pin', 'modern-pin'].index(current_style) if current_style in ['dot', 'pin', 'modern-pin'] else 2,
+                        key=f"style_{poi_type}",
+                        label_visibility="collapsed"
+                    )
+                    if new_style != current_style:
+                        if poi_type not in st.session_state.layer_meta:
+                            st.session_state.layer_meta[poi_type] = {}
+                        st.session_state.layer_meta[poi_type]['style'] = new_style
+
+# ============================================================================
+# ACTION FUNCTIONS
+# ============================================================================
+
+def scan_area():
+    """Execute area scan using Overpass API"""
+    if not st.session_state.current_query:
+        st.warning("⚠️ Please enter a search query")
+        add_log("Scan attempted with empty query", "WARNING")
+        return
+    
+    add_log(f"Starting scan with query: {st.session_state.current_query}", "INFO")
+    
+    # Parse coordinates
+    lat, lon = parse_coordinates(st.session_state.geo_coords)
+    
+    # Fetch POIs from Overpass
+    pois = fetch_pois(
+        st.session_state.current_query,
+        lat,
+        lon,
+        st.session_state.geo_radius
+    )
+    
+    # Update session state
+    st.session_state.scanned_records = pois
+    st.session_state.poi_count = len(pois)
+    st.session_state.last_scan_time = datetime.now()
+    
+    # Update search history
+    if st.session_state.current_query not in st.session_state.search_history:
+        st.session_state.search_history.append(st.session_state.current_query)
+        if len(st.session_state.search_history) > 20:
+            st.session_state.search_history = st.session_state.search_history[-20:]
+    
+    # Auto-generate layer groups
+    poi_types = set()
+    for poi in pois:
+        poi_types.add(poi.get('type', 'unknown'))
+    
+    for poi_type in poi_types:
+        if poi_type not in st.session_state.layer_meta:
+            st.session_state.layer_meta[poi_type] = {
+                'color': st.session_state.marker_color,
+                'style': st.session_state.marker_style,
+                'size': st.session_state.marker_size,
+                'visible': True
             }
-        </script>
+    
+    add_log(f"Scan complete: {len(pois)} POIs found", "SUCCESS")
+    
+    if len(pois) == 0:
+        st.warning("⚠️ No POIs found. Try adjusting the search query or expanding the radius.")
+
+def clear_all():
+    """Clear all POIs and reset state"""
+    st.session_state.scanned_records = []
+    st.session_state.poi_count = 0
+    st.session_state.layer_meta = {}
+    st.session_state.layer_groups = {}
+    st.session_state.poi_visibility = {}
+    st.session_state.last_scan_time = None
+    st.session_state.query_time = None
+    st.session_state.retry_count = 0
+    add_log("All POIs cleared", "INFO")
+    st.rerun()
+
+def export_geojson():
+    """Export POIs as GeoJSON"""
+    if not st.session_state.scanned_records:
+        st.warning("No POIs to export")
+        return
+    
+    # Convert to GeoJSON format
+    features = []
+    for poi in st.session_state.scanned_records:
+        feature = {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [poi.get('lon'), poi.get('lat')]
+            },
+            "properties": {
+                "name": poi.get('name', 'Unnamed'),
+                "type": poi.get('type', 'unknown'),
+                "tags": poi.get('tags', {}),
+                "address": poi.get('address', ''),
+                "opening_hours": poi.get('opening_hours', ''),
+                "phone": poi.get('phone', ''),
+                "website": poi.get('website', '')
+            }
+        }
+        features.append(feature)
+    
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": {
+            "exported_at": datetime.now().isoformat(),
+            "source": "Open Node - Overpass API",
+            "query": st.session_state.current_query,
+            "total_features": len(features)
+        }
+    }
+    
+    return geojson
+
+# ============================================================================
+# MAIN APPLICATION
+# ============================================================================
+
+def main():
+    # Create layout
+    col1, col2 = st.columns([1, 4])
+    
+    with col1:
+        render_sidebar()
+    
+    with col2:
+        # Map container
+        st.markdown('<div class="map-container">', unsafe_allow_html=True)
+        
+        # Create and display map
+        m = create_map()
+        folium_static(m, width=None, height=700)
+        
+        # Map controls below map
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+        
+        with col1:
+            # Export GeoJSON
+            if st.button("📥 Export GeoJSON", use_container_width=True):
+                geojson_data = export_geojson()
+                if geojson_data:
+                    json_str = json.dumps(geojson_data, indent=2)
+                    b64 = base64.b64encode(json_str.encode()).decode()
+                    href = f'<a href="data:application/json;base64,{b64}" download="opennode_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.geojson" style="text-decoration:none;color:white;background:#003366;padding:8px 16px;border-radius:4px;display:inline-block;width:100%;text-align:center;">Download GeoJSON</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+                    add_log("GeoJSON exported", "INFO")
+        
+        with col2:
+            # Export KML (simplified version)
+            if st.button("📍 Export KML", use_container_width=True):
+                st.info("KML export coming soon!")
+                add_log("KML export requested", "INFO")
+        
+        with col3:
+            # Export CSV
+            if st.button("📊 Export CSV", use_container_width=True):
+                if st.session_state.scanned_records:
+                    df = pd.DataFrame(st.session_state.scanned_records)
+                    csv = df.to_csv(index=False)
+                    b64 = base64.b64encode(csv.encode()).decode()
+                    href = f'<a href="data:text/csv;base64,{b64}" download="opennode_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv" style="text-decoration:none;color:white;background:#003366;padding:8px 16px;border-radius:4px;display:inline-block;width:100%;text-align:center;">Download CSV</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+                    add_log("CSV exported", "INFO")
+                else:
+                    st.warning("No data to export")
+        
+        with col4:
+            # Settings
+            with st.popover("⚙️ Settings"):
+                label_size = st.slider(
+                    "Label Size",
+                    min_value=6,
+                    max_value=20,
+                    value=st.session_state.label_size
+                )
+                st.session_state.label_size = label_size
+                
+                marker_size = st.slider(
+                    "Marker Size",
+                    min_value=8,
+                    max_value=32,
+                    value=st.session_state.marker_size
+                )
+                st.session_state.marker_size = marker_size
+                
+                marker_color = st.color_picker(
+                    "Default Marker Color",
+                    value=st.session_state.marker_color
+                )
+                st.session_state.marker_color = marker_color
+                
+                marker_style = st.selectbox(
+                    "Default Marker Style",
+                    ['modern-pin', 'pin', 'dot'],
+                    index=['modern-pin', 'pin', 'dot'].index(st.session_state.marker_style)
+                )
+                st.session_state.marker_style = marker_style
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Footer
+    st.markdown("""
+    <div style="text-align:center;padding:20px;color:#666;font-size:12px;font-family:Montserrat,sans-serif;border-top:1px solid #e0e0e0;margin-top:20px;">
+        Open Node • Geospatial POI Explorer • Data from OpenStreetMap via Overpass API
+    </div>
     """, unsafe_allow_html=True)
 
-with st.sidebar:
-    st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
-    
-    selected_tags = []
-    scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
-    
-    location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
-    radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
-    st.session_state.geo_radius = radius_val
-
-    coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
-    if coord_match:
-        lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
-        st.session_state.geo_coords = location_input
-    else:
-        fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-        lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
-
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-    search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-    
-    for cat_name, node_items in POI_CONFIG.items():
-        matched = [item for item in node_items if search_query in item[0].lower()]
-        if matched:
-            with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                for label, tag in matched:
-                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
-
-    st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
-    with st.container():
-        for cat_name, node_items in ADVANCED_CONFIG.items():
-            matched = [item for item in node_items if search_query in item[0].lower()]
-            if matched:
-                with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                    for label, tag in matched:
-                        if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
-
-    if scan_triggered:
-        log_event("USER_ACTION", "SCAN_BUTTON_CLICKED", {
-            "coordinates": f"{lat_coord}, {lon_coord}",
-            "radius": radius_val,
-            "selected_tags_count": len(selected_tags)
-        })
-        if not selected_tags:
-            st.error("Select ≥ 1 layer.")
-            add_api_log("Scan attempted with no layers selected", "ERROR")
-            log_event("ERROR", "SCAN_FAILED_NO_TAGS", {"reason": "No layers selected"})
-        else:
-            add_api_log(f"Scan initiated with {len(selected_tags)} tags", "INFO")
-            st.session_state.scan_active_loading = True
-            st.rerun()
-            
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("CLEAR ALL", type="primary", key="clear_btn"):
-        st.session_state.scanned_records = []
-        st.session_state.layer_meta = {}
-        st.session_state.layer_groups = {}
-        st.session_state.network_stats = None
-        st.session_state.scan_active_loading = False
-        clear_api_logs()
-        for key in list(st.session_state.keys()):
-            if key.startswith("chk_"): st.session_state[key] = False
-        add_api_log("Cleared all data and logs", "INFO")
-        st.rerun()
-
-    st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
-    with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
-    with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
-
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-    with st.popover("IMPORT FILE", use_container_width=True):
-        imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
-        if imported_file is not None:
-            if st.button("LOAD", type="secondary", use_container_width=True):
-                try:
-                    data = json.load(imported_file)
-                    st.session_state.scanned_records = data.get("scanned_records", data)
-                    st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
-                    st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
-                    add_api_log(f"Imported {len(st.session_state.scanned_records)} records from file", "INFO")
-                    st.rerun()
-                except Exception as e:
-                    st.error("Invalid File")
-                    add_api_log(f"Import failed: {str(e)[:100]}", "ERROR")
-
-    # -------------------------------------------------------------------------
-    # SESSION LOGS (Minimal - No Emojis)
-    # -------------------------------------------------------------------------
-    st.markdown("<hr style='margin: 8px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
-    
-    with st.expander("SESSION LOGS", expanded=False):
-        st.markdown("<div style='font-size: 8px; font-weight: 600; margin-bottom: 4px; color: #888780;'>debug information</div>", unsafe_allow_html=True)
-        
-        col_log1, col_log2, col_log3 = st.columns(3)
-        with col_log1:
-            if st.button("REFRESH", key="refresh_logs", use_container_width=True):
-                st.rerun()
-        with col_log2:
-            if st.button("CLEAR", key="clear_logs_btn", use_container_width=True):
-                st.session_state.api_logs = []
-                st.session_state.event_logs = []
-                st.rerun()
-        with col_log3:
-            if st.session_state.get('event_logs', []):
-                all_logs = {
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "events": st.session_state.event_logs,
-                    "api_logs": st.session_state.api_logs,
-                    "final_state": {
-                        "poi_count": len(st.session_state.get('scanned_records', []))
-                    }
-                }
-                logs_json = json.dumps(all_logs, indent=2)
-                st.download_button(
-                    "EXPORT",
-                    logs_json,
-                    file_name=f"opennode_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json",
-                    use_container_width=True
-                )
-        
-        st.markdown("---")
-        st.markdown("### event timeline")
-        
-        if st.session_state.get('event_logs', []):
-            log_text = ""
-            for log in st.session_state.event_logs[-30:]:
-                time_str = log.get('timestamp', '')[-12:-3] if log.get('timestamp') else ''
-                event_type = log.get('event_type', '')
-                event_name = log.get('event_name', '')
-                level = log.get('level', 'INFO')
-                
-                prefix = "[ERR]" if level == 'ERROR' else "[WRN]" if level == 'WARNING' else "[INF]"
-                log_text += f"{prefix} [{time_str}] {event_type}: {event_name}\n"
-                
-                if log.get('event_data'):
-                    data_str = str(log.get('event_data'))[:80]
-                    log_text += f"     {data_str}\n"
-            
-            st.code(log_text, language="text", line_numbers=False)
-        else:
-            st.info("No events logged. Click SCAN AREA to generate logs.")
-        
-        st.markdown("---")
-        st.markdown("### current state")
-        st.code(f"""
-poi_count: {len(st.session_state.get('scanned_records', []))}
-scan_active: {st.session_state.get('scan_active_loading', False)}
-label_size: {st.session_state.get('label_size', 9)}
-fullscreen: {st.session_state.get('fullscreen_active', False)}
-sidebar: {'collapsed' if st.session_state.get('sidebar_collapsed', False) else 'expanded'}
-        """, language="text", line_numbers=False)
-
-# -----------------------------------------------------------------------------
-# PIPELINE STAGE PIPING CONTROLLER
-# -----------------------------------------------------------------------------
-main_canvas = st.empty()
-
-if st.session_state.scan_active_loading:
-    log_event("PROCESS", "POI_LOADING_STARTED", {
-        "coordinates": f"{lat_coord}, {lon_coord}",
-        "radius": radius_val,
-        "tags_count": len(selected_tags)
-    })
-    
-    records = []
-    success = False
-    
-    main_canvas.markdown(f'''
-        <div class="py-loading-container">
-            <div class="py-spinner"></div>
-            <div class="py-loading-title">LOADING POI DATA...</div>
-            <div class="py-loading-subtitle">Radius: {radius_val}m | Tags: {len(selected_tags)}</div>
-            <div class="py-loading-subtitle" id="scan-status-text">Finding your province...</div>
-        </div>
-        <script>
-            const statusDiv = document.getElementById('scan-status-text');
-            const statusMessages = [
-                "Finding province from coordinates...",
-                "Loading province POI data from GitHub...",
-                "Filtering by radius...",
-                "Applying tag filters...",
-                "Ready!"
-            ];
-            let idx = 0;
-            if(statusDiv) {{
-                setInterval(() => {{
-                    idx = (idx + 1) % statusMessages.length;
-                    statusDiv.innerText = statusMessages[idx];
-                }}, 1000);
-            }}
-        </script>
-    ''', unsafe_allow_html=True)
-    
-    add_api_log("Starting POI data load (GitHub primary, Overpass fallback)", "INFO")
-    
-    province_name = get_province_from_coords(lat_coord, lon_coord)
-    log_event("PROCESS", "PROVINCE_DETECTION", {"province": province_name})
-    
-    if province_name:
-        add_api_log(f"Coordinates map to province: {province_name}", "INFO")
-        log_event("PROCESS", "GITHUB_POI_LOAD_START", {"province": province_name})
-        
-        records = load_pois_with_fallback(province_name, lat_coord, lon_coord, radius_val, selected_tags)
-        
-        log_event("PROCESS", "POI_LOAD_COMPLETE", {
-            "province": province_name,
-            "records_count": len(records)
-        })
-        
-        if records:
-            st.session_state.scanned_records = records
-            st.session_state.last_scan_lat = lat_coord
-            st.session_state.last_scan_lon = lon_coord
-            st.session_state.network_stats = None
-            success = True
-            add_api_log(f"Final record count: {len(records)} POIs displayed", "INFO")
-            log_event("SUCCESS", "POI_DISPLAYED", {"count": len(records)})
-        else:
-            add_api_log("No POIs found matching criteria from any source", "WARNING")
-            log_event("WARNING", "NO_POIS_FOUND", {"province": province_name})
-    else:
-        add_api_log(f"Coordinates ({lat_coord}, {lon_coord}) not within any loaded province boundary", "ERROR")
-        log_event("ERROR", "PROVINCE_NOT_FOUND", {"coordinates": f"{lat_coord}, {lon_coord}"})
-    
-    if not success:
-        add_api_log("Scan failed - no data retrieved", "ERROR")
-        log_event("ERROR", "SCAN_FAILED", {"reason": "No POI data retrieved"})
-        main_canvas.markdown('<div class="py-loading-container" style="border-left-color: #AA2E20;"><div class="py-loading-title">Scan Failed</div><div class="py-loading-subtitle">No POI data available for this area</div></div>', unsafe_allow_html=True)
-        time.sleep(2)
-
-    st.session_state.scan_active_loading = False
-    log_event("STATE_CHANGE", "SCAN_LOADING_COMPLETE", {"success": success})
-    st.rerun()
-    
-# -----------------------------------------------------------------------------
-# 4. MAP FRAME RENDERING ENGINE
-# -----------------------------------------------------------------------------
-pts_active = st.session_state.scanned_records
-unique_layers = list(set([p.get('type', 'Unclassified') for p in pts_active]))
-cat_palette = ["#003366", "#C9AB4C", "#1A5A8A", "#A8862E", "#3D7DA8", "#7A5C10", "#6A94B0", "#D4B85A", "#001F3F", "#E8D494"]
-
-for idx, layer in enumerate(unique_layers):
-    if layer not in st.session_state.layer_meta:
-        st.session_state.layer_meta[layer] = {
-            "color": cat_palette[idx % len(cat_palette)],
-            "style": st.session_state.global_marker_style,
-            "size": st.session_state.global_marker_size
-        }
-
-layer_meta_json = json.dumps(st.session_state.layer_meta)
-target_config_json = json.dumps(st.session_state.target_config)
-radius_config_json = json.dumps(st.session_state.radius_config)
-geojson_str = json.dumps(pts_active)
-
-render_lat, render_lon = lat_coord, lon_coord
-is_stale = "true" if (lat_coord != st.session_state.last_scan_lat or lon_coord != st.session_state.last_scan_lon) else "false"
-show_loading = "true" if st.session_state.scan_active_loading else "false"
-
-api_logs_html = ""
-for log in st.session_state.api_logs[-20:]:
-    level_class = f"api-log-{log['level'].lower()}"
-    api_logs_html += f'<div class="api-log-entry"><span class="api-log-time">[{log["time"]}]</span> <span class="{level_class}">{log["message"]}</span></div>'
-
-api_log_panel = f'''
-<div class="api-log-container" id="apiLogPanel">
-    <div class="api-log-header" onclick="toggleApiLog()">
-        <span>API LOG</span>
-        <span class="api-log-close" onclick="event.stopPropagation(); clearApiLogsFromUI();">×</span>
-    </div>
-    <div class="api-log-content" id="apiLogContent">
-        {api_logs_html if api_logs_html else '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>No logs. Click SCAN.</span></div>'}
-    </div>
-</div>
-<script>
-    function toggleApiLog() {{
-        const content = document.getElementById('apiLogContent');
-        if (content) {{
-            if (content.style.display === 'none') {{
-                content.style.display = 'block';
-            }} else {{
-                content.style.display = 'none';
-            }}
-        }}
-    }}
-    function clearApiLogsFromUI() {{
-        const content = document.getElementById('apiLogContent');
-        if (content) {{
-            content.innerHTML = '<div class="api-log-entry"><span class="api-log-time">[--:--:--]</span> <span>Logs cleared.</span></div>';
-        }}
-    }}
-</script>
-'''
-
-if st.session_state.network_stats:
-    s = st.session_state.network_stats
-    st.markdown(f"""<div style='background:#f1f5f9; padding:6px 12px; border-left:3px solid #C9AB4C; margin-bottom:2px; font-size:9px; font-weight:600; color:#003366;'>STREET GRAPH — Intersections: <b>{s.get('n', 0)}</b> | Edges: <b>{s.get('m', 0)}</b> | Length: <b>{s.get('street_length_total', 0):,.1f}m</b> | Density: <b>{s.get('intersection_density_km', 0):,.2f}/km²</b></div>""", unsafe_allow_html=True)
-
-fullscreen_class = "fullscreen-mode" if st.session_state.get('fullscreen_active', False) else ""
-
-leaflet_template = """
-<!DOCTYPE html>
-<html>
-<head>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
-        #map-container { position: relative; width: 100%; height: 100vh; }
-        #map { height: 100vh; width: 100%; z-index: 1; }
-        #map-loading-overlay {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 340px; background: #ffffff; z-index: 99999; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 24px; border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.15);
-            box-shadow: 0 10px 25px rgba(0, 51, 102, 0.15); pointer-events: all;
-        }
-        .loading-spinner { width: 44px; height: 44px; border: 4px solid rgba(0, 51, 102, 0.1); border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
-        .loading-text { font-size: 11px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
-        .loading-subtitle { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; margin-top: 6px; }
-        .elapsed-timer { font-size: 10px; font-weight: 600; color: #C9AB4C; font-family: monospace; letter-spacing: 0.5px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        #scan-results-panel {
-            position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08);
-        }
-        
-        /* Workspace header */
-        .workspace-header {
-            background: #003366;
-            color: #ffffff;
-            padding: 6px 10px;
-            font-size: 9px;
-            font-weight: 800;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            text-transform: uppercase;
-            border-bottom: 2px solid #C9AB4C;
-            letter-spacing: 1px;
-            flex-shrink: 0;
-        }
-        .workspace-header .workspace-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .workspace-header .workspace-title .count-badge {
-            background: rgba(201, 171, 76, 0.3);
-            padding: 1px 6px;
-            border-radius: 2px;
-            font-size: 8px;
-            color: #C9AB4C;
-        }
-        
-        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; max-height: calc(100vh - 280px); }
-        .layer-category-block { border-bottom: 1px solid #f0f0f0; }
-        .layer-category-header { background: #ffffff; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
-        .layer-header-left { display: flex; align-items: center; gap: 4px; font-size: 8px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
-        .layer-category-items { padding: 0; background: #f8fafc; }
-        .layer-category-items.collapsed { display: none !important; }
-        .results-item { padding: 3px 6px 3px 12px; font-size: 8px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
-        .results-item:hover { background: #ffffff; color: #003366; }
-        .action-icon-trigger { cursor: pointer; padding: 1px; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 2px; transition: all 0.15s; }
-        .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
-        .action-icon-trigger svg { fill: #888780; width: 10px; height: 10px; }
-        .action-icon-trigger:hover svg { fill: #003366; }
-        .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
-        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 1px 3px; border-radius: 2px; font-size: __LABEL_SIZE__px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .hide-labels .poi-text-label { display: none !important; }
-        .color-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
-        .config-block-wrapper { padding: 4px 8px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.05); display: flex; flex-direction: column; gap: 3px; }
-        .config-headline { font-size: 7px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
-        .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 8px; font-weight: 600; color: #003366; gap: 4px; }
-        .config-flex-row select, .config-flex-row input { font-size: 8px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 2px; outline: none; }
-        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 3px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
-        .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 8px; border-radius: 50%; background: #003366; cursor: pointer; }
-        .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 3px; border-bottom: 1px solid rgba(0,51,102,0.08); }
-        .group-cluster-header { background: #e2e8f0; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-        .group-cluster-title { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 4px; }
-        .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
-        .cluster-popover-modal.active { display: block; }
-        .cluster-selection-row { display: flex; align-items: center; gap: 6px; font-size: 8px; padding: 3px 0; color: #003366; font-weight: 600; }
-        
-        /* Label size slider in basemap controller - smaller */
-        .label-size-row {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 1px 0 1px 18px;
-            font-size: 6px;
-            font-weight: 600;
-            color: #888780;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-        .label-size-row input[type="range"] {
-            flex-grow: 1;
-            height: 2px;
-            -webkit-appearance: none;
-            background: rgba(0,51,102,0.15);
-            border-radius: 1px;
-            outline: none;
-            margin: 0;
-            max-width: 60px;
-        }
-        .label-size-row input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: #003366;
-            cursor: pointer;
-        }
-        .label-size-row input[type="range"]::-moz-range-thumb {
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: #003366;
-            cursor: pointer;
-            border: none;
-        }
-        .label-size-row .label-size-value {
-            color: #003366;
-            font-weight: 700;
-            min-width: 10px;
-            text-align: center;
-            font-size: 6px;
-        }
-        
-        /* Full screen mode - hide workspace panel and API log, show only map */
-        .fullscreen-mode #scan-results-panel {
-            display: none !important;
-        }
-        .fullscreen-mode #apiLogPanel {
-            display: none !important;
-        }
-        .fullscreen-mode #mapFullscreenBtn {
-            background: rgba(0, 51, 102, 0.9) !important;
-            color: #ffffff !important;
-            border-color: rgba(255,255,255,0.3) !important;
-        }
-        
-        /* Fullscreen toggle button on map - top left */
-        .map-fullscreen-btn {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            z-index: 9999;
-            background: rgba(255,255,255,0.92);
-            color: #003366;
-            border: 1px solid rgba(0, 51, 102, 0.15);
-            border-radius: 3px;
-            padding: 0;
-            width: 28px;
-            height: 28px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 11px;
-            font-weight: 700;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-        }
-        .map-fullscreen-btn:hover {
-            background: #003366;
-            color: #ffffff;
-            border-color: #003366;
-        }
-    </style>
-</head>
-<body>
-    <div id="map-container" class="__FULLSCREEN_CLASS__">
-        <div id="map-loading-overlay" style="display: __SHOW_LOADING_DISPLAY__;">
-            <div class="loading-spinner"></div>
-            <div class="loading-text">Scanning Spatial Engine</div>
-            <div class="loading-subtitle" id="scan-status-text-map">Initializing queries...</div>
-            <div class="elapsed-timer" id="timer-output">Elapsed: 0.0s</div>
-        </div>
-        <div id="map"></div>
-        
-        <!-- Fullscreen toggle button on map - top left -->
-        <button class="map-fullscreen-btn" id="mapFullscreenBtn" onclick="toggleFullscreen()">⛶</button>
-        
-        <div id="scan-results-panel">
-            <!-- Workspace Header -->
-            <div class="workspace-header">
-                <div class="workspace-title">
-                    <span>WORKSPACE</span>
-                    <span class="count-badge" id="results-count">0</span>
-                </div>
-                <div>
-                    <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 7px; font-weight: 700; border: 1px solid rgba(255,255,255,0.3); padding: 2px 6px; border-radius: 2px; cursor: pointer;">GROUP</span>
-                </div>
-            </div>
-            <div id="cluster-modal-overlay" class="cluster-popover-modal">
-                <div style="font-size: 8px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 6px;">CREATE LAYER CLUSTER</div>
-                <div style="margin-bottom: 6px;"><input type="text" id="new-cluster-name-input" placeholder="Enter cluster name..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 8px; padding: 3px; border: 1px solid rgba(0,51,102,0.2);"></div>
-                <div id="cluster-checkbox-target-mount" style="max-height: 120px; overflow-y: auto; margin-bottom: 6px;"></div>
-                <div style="display: flex; gap: 3px;"><button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 3px; font-size:8px; font-weight:700; cursor:pointer;">BUILD</button><button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 3px; font-size:8px; font-weight:700; cursor:pointer;">CANCEL</button></div>
-            </div>
-            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
-                <div class="config-headline">Basemap Controller</div>
-                <div class="config-flex-row">
-                    <span>Tile:</span>
-                    <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
-                        <option value="osm">OSM</option>
-                        <option value="satellite">Satellite</option>
-                        <option value="carto">Carto</option>
-                    </select>
-                    <label style="font-size:8px; font-weight:700; color:#003366; display:flex; align-items:center; gap:2px; cursor:pointer;">
-                        <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
-                    </label>
-                </div>
-                <!-- Label size slider under the checkbox - smaller -->
-                <div class="label-size-row">
-                    <span>size</span>
-                    <input type="range" id="labelSizeSlider" min="6" max="20" value="__LABEL_SIZE__" oninput="updateLabelSize(this.value)">
-                    <span class="label-size-value" id="labelSizeValue">__LABEL_SIZE__</span>
-                </div>
-            </div>
-            <div class="config-block-wrapper"><div class="config-headline">Global Markers</div><div class="config-flex-row"><span>Style:</span><select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)"><option value="dots">Dots</option><option value="pin">Pin</option><option value="modern-pin">Modern</option></select><input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)"></div><div class="config-flex-row"><span>Color:</span><input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)"><select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:60px;"><option value="">Preset</option><option value="#003366">Midnight</option><option value="#C9AB4C">Gold</option><option value="#AA2E20">Crimson</option></select></div></div>
-            <div class="config-block-wrapper"><div class="config-headline">Target & Radius</div><div class="config-flex-row"><span>Target:</span><select onchange="patchTargetCenterConfig('style', this.value)"><option value="star">Star</option><option value="circle">Dot</option></select><input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)"><input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)"></div><div class="config-flex-row"><span>Radius:</span><input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)"><span>Opacity:</span><input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)"></div><div class="config-flex-row"><span>Thick:</span><input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)"></div></div>
-            <div class="results-list" id="results-list-box"></div>
-        </div>
-        __API_LOG_PANEL__
-    </div>
-
-    <script>
-        const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([__LAT__, __LON__], 14);
-        let layerMeta = __LAYER_META_JSON__; let targetConfig = __TARGET_CONFIG_JSON__; let radiusConfig = __RADIUS_CONFIG_JSON__; let pts = __GEOJSON__; let clusters = {}; 
-        let scanStartTime = null;
-        let labelSize = __LABEL_SIZE__;
-        
-        // Custom zoom controls positioned on right
-        L.control.zoom({ position: 'topright' }).addTo(map);
-        
-        if (__SHOW_LOADING__) {
-            const overlay = document.getElementById('map-loading-overlay');
-            if (overlay) overlay.style.display = 'flex';
-            scanStartTime = performance.now();
-            const timerInterval = setInterval(() => {
-                if (scanStartTime) {
-                    let current = (performance.now() - scanStartTime) / 1000;
-                    const timerEl = document.getElementById('timer-output');
-                    if (timerEl) timerEl.innerText = "Time Elapsed: " + current.toFixed(1) + "s";
-                    if (!__SHOW_LOADING__) clearInterval(timerInterval);
-                }
-            }, 100);
-            
-            const statusDiv = document.getElementById('scan-status-text-map');
-            const messages = ["Connecting to OSM...", "Fetching features...", "Processing geometry...", "Building network graph...", "Compiling results..."];
-            let msgIdx = 0;
-            if(statusDiv) {
-                const msgInterval = setInterval(() => {
-                    msgIdx = (msgIdx + 1) % messages.length;
-                    if(statusDiv) statusDiv.innerText = messages[msgIdx];
-                    if (!__SHOW_LOADING__) clearInterval(msgInterval);
-                }, 1500);
-            }
-        }
-
-        const basemaps = {
-            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
-        };
-        basemaps[(localStorage.getItem('ts_persistent_basemap') || 'osm')].addTo(map);
-        
-        function switchActiveBasemap(targetKey) {
-            Object.keys(basemaps).forEach(k => { if(map.hasLayer(basemaps[k])) map.removeLayer(basemaps[k]); });
-            basemaps[targetKey].addTo(map); localStorage.setItem('ts_persistent_basemap', targetKey);
-        }
-
-        let labelsActive = localStorage.getItem('ts_persistent_labels') !== 'false';
-        document.getElementById('label-toggle-chk').checked = labelsActive;
-        if (!labelsActive) document.getElementById('map').classList.add('hide-labels');
-        
-        function toggleLabelsMatrix(isShown) {
-            if (isShown) document.getElementById('map').classList.remove('hide-labels');
-            else document.getElementById('map').classList.add('hide-labels');
-            localStorage.setItem('ts_persistent_labels', isShown);
-        }
-
-        let radiusCircle = null;
-        function renderRadiusCircleBounds() {
-            if (radiusCircle) map.removeLayer(radiusCircle);
-            radiusCircle = L.circle([__LAT__, __LON__], { radius: __RADIUS__, color: radiusConfig.color, weight: parseFloat(radiusConfig.weight), fillColor: radiusConfig.color, fillOpacity: parseFloat(radiusConfig.fill_opacity) }).addTo(map);
-        }
-
-        let centerMarker = null;
-        function renderTargetCenterIcon() {
-            if (centerMarker) map.removeLayer(centerMarker);
-            const d = targetConfig.size; const c = targetConfig.color;
-            const htmlElement = targetConfig.style === "star" ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);">★</div>` : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 51, 102, 0.4);"></div>`;
-            centerMarker = L.marker([__LAT__, __LON__], { icon: L.divIcon({ className: 'custom-center-icon', html: htmlElement, iconSize: [d, d], iconAnchor: [d/2, d/2] }), zIndexOffset: 999999 }).addTo(map);
-        }
-
-        const generateMarkerElement = (color, styleMode, sizeDimension) => {
-            const d = parseInt(sizeDimension);
-            if (styleMode === "pin") {
-                return L.divIcon({ html: `<div class="custom-pin-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${d*1.3}" height="${d*1.3}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/></svg></div>`, className: '', iconSize: [d*1.3, d*1.3], iconAnchor: [d*0.65, d*1.3] });
-            } else if (styleMode === "modern-pin") {
-                const w = d * 1.5; const h = d * 2.5; const r = d * 0.45; 
-                const customSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 65" width="${w}" height="${h}"><defs><radialGradient id="groundShadow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#000000" stop-opacity="1.0"/><stop offset="100%" stop-color="#000000" stop-opacity="0"/></radialGradient><radialGradient id="sphereGloss-${color.replace('#','')}" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="50%" stop-color="${color}"/><stop offset="100%" stop-color="${color}" stop-opacity="0.75"/></radialGradient></defs><ellipse cx="20" cy="44" rx="12" ry="3.5" fill="url(#groundShadow)" /><path d="M20 20 L20 44" stroke="#222222" stroke-width="2.5" stroke-linecap="round"/><path d="M20 20 L20 44" stroke="#888888" stroke-width="0.8" stroke-linecap="round"/><circle cx="20" cy="20" r="${r}" fill="url(#sphereGloss-${color.replace('#','')})"/></svg>`;
-                return L.divIcon({ html: `<div style="transform: translate(-50%, -92%); width: ${w}px; height: ${h}px;">${customSvg}</div>`, className: '', iconSize: [w, h], iconAnchor: [0, 0] });
-            }
-            return L.divIcon({ html: `<div style="background-color: ${color}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 1.5px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"></div>`, className: '', iconSize: [d, d], iconAnchor: [d/2, d/2] });
-        };
-
-        const layerGroupsRef = {}; const categoryMap = {};
-
-        function compileLayersAndRenderPoints() {
-            Object.keys(layerGroupsRef).forEach(k => { map.removeLayer(layerGroupsRef[k]); delete layerGroupsRef[k]; });
-            Object.keys(categoryMap).forEach(k => delete categoryMap[k]);
-            pts.forEach(p => {
-                const layerKey = p.type || 'Unclassified';
-                if (!categoryMap[layerKey]) categoryMap[layerKey] = []; categoryMap[layerKey].push(p);
-            });
-            Object.keys(categoryMap).forEach(key => {
-                layerGroupsRef[key] = L.layerGroup().addTo(map);
-                const meta = layerMeta[key] || { color: "#003366", style: "dots", size: 12 };
-                categoryMap[key].forEach(p => {
-                    if (p.visible === false) return;
-                    if (p.has_footprint && p.footprint_geojson) {
-                        L.geoJSON(p.footprint_geojson, { style: { color: meta.color, weight: 1.5, fillColor: meta.color, fillOpacity: 0.35 } }).addTo(layerGroupsRef[key]);
-                    }
-                    const marker = L.marker([p.lat, p.lon], { icon: generateMarkerElement(meta.color, meta.style, meta.size) }).bindPopup(`<b>${p.name}</b><br><span style="color:#888780;font-size:8px;">${p.type}</span>`);
-                    if (p.name && p.name !== 'Unknown') marker.bindTooltip(p.name, { permanent: true, direction: 'top', offset: [0, -10], className: 'poi-text-label' });
-                    marker.addTo(layerGroupsRef[key]);
-                });
-            });
-        }
-
-        window.openClusterModalWindow = function() {
-            const container = document.getElementById('cluster-checkbox-target-mount'); container.innerHTML = '';
-            const layers = Object.keys(categoryMap);
-            if(layers.length === 0) container.innerHTML = '<div style="font-size:8px; padding:3px; color:#888780;">No active layers.</div>';
-            else { layers.forEach(lyr => { container.innerHTML += `<div class="cluster-selection-row"><input type="checkbox" class="cluster-matrix-select-target" value="${lyr}" style="accent-color:#003366;"><span>${lyr} (${categoryMap[lyr].length})</span></div>`; }); }
-            document.getElementById('cluster-modal-overlay').classList.add('active');
-        };
-
-        window.closeClusterModalWindow = function() { document.getElementById('cluster-modal-overlay').classList.remove('active'); document.getElementById('new-cluster-name-input').value = ''; };
-        window.commitStructuralLayerCluster = function() {
-            const titleInput = document.getElementById('new-cluster-name-input').value.trim(); if (!titleInput) return;
-            const selectedCheckboxes = document.querySelectorAll('.cluster-matrix-select-target:checked');
-            const layerKeys = Array.from(selectedCheckboxes).map(cb => cb.value); if (layerKeys.length === 0) return;
-            clusters[titleInput] = layerKeys; closeClusterModalWindow(); rebuildSidebarControlLayout();
-        };
-
-        window.destroyClusterGroupReference = function(clusterId) { delete clusters[clusterId]; rebuildSidebarControlLayout(); };
-        window.toggleClusterGroupVisibility = function(clusterId, currentlyVisible) {
-            const targetedLayers = clusters[clusterId] || [];
-            pts.forEach(p => { if (targetedLayers.includes(p.type)) p.visible = !currentlyVisible; });
-            compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
-        };
-
-        window.batchStyleGroupCluster = function(clusterId, property, value) {
-            const targetedLayers = clusters[clusterId] || [];
-            targetedLayers.forEach(layerKey => { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; });
-            compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
-        };
-
-        window.patchGlobalMarkerStyle = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].style = v); compileLayersAndRenderPoints(); };
-        window.patchGlobalMarkerSize = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].size = parseInt(v)); compileLayersAndRenderPoints(); };
-        window.patchGlobalMarkerColor = function(v) { Object.keys(layerMeta).forEach(k => layerMeta[k].color = v); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
-        window.patchTargetCenterConfig = function(key, val) { targetConfig[key] = val; renderTargetCenterIcon(); };
-        window.patchRadiusLayerConfig = function(key, val) { radiusConfig[key] = val; renderRadiusCircleBounds(); };
-        window.triggerLayerUpdate = function(layerKey, property, value) { if (!layerMeta[layerKey]) layerMeta[layerKey] = {}; layerMeta[layerKey][property] = property === 'size' ? parseInt(value) : value; compileLayersAndRenderPoints(); };
-        window.updateLabelSize = function(val) {
-            labelSize = val;
-            document.getElementById('labelSizeValue').textContent = val;
-            document.querySelectorAll('.poi-text-label').forEach(el => {
-                el.style.fontSize = val + 'px';
-            });
-        };
-
-        function rebuildSidebarControlLayout() {
-            const listBox = document.getElementById('results-list-box'); 
-            document.getElementById('results-count').innerText = pts.length;
-            if (pts.length === 0) { listBox.innerHTML = "<div style='font-size:8px; padding:8px; color:#888780;'>No items mapped.</div>"; return; }
-            let htmlPayload = '';
-            const trashSvg = `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
-            const eyeSvg = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
-            const editSvg = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
-
-            Object.keys(clusters).forEach(clusterName => {
-                const assignedLayers = clusters[clusterName] || []; let aggregatedCount = 0; let groupIsVisible = false;
-                assignedLayers.forEach(lKey => { if (categoryMap[lKey]) { aggregatedCount += categoryMap[lKey].length; if (categoryMap[lKey].some(p => p.visible !== false)) groupIsVisible = true; } });
-                htmlPayload += `<div class="group-cluster-block" id="cluster-block-${clusterName}"><div class="group-cluster-header"><div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')"><span style="color:#C9AB4C;">⚡</span><span>${clusterName} <span style="font-weight:500; font-size:7px; opacity:0.75;">(${aggregatedCount})</span></span></div><div style="display:flex; align-items:center; gap:1px;"><a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a><span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 7px; color:#003366; margin-left:3px; cursor:pointer;">▼</span></div></div><div class="config-block-wrapper" style="background: #e2e8f0; border-bottom: 1px solid rgba(0,51,102,0.15);"><div class="config-headline" style="font-size:6.5px; opacity:0.8;">Batch Style</div><div class="config-flex-row"><select onchange="batchStyleGroupCluster('${clusterName}', 'style', this.value)"><option value="dots">Dots</option><option value="pin">Pin</option><option value="modern-pin">Modern</option></select><input type="range" min="10" max="40" value="12" class="slider-control-element" oninput="batchStyleGroupCluster('${clusterName}', 'size', this.value)"><input type="color" value="#003366" onchange="batchStyleGroupCluster('${clusterName}', 'color', this.value)"></div></div><div class="layer-category-items collapsed" id="items-cluster-items-${clusterName}" style="padding-left: 6px; background: rgba(0,0,0,0.02);">`;
-                assignedLayers.forEach(catName => { if(!categoryMap[catName]) return; const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 }; const layerPts = categoryMap[catName] || []; const isLayerVisible = layerPts.some(p => p.visible !== false); htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg); });
-                htmlPayload += '</div></div>';
-            });
-
-            Object.keys(categoryMap).forEach(catName => {
-                let insideClusterGroup = false; Object.values(clusters).forEach(layerArr => { if(layerArr.includes(catName)) insideClusterGroup = true; }); if (insideClusterGroup) return;
-                const meta = layerMeta[catName] || { color: "#003366", style: "dots", size: 12 }; const layerPts = categoryMap[catName] || []; const isLayerVisible = layerPts.some(p => p.visible !== false);
-                htmlPayload += `<div class="layer-category-block" id="cat-block-${catName}">`; htmlPayload += injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg); htmlPayload += '</div>';
-            });
-            listBox.innerHTML = htmlPayload;
-        }
-
-        function injectLayerItemDOMElements(catName, meta, layerPts, isLayerVisible, editSvg, eyeSvg, trashSvg) {
-            let chunk = `<div class="layer-category-header"><div class="layer-header-left" onclick="toggleAccordionCollapse('${catName}')"><span class="color-dot" style="background-color: ${meta.color};"></span><span style="font-weight:700;">${catName} <span style="color:#C9AB4C; font-size:7px;">(${layerPts.length})</span></span></div><div style="display:flex; align-items:center; gap:1px;"><a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a><a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a><span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 7px; color:#C9AB4C; margin-left:3px; cursor:pointer;">▼</span></div></div><div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);"><div class="config-flex-row"><select onchange="triggerLayerUpdate('${catName}', 'style', this.value)"><option value="dots" ${meta.style==='dots'?'selected':''}>Dots</option><option value="pin" ${meta.style==='pin'?'selected':''}>Pin</option><option value="modern-pin" ${meta.style==='modern-pin'?'selected':''}>Modern</option></select><input type="range" min="10" max="40" value="${meta.size}" class="slider-control-element" oninput="triggerLayerUpdate('${catName}', 'size', this.value)"><input type="color" value="${meta.color}" onchange="triggerLayerUpdate('${catName}', 'color', this.value); rebuildSidebarControlLayout();"></div></div><div class="layer-category-items collapsed" id="items-${catName}">`;
-            layerPts.forEach(p => { const itemVisible = p.visible !== false; chunk += `<div class="results-item" id="res-item-${p.uid}" style="${itemVisible ? '' : 'opacity:0.4;'}"><div style="flex-grow:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${p.name || 'Unknown'}" onclick="map.flyTo([${p.lat}, ${p.lon}], 17);">${p.name || 'Unknown'}</div><div style="display:flex; align-items:center; gap:1px;"><a class="action-icon-trigger" onclick="promptRenamePoi(${p.uid}, '${p.name}')">${editSvg}</a><a class="action-icon-trigger" onclick="togglePoiVisibility(${p.uid})">${eyeSvg}</a><a class="action-icon-trigger delete-btn" onclick="removePoiInstance(${p.uid}, '${catName}')">${trashSvg}</a></div></div>`; });
-            chunk += '</div>'; return chunk;
-        }
-
-        window.toggleAccordionCollapse = function(catKey) { const panel = document.getElementById('items-' + catKey); const chev = document.getElementById('chevron-' + catKey); if(panel) { panel.classList.toggle('collapsed'); chev.innerText = panel.classList.contains('collapsed') ? '▼' : '▲'; } };
-        window.togglePoiVisibility = function(uid) { const p = pts.find(item => item.uid === uid); if (p) { p.visible = (p.visible === false); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
-        window.promptRenamePoi = function(uid, oldName) { const newName = prompt("Rename asset:", oldName); if (newName && newName.trim() !== "") { const p = pts.find(item => item.uid === uid); if (p) { p.name = newName; compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } } };
-        window.removePoiInstance = function(uid, catKey) { pts = pts.filter(item => item.uid !== uid); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
-        window.toggleLayerWorkspaceVisibility = function(catKey, currentlyVisible) { pts.forEach(p => { if (p.type === catKey) p.visible = !currentlyVisible; }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); };
-        window.promptRenameLayer = function(oldKey) { const newKey = prompt("Rename layer:", oldKey); if (newKey && newKey.trim() !== "" && newKey !== oldKey) { pts.forEach(p => { if (p.type === oldKey) p.type = newKey; }); if (layerMeta[oldKey]) { layerMeta[newKey] = layerMeta[oldKey]; delete layerMeta[oldKey]; } Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].map(item => item === oldKey ? newKey : item); }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
-        window.triggerLayerDeletion = function(catKey) { if (confirm(`Remove layer: "${catKey}"?`)) { pts = pts.filter(p => p.type !== catKey); delete layerMeta[catKey]; Object.keys(clusters).forEach(cName => { clusters[cName] = clusters[cName].filter(item => item !== catKey); }); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
-
-        map.on('contextmenu', function(e) {
-            const lat = e.latlng.lat; const lng = e.latlng.lng;
-            const menuHtml = `<div style="font-family: Montserrat, sans-serif; font-size: 9px; color: #003366; min-width: 120px; background:#fff; padding:4px;"><div style="font-weight: 800; border-bottom: 1px solid #C9AB4C; padding-bottom: 3px; margin-bottom: 4px; letter-spacing: 0.5px;">MAP</div><div style="padding: 4px 2px; cursor: pointer; font-weight: 700;" onclick="navigator.clipboard.writeText('${lat.toFixed(5)}, ${lng.toFixed(5)}'); map.closePopup();">Copy Coords</div><div style="padding: 4px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank'); map.closePopup();">Google Maps</div><div style="padding: 4px 2px; cursor: pointer; font-weight: 700;" onclick="window.open('https://www.google.com/maps?layer=c&cbll=${lat},${lng}', '_blank'); map.closePopup();">Streetview</div></div>`;
-            L.popup().setLatLng(e.latlng).setContent(menuHtml).openOn(map);
-        });
-        
-        // Fullscreen toggle - Toggle class on map-container
-        function toggleFullscreen() {
-            const container = document.getElementById('map-container');
-            container.classList.toggle('fullscreen-mode');
-            const btn = document.getElementById('mapFullscreenBtn');
-            if (container.classList.contains('fullscreen-mode')) {
-                btn.textContent = '⛶';
-                btn.style.background = 'rgba(0, 51, 102, 0.9)';
-                btn.style.color = '#ffffff';
-                btn.style.borderColor = 'rgba(255,255,255,0.3)';
-            } else {
-                btn.textContent = '⛶';
-                btn.style.background = 'rgba(255,255,255,0.92)';
-                btn.style.color = '#003366';
-                btn.style.borderColor = 'rgba(0, 51, 102, 0.15)';
-            }
-            setTimeout(function() {
-                map.invalidateSize();
-            }, 350);
-        }
-
-        renderTargetCenterIcon(); renderRadiusCircleBounds(); compileLayersAndRenderPoints(); rebuildSidebarControlLayout();
-        if (pts.length > 0 && !__IS_STALE__) {
-            const validPts = pts.filter(p => p.visible !== false); if (validPts.length > 0) map.fitBounds(L.featureGroup([L.marker([__LAT__, __LON__]), ...validPts.map(p => L.marker([p.lat, p.lon]))]).getBounds().pad(0.05));
-        }
-    </script>
-</body>
-</html>
-"""
-
-fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-render_lat, render_lon = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
-
-show_loading_display = "flex" if st.session_state.scan_active_loading else "none"
-label_size = st.session_state.get('label_size', 9)
-
-leaflet_html = (leaflet_template
-                .replace("__LAT__", str(render_lat))
-                .replace("__LON__", str(render_lon))
-                .replace("__RADIUS__", str(radius_val))
-                .replace("__IS_STALE__", is_stale)
-                .replace("__SHOW_LOADING__", "true" if st.session_state.scan_active_loading else "false")
-                .replace("__SHOW_LOADING_DISPLAY__", show_loading_display)
-                .replace("__GLOBAL_MARKER_SIZE__", str(st.session_state.global_marker_size))
-                .replace("__GLOBAL_MARKER_COLOR__", str(st.session_state.global_marker_color))
-                .replace("__TARGET_CONFIG_JSON__", target_config_json)
-                .replace("__RADIUS_CONFIG_JSON__", radius_config_json)
-                .replace("__LAYER_META_JSON__", layer_meta_json)
-                .replace("__GEOJSON__", geojson_str)
-                .replace("__API_LOG_PANEL__", api_log_panel)
-                .replace("__LABEL_SIZE__", str(label_size))
-                .replace("__FULLSCREEN_CLASS__", fullscreen_class))
-
-st.components.v1.html(leaflet_html, height=850, scrolling=False)
+if __name__ == "__main__":
+    main()
