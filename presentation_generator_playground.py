@@ -75,9 +75,6 @@ Size: {property_data.get('Size', 'Not specified')}
 Frontage: {property_data.get('Frontage', 'Not specified')}
 Location: {property_data.get('Location', 'Not specified')}
 Property Type: {property_data.get('Property Type', 'Not specified')}
-Bedrooms: {property_data.get('Bedrooms', 'Not specified')}
-Bathrooms: {property_data.get('Bathrooms', 'Not specified')}
-Parking: {property_data.get('Parking', 'Not specified')}
 
 Generate a professional, marketing-friendly list of key features (bullet points) that would attract buyers. 
 Focus on the most compelling aspects based on the size, location, and amenities.
@@ -112,18 +109,6 @@ def generate_fallback_features(property_data):
     if prop_type and prop_type.strip():
         features.append(f"Well-designed {prop_type} with modern amenities")
     
-    bedrooms = property_data.get('Bedrooms', '')
-    if bedrooms and bedrooms.strip():
-        features.append(f"{bedrooms} generously sized bedrooms with ample natural light")
-    
-    bathrooms = property_data.get('Bathrooms', '')
-    if bathrooms and bathrooms.strip():
-        features.append(f"{bathrooms} well-appointed bathrooms with premium fixtures")
-    
-    parking = property_data.get('Parking', '')
-    if parking and parking.strip():
-        features.append(f"Secure parking with {parking} spaces")
-    
     if not features:
         features.append("Excellent property with great potential")
         features.append("Convenient location with easy access to amenities")
@@ -134,39 +119,48 @@ def collect_property_data():
     """Collect property data from session state or input fields"""
     property_data = {}
     
-    property_fields = [
-        'Size', 'Frontage', 'Location', 'Property Type', 
-        'Bedrooms', 'Bathrooms', 'Parking'
-    ]
+    # Check all possible property-related fields
+    field_mappings = {
+        'LEASABLE_AREA': 'Size',
+        'PROPERTY_SIZE': 'Size',
+        'SIZE': 'Size',
+        'FRONTAGE': 'Frontage',
+        'PROPERTY_ADDRESS': 'Location',
+        'LOCATION': 'Location',
+        'ADDRESS': 'Location',
+        'PROPERTY_TYPE': 'Property Type',
+        'TYPE': 'Property Type'
+    }
     
-    # Try to get data from various sources
-    for field in property_fields:
-        # Check session state
-        val_key = f"val_{field}"
+    # Check session state for all tokens
+    for token in st.session_state.tokens:
+        clean_label = token.replace("{", "").replace("}", "").upper()
+        val_key = f"val_{token}"
         if val_key in st.session_state and st.session_state[val_key]:
-            property_data[field] = st.session_state[val_key]
-        # Check temp form data
-        elif field in st.session_state.temp_form_data:
-            property_data[field] = st.session_state.temp_form_data[field]
-        # Check if field exists in tokens and has value
-        elif field in st.session_state.tokens:
-            val_key = f"val_{field}"
-            if val_key in st.session_state:
-                property_data[field] = st.session_state[val_key]
+            # Map to standard field names
+            if clean_label in field_mappings:
+                property_data[field_mappings[clean_label]] = st.session_state[val_key]
+            elif "FEATURE" not in clean_label and "DESCRIPTION" not in clean_label:
+                # Store other fields too
+                property_data[clean_label] = st.session_state[val_key]
     
-    # Also check for common variations
-    if 'LEASABLE_AREA' in st.session_state.temp_form_data:
-        property_data['Size'] = st.session_state.temp_form_data['LEASABLE_AREA']
-    if 'PROPERTY_ADDRESS' in st.session_state.temp_form_data:
-        property_data['Location'] = st.session_state.temp_form_data['PROPERTY_ADDRESS']
+    # Also check temp_form_data
+    for key, value in st.session_state.temp_form_data.items():
+        if value and str(value).strip():
+            clean_key = key.replace("{", "").replace("}", "").upper()
+            if clean_key in field_mappings:
+                property_data[field_mappings[clean_key]] = value
     
     return property_data
 
 def check_property_data_ready():
     """Check if enough property data is filled to generate features"""
     property_data = collect_property_data()
-    required_fields = ['Size', 'Location', 'Frontage']
-    filled_count = sum(1 for field in required_fields if property_data.get(field, '').strip())
+    
+    # Check if we have at least 2 of these key fields
+    key_fields = ['Size', 'Frontage', 'Location']
+    filled_count = sum(1 for field in key_fields if property_data.get(field, '').strip())
+    
     return filled_count >= 2, property_data
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
@@ -224,10 +218,6 @@ MINIMAL_CRE_SYSTEM = """
         font-size: 13px !important;
         color: #1A1A1A !important;
         margin-bottom: 4px;
-        display: flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-        flex-wrap: wrap !important;
     }
     
     /* AI button styling */
@@ -235,30 +225,26 @@ MINIMAL_CRE_SYSTEM = """
         background-color: #6C63FF !important;
         color: white !important;
         font-weight: 500 !important;
-        font-size: 11px !important;
-        padding: 2px 10px !important;
-        border-radius: 12px !important;
+        font-size: 12px !important;
+        padding: 4px 16px !important;
+        border-radius: 20px !important;
         border: none !important;
         cursor: pointer !important;
-        text-decoration: none !important;
-        display: inline-block !important;
         transition: all 0.2s ease !important;
+        margin-left: 8px !important;
     }
     .ai-generate-btn:hover {
         background-color: #5A52D5 !important;
         transform: scale(1.02) !important;
     }
-    .ai-generate-btn:disabled {
-        background-color: #999999 !important;
-        cursor: not-allowed !important;
-    }
     .ai-ready-badge {
         background-color: #E8F5E9;
         color: #2E7D32;
-        font-size: 10px;
-        padding: 2px 8px;
-        border-radius: 10px;
+        font-size: 11px;
+        padding: 2px 10px;
+        border-radius: 12px;
         font-weight: 500;
+        margin-left: 8px;
     }
     
     /* Type mapping section */
@@ -294,6 +280,21 @@ MINIMAL_CRE_SYSTEM = """
         font-weight: 500 !important;
         color: #333 !important;
         white-space: nowrap !important;
+    }
+    .ai-status-bar {
+        background-color: #E8F5E9;
+        padding: 8px 14px;
+        border-radius: 6px;
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: #2E7D32;
+        border-left: 4px solid #2E7D32;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .ai-status-bar .check {
+        font-weight: bold;
     }
 </style>
 """
@@ -1250,7 +1251,7 @@ else:
         
         # Show AI status message if ready
         if is_ready:
-            st.markdown('<div style="background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32;">✅ AI feature generation ready - look for [AI Generate] buttons on feature fields</div>', unsafe_allow_html=True)
+            st.markdown('<div class="ai-status-bar"><span class="check">✅</span> AI feature generation ready - click <strong>✨ Generate AI Features</strong> button below</div>', unsafe_allow_html=True)
         
         # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
@@ -1277,30 +1278,32 @@ else:
                 # Check if this is a property feature field
                 is_feature_field = "FEATURE" in clean_upper or "DESCRIPTION" in clean_upper or "AMENITIES" in clean_upper
                 
-                # Create label with AI button if applicable
-                label_html = f'<div class="placeholder-label">{label_text}'
+                # Show the label
+                st.markdown(f'<div class="placeholder-label">{label_text}</div>', unsafe_allow_html=True)
                 
+                # Show AI Generate button as a separate button ABOVE the text area for feature fields
                 if is_feature_field and is_ready and current_type == "Text":
-                    # Show AI generate button
-                    label_html += f' <span style="font-size:11px; color:#666;">|</span>'
-                    label_html += f' <span style="font-size:11px; color:#6C63FF; font-weight:500;">AI Generate</span>'
-                
-                label_html += '</div>'
-                st.markdown(label_html, unsafe_allow_html=True)
-                
-                # Show AI button as a separate small button right after the label
-                if is_feature_field and is_ready and current_type == "Text":
-                    col_ai_btn, col_ai_status = st.columns([1, 4])
+                    col_ai_btn, col_ai_spacer = st.columns([1, 3])
                     with col_ai_btn:
-                        if st.button("✨ Generate", key=f"ai_gen_{token}", help="Generate property features using AI"):
-                            with st.spinner("AI is generating features..."):
+                        if st.button("✨ Generate AI Features", key=f"ai_gen_{token}", use_container_width=True):
+                            with st.spinner("AI is generating property features..."):
                                 features = generate_property_features(property_data)
                                 if features:
                                     st.session_state[f"val_{token}"] = features
                                     st.session_state.temp_form_data[token] = features
+                                    # Save to temp file
+                                    if st.session_state.saved_template_name:
+                                        temp_path = get_temp_config_path(st.session_state.saved_template_name)
+                                        try:
+                                            with open(temp_path, 'w', encoding='utf-8') as f:
+                                                json.dump(st.session_state.temp_form_data, f, indent=4)
+                                        except Exception:
+                                            pass
                                     st.rerun()
                                 else:
-                                    st.error("AI generation failed. Please try again.")
+                                    st.error("AI generation failed. Please check your internet connection and try again.")
+                    with col_ai_spacer:
+                        st.markdown('<div style="font-size:12px; color:#666; padding-top:8px;">AI will analyze your property data and generate compelling features</div>', unsafe_allow_html=True)
                 
                 if current_type == "Image" and st.session_state.template_type == 'pptx':
                     image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
@@ -1353,8 +1356,8 @@ else:
                             value=current_value, 
                             key=f"val_{token}", 
                             label_visibility="collapsed", 
-                            placeholder=f"Enter {clean_label}...",
-                            height=100
+                            placeholder=f"Enter {clean_label}... or use AI Generate above",
+                            height=120
                         )
                     else:
                         new_value = st.text_input(
