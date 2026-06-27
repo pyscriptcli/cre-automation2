@@ -38,12 +38,17 @@ contacts_database = {
 }
 
 # --- AI GENERATION FUNCTIONS ---
-def generate_with_huggingface(prompt, max_length=200, temperature=0.7):
+def generate_with_huggingface(prompt, max_length=300, temperature=0.8):
     """
     Generate text using Hugging Face's free inference API.
-    Uses google/flan-t5-base model which is good for text generation tasks.
+    Tries multiple models for better reliability.
     """
-    api_url = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+    models = [
+        "https://api-inference.huggingface.co/models/google/flan-t5-large",
+        "https://api-inference.huggingface.co/models/google/flan-t5-base",
+        "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium",
+        "https://api-inference.huggingface.co/models/gpt2"
+    ]
     
     payload = {
         "inputs": prompt,
@@ -55,65 +60,128 @@ def generate_with_huggingface(prompt, max_length=200, temperature=0.7):
         }
     }
     
-    try:
-        response = ai_requests.post(api_url, json=payload, timeout=30)
-        if response.status_code == 200:
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0:
-                return result[0].get('generated_text', '').strip()
-            elif isinstance(result, dict):
-                return result.get('generated_text', '').strip()
-        return None
-    except Exception as e:
-        return None
+    for api_url in models:
+        try:
+            response = ai_requests.post(api_url, json=payload, timeout=30)
+            if response.status_code == 200:
+                result = response.json()
+                if isinstance(result, list) and len(result) > 0:
+                    text = result[0].get('generated_text', '').strip()
+                    if text and len(text) > 20:
+                        return text
+                elif isinstance(result, dict):
+                    text = result.get('generated_text', '').strip()
+                    if text and len(text) > 20:
+                        return text
+            elif response.status_code == 503:
+                # Model is loading, try next one
+                continue
+        except Exception:
+            continue
+    
+    return None
 
 def generate_property_features(property_data):
-    """Generate property features based on the provided data."""
-    prompt = f"""Generate a compelling property feature list for a property with these details:
+    """Generate property features based on the provided data using AI."""
+    
+    # Extract values with proper defaults
+    size = property_data.get('Size', '').strip()
+    frontage = property_data.get('Frontage', '').strip()
+    location = property_data.get('Location', '').strip()
+    prop_type = property_data.get('Property Type', '').strip()
+    
+    # Build a comprehensive prompt
+    prompt = f"""Generate 4-6 compelling bullet point features for a commercial property.
 
-Size: {property_data.get('Size', 'Not specified')}
-Frontage: {property_data.get('Frontage', 'Not specified')}
-Location: {property_data.get('Location', 'Not specified')}
-Property Type: {property_data.get('Property Type', 'Not specified')}
+Property Details:
+- Size: {size if size else 'Not specified'}
+- Frontage: {frontage if frontage else 'Not specified'} 
+- Location: {location if location else 'Not specified'}
+- Property Type: {prop_type if prop_type else 'Not specified'}
 
-Generate a professional, marketing-friendly list of key features (bullet points) that would attract buyers. 
-Focus on the most compelling aspects based on the size, location, and amenities.
-Keep it concise and impactful."""
+Generate professional real estate features following these rules:
+1. Each feature should be 1-2 sentences
+2. Highlight the most compelling aspects
+3. Use professional real estate marketing language
+4. Focus on size, location, accessibility, and potential
+5. Format as bullet points starting with "•"
 
-    result = generate_with_huggingface(prompt, max_length=250, temperature=0.7)
+Example format:
+• Prime commercial lot in [location] with [frontage] frontage
+• Spacious [size] property ideal for various business types
+• Excellent accessibility and visibility
+• High potential for development and investment
+
+Generate features:"""
+
+    # Try AI generation first
+    result = generate_with_huggingface(prompt, max_length=350, temperature=0.8)
     
     if result:
+        # Clean up the result
         result = re.sub(r'^Generated:?\s*', '', result)
         result = re.sub(r'^Features?:?\s*', '', result)
+        result = re.sub(r'^Here are.*?:?\s*', '', result, flags=re.IGNORECASE)
+        result = re.sub(r'^Bullet points?:?\s*', '', result, flags=re.IGNORECASE)
+        result = re.sub(r'^Example.*?:?\s*', '', result, flags=re.IGNORECASE)
+        
+        # If it doesn't have bullet points, add them
+        if not result.startswith('•'):
+            lines = result.split('\n')
+            formatted_lines = []
+            for line in lines:
+                line = line.strip()
+                if line and not line.startswith('•'):
+                    formatted_lines.append(f"• {line}")
+                elif line:
+                    formatted_lines.append(line)
+            result = '\n'.join(formatted_lines)
+        
         return result
     else:
-        return generate_fallback_features(property_data)
+        # Fallback to improved template generation
+        return generate_fallback_features_improved(property_data)
 
-def generate_fallback_features(property_data):
-    """Generate features using templates if AI is unavailable"""
+def generate_fallback_features_improved(property_data):
+    """Generate features using improved templates if AI is unavailable"""
     features = []
     
-    size = property_data.get('Size', '')
-    if size and size.strip():
-        features.append(f"Spacious {size} property with excellent space utilization")
+    size = property_data.get('Size', '').strip()
+    frontage = property_data.get('Frontage', '').strip()
+    location = property_data.get('Location', '').strip()
+    prop_type = property_data.get('Property Type', '').strip()
     
-    frontage = property_data.get('Frontage', '')
-    if frontage and frontage.strip():
-        features.append(f"Wide {frontage} frontage providing great street presence")
+    # Generate size-based features
+    if size:
+        size_num = re.sub(r'[^0-9.]', '', size)
+        features.append(f"• Spacious {size} property with excellent space utilization and versatile development potential")
+    else:
+        features.append("• Generously sized property with excellent development potential")
     
-    location = property_data.get('Location', '')
-    if location and location.strip():
-        features.append(f"Prime location in {location} with excellent accessibility")
+    # Generate frontage-based features
+    if frontage:
+        features.append(f"• Wide {frontage} frontage providing exceptional street presence and visibility")
+    else:
+        features.append("• Excellent street frontage with high visibility")
     
-    prop_type = property_data.get('Property Type', '')
-    if prop_type and prop_type.strip():
-        features.append(f"Well-designed {prop_type} with modern amenities")
+    # Generate location-based features
+    if location:
+        features.append(f"• Prime location in {location} with outstanding accessibility and convenience")
+        features.append(f"• Strategically situated in {location} near key commercial establishments and transportation hubs")
+    else:
+        features.append("• Strategic location with excellent accessibility to major roads and establishments")
     
-    if not features:
-        features.append("Excellent property with great potential")
-        features.append("Convenient location with easy access to amenities")
+    # Generate property type features
+    if prop_type:
+        features.append(f"• Well-designed {prop_type} property with modern amenities and functional layout")
+    else:
+        features.append("• Well-designed property with modern amenities and functional layout")
     
-    return "\n".join(f"• {feature}" for feature in features)
+    # Add some generic features that are always relevant
+    features.append("• High potential for value appreciation and business growth")
+    features.append("• Ideal for various business types and investment opportunities")
+    
+    return "\n".join(features[:6])  # Return max 6 features
 
 def collect_property_data():
     """Collect property data from session state or input fields"""
@@ -124,6 +192,7 @@ def collect_property_data():
         'LEASABLE_AREA': 'Size',
         'PROPERTY_SIZE': 'Size',
         'SIZE': 'Size',
+        'AREA': 'Size',
         'FRONTAGE': 'Frontage',
         'PROPERTY_ADDRESS': 'Location',
         'LOCATION': 'Location',
@@ -160,8 +229,9 @@ def check_property_data_ready():
     # Check if we have at least 2 of these key fields
     key_fields = ['Size', 'Frontage', 'Location']
     filled_count = sum(1 for field in key_fields if property_data.get(field, '').strip())
+    filled_fields = [field for field in key_fields if property_data.get(field, '').strip()]
     
-    return filled_count >= 2, property_data
+    return filled_count >= 2, property_data, filled_fields
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -292,9 +362,26 @@ MINIMAL_CRE_SYSTEM = """
         display: flex;
         align-items: center;
         gap: 8px;
+        flex-wrap: wrap;
     }
     .ai-status-bar .check {
         font-weight: bold;
+    }
+    .ai-feature-button {
+        background: linear-gradient(135deg, #6C63FF 0%, #5A52D5 100%) !important;
+        color: white !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        padding: 6px 20px !important;
+        border-radius: 20px !important;
+        border: none !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 8px rgba(108, 99, 255, 0.3) !important;
+    }
+    .ai-feature-button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(108, 99, 255, 0.4) !important;
     }
 </style>
 """
@@ -1247,11 +1334,25 @@ else:
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
         # Check if property data is ready for AI generation
-        is_ready, property_data = check_property_data_ready()
+        is_ready, property_data, filled_fields = check_property_data_ready()
         
         # Show AI status message if ready
         if is_ready:
-            st.markdown('<div class="ai-status-bar"><span class="check">✅</span> AI feature generation ready - click <strong>✨ Generate AI Features</strong> button below</div>', unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="ai-status-bar">
+                <span class="check">✅</span> 
+                AI ready! Found property data: {', '.join(filled_fields)}.
+                Click <strong>✨ Generate AI Features</strong> below for property feature fields.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="ai-status-bar" style="background-color: #FFF3E0; color: #E65100; border-left-color: #E65100;">
+                <span style="font-weight: bold;">ℹ️</span> 
+                Fill in at least 2 of these fields to enable AI generation: 
+                <strong>LEASABLE_AREA</strong>, <strong>FRONTAGE</strong>, <strong>PROPERTY_ADDRESS</strong>
+            </div>
+            """, unsafe_allow_html=True)
         
         # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
@@ -1283,7 +1384,7 @@ else:
                 
                 # Show AI Generate button as a separate button ABOVE the text area for feature fields
                 if is_feature_field and is_ready and current_type == "Text":
-                    col_ai_btn, col_ai_spacer = st.columns([1, 3])
+                    col_ai_btn, col_ai_spacer = st.columns([1.2, 2.8])
                     with col_ai_btn:
                         if st.button("✨ Generate AI Features", key=f"ai_gen_{token}", use_container_width=True):
                             with st.spinner("AI is generating property features..."):
