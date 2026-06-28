@@ -386,6 +386,36 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18):
+    """Generates high-res map with pin always included - with 1km default radius if no bounds provided"""
+    
+    # If bounds are too small or invalid, use 1km radius from pin
+    def calculate_1km_bounds(lat, lon):
+        """Calculate approximately 1km bounding box around a point"""
+        # 1 degree latitude ≈ 111.32 km
+        # 1 degree longitude ≈ 111.32 * cos(latitude) km
+        lat_deg_per_km = 1.0 / 111.32
+        lon_deg_per_km = 1.0 / (111.32 * math.cos(math.radians(lat)))
+        
+        # 0.5km in each direction for 1km total
+        lat_offset = lat_deg_per_km * 0.5
+        lon_offset = lon_deg_per_km * 0.5
+        
+        return lat + lat_offset, lat - lat_offset, lon + lon_offset, lon - lon_offset
+    
+    # Check if bounds are valid (not None and have reasonable size)
+    bounds_valid = all(x is not None for x in [n, s, e, w])
+    if bounds_valid:
+        # Check if bounds are too small or invalid
+        lat_span = abs(n - s)
+        lon_span = abs(e - w)
+        # If bounds are extremely small (less than 10 meters), use 1km
+        if lat_span < 0.0001 or lon_span < 0.0001:
+            bounds_valid = False
+    
+    if not bounds_valid:
+        # Use 1km radius from pin
+        n, s, e, w = calculate_1km_bounds(pin_lat, pin_lon)
+    
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
@@ -419,6 +449,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     
     tile_urls = get_tile_urls(style)
     
+    # Fetch and stitch tiles
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             tile_data = None
@@ -454,15 +485,21 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     if bottom <= top: bottom = top + 100
     cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
+    # --- DRAW PIN MARKER (ALWAYS INCLUDED) ---
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
+    
+    # Ensure pin is within bounds (clamp if needed)
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
+    # Draw pin with shadow and star
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
+    
+    # Shadow
     draw.ellipse([
         pin_local_x - radius - shadow_offset, 
         pin_local_y - radius - shadow_offset, 
@@ -470,6 +507,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         pin_local_y + radius + shadow_offset
     ], fill=(0, 0, 0, 60))
     
+    # Pin circle
     draw.ellipse([
         pin_local_x - radius,
         pin_local_y - radius,
@@ -477,6 +515,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         pin_local_y + radius
     ], fill=pin_color, outline=(255, 255, 255), width=max(1, int(radius * 0.1)))
     
+    # Star
     star_size = int(radius * 0.55)
     star_points = []
     for i in range(10):
@@ -484,6 +523,18 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         r = star_size if i % 2 == 0 else star_size * 0.4
         star_points.append((pin_local_x + r * math.cos(angle), pin_local_y + r * math.sin(angle)))
     draw.polygon(star_points, fill=(255, 255, 255))
+    
+    # Add a small glow effect around the pin for visibility
+    glow_radius = int(radius * 1.5)
+    for i in range(3):
+        alpha = 30 - i * 10
+        glow_radius_i = glow_radius + i * 5
+        draw.ellipse([
+            pin_local_x - glow_radius_i,
+            pin_local_y - glow_radius_i,
+            pin_local_x + glow_radius_i,
+            pin_local_y + glow_radius_i
+        ], outline=(255, 255, 255, alpha), width=1)
     
     final_img = cropped.convert("RGB")
     img_byte_arr = io.BytesIO()
@@ -596,26 +647,36 @@ def render_isolated_map_editor():
         plat, plon = 14.5995, 120.9842
 
     if st.session_state[export_trigger_key]:
-        with st.spinner("Compiling ultra high-resolution map asset with pin... Please wait"):
+        with st.spinner("Exporting Map... Please wait"):
             n, s, e, w = None, None, None, None
+            
+            # Check if user drew a rectangle
             if st.session_state.get(bounds_key):
                 b = st.session_state[bounds_key]
                 if b and "_northEast" in b and "_southWest" in b:
                     n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
                     e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+                    
+                    # Validate bounds have reasonable size
+                    if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
+                        n, s, e, w = None, None, None, None
             
-            if n is None:
-                buffer = 0.01
-                n, s = plat + buffer, plat - buffer
-                e, w = plon + buffer, plon - buffer
+            # If no valid bounds, use 1km radius (handled in generate_static_map_bounds)
+            # Pass None values - the function will calculate 1km bounds
             
             map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w, pin_lat=plat, pin_lon=plon, 
-                style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
+                n=n, s=s, e=e, w=w, 
+                pin_lat=plat, pin_lon=plon, 
+                style=basemap_style, 
+                pin_color=pin_color, 
+                pin_size=int(pin_size)
             )
+            
+            # Store the generated map image
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
             
+            # Save to temp data
             if st.session_state.temp_form_data:
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
