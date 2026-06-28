@@ -312,14 +312,14 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
 
 # --- BASEMAP CONFIGURATION WITH IMPROVED RELIABILITY ---
 BASEMAP_CONFIG = {
-    "Satellite (Streets)": {
+    "Satellite (Labels)": {
         "urls": [
             "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
             "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
         ],
         "attribution": "Google"
     },
-    "Satellite (Labels + Streets)": {
+    "Satellite (Streets)": {
         "urls": [
             "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
             "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
@@ -385,8 +385,7 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
     return None
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#DC3545", pin_size=12):
-    """Generates high-res map with pin included - NO radius"""
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18):
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
