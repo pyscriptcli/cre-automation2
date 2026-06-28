@@ -830,10 +830,18 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 def get_download_filename(template_name, file_type):
-    base_name = re.sub(r'\.(pptx|docx)$', '', template_name or "Document")
+    """Generate filename: Generated_TemplateName_Date"""
+    # Remove template_ prefix and file extension
+    base_name = re.sub(r'^template_', '', template_name or "Document")
+    base_name = re.sub(r'\.(pptx|docx)$', '', base_name)
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
-    return f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_type}"
-
+    
+    # Get current date in MMDDYYYY format
+    current_date = datetime.now().strftime('%m%d%Y')
+    
+    # Format: Generated_TemplateName_Date.ext
+    return f"Generated_{base_name}_{current_date}.{file_type}"
+    
 def autosave_current_form_data():
     if not st.session_state.saved_template_name or not st.session_state.tokens:
         return False
