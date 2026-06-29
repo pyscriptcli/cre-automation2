@@ -854,49 +854,53 @@ def clean_empty_placeholders(text):
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """
-    Replace text in paragraph by processing each placeholder individually.
-    This ensures each placeholder is replaced with its value, even when multiple
-    placeholders exist in the same text run.
+    Safely replace text in paragraph by processing each placeholder individually.
+    This prevents destroying neighbor placeholders when replacements span across runs.
     """
-    # Process each run individually
-    for run in paragraph.runs:
-        current_text = run.text
-        
-        # Check if this run contains any placeholders
-        has_placeholder = any(token in current_text for token in text_inputs.keys())
-        if not has_placeholder:
-            continue
-        
-        # Process each placeholder one by one
-        for token, value in text_inputs.items():
-            if token in current_text:
-                # Replace this placeholder with its value (or empty string)
-                replacement = str(value) if value and str(value).strip() else ""
-                current_text = current_text.replace(token, replacement)
-        
-        # Clean up any remaining empty placeholders
-        current_text = clean_empty_placeholders(current_text)
-        run.text = current_text
+    # First, check if the paragraph text contains any placeholder we need to replace
+    full_text = paragraph.text
+    has_any_placeholder = any(token in full_text for token in text_inputs.keys())
+    if not has_any_placeholder:
+        return
     
-    # Handle case where paragraph has no runs but has text (e.g., from table cells)
-    if hasattr(paragraph, 'text') and paragraph.text:
-        current_text = paragraph.text
-        has_placeholder = any(token in current_text for token in text_inputs.keys())
-        if has_placeholder:
-            for token, value in text_inputs.items():
-                if token in current_text:
-                    replacement = str(value) if value and str(value).strip() else ""
-                    current_text = current_text.replace(token, replacement)
-            current_text = clean_empty_placeholders(current_text)
-            
-            if not paragraph.runs:
-                paragraph.add_run(current_text)
-            else:
-                # Update all runs that contain placeholders
-                for run in paragraph.runs:
-                    if any(token in run.text for token in text_inputs.keys()):
-                        run.text = current_text
-                        break
+    # Build a complete map of all text in the paragraph with placeholder replacements
+    # We'll collect text from all runs to build the full replaced text
+    run_texts = []
+    run_positions = []
+    
+    for run in paragraph.runs:
+        run_texts.append(run.text)
+        run_positions.append(len(run_texts) - 1)
+    
+    # If there are no runs, add a single empty run
+    if not run_texts:
+        paragraph.add_run("")
+        run_texts = [""]
+        run_positions = [0]
+    
+    # Build the full text by concatenating all runs
+    full_text = "".join(run_texts)
+    
+    # Replace each placeholder one by one in the full text
+    for token, value in text_inputs.items():
+        if token in full_text:
+            replacement = str(value) if value and str(value).strip() else ""
+            full_text = full_text.replace(token, replacement)
+    
+    # Clean up any remaining empty placeholders
+    full_text = clean_empty_placeholders(full_text)
+    
+    # Clear all runs and set the final text in the first run
+    # This preserves formatting by keeping the first run's style
+    first_run = paragraph.runs[0]
+    first_run.text = full_text
+    
+    # Remove all other runs
+    for run in paragraph.runs[1:]:
+        run.text = ""
+    
+    # Remove any empty runs that were created
+    # (The PPTX library will handle empty runs appropriately)
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
