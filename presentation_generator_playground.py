@@ -388,15 +388,14 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
 def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18):
     """Generates high-res map with pin always included - with 1km default radius if no bounds provided"""
     
-    # If bounds are too small or invalid, use 1km radius from pin
     def calculate_1km_bounds(lat, lon):
-        """Calculate approximately 1km bounding box around a point"""
+        """Calculate approximately 1km bounding box centered on the pin"""
         # 1 degree latitude ≈ 111.32 km
         # 1 degree longitude ≈ 111.32 * cos(latitude) km
         lat_deg_per_km = 1.0 / 111.32
         lon_deg_per_km = 1.0 / (111.32 * math.cos(math.radians(lat)))
         
-        # 0.5km in each direction for 1km total
+        # 0.5km in each direction for 1km total (centered on pin)
         lat_offset = lat_deg_per_km * 0.5
         lon_offset = lon_deg_per_km * 0.5
         
@@ -413,7 +412,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
             bounds_valid = False
     
     if not bounds_valid:
-        # Use 1km radius from pin
+        # Use 1km radius centered on pin
         n, s, e, w = calculate_1km_bounds(pin_lat, pin_lon)
     
     lon_span = e - w
@@ -473,23 +472,71 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         px_y = (1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n_tiles * tile_size * scale_factor
         return px_x, px_y
     
+    # Calculate pixel positions for cropping
     px_w, py_n = num2px(n, w, zoom)
     px_e, py_s = num2px(s, e, zoom)
     base_x = x_min * tile_size * scale_factor
     base_y = y_min * tile_size * scale_factor
-    left = int(px_w - base_x)
-    top = int(py_n - base_y)
-    right = int(px_e - base_x)
-    bottom = int(py_s - base_y)
-    if right <= left: right = left + 100
-    if bottom <= top: bottom = top + 100
-    cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # --- DRAW PIN MARKER (ALWAYS INCLUDED) ---
+    # For no bounds case, ensure the crop is perfectly centered on pin
+    if not bounds_valid:
+        # Calculate pin pixel position in the stitched image
+        pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
+        
+        # Calculate crop dimensions
+        crop_width = int(px_e - px_w)
+        crop_height = int(py_s - py_n)
+        
+        # Center the crop on the pin
+        left = int(pin_px_x - base_x - crop_width // 2)
+        top = int(pin_px_y - base_y - crop_height // 2)
+        right = left + crop_width
+        bottom = top + crop_height
+        
+        # Ensure we don't go out of bounds
+        stitched_width = width_tiles * tile_size * scale_factor
+        stitched_height = height_tiles * tile_size * scale_factor
+        
+        if left < 0:
+            right -= left
+            left = 0
+        if top < 0:
+            bottom -= top
+            top = 0
+        if right > stitched_width:
+            left -= (right - stitched_width)
+            right = stitched_width
+        if bottom > stitched_height:
+            top -= (bottom - stitched_height)
+            bottom = stitched_height
+        
+        # Ensure valid crop dimensions
+        if right <= left: right = left + 100
+        if bottom <= top: bottom = top + 100
+        
+        cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
+    else:
+        # Use the bounds-based crop
+        left = int(px_w - base_x)
+        top = int(py_n - base_y)
+        right = int(px_e - base_x)
+        bottom = int(py_s - base_y)
+        if right <= left: right = left + 100
+        if bottom <= top: bottom = top + 100
+        cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
+    
+    # --- DRAW PIN MARKER (ALWAYS INCLUDED AND CENTERED FOR NO BOUNDS) ---
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
+    
+    # Calculate pin position relative to the crop
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
+    
+    # For no bounds case, the pin should be exactly in the center
+    if not bounds_valid:
+        pin_local_x = cropped.width // 2
+        pin_local_y = cropped.height // 2
     
     # Ensure pin is within bounds (clamp if needed)
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
