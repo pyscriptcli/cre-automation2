@@ -369,34 +369,27 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
     return None
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18, property_name="", property_image=None):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18, property_name="", property_image=None, fov_angle=45, heading=75, cone_radius=180):
     """Generates high-res map with pin always included - with 1km default radius if no bounds provided"""
     
     def calculate_1km_bounds(lat, lon):
         """Calculate approximately 1km bounding box centered on the pin"""
-        # 1 degree latitude ≈ 111.32 km
-        # 1 degree longitude ≈ 111.32 * cos(latitude) km
         lat_deg_per_km = 1.0 / 111.32
         lon_deg_per_km = 1.0 / (111.32 * math.cos(math.radians(lat)))
         
-        # 0.5km in each direction for 1km total (centered on pin)
         lat_offset = lat_deg_per_km * 0.5
         lon_offset = lon_deg_per_km * 0.5
         
         return lat + lat_offset, lat - lat_offset, lon + lon_offset, lon - lon_offset
     
-    # Check if bounds are valid (not None and have reasonable size)
     bounds_valid = all(x is not None for x in [n, s, e, w])
     if bounds_valid:
-        # Check if bounds are too small or invalid
         lat_span = abs(n - s)
         lon_span = abs(e - w)
-        # If bounds are extremely small (less than 10 meters), use 1km
         if lat_span < 0.0001 or lon_span < 0.0001:
             bounds_valid = False
     
     if not bounds_valid:
-        # Use 1km radius centered on pin
         n, s, e, w = calculate_1km_bounds(pin_lat, pin_lon)
     
     lon_span = e - w
@@ -432,7 +425,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     
     tile_urls = get_tile_urls(style)
     
-    # Fetch and stitch tiles
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             tile_data = None
@@ -456,28 +448,21 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         px_y = (1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n_tiles * tile_size * scale_factor
         return px_x, px_y
     
-    # Calculate pixel positions for cropping
     px_w, py_n = num2px(n, w, zoom)
     px_e, py_s = num2px(s, e, zoom)
     base_x = x_min * tile_size * scale_factor
     base_y = y_min * tile_size * scale_factor
     
-    # For no bounds case, ensure the crop is perfectly centered on pin
     if not bounds_valid:
-        # Calculate pin pixel position in the stitched image
         pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
-        
-        # Calculate crop dimensions
         crop_width = int(px_e - px_w)
         crop_height = int(py_s - py_n)
         
-        # Center the crop on the pin
         left = int(pin_px_x - base_x - crop_width // 2)
         top = int(pin_px_y - base_y - crop_height // 2)
         right = left + crop_width
         bottom = top + crop_height
         
-        # Ensure we don't go out of bounds
         stitched_width = width_tiles * tile_size * scale_factor
         stitched_height = height_tiles * tile_size * scale_factor
         
@@ -494,13 +479,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
             top -= (bottom - stitched_height)
             bottom = stitched_height
         
-        # Ensure valid crop dimensions
         if right <= left: right = left + 100
         if bottom <= top: bottom = top + 100
         
         cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     else:
-        # Use the bounds-based crop
         left = int(px_w - base_x)
         top = int(py_n - base_y)
         right = int(px_e - base_x)
@@ -509,28 +492,48 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         if bottom <= top: bottom = top + 100
         cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # --- DRAW PIN MARKER ---
-    draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
-    
-    # Calculate pin position relative to the crop
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
-    # For no bounds case, the pin should be exactly in the center
     if not bounds_valid:
         pin_local_x = cropped.width // 2
         pin_local_y = cropped.height // 2
     
-    # Ensure pin is within bounds (clamp if needed)
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
+
+    # --- DRAW FIELD OF VIEW (FOV) CONE ---
+    fov_layer = Image.new("RGBA", cropped.size, (0, 0, 0, 0))
+    fov_draw = ImageDraw.Draw(fov_layer)
+
+    # Convert map headings to math radians (correct offset for PIL coordinates system)
+    start_angle = math.radians(heading - (fov_angle / 2) - 90)
+    end_angle = math.radians(heading + (fov_angle / 2) - 90)
+
+    # Calculate outer edge triangle limits radiating outwards from the pin location
+    point_1 = (
+        pin_local_x + (cone_radius * scale_factor) * math.cos(start_angle),
+        pin_local_y + (cone_radius * scale_factor) * math.sin(start_angle)
+    )
+    point_2 = (
+        pin_local_x + (cone_radius * scale_factor) * math.cos(end_angle),
+        pin_local_y + (cone_radius * scale_factor) * math.sin(end_angle)
+    )
+
+    # Draw semi-transparent heading sector polygon
+    fov_draw.polygon(
+        [(pin_local_x, pin_local_y), point_1, point_2], 
+        fill=(255, 215, 0, 95),       # Vibrant yellow with balanced transparent alpha blending
+        outline=(255, 165, 0, 140)     # Clean distinct outer edge boundary line
+    )
+    cropped = Image.alpha_composite(cropped, fov_layer)
     
-    # Draw pin with shadow and star
+    # --- DRAW PIN MARKER ---
+    draw = ImageDraw.Draw(cropped)
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
     
-    # Shadow
     draw.ellipse([
         pin_local_x - radius - shadow_offset, 
         pin_local_y - radius - shadow_offset, 
@@ -538,7 +541,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         pin_local_y + radius + shadow_offset
     ], fill=(0, 0, 0, 60))
     
-    # Pin circle
     draw.ellipse([
         pin_local_x - radius,
         pin_local_y - radius,
@@ -546,7 +548,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         pin_local_y + radius
     ], fill=pin_color, outline=(255, 255, 255), width=max(1, int(radius * 0.1)))
     
-    # Star
     star_size = int(radius * 0.55)
     star_points = []
     for i in range(10):
@@ -555,7 +556,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         star_points.append((pin_local_x + r * math.cos(angle), pin_local_y + r * math.sin(angle)))
     draw.polygon(star_points, fill=(255, 255, 255))
     
-    # Add a small glow effect around the pin for visibility
     glow_radius = int(radius * 1.5)
     for i in range(3):
         alpha = 30 - i * 10
@@ -568,15 +568,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         ], outline=(255, 255, 255, alpha), width=1)
     
     # --- ADD PROPERTY PHOTO AS STATIC OVERLAY (POPUP) ---
-    # This creates a popup-like overlay in the top-right corner of the map
-    
     if property_name or property_image:
         try:
-            # Popup dimensions
             popup_width = 220
             popup_padding = 15
             
-            # Calculate popup height based on content
             if property_image and property_name:
                 popup_height = 280
             elif property_image:
@@ -587,14 +583,10 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                 popup_height = 0
             
             if popup_height > 0:
-                # Position in top-right corner
                 popup_x = cropped.width - popup_width - popup_padding
                 popup_y = popup_padding
                 
-                # Create popup background with rounded corners and shadow
                 popup_img = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 245))
-                
-                # Draw rounded rectangle background
                 popup_draw = ImageDraw.Draw(popup_img)
                 popup_draw.rounded_rectangle(
                     [(0, 0), (popup_width, popup_height)], 
@@ -604,7 +596,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                     width=1
                 )
                 
-                # Add shadow effect (draw a slightly offset dark rectangle behind)
                 shadow_img = Image.new('RGBA', (popup_width + 8, popup_height + 8), (0, 0, 0, 40))
                 shadow_draw = ImageDraw.Draw(shadow_img)
                 shadow_draw.rounded_rectangle(
@@ -612,35 +603,27 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                     radius=14, 
                     fill=(0, 0, 0, 40)
                 )
-                # Paste shadow first
                 cropped.paste(shadow_img, (popup_x - 4, popup_y - 4), shadow_img)
                 
-                # Add property image if provided
                 if property_image:
                     try:
-                        # Open and resize image
                         img = Image.open(io.BytesIO(property_image))
                         if img.mode != 'RGB':
                             img = img.convert('RGB')
                         
-                        # Calculate image size (fit within popup with padding)
                         img_padding = 10
                         img_max_width = popup_width - (img_padding * 2)
                         img_max_height = 150
                         
-                        # Resize maintaining aspect ratio
                         img.thumbnail((img_max_width, img_max_height), Image.Resampling.LANCZOS)
                         
-                        # Calculate position (centered horizontally, at top)
                         img_x = (popup_width - img.width) // 2
                         img_y = img_padding
                         
-                        # Create mask for rounded image corners
                         img_mask = Image.new('L', img.size, 0)
                         img_mask_draw = ImageDraw.Draw(img_mask)
                         img_mask_draw.rounded_rectangle([(0, 0), img.size], radius=8, fill=255)
                         
-                        # Create a copy of the popup to paste image onto
                         popup_with_image = popup_img.copy()
                         popup_with_image.paste(img, (img_x, img_y), img_mask)
                         popup_img = popup_with_image
@@ -648,10 +631,8 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                     except Exception as e:
                         print(f"Error adding property image: {e}")
                 
-                # Add property name text
                 if property_name:
                     try:
-                        # Get font
                         try:
                             font = ImageFont.truetype("arial.ttf", 14)
                         except:
@@ -660,7 +641,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                             except:
                                 font = ImageFont.load_default()
                         
-                        # Try bold font for label
                         try:
                             bold_font = ImageFont.truetype("arialbd.ttf", 11)
                         except:
@@ -672,22 +652,17 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                         font = ImageFont.load_default()
                         bold_font = font
                     
-                    # Draw label
                     if property_image:
                         text_y = 165
                     else:
                         text_y = 15
                     
                     popup_draw = ImageDraw.Draw(popup_img)
-                    
-                    # Draw "PROPERTY" label
                     popup_draw.text((15, text_y), "PROPERTY", fill=(100, 100, 100, 200), font=bold_font)
                     
-                    # Draw property name (wrap if too long)
                     name_y = text_y + 20
                     max_chars_per_line = 18
                     if len(property_name) > max_chars_per_line:
-                        # Split into multiple lines
                         words = property_name.split()
                         lines = []
                         current_line = ""
@@ -706,7 +681,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                     else:
                         popup_draw.text((15, name_y), property_name, fill=(30, 30, 30, 255), font=font)
                 
-                # Paste the popup onto the map
                 cropped.paste(popup_img, (popup_x, popup_y), popup_img)
                 
         except Exception as e:
@@ -784,6 +758,11 @@ def render_isolated_map_editor():
     export_trigger_key = f"map_export_active_{token_key}"
     popup_image_key = f"popup_image_{token_key}"
     popup_name_key = f"popup_name_{token_key}"
+
+    # Heading cone slider session states
+    fov_angle_key = f"map_fov_angle_{token_key}"
+    heading_key = f"map_heading_{token_key}"
+    cone_radius_key = f"map_cone_radius_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Satellite (Streets)"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
@@ -794,6 +773,9 @@ def render_isolated_map_editor():
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
     if popup_image_key not in st.session_state: st.session_state[popup_image_key] = None
     if popup_name_key not in st.session_state: st.session_state[popup_name_key] = ""
+    if fov_angle_key not in st.session_state: st.session_state[fov_angle_key] = 45
+    if heading_key not in st.session_state: st.session_state[heading_key] = 75
+    if cone_radius_key not in st.session_state: st.session_state[cone_radius_key] = 180
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -820,12 +802,11 @@ def render_isolated_map_editor():
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # Add popup photo section
+    # Add popup photo & Heading Cone configurations
     st.markdown("---")
-    st.markdown("**Property Info (will appear on map)**")
-    
     col_popup1, col_popup2 = st.columns([2, 1])
     with col_popup1:
+        st.markdown("**Property Info (will appear on map)**")
         popup_name = st.text_input(
             "Property Name", 
             value=st.session_state[popup_name_key],
@@ -836,7 +817,7 @@ def render_isolated_map_editor():
             st.session_state[popup_name_key] = popup_name
     
     with col_popup2:
-        # Use a simpler key that doesn't conflict
+        st.markdown("**Property Photo**")
         upload_key = f"popup_upload_{token_key}"
         uploaded_popup_image = st.file_uploader(
             "Upload Photo", 
@@ -849,6 +830,20 @@ def render_isolated_map_editor():
             st.success("Photo uploaded!")
         elif st.session_state[popup_image_key]:
             st.caption("Photo ready")
+
+    # Camera Field of View layout tools
+    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+    st.markdown("**Camera Field of View Triangle (Heading Cone)**")
+    fov_c1, fov_c2, fov_c3 = st.columns(3)
+    with fov_c1:
+        ui_heading = st.slider("Camera Facing Direction (Heading °)", 0, 360, int(st.session_state[heading_key]), step=5, key=f"ui_head_{token_key}")
+        st.session_state[heading_key] = ui_heading
+    with fov_c2:
+        ui_fov = st.slider("Cone Opening Width (FOV Angle °)", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"ui_fov_{token_key}")
+        st.session_state[fov_angle_key] = ui_fov
+    with fov_c3:
+        ui_radius = st.slider("Cone Reach Length (Pixels)", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"ui_rad_{token_key}")
+        st.session_state[cone_radius_key] = ui_radius
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
@@ -861,18 +856,15 @@ def render_isolated_map_editor():
         with st.spinner("Exporting Map... Please wait"):
             n, s, e, w = None, None, None, None
             
-            # Check if user drew a rectangle
             if st.session_state.get(bounds_key):
                 b = st.session_state[bounds_key]
                 if b and "_northEast" in b and "_southWest" in b:
                     n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
                     e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
                     
-                    # Validate bounds have reasonable size
                     if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
                         n, s, e, w = None, None, None, None
             
-            # Get property info for the map
             property_name = st.session_state[popup_name_key] or ""
             property_image = st.session_state[popup_image_key]
             
@@ -883,14 +875,15 @@ def render_isolated_map_editor():
                 pin_color=pin_color, 
                 pin_size=int(pin_size),
                 property_name=property_name,
-                property_image=property_image
+                property_image=property_image,
+                fov_angle=st.session_state[fov_angle_key],
+                heading=st.session_state[heading_key],
+                cone_radius=st.session_state[cone_radius_key]
             )
             
-            # Store the generated map image
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
             
-            # Save to temp data
             if st.session_state.temp_form_data:
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
@@ -929,7 +922,6 @@ def render_isolated_map_editor():
     </div>
     """
     
-    # Build popup HTML with image (for interactive map only - this won't appear in export)
     property_name_display = st.session_state[popup_name_key] or "Property Location"
     
     if st.session_state[popup_image_key]:
@@ -1058,22 +1050,18 @@ def clean_empty_placeholders(text):
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """Replace text in paragraph, removing empty placeholders"""
-    # Process each run
     for run in paragraph.runs:
         current_text = run.text
         for token, value in text_inputs.items():
             if token in current_text:
-                if value and str(value).strip():  # Value exists and is not empty
+                if value and str(value).strip():
                     current_text = current_text.replace(token, str(value))
-                else:  # Value is empty, remove the placeholder
+                else:
                     current_text = current_text.replace(token, '')
-        # Clean up any remaining placeholders and extra whitespace
         run.text = clean_empty_placeholders(current_text)
     
-    # Handle paragraph text if no runs exist or if there are still placeholders
     if hasattr(paragraph, 'text') and paragraph.text:
         current_text = paragraph.text
-        # Check if any placeholders remain
         has_placeholder = any(token in current_text for token in text_inputs.keys())
         if has_placeholder:
             for token, value in text_inputs.items():
@@ -1087,7 +1075,6 @@ def replace_text_in_paragraph(paragraph, text_inputs):
             if not paragraph.runs:
                 paragraph.add_run(current_text)
             else:
-                # Update the first run with cleaned text
                 for run in paragraph.runs:
                     if any(token in run.text for token in text_inputs.keys()):
                         run.text = current_text
@@ -1147,15 +1134,11 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
 
 def get_download_filename(template_name, file_type):
     """Generate filename: Generated_TemplateName_Date"""
-    # Remove template_ prefix and file extension
     base_name = re.sub(r'^template_', '', template_name or "Document")
     base_name = re.sub(r'\.(pptx|docx)$', '', base_name)
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
     
-    # Get current date in MMDDYYYY format
     current_date = datetime.now().strftime('%m%d%Y')
-    
-    # Format: Generated_TemplateName_Date.ext
     return f"Generated_{base_name}_{current_date}.{file_type}"
     
 def autosave_current_form_data():
@@ -1383,7 +1366,6 @@ else:
         with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field.")
             
-            # Simple 2-column layout for type mapping
             cols = st.columns(2)
             for idx, token in enumerate(tokens):
                 with cols[idx % 2]:
