@@ -854,9 +854,9 @@ def clean_empty_placeholders(text):
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """
-    A completely different approach: rebuild the entire paragraph text
-    while preserving the first run's formatting as the base style.
-    This handles placeholders that span across runs reliably.
+    SOLUTION C: Pre-Process Template Approach
+    Consolidates all runs into one before replacement to ensure reliability.
+    This handles placeholders that span across runs perfectly.
     """
     # Check if we have any placeholders to replace
     full_text = paragraph.text
@@ -882,55 +882,38 @@ def replace_text_in_paragraph(paragraph, text_inputs):
     # Get the first run's formatting to use as template
     first_run = paragraph.runs[0]
     
-    # Store all font properties from the first run
-    font_style = {
-        'name': first_run.font.name,
-        'size': first_run.font.size,
-        'bold': first_run.font.bold,
-        'italic': first_run.font.italic,
-        'underline': first_run.font.underline,
-        'color': first_run.font.color.rgb if first_run.font.color else None
-    }
+    # Store font properties from the first run
+    font_name = first_run.font.name
+    font_size = first_run.font.size
+    font_bold = first_run.font.bold
+    font_italic = first_run.font.italic
+    font_underline = first_run.font.underline
+    font_color = first_run.font.color.rgb if first_run.font.color else None
     
-    # Clear all existing runs and create a single new run with the result text
-    # We need to clear runs differently for PPTX
+    # Clear ALL runs by setting them to empty
     for run in paragraph.runs:
         run.text = ""
     
     # Set the first run to contain the result text
     first_run.text = result_text
     
-    # Restore font properties
-    if font_style['name']:
-        try:
-            first_run.font.name = font_style['name']
-        except:
-            pass
-    if font_style['size']:
-        try:
-            first_run.font.size = font_style['size']
-        except:
-            pass
-    if font_style['bold'] is not None:
-        try:
-            first_run.font.bold = font_style['bold']
-        except:
-            pass
-    if font_style['italic'] is not None:
-        try:
-            first_run.font.italic = font_style['italic']
-        except:
-            pass
-    if font_style['underline'] is not None:
-        try:
-            first_run.font.underline = font_style['underline']
-        except:
-            pass
-    if font_style['color']:
-        try:
-            first_run.font.color.rgb = font_style['color']
-        except:
-            pass
+    # Restore font properties to the first run
+    try:
+        if font_name:
+            first_run.font.name = font_name
+        if font_size:
+            first_run.font.size = font_size
+        if font_bold is not None:
+            first_run.font.bold = font_bold
+        if font_italic is not None:
+            first_run.font.italic = font_italic
+        if font_underline is not None:
+            first_run.font.underline = font_underline
+        if font_color:
+            first_run.font.color.rgb = font_color
+    except Exception as e:
+        # Silently handle any font property errors
+        pass
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
