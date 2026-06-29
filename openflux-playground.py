@@ -110,8 +110,27 @@ MINIMAL_CRE_SYSTEM = """
         color: #333 !important;
         white-space: nowrap !important;
     }
+    .preset-card {
+        background-color: #F8F9FA;
+        border: 1px solid #E0E0E0;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 8px;
+    }
 </style>
 """
+
+# --- CONE PRESET CONFIGURATIONS ---
+CONE_PRESETS = {
+    "Default (Top-Right)": {"heading": 45, "fov": 60, "radius": 180},
+    "Top-Left": {"heading": 135, "fov": 60, "radius": 180},
+    "Top-Right": {"heading": 45, "fov": 60, "radius": 180},
+    "Bottom-Left": {"heading": 225, "fov": 60, "radius": 180},
+    "Bottom-Right": {"heading": 315, "fov": 60, "radius": 180},
+    "Wide Angle": {"heading": 45, "fov": 90, "radius": 250},
+    "Narrow Focus": {"heading": 45, "fov": 30, "radius": 120},
+    "Custom": {"heading": 75, "fov": 45, "radius": 180}
+}
 
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
@@ -574,6 +593,9 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
             popup_padding = 15
             popup_height = 210
             
+            popup_x = cropped.width - popup_width - popup_padding
+            popup_y = popup_padding
+            
             # Create popup background with rounded corners
             popup_img = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 245))
             popup_draw = ImageDraw.Draw(popup_img)
@@ -704,6 +726,7 @@ def render_isolated_map_editor():
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
     popup_image_key = f"popup_image_{token_key}"
+    preset_key = f"cone_preset_{token_key}"
 
     # Heading cone slider session states
     fov_angle_key = f"map_fov_angle_{token_key}"
@@ -718,8 +741,9 @@ def render_isolated_map_editor():
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
     if popup_image_key not in st.session_state: st.session_state[popup_image_key] = None
-    if fov_angle_key not in st.session_state: st.session_state[fov_angle_key] = 45
-    if heading_key not in st.session_state: st.session_state[heading_key] = 75
+    if preset_key not in st.session_state: st.session_state[preset_key] = "Default (Top-Right)"
+    if fov_angle_key not in st.session_state: st.session_state[fov_angle_key] = 60
+    if heading_key not in st.session_state: st.session_state[heading_key] = 45
     if cone_radius_key not in st.session_state: st.session_state[cone_radius_key] = 180
     
     if dragged_key in st.session_state:
@@ -729,6 +753,7 @@ def render_isolated_map_editor():
     map_styles = ["Satellite (Streets)", "Satellite (Labels)", "Satellite (Clean)", 
               "Street Map (Labels)", "Street Map (Streets)", "OSM Carto Light"]
 
+    # --- TOP ROW: Map Controls ---
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
     with c_btn:
         st.markdown("<div style='margin-bottom: 2px;'></div>", unsafe_allow_html=True)
@@ -747,7 +772,7 @@ def render_isolated_map_editor():
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # Add popup photo upload (removed property name)
+    # --- PROPERTY PHOTO UPLOAD ---
     st.markdown("---")
     st.markdown("**Property Photo (will appear on map)**")
     upload_key = f"popup_upload_{token_key}"
@@ -763,56 +788,51 @@ def render_isolated_map_editor():
     elif st.session_state[popup_image_key]:
         st.caption("Photo ready")
 
-    # Camera Field of View layout tools - 2x2 grid
-    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
-    st.markdown("**Camera Field of View Triangle (Heading Cone)**")
+    # --- CONE PRESETS SECTION ---
+    st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
+    st.markdown("**Camera Field of View (Cone) - Presets**")
     
-    # Create 2x2 grid
-    fov_c1, fov_c2 = st.columns(2)
-    with fov_c1:
-        st.markdown("**Top Left**")
-        heading_top_left = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_tl_{token_key}")
-        st.session_state[heading_key] = heading_top_left
-        
-        fov_top_left = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_tl_{token_key}")
-        st.session_state[fov_angle_key] = fov_top_left
-        
-        radius_top_left = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_tl_{token_key}")
-        st.session_state[cone_radius_key] = radius_top_left
+    # Preset dropdown
+    col_preset1, col_preset2 = st.columns([2, 1])
+    with col_preset1:
+        selected_preset = st.selectbox(
+            "Select Cone Preset",
+            options=list(CONE_PRESETS.keys()),
+            key=preset_key,
+            label_visibility="collapsed"
+        )
     
-    with fov_c2:
-        st.markdown("**Top Right**")
-        heading_top_right = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_tr_{token_key}")
-        st.session_state[heading_key] = heading_top_right
-        
-        fov_top_right = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_tr_{token_key}")
-        st.session_state[fov_angle_key] = fov_top_right
-        
-        radius_top_right = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_tr_{token_key}")
-        st.session_state[cone_radius_key] = radius_top_right
+    with col_preset2:
+        if st.button("Apply Preset", key=f"apply_preset_{token_key}", use_container_width=True):
+            preset_values = CONE_PRESETS[selected_preset]
+            st.session_state[heading_key] = preset_values["heading"]
+            st.session_state[fov_angle_key] = preset_values["fov"]
+            st.session_state[cone_radius_key] = preset_values["radius"]
+            st.rerun()
     
-    fov_c3, fov_c4 = st.columns(2)
-    with fov_c3:
-        st.markdown("**Bottom Left**")
-        heading_bottom_left = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_bl_{token_key}")
-        st.session_state[heading_key] = heading_bottom_left
-        
-        fov_bottom_left = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_bl_{token_key}")
-        st.session_state[fov_angle_key] = fov_bottom_left
-        
-        radius_bottom_left = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_bl_{token_key}")
-        st.session_state[cone_radius_key] = radius_bottom_left
+    # Show current preset values
+    st.markdown('<div class="preset-card">', unsafe_allow_html=True)
+    col_h, col_f, col_r = st.columns(3)
+    with col_h:
+        st.markdown(f"**Heading:** {st.session_state[heading_key]}°")
+    with col_f:
+        st.markdown(f"**FOV Angle:** {st.session_state[fov_angle_key]}°")
+    with col_r:
+        st.markdown(f"**Cone Radius:** {st.session_state[cone_radius_key]}px")
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    with fov_c4:
-        st.markdown("**Bottom Right**")
-        heading_bottom_right = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_br_{token_key}")
-        st.session_state[heading_key] = heading_bottom_right
-        
-        fov_bottom_right = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_br_{token_key}")
-        st.session_state[fov_angle_key] = fov_bottom_right
-        
-        radius_bottom_right = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_br_{token_key}")
-        st.session_state[cone_radius_key] = radius_bottom_right
+    # Fine-tuning sliders
+    st.markdown("**Fine-tune Cone Settings**")
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+        heading_val = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_slider_{token_key}")
+        st.session_state[heading_key] = heading_val
+    with col_f2:
+        fov_val = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_slider_{token_key}")
+        st.session_state[fov_angle_key] = fov_val
+    with col_f3:
+        radius_val = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_slider_{token_key}")
+        st.session_state[cone_radius_key] = radius_val
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
