@@ -664,7 +664,6 @@ def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-# --- ISOLATED FULL-SCREEN MAP EDITOR PAGE ---
 def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
     
@@ -726,6 +725,14 @@ def render_isolated_map_editor():
     export_trigger_key = f"map_export_active_{token_key}"
     popup_image_key = f"popup_image_{token_key}"
     preset_key = f"cone_preset_{token_key}"
+    
+    # Photo placeholder mapping based on preset
+    photo_placeholder_mapping = {
+        "Top-Left": "LM_POP_TL",
+        "Top-Right": "LM_POP_TR",
+        "Bottom-Left": "LM_POP_BL",
+        "Bottom-Right": "LM_POP_BR"
+    }
 
     # Heading cone session states
     fov_angle_key = f"map_fov_angle_{token_key}"
@@ -773,7 +780,14 @@ def render_isolated_map_editor():
     
     # --- PROPERTY PHOTO UPLOAD ---
     st.markdown("---")
-    st.markdown("**Property Photo (will appear on map)**")
+    
+    # Get current preset to show which placeholder will be used
+    current_preset = st.session_state[preset_key]
+    current_placeholder = photo_placeholder_mapping.get(current_preset, "LM_POP_TR")
+    
+    st.markdown(f"**Property Photo (will appear in {{{{{current_placeholder}}}}})**")
+    st.caption(f"Photo will be placed in {current_placeholder} placeholder based on cone preset selection")
+    
     upload_key = f"popup_upload_{token_key}"
     uploaded_popup_image = st.file_uploader(
         "Upload Photo", 
@@ -783,11 +797,11 @@ def render_isolated_map_editor():
     )
     if uploaded_popup_image:
         st.session_state[popup_image_key] = uploaded_popup_image.getvalue()
-        st.success("Photo uploaded!")
+        st.success(f"Photo uploaded! Will appear in {current_placeholder}")
     elif st.session_state[popup_image_key]:
-        st.caption("Photo ready")
+        st.caption(f"Photo ready for {current_placeholder}")
 
-    # --- CONE PRESETS SECTION (Dropdown only, no fine-tuning) ---
+    # --- CONE PRESETS SECTION ---
     st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
     st.markdown("**Camera Field of View (Cone) - Select Preset**")
     
@@ -809,15 +823,17 @@ def render_isolated_map_editor():
         st.session_state[cone_radius_key] = preset_values["radius"]
         st.rerun()
     
-    # Show current preset values
+    # Show current preset values and placeholder mapping
     st.markdown('<div class="preset-card">', unsafe_allow_html=True)
-    col_h, col_f, col_r = st.columns(3)
+    col_h, col_f, col_r, col_p = st.columns(4)
     with col_h:
         st.markdown(f"**Heading:** {st.session_state[heading_key]}°")
     with col_f:
         st.markdown(f"**FOV Angle:** {st.session_state[fov_angle_key]}°")
     with col_r:
         st.markdown(f"**Cone Radius:** {st.session_state[cone_radius_key]}px")
+    with col_p:
+        st.markdown(f"**Photo →** {current_placeholder}")
     st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
@@ -857,8 +873,15 @@ def render_isolated_map_editor():
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
             
+            # Update the correct placeholder in temp_form_data
             if st.session_state.temp_form_data:
+                # Store the photo in the appropriate placeholder
+                placeholder_key = f"{{{{{current_placeholder}}}}}"
+                st.session_state.temp_form_data[placeholder_key] = st.session_state[popup_image_key]
+                
+                # Also store coordinates
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
+                
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
                 try:
                     with open(temp_path, 'w', encoding='utf-8') as f:
@@ -869,7 +892,7 @@ def render_isolated_map_editor():
             st.session_state[export_trigger_key] = False
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
-            st.success("Map with pin attached successfully!")
+            st.success(f"Map with pin attached successfully! Photo placed in {current_placeholder}")
             time.sleep(0.5)
             st.rerun()
 
@@ -904,6 +927,7 @@ def render_isolated_map_editor():
             <img src="{img_src}" style="width: 100%; height: auto; max-height: 180px; object-fit: cover; display: block;">
             <div style="padding: 10px 12px; background: white;">
                 <p style="margin: 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
+                <p style="margin: 4px 0 0 0; font-size: 10px; color: #999;">Photo → {current_placeholder}</p>
             </div>
         </div>
         """
@@ -914,6 +938,7 @@ def render_isolated_map_editor():
                 No Photo
             </div>
             <p style="margin: 8px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
+            <p style="margin: 4px 0 0 0; font-size: 10px; color: #999;">Photo → {current_placeholder}</p>
         </div>
         """
     
