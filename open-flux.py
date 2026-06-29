@@ -91,65 +91,54 @@ MINIMAL_CRE_SYSTEM = """
         margin-bottom: 4px;
     }
     
-    /* Style mapping row */
-    .style-mapping-row {
-        background-color: #F8F9FA !important;
-        border: 1px solid #E8E8E8 !important;
-        border-radius: 6px !important;
-        padding: 10px 14px !important;
-        margin-bottom: 6px !important;
+    /* Style mapping - compact row */
+    .style-row {
         display: flex !important;
         align-items: center !important;
+        padding: 6px 0 !important;
+        border-bottom: 1px solid #F0F0F0 !important;
     }
-    .style-field-name {
-        font-weight: 600 !important;
+    .style-field {
+        font-weight: 500 !important;
         font-size: 13px !important;
         color: #1A1A1A !important;
         min-width: 180px !important;
+        padding-right: 12px !important;
     }
     .style-controls {
         display: flex !important;
         align-items: center !important;
-        gap: 12px !important;
-        flex-wrap: wrap !important;
+        gap: 8px !important;
+        flex: 1 !important;
     }
-    .style-control-group {
-        display: flex !important;
-        align-items: center !important;
-        gap: 4px !important;
-    }
-    .style-label {
-        font-size: 11px !important;
-        color: #666 !important;
-        margin-right: 2px !important;
-        min-width: 20px !important;
-    }
-    .style-checkbox {
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-    .style-checkbox > label {
-        font-size: 14px !important;
-        font-weight: 700 !important;
-        padding: 2px 6px !important;
+    .style-btn {
         background: #FFFFFF !important;
-        border: 1px solid #CCCCCC !important;
+        border: 1px solid #D0D0D0 !important;
         border-radius: 4px !important;
-        min-width: 28px !important;
-        text-align: center !important;
+        padding: 2px 10px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
         cursor: pointer !important;
+        min-width: 32px !important;
+        text-align: center !important;
+        color: #333 !important;
+        transition: all 0.2s !important;
     }
-    .style-checkbox > label:hover {
+    .style-btn:hover {
         background: #E8F0FE !important;
         border-color: #003366 !important;
     }
-    .style-size-input {
-        max-width: 60px !important;
+    .style-btn-active {
+        background: #003366 !important;
+        border-color: #003366 !important;
+        color: #FFFFFF !important;
     }
-    .style-size-input input {
-        text-align: center !important;
-        padding: 2px 4px !important;
-        font-size: 13px !important;
+    .style-btn-active:hover {
+        background: #002244 !important;
+        border-color: #002244 !important;
+    }
+    .style-type {
+        min-width: 100px !important;
     }
     
     /* Map editor controls */
@@ -900,7 +889,8 @@ def clean_empty_placeholders(text):
 
 def replace_text_in_paragraph(paragraph, text_inputs, style_mapping):
     """
-    Replace placeholders and apply manual styling from the style mapping.
+    Replace placeholders and apply manual styling if specified.
+    If no style override, follows the original placeholder formatting.
     """
     # Check if we have any placeholders to replace
     full_text = paragraph.text
@@ -923,10 +913,16 @@ def replace_text_in_paragraph(paragraph, text_inputs, style_mapping):
         paragraph.add_run(result_text)
         return
     
-    # Get the first run's basic formatting as base
+    # Get the first run's formatting as base
     first_run = paragraph.runs[0]
-    base_font_name = first_run.font.name
-    base_font_color = first_run.font.color.rgb if first_run.font.color else None
+    
+    # Store ALL formatting from the first run
+    font_name = first_run.font.name
+    font_size = first_run.font.size
+    font_bold = first_run.font.bold
+    font_italic = first_run.font.italic
+    font_underline = first_run.font.underline
+    font_color = first_run.font.color.rgb if first_run.font.color else None
     
     # Clear ALL runs
     for run in paragraph.runs:
@@ -935,23 +931,24 @@ def replace_text_in_paragraph(paragraph, text_inputs, style_mapping):
     # Set the text in the first run
     first_run.text = result_text
     
-    # Apply base formatting from the first run
-    if base_font_name:
-        try:
-            first_run.font.name = base_font_name
-        except:
-            pass
-    if base_font_color:
-        try:
-            first_run.font.color.rgb = base_font_color
-        except:
-            pass
+    # First, apply the original formatting from the template
+    try:
+        if font_name:
+            first_run.font.name = font_name
+        if font_size:
+            first_run.font.size = font_size
+        if font_color:
+            first_run.font.color.rgb = font_color
+    except:
+        pass
     
-    # Find the first token that has style mapping and apply it
+    # Then, check if we have style overrides and apply them
+    # Find the first token that has style mapping
     for token in text_inputs.keys():
         if token in style_mapping and style_mapping[token]:
             style = style_mapping[token]
-            # Apply styles
+            
+            # Only override if explicitly set
             if style.get('bold') is not None:
                 try:
                     first_run.font.bold = style['bold']
@@ -965,11 +962,6 @@ def replace_text_in_paragraph(paragraph, text_inputs, style_mapping):
             if style.get('underline') is not None:
                 try:
                     first_run.font.underline = style['underline']
-                except:
-                    pass
-            if style.get('size'):
-                try:
-                    first_run.font.size = Pt(style['size'])
                 except:
                     pass
             break  # Apply only the first found style
@@ -1264,37 +1256,32 @@ else:
         
         with st.expander("Data Type & Style Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure data type and text styling for each placeholder field.")
+            st.markdown("*Leave style options unchecked to follow the template's original formatting.*")
             
-            # Header row with consistent spacing
-            col_header1, col_header2, col_header3, col_header4, col_header5 = st.columns([1.8, 1.0, 0.8, 0.8, 1.0])
-            with col_header1:
+            # Header
+            col_h1, col_h2, col_h3, col_h4 = st.columns([2.0, 1.2, 0.8, 0.8])
+            with col_h1:
                 st.markdown("**Field**")
-            with col_header2:
+            with col_h2:
                 st.markdown("**Type**")
-            with col_header3:
+            with col_h3:
                 st.markdown("**B**")
-            with col_header4:
+            with col_h4:
                 st.markdown("**I**")
-            with col_header5:
-                st.markdown("**Size**")
             
-            st.markdown("<hr style='margin: 2px 0 8px 0;'>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin: 4px 0 8px 0;'>", unsafe_allow_html=True)
             
-            for idx, token in enumerate(tokens):
+            for token in tokens:
                 clean_label = token.replace("{", "").replace("}", "")
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                # Create a styled row container
-                st.markdown(f"""
-                <div class="style-mapping-row">
-                    <span class="style-field-name">{clean_label}</span>
-                </div>
-                """, unsafe_allow_html=True)
+                # Row with 4 columns
+                col1, col2, col3, col4 = st.columns([2.0, 1.2, 0.8, 0.8])
                 
-                # Controls in a single row with columns
-                col_type, col_bold, col_italic, col_size, col_spacer = st.columns([1.8, 0.8, 0.8, 1.2, 0.5])
+                with col1:
+                    st.markdown(f"**{clean_label}**")
                 
-                with col_type:
+                with col2:
                     data_type = st.selectbox(
                         "", 
                         ["Text", "Image", "Map"], 
@@ -1307,18 +1294,17 @@ else:
                         auto_save_config()
                         st.rerun()
                 
-                # Style controls - only show for text type
+                # Style controls - only for Text type
                 if data_type == "Text":
                     # Initialize style mapping if not exists
                     if token not in st.session_state.style_mapping:
                         st.session_state.style_mapping[token] = {
                             'bold': False,
                             'italic': False,
-                            'underline': False,
-                            'size': 12
+                            'underline': False
                         }
                     
-                    with col_bold:
+                    with col3:
                         bold = st.checkbox(
                             "B", 
                             value=st.session_state.style_mapping[token].get('bold', False),
@@ -1327,7 +1313,7 @@ else:
                         )
                         st.session_state.style_mapping[token]['bold'] = bold
                     
-                    with col_italic:
+                    with col4:
                         italic = st.checkbox(
                             "I", 
                             value=st.session_state.style_mapping[token].get('italic', False),
@@ -1335,29 +1321,11 @@ else:
                             label_visibility="collapsed"
                         )
                         st.session_state.style_mapping[token]['italic'] = italic
-                    
-                    with col_size:
-                        size = st.number_input(
-                            "",
-                            min_value=8,
-                            max_value=72,
-                            value=st.session_state.style_mapping[token].get('size', 12),
-                            step=1,
-                            key=f"style_size_{token}",
-                            label_visibility="collapsed"
-                        )
-                        st.session_state.style_mapping[token]['size'] = size
                 else:
-                    # Placeholder for non-text types
-                    with col_bold:
+                    with col3:
                         st.caption("—")
-                    with col_italic:
+                    with col4:
                         st.caption("—")
-                    with col_size:
-                        st.caption("—")
-                
-                with col_spacer:
-                    pass
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
