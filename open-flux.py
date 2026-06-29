@@ -390,29 +390,20 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     
     def calculate_1km_bounds(lat, lon):
         """Calculate approximately 1km bounding box centered on the pin"""
-        # 1 degree latitude ≈ 111.32 km
-        # 1 degree longitude ≈ 111.32 * cos(latitude) km
         lat_deg_per_km = 1.0 / 111.32
         lon_deg_per_km = 1.0 / (111.32 * math.cos(math.radians(lat)))
-        
-        # 0.5km in each direction for 1km total (centered on pin)
         lat_offset = lat_deg_per_km * 0.5
         lon_offset = lon_deg_per_km * 0.5
-        
         return lat + lat_offset, lat - lat_offset, lon + lon_offset, lon - lon_offset
     
-    # Check if bounds are valid (not None and have reasonable size)
     bounds_valid = all(x is not None for x in [n, s, e, w])
     if bounds_valid:
-        # Check if bounds are too small or invalid
         lat_span = abs(n - s)
         lon_span = abs(e - w)
-        # If bounds are extremely small (less than 10 meters), use 1km
         if lat_span < 0.0001 or lon_span < 0.0001:
             bounds_valid = False
     
     if not bounds_valid:
-        # Use 1km radius centered on pin
         n, s, e, w = calculate_1km_bounds(pin_lat, pin_lon)
     
     lon_span = e - w
@@ -448,7 +439,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     
     tile_urls = get_tile_urls(style)
     
-    # Fetch and stitch tiles
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             tile_data = None
@@ -472,51 +462,31 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         px_y = (1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n_tiles * tile_size * scale_factor
         return px_x, px_y
     
-    # Calculate pixel positions for cropping
     px_w, py_n = num2px(n, w, zoom)
     px_e, py_s = num2px(s, e, zoom)
     base_x = x_min * tile_size * scale_factor
     base_y = y_min * tile_size * scale_factor
     
-    # For no bounds case, ensure the crop is perfectly centered on pin
     if not bounds_valid:
-        # Calculate pin pixel position in the stitched image
         pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
-        
-        # Calculate crop dimensions
         crop_width = int(px_e - px_w)
         crop_height = int(py_s - py_n)
-        
-        # Center the crop on the pin
         left = int(pin_px_x - base_x - crop_width // 2)
         top = int(pin_px_y - base_y - crop_height // 2)
         right = left + crop_width
         bottom = top + crop_height
         
-        # Ensure we don't go out of bounds
         stitched_width = width_tiles * tile_size * scale_factor
         stitched_height = height_tiles * tile_size * scale_factor
         
-        if left < 0:
-            right -= left
-            left = 0
-        if top < 0:
-            bottom -= top
-            top = 0
-        if right > stitched_width:
-            left -= (right - stitched_width)
-            right = stitched_width
-        if bottom > stitched_height:
-            top -= (bottom - stitched_height)
-            bottom = stitched_height
-        
-        # Ensure valid crop dimensions
+        if left < 0: right -= left; left = 0
+        if top < 0: bottom -= top; top = 0
+        if right > stitched_width: left -= (right - stitched_width); right = stitched_width
+        if bottom > stitched_height: top -= (bottom - stitched_height); bottom = stitched_height
         if right <= left: right = left + 100
         if bottom <= top: bottom = top + 100
-        
         cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     else:
-        # Use the bounds-based crop
         left = int(px_w - base_x)
         top = int(py_n - base_y)
         right = int(px_e - base_x)
@@ -525,28 +495,21 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         if bottom <= top: bottom = top + 100
         cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # --- DRAW PIN MARKER (ALWAYS INCLUDED AND CENTERED FOR NO BOUNDS) ---
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
-    
-    # Calculate pin position relative to the crop
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
-    # For no bounds case, the pin should be exactly in the center
     if not bounds_valid:
         pin_local_x = cropped.width // 2
         pin_local_y = cropped.height // 2
     
-    # Ensure pin is within bounds (clamp if needed)
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
-    # Draw pin with shadow and star
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
     
-    # Shadow
     draw.ellipse([
         pin_local_x - radius - shadow_offset, 
         pin_local_y - radius - shadow_offset, 
@@ -554,15 +517,11 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         pin_local_y + radius + shadow_offset
     ], fill=(0, 0, 0, 60))
     
-    # Pin circle
     draw.ellipse([
-        pin_local_x - radius,
-        pin_local_y - radius,
-        pin_local_x + radius,
-        pin_local_y + radius
+        pin_local_x - radius, pin_local_y - radius,
+        pin_local_x + radius, pin_local_y + radius
     ], fill=pin_color, outline=(255, 255, 255), width=max(1, int(radius * 0.1)))
     
-    # Star
     star_size = int(radius * 0.55)
     star_points = []
     for i in range(10):
@@ -571,16 +530,13 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         star_points.append((pin_local_x + r * math.cos(angle), pin_local_y + r * math.sin(angle)))
     draw.polygon(star_points, fill=(255, 255, 255))
     
-    # Add a small glow effect around the pin for visibility
     glow_radius = int(radius * 1.5)
     for i in range(3):
         alpha = 30 - i * 10
         glow_radius_i = glow_radius + i * 5
         draw.ellipse([
-            pin_local_x - glow_radius_i,
-            pin_local_y - glow_radius_i,
-            pin_local_x + glow_radius_i,
-            pin_local_y + glow_radius_i
+            pin_local_x - glow_radius_i, pin_local_y - glow_radius_i,
+            pin_local_x + glow_radius_i, pin_local_y + glow_radius_i
         ], outline=(255, 255, 255, alpha), width=1)
     
     final_img = cropped.convert("RGB")
@@ -596,23 +552,11 @@ def hex_to_rgb(hex_color):
 # --- ISOLATED FULL-SCREEN MAP EDITOR PAGE ---
 def render_isolated_map_editor():
     token_key = st.session_state.active_map_editor_token
-    
     st.markdown("""
         <style>
-            div[data-testid="stHorizontalBlock"] {
-                align-items: flex-end !important;
-                gap: 12px !important;
-            }
-            div[data-baseweb="input"], div[data-baseweb="select"], .stColorPicker div {
-                height: 38px !important;
-            }
-            .manual-picker-label {
-                font-family: 'Segoe UI', Arial, sans-serif !important;
-                font-size: 14px !important;
-                color: #1A1A1A !important;
-                margin-bottom: 8px !important;
-                line-height: 1.2;
-            }
+            div[data-testid="stHorizontalBlock"] { align-items: flex-end !important; gap: 12px !important; }
+            div[data-baseweb="input"], div[data-baseweb="select"], .stColorPicker div { height: 38px !important; }
+            .manual-picker-label { font-family: 'Segoe UI', Arial, sans-serif !important; font-size: 14px !important; color: #1A1A1A !important; margin-bottom: 8px !important; line-height: 1.2; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -633,7 +577,6 @@ def render_isolated_map_editor():
                                     st.session_state[f"val_{token}"] = value
                     except Exception as e:
                         st.error(f"Error restoring data: {e}")
-            
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
             st.rerun()
@@ -696,40 +639,25 @@ def render_isolated_map_editor():
     if st.session_state[export_trigger_key]:
         with st.spinner("Exporting Map... Please wait"):
             n, s, e, w = None, None, None, None
-            
-            # Check if user drew a rectangle
             if st.session_state.get(bounds_key):
                 b = st.session_state[bounds_key]
                 if b and "_northEast" in b and "_southWest" in b:
                     n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
                     e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
-                    
-                    # Validate bounds have reasonable size
                     if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
                         n, s, e, w = None, None, None, None
             
-            # If no valid bounds, use 1km radius (handled in generate_static_map_bounds)
-            # Pass None values - the function will calculate 1km bounds
-            
             map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w, 
-                pin_lat=plat, pin_lon=plon, 
-                style=basemap_style, 
-                pin_color=pin_color, 
-                pin_size=int(pin_size)
+                n=n, s=s, e=e, w=w, pin_lat=plat, pin_lon=plon, 
+                style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
             )
-            
-            # Store the generated map image
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
-            
-            # Save to temp data
             if st.session_state.temp_form_data:
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
                 with open(temp_path, 'w', encoding='utf-8') as f:
                     json.dump(st.session_state.temp_form_data, f, indent=4)
-            
             st.session_state[export_trigger_key] = False
             st.session_state.restore_form_data = True
             st.session_state.active_map_editor_token = None
@@ -758,30 +686,12 @@ def render_isolated_map_editor():
     </div>
     """
     folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
-    
-    Draw(
-        export=False, 
-        position='topleft',
-        draw_options={
-            'polyline': False,
-            'polygon': False,
-            'circle': False,
-            'marker': False,
-            'circlemarker': False,
-            'rectangle': True
-        },
-        edit_options={'edit': True}
-    ).add_to(m)
-    
+    Draw(export=False, position='topleft', draw_options={'polyline': False, 'polygon': False, 'circle': False, 'marker': False, 'circlemarker': False, 'rectangle': True}, edit_options={'edit': True}).add_to(m)
     st.info("Draw a rectangle to define crop area (visible for guidance only, not in export) | Drag pin to reposition")
-    map_data = st_folium(
-        m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", 
-        returned_objects=["last_active_drawing", "bounds", "last_marker_moved"]
-    )
+    map_data = st_folium(m, height=600, width=1300, use_container_width=True, key=f"int_map_{token_key}", returned_objects=["last_active_drawing", "bounds", "last_marker_moved"])
 
     if isinstance(map_data, dict):
-        if map_data.get("bounds"):
-            st.session_state[bounds_key] = map_data["bounds"]
+        if map_data.get("bounds"): st.session_state[bounds_key] = map_data["bounds"]
         if map_data.get("last_marker_moved"):
             moved = map_data["last_marker_moved"]
             if moved:
@@ -845,310 +755,37 @@ def extract_placeholders(template_bytes, template_type):
     return []
 
 def clean_empty_placeholders(text):
-    """Remove any {{...}} placeholders that remain empty and clean up whitespace"""
-    if not text:
-        return text
-    # Remove empty placeholders but keep surrounding spaces
+    if not text: return text
     cleaned = re.sub(r'\{\{[^}]*\}\}', '', text)
-    # Normalize multiple spaces but keep single spaces between words
-    cleaned = re.sub(r' +', ' ', cleaned).strip()
-    return cleaned
+    return re.sub(r' +', ' ', cleaned).strip()
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """
-    Replace ALL placeholders in a paragraph while preserving formatting.
-    Each placeholder is replaced individually, preserving the formatting of its surrounding text.
+    Sequentially processes and replaces each unique placeholder inside a text block,
+    preserving formatting run properties reliably without generating duplicated runs or text loops.
     """
-    # First, combine all runs to get the complete text
-    complete_text = ""
-    for run in paragraph.runs:
-        complete_text += run.text
-    
-    # Check if any placeholder exists in this paragraph
-    has_placeholder = any(token in complete_text for token in text_inputs.keys())
-    if not has_placeholder:
-        return
-    
-    # Store all runs with their text and formatting
-    runs_data = []
-    for run in paragraph.runs:
-        run_info = {
-            'text': run.text,
-            'bold': run.font.bold if hasattr(run.font, 'bold') else None,
-            'italic': run.font.italic if hasattr(run.font, 'italic') else None,
-            'underline': run.font.underline if hasattr(run.font, 'underline') else None,
-            'color': run.font.color.rgb if hasattr(run.font, 'color') and run.font.color else None,
-            'size': run.font.size if hasattr(run.font, 'size') else None,
-            'name': run.font.name if hasattr(run.font, 'name') else None
-        }
-        runs_data.append(run_info)
-    
-    # Build the complete text with all placeholders replaced
-    modified_text = complete_text
     for token, value in text_inputs.items():
-        if token in modified_text:
-            replacement = str(value) if value and str(value).strip() else ''
-            modified_text = modified_text.replace(token, replacement)
-    
-    # Clean up spacing but preserve intended spaces
-    modified_text = re.sub(r'\s+', ' ', modified_text).strip()
-    
-    # Now we need to rebuild the paragraph run by run
-    # preserving the original formatting pattern
-    
-    # Clear all existing runs
-    for run in paragraph.runs:
-        run.text = ""
-    
-    # If we have no runs, create one
-    if len(paragraph.runs) == 0:
-        paragraph.add_run(modified_text)
-        return
-    
-    # Check if we have a formatting pattern to preserve
-    # Look for bold/non-bold pattern
-    has_bold = any(run_info.get('bold') is True for run_info in runs_data)
-    has_non_bold = any(run_info.get('bold') is False for run_info in runs_data)
-    
-    # If we have mixed formatting (some bold, some not), try to preserve it
-    if has_bold and has_non_bold:
-        # Find the pattern of formatting
-        formatting_pattern = []
-        for run_info in runs_data:
-            if run_info['text']:  # Only include non-empty runs
-                formatting_pattern.append({
-                    'bold': run_info['bold'],
-                    'italic': run_info['italic'],
-                    'underline': run_info['underline'],
-                    'color': run_info['color'],
-                    'size': run_info['size'],
-                    'name': run_info['name'],
-                    'text': run_info['text']
-                })
+        # Clean replacement text segment
+        replacement = str(value) if value and str(value).strip() else ''
         
-        # Now we need to map the modified text back to this pattern
-        # We'll use the original text segments as a guide
-        
-        # Find all placeholders and their positions in the original text
-        placeholder_info = []
-        for token in text_inputs.keys():
-            if token in complete_text:
-                start = 0
-                while True:
-                    pos = complete_text.find(token, start)
-                    if pos == -1:
-                        break
-                    placeholder_info.append({
-                        'token': token,
-                        'start': pos,
-                        'end': pos + len(token),
-                        'value': str(text_inputs[token]) if text_inputs[token] and str(text_inputs[token]).strip() else ''
-                    })
-                    start = pos + 1
-        
-        # Sort by position
-        placeholder_info.sort(key=lambda x: x['start'])
-        
-        # Rebuild the text with formatting
-        new_runs = []
-        current_pos = 0
-        
-        # Process each run's text segment
-        for run_data in runs_data:
-            if not run_data['text']:
-                continue
-                
-            run_text = run_data['text']
-            run_start = current_pos
-            run_end = current_pos + len(run_text)
-            
-            # Check if this run contains any placeholders
-            has_token_in_run = any(
-                pi['start'] >= run_start and pi['end'] <= run_end 
-                for pi in placeholder_info
-            )
-            
-            if not has_token_in_run:
-                # No placeholders in this run, keep it as is
-                new_runs.append({
-                    'text': run_text,
-                    'bold': run_data['bold'],
-                    'italic': run_data['italic'],
-                    'underline': run_data['underline'],
-                    'color': run_data['color'],
-                    'size': run_data['size'],
-                    'name': run_data['name']
-                })
-            else:
-                # This run has placeholders, split it
-                last_pos = 0
-                for pi in placeholder_info:
-                    if pi['start'] >= run_start and pi['end'] <= run_end:
-                        # This placeholder is in this run
-                        local_start = pi['start'] - run_start
-                        local_end = pi['end'] - run_start
-                        
-                        # Text before the placeholder
-                        if local_start > last_pos:
-                            before_text = run_text[last_pos:local_start]
-                            if before_text:
-                                new_runs.append({
-                                    'text': before_text,
-                                    'bold': run_data['bold'],
-                                    'italic': run_data['italic'],
-                                    'underline': run_data['underline'],
-                                    'color': run_data['color'],
-                                    'size': run_data['size'],
-                                    'name': run_data['name']
-                                })
-                        
-                        # The placeholder value with the run's formatting
-                        if pi['value']:
-                            new_runs.append({
-                                'text': pi['value'],
-                                'bold': run_data['bold'],
-                                'italic': run_data['italic'],
-                                'underline': run_data['underline'],
-                                'color': run_data['color'],
-                                'size': run_data['size'],
-                                'name': run_data['name']
-                            })
-                        
-                        last_pos = local_end
-                
-                # Text after the last placeholder in this run
-                if last_pos < len(run_text):
-                    after_text = run_text[last_pos:]
-                    if after_text:
-                        new_runs.append({
-                            'text': after_text,
-                            'bold': run_data['bold'],
-                            'italic': run_data['italic'],
-                            'underline': run_data['underline'],
-                            'color': run_data['color'],
-                            'size': run_data['size'],
-                            'name': run_data['name']
-                        })
-            
-            current_pos = run_end
-        
-        # If we successfully split into new runs, use them
-        if new_runs:
-            # Clear all runs again
-            for run in paragraph.runs:
-                run.text = ""
-            
-            # Rebuild with new runs
-            for i, run_data in enumerate(new_runs):
-                if i < len(paragraph.runs):
-                    run = paragraph.runs[i]
-                else:
-                    run = paragraph.add_run()
-                
-                run.text = run_data['text']
-                
-                # Apply formatting
-                try:
-                    if run_data['bold'] is not None:
-                        run.font.bold = run_data['bold']
-                except:
-                    pass
-                try:
-                    if run_data['italic'] is not None:
-                        run.font.italic = run_data['italic']
-                except:
-                    pass
-                try:
-                    if run_data['underline'] is not None:
-                        run.font.underline = run_data['underline']
-                except:
-                    pass
-                try:
-                    if run_data['color'] is not None:
-                        run.font.color.rgb = run_data['color']
-                except:
-                    pass
-                try:
-                    if run_data['size'] is not None:
-                        run.font.size = run_data['size']
-                except:
-                    pass
-                try:
-                    if run_data['name'] is not None:
-                        run.font.name = run_data['name']
-                except:
-                    pass
-            
-            # Clear any extra runs
-            for i in range(len(new_runs), len(paragraph.runs)):
-                paragraph.runs[i].text = ""
-            
-            return
-    
-    # Fallback: If we couldn't preserve formatting, put everything in the first run
-    if len(paragraph.runs) > 0:
-        first_run = paragraph.runs[0]
-        
-        # Store formatting properties from the first run
-        try:
-            bold = first_run.font.bold
-        except:
-            bold = None
-        try:
-            italic = first_run.font.italic
-        except:
-            italic = None
-        try:
-            underline = first_run.font.underline
-        except:
-            underline = None
-        try:
-            size = first_run.font.size
-        except:
-            size = None
-        try:
-            name = first_run.font.name
-        except:
-            name = None
-        
-        # Clear all runs
+        # Step 1: Scan individual runs. If a run cleanly holds the full placeholder token, swap it directly.
         for run in paragraph.runs:
-            run.text = ""
-        
-        # Put the modified text in the first run with its original formatting
-        first_run.text = modified_text
-        
-        # Restore formatting
-        try:
-            if bold is not None:
-                first_run.font.bold = bold
-        except:
-            pass
-        try:
-            if italic is not None:
-                first_run.font.italic = italic
-        except:
-            pass
-        try:
-            if underline is not None:
-                first_run.font.underline = underline
-        except:
-            pass
-        try:
-            if size is not None:
-                first_run.font.size = size
-        except:
-            pass
-        try:
-            if name is not None:
-                first_run.font.name = name
-        except:
-            pass
-        
-        # Clear all other runs
-        for i in range(1, len(paragraph.runs)):
-            paragraph.runs[i].text = ""
-        
+            if token in run.text:
+                run.text = run.text.replace(token, replacement)
+                
+        # Step 2: Fallback fallback for tokens fragmented across multiple text runs
+        # We re-verify paragraph text to catch remaining fragmented elements.
+        full_text = "".join(r.text for r in paragraph.runs)
+        if token in full_text:
+            # Replace placeholder token within full context
+            updated_text = full_text.replace(token, replacement)
+            
+            # Repopulate content via the initial paragraph run to safely preserve layout styling
+            if paragraph.runs:
+                paragraph.runs[0].text = updated_text
+                for secondary_run in paragraph.runs[1:]:
+                    secondary_run.text = ""
+
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
     for slide in prs.slides:
@@ -1172,16 +809,13 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
                                 for paragraph in cell.text_frame.paragraphs: 
                                     replace_text_in_paragraph(paragraph, text_inputs)
         for img_file, left, top, width, height in images_to_add:
-            try:
-                slide.shapes.add_picture(smart_crop_to_fit(img_file, width, height), left, top, width=width, height=height)
-            except Exception: 
-                pass
+            try: slide.shapes.add_picture(smart_crop_to_fit(img_file, width, height), left, top, width=width, height=height)
+            except Exception: pass
         for old_shape in shapes_to_delete:
             try:
                 sp = old_shape._element
                 sp.getparent().remove(sp)
-            except Exception: 
-                pass
+            except Exception: pass
     pptx_stream = io.BytesIO()
     prs.save(pptx_stream)
     return pptx_stream.getvalue()
@@ -1202,16 +836,10 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 def get_download_filename(template_name, file_type):
-    """Generate filename: Generated_TemplateName_Date"""
-    # Remove template_ prefix and file extension
     base_name = re.sub(r'^template_', '', template_name or "Document")
     base_name = re.sub(r'\.(pptx|docx)$', '', base_name)
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
-    
-    # Get current date in MMDDYYYY format
     current_date = datetime.now().strftime('%m%d%Y')
-    
-    # Format: Generated_TemplateName_Date.ext
     return f"Generated_{base_name}_{current_date}.{file_type}"
     
 def autosave_current_form_data():
@@ -1221,8 +849,7 @@ def autosave_current_form_data():
         val_key = f"val_{token}"
         if val_key in st.session_state:
             current_type = st.session_state.custom_mapping.get(token, "Text")
-            if current_type != "Image":
-                st.session_state.temp_form_data[token] = st.session_state[val_key]
+            if current_type != "Image": st.session_state.temp_form_data[token] = st.session_state[val_key]
     temp_path = get_temp_config_path(st.session_state.saved_template_name)
     try:
         with open(temp_path, 'w', encoding='utf-8') as f:
@@ -1232,11 +859,9 @@ def autosave_current_form_data():
         return False
 
 def restore_form_data_from_session():
-    if not st.session_state.saved_template_name:
-        return False
+    if not st.session_state.saved_template_name: return False
     has_session_data = any(f"val_{token}" in st.session_state for token in st.session_state.tokens)
-    if has_session_data:
-        return True
+    if has_session_data: return True
     if st.session_state.temp_form_data:
         for token, value in st.session_state.temp_form_data.items():
             current_type = st.session_state.custom_mapping.get(token, "Text")
@@ -1254,8 +879,7 @@ def restore_form_data_from_session():
                     if current_type != "Image" and f"val_{token}" not in st.session_state:
                         st.session_state[f"val_{token}"] = value
                 return True
-        except Exception: 
-            pass
+        except Exception: pass
     return False
 
 def purge_all_temporary_data():
@@ -1407,7 +1031,6 @@ else:
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
         
-        # --- CTA PRESETS - SIMPLIFIED ---
         cta_sets = detect_cta_sets()
         if cta_sets:
             st.markdown("**Call to Action Presets**")
@@ -1422,7 +1045,6 @@ else:
                         current_advisor = st.session_state[f"val_{cta_name_token}"]
                     
                     st.caption(f"CTA{cta_num}")
-                    
                     selected_advisor = st.selectbox(
                         f"Select advisor",
                         options=[""] + list(contacts_database.keys()),
@@ -1430,7 +1052,6 @@ else:
                         key=f"cta_autofill_{cta_num}",
                         label_visibility="collapsed"
                     )
-                    
                     if selected_advisor and selected_advisor != current_advisor:
                         apply_cta_preset_autofill(cta_num, selected_advisor)
                         st.rerun()
@@ -1454,7 +1075,6 @@ else:
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
-        # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
             col_target = idx % 2
             if col_target == 0:
@@ -1508,7 +1128,6 @@ else:
                     
                     if st.button("Open Map Editor", key=f"btn_map_{token}", use_container_width=True, on_click=save_all_and_navigate, args=(token,)):
                         pass
-                    
                     field_types[token] = "Image"
                     
                 else:
@@ -1533,7 +1152,6 @@ else:
                     if new_value != current_value:
                         st.session_state[f"val_{token}"] = new_value
                         st.session_state.temp_form_data[token] = new_value
-                        
                         if st.session_state.saved_template_name:
                             temp_path = get_temp_config_path(st.session_state.saved_template_name)
                             try:
@@ -1543,7 +1161,6 @@ else:
                     
                     text_data[token] = new_value
                     field_types[token] = "Text"
-                    
                 st.markdown('<div style="margin-bottom:14px;"></div>', unsafe_allow_html=True)
 
     # --- DOWNLOAD & CLEANUP SECTION ---
