@@ -856,129 +856,93 @@ def clean_empty_placeholders(text):
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """
-    Replace placeholders one by one while preserving formatting.
-    Each placeholder is treated independently - replaced with its value
-    while keeping the formatting of the runs around it.
+    Replace ALL placeholders in a paragraph while preserving formatting.
     """
-    # Check if this paragraph contains any placeholders
-    full_text = ""
+    # First, combine all runs to get the complete text
+    complete_text = ""
     for run in paragraph.runs:
-        full_text += run.text
+        complete_text += run.text
     
-    has_placeholder = any(token in full_text for token in text_inputs.keys())
+    # Check if any placeholder exists in this paragraph
+    has_placeholder = any(token in complete_text for token in text_inputs.keys())
     if not has_placeholder:
         return
     
-    # Store all runs with their text and formatting
-    runs_data = []
-    for run in paragraph.runs:
-        run_info = {
-            'text': run.text,
-            'bold': run.font.bold if hasattr(run.font, 'bold') else None,
-            'italic': run.font.italic if hasattr(run.font, 'italic') else None,
-            'underline': run.font.underline if hasattr(run.font, 'underline') else None,
-            'color': run.font.color.rgb if hasattr(run.font, 'color') and run.font.color else None,
-            'size': run.font.size if hasattr(run.font, 'size') else None,
-            'name': run.font.name if hasattr(run.font, 'name') else None
-        }
-        runs_data.append(run_info)
+    # Replace ALL placeholders in the complete text
+    modified_text = complete_text
+    for token, value in text_inputs.items():
+        if token in modified_text:
+            # Replace the placeholder with its value
+            replacement = str(value) if value and str(value).strip() else ''
+            modified_text = modified_text.replace(token, replacement)
     
-    # Process each run individually
-    # We'll rebuild the paragraph run by run
-    new_runs_data = []
+    # Clean up spacing but preserve intended spaces
+    modified_text = re.sub(r'\s+', ' ', modified_text).strip()
     
-    for run_info in runs_data:
-        run_text = run_info['text']
+    # Store the original formatting from the first run
+    # We'll apply this formatting to the entire text
+    if len(paragraph.runs) > 0:
+        first_run = paragraph.runs[0]
         
-        # Check if this run contains any placeholders
-        has_token_in_run = any(token in run_text for token in text_inputs.keys())
+        # Store formatting properties
+        try:
+            bold = first_run.font.bold
+        except:
+            bold = None
+        try:
+            italic = first_run.font.italic
+        except:
+            italic = None
+        try:
+            underline = first_run.font.underline
+        except:
+            underline = None
+        try:
+            size = first_run.font.size
+        except:
+            size = None
+        try:
+            name = first_run.font.name
+        except:
+            name = None
         
-        if not has_token_in_run:
-            # No placeholders in this run, keep it as is
-            new_runs_data.append({
-                'text': run_text,
-                'bold': run_info['bold'],
-                'italic': run_info['italic'],
-                'underline': run_info['underline'],
-                'color': run_info['color'],
-                'size': run_info['size'],
-                'name': run_info['name']
-            })
-        else:
-            # This run has placeholders, we need to split it
-            # Process each token individually
-            current_pos = 0
-            temp_text = run_text
-            
-            # Find all placeholders in this run
-            tokens_in_run = []
-            for token in text_inputs.keys():
-                if token in temp_text:
-                    # Find all occurrences of this token
-                    start_pos = 0
-                    while True:
-                        pos = temp_text.find(token, start_pos)
-                        if pos == -1:
-                            break
-                        tokens_in_run.append({
-                            'token': token,
-                            'start': pos,
-                            'end': pos + len(token),
-                            'value': str(text_inputs[token]) if text_inputs[token] and str(text_inputs[token]).strip() else ''
-                        })
-                        start_pos = pos + 1
-            
-            # Sort by position (ascending)
-            tokens_in_run.sort(key=lambda x: x['start'])
-            
-            # Split the text around each placeholder
-            last_pos = 0
-            for token_info in tokens_in_run:
-                # Text before the placeholder
-                if token_info['start'] > last_pos:
-                    before_text = temp_text[last_pos:token_info['start']]
-                    if before_text:
-                        new_runs_data.append({
-                            'text': before_text,
-                            'bold': run_info['bold'],
-                            'italic': run_info['italic'],
-                            'underline': run_info['underline'],
-                            'color': run_info['color'],
-                            'size': run_info['size'],
-                            'name': run_info['name']
-                        })
-                
-                # The placeholder value (with the same formatting as the original run)
-                if token_info['value']:
-                    new_runs_data.append({
-                        'text': token_info['value'],
-                        'bold': run_info['bold'],
-                        'italic': run_info['italic'],
-                        'underline': run_info['underline'],
-                        'color': run_info['color'],
-                        'size': run_info['size'],
-                        'name': run_info['name']
-                    })
-                
-                last_pos = token_info['end']
-            
-            # Text after the last placeholder
-            if last_pos < len(temp_text):
-                after_text = temp_text[last_pos:]
-                if after_text:
-                    new_runs_data.append({
-                        'text': after_text,
-                        'bold': run_info['bold'],
-                        'italic': run_info['italic'],
-                        'underline': run_info['underline'],
-                        'color': run_info['color'],
-                        'size': run_info['size'],
-                        'name': run_info['name']
-                    })
-    
-    # Clear all existing runs
-    for run in paragraph.runs:
-        run.text = ""
+        # Clear all runs
+        for run in paragraph.runs:
+            run.text = ""
+        
+        # Put the modified text in the first run with its original formatting
+        first_run.text = modified_text
+        
+        # Restore formatting
+        try:
+            if bold is not None:
+                first_run.font.bold = bold
+        except:
+            pass
+        try:
+            if italic is not None:
+                first_run.font.italic = italic
+        except:
+            pass
+        try:
+            if underline is not None:
+                first_run.font.underline = underline
+        except:
+            pass
+        try:
+            if size is not None:
+                first_run.font.size = size
+        except:
+            pass
+        try:
+            if name is not None:
+                first_run.font.name = name
+        except:
+            pass
+        
+        # Clear all other runs
+        for i in range(1, len(paragraph.runs)):
+            paragraph.runs[i].text = ""
     
     # Rebuild the paragraph with new runs
     for i, run_data in enumerate(new_runs_data):
@@ -1025,6 +989,7 @@ def replace_text_in_paragraph(paragraph, text_inputs):
     # Clear any extra runs that weren't used
     for i in range(len(new_runs_data), len(paragraph.runs)):
         paragraph.runs[i].text = ""
+        
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
     for slide in prs.slides:
