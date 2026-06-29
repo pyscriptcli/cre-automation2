@@ -651,7 +651,7 @@ def render_isolated_map_editor():
         del st.session_state[dragged_key]
 
     map_styles = ["Satellite (Streets)", "Satellite (Labels)", "Satellite (Clean)", 
-              "Street Map (Labels)", "Street Map (Clean)", "OSM Carto Light"]
+              "Street Map (Labels)", "Street Map (Streets)", "OSM Carto Light"]
 
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
     with c_btn:
