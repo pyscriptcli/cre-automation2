@@ -891,19 +891,38 @@ def replace_text_in_paragraph(paragraph, text_inputs):
     
     if spans_across_runs:
         # If placeholders span across runs, we need to rebuild the text
-        # Keep the first run's formatting and clear others
+        # Store the first run's formatting
         first_run = paragraph.runs[0]
         
-        # Store formatting from first run
-        font = first_run.font
+        # Store font properties from the first run
+        font_props = {
+            'name': first_run.font.name,
+            'size': first_run.font.size,
+            'bold': first_run.font.bold,
+            'italic': first_run.font.italic,
+            'underline': first_run.font.underline,
+            'color': first_run.font.color.rgb if first_run.font.color else None
+        }
         
         # Clear all runs and set the replaced text in the first run
         for run in paragraph.runs[1:]:
             run.text = ""
         
         first_run.text = replaced_text
-        # Restore formatting
-        first_run.font = font
+        
+        # Restore font properties
+        if font_props['name']:
+            first_run.font.name = font_props['name']
+        if font_props['size']:
+            first_run.font.size = font_props['size']
+        if font_props['bold'] is not None:
+            first_run.font.bold = font_props['bold']
+        if font_props['italic'] is not None:
+            first_run.font.italic = font_props['italic']
+        if font_props['underline'] is not None:
+            first_run.font.underline = font_props['underline']
+        if font_props['color']:
+            first_run.font.color.rgb = font_props['color']
     else:
         # Process each run individually (placeholders are contained within single runs)
         for run in paragraph.runs:
