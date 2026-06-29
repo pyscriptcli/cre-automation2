@@ -855,7 +855,7 @@ def clean_empty_placeholders(text):
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
-    """Replace text in paragraph while preserving formatting and spacing"""
+    """Replace text in paragraph while preserving formatting and exact spacing"""
     # Check if this paragraph contains any placeholders
     full_text = ""
     for run in paragraph.runs:
@@ -887,12 +887,10 @@ def replace_text_in_paragraph(paragraph, text_inputs):
         if modified_text != current_text:
             run.text = modified_text
     
-    # Handle cross-run placeholders and fix spacing
+    # Handle cross-run placeholders
     # Combine all text after individual run processing
     combined_text = ""
-    run_texts = []
     for run in paragraph.runs:
-        run_texts.append(run.text)
         combined_text += run.text
     
     # Check if any placeholders remain (they might span across runs)
@@ -907,15 +905,19 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                 else:
                     combined_text = combined_text.replace(token, '')
         
-        # Fix spacing issues in combined text
-        # Add spaces between lowercase and uppercase letters
+        # IMPORTANT: Only fix spacing issues that are clearly errors
+        # Add spaces between lowercase and uppercase letters (e.g., "sqmCommercial" -> "sqm Commercial")
         combined_text = re.sub(r'([a-z])([A-Z])', r'\1 \2', combined_text)
-        # Add spaces between numbers and letters
+        # Add spaces between numbers and letters when no space exists (e.g., "30meters" -> "30 meters")
         combined_text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', combined_text)
-        # Add spaces between letters and numbers
+        # Add spaces between letters and numbers when no space exists (e.g., "sqm2" -> "sqm 2")
         combined_text = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', combined_text)
-        # Remove multiple spaces but keep single spaces
-        combined_text = re.sub(r' +', ' ', combined_text).strip()
+        
+        # DO NOT compress multiple spaces - preserve exact spacing from template
+        # Remove only if there are 3+ spaces and replace with exact count from template
+        # Actually, we should preserve whatever spacing was in the template
+        # So we only trim leading/trailing spaces
+        combined_text = combined_text.strip()
         
         # Put combined text in first run, clear others
         if len(paragraph.runs) > 0:
@@ -923,15 +925,20 @@ def replace_text_in_paragraph(paragraph, text_inputs):
             for i in range(1, len(paragraph.runs)):
                 paragraph.runs[i].text = ""
     else:
-        # No cross-run placeholders, just clean up spacing in each run
+        # No cross-run placeholders, preserve exact spacing in each run
         for run in paragraph.runs:
             if run.text:
-                # Fix spacing in this run
+                # Only fix obvious spacing errors, don't compress intentional spaces
                 text = run.text
+                # Add spaces between lowercase and uppercase letters
                 text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+                # Add spaces between numbers and letters
                 text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', text)
+                # Add spaces between letters and numbers
                 text = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', text)
-                text = re.sub(r' +', ' ', text).strip()
+                # Don't compress multiple spaces - preserve them
+                # Only strip leading/trailing spaces
+                text = text.strip()
                 run.text = text
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
