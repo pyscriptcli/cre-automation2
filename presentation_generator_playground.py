@@ -118,11 +118,6 @@ MINIMAL_CRE_SYSTEM = """
         border-radius: 4px;
         border: 1px solid #E8E8E8;
         margin-bottom: 6px;
-        transition: all 0.2s ease;
-    }
-    .mapping-row:hover {
-        background-color: #F0F1F3;
-        border-color: #003366;
     }
     .mapping-row-label {
         font-weight: 500;
@@ -134,24 +129,6 @@ MINIMAL_CRE_SYSTEM = """
     }
     .mapping-row .stSelectbox {
         margin-bottom: 0 !important;
-    }
-    .position-badge {
-        display: inline-block;
-        background: #003366;
-        color: white;
-        padding: 1px 8px;
-        border-radius: 10px;
-        font-size: 10px;
-        font-weight: 600;
-        margin-right: 4px;
-    }
-    .order-indicator {
-        color: #666;
-        font-size: 11px;
-        padding: 2px 6px;
-        background: #E8E8E8;
-        border-radius: 3px;
-        display: inline-block;
     }
 </style>
 """
@@ -835,7 +812,7 @@ def extract_placeholders_from_pptx(pptx_bytes):
     prs = Presentation(io.BytesIO(pptx_bytes))
     tokens, seen = [], set()
     
-    # First pass: collect all placeholders in order of appearance
+    # First pass: collect all placeholders in order of appearance (top to bottom)
     for slide in prs.slides:
         # Check shapes in order
         for shape in slide.shapes:
@@ -859,7 +836,7 @@ def extract_placeholders_from_docx(docx_bytes):
     doc = Document(io.BytesIO(docx_bytes))
     tokens, seen = [], set()
     
-    # Check paragraphs in order
+    # Check paragraphs in order (top to bottom)
     for paragraph in doc.paragraphs:
         for token in re.findall(r'\{\{.*?\}\}', paragraph.text):
             if token not in seen:
@@ -1049,21 +1026,6 @@ def purge_all_temporary_data():
             if f"map_bytes_holder_{token}" in st.session_state: del st.session_state[f"map_bytes_holder_{token}"]
     st.session_state.temp_form_data = {}
 
-# --- TOKEN ORDER MANAGEMENT FUNCTIONS ---
-def get_token_order():
-    """Get or initialize token order from session state"""
-    order_key = "token_order"
-    if order_key not in st.session_state or len(st.session_state[order_key]) != len(st.session_state.tokens):
-        # Initialize with original order
-        st.session_state[order_key] = list(range(len(st.session_state.tokens)))
-    return st.session_state[order_key]
-
-def apply_token_order():
-    """Apply the current token order to the tokens list"""
-    if "token_order" in st.session_state and len(st.session_state.token_order) == len(st.session_state.tokens):
-        ordered_tokens = [st.session_state.tokens[i] for i in st.session_state.token_order]
-        st.session_state.tokens = ordered_tokens
-
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -1071,7 +1033,6 @@ st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 if "active_map_editor_token" not in st.session_state: st.session_state.active_map_editor_token = None
 if "custom_mapping" not in st.session_state: st.session_state.custom_mapping = {}
 if "tokens" not in st.session_state: st.session_state.tokens = []
-if "_original_tokens" not in st.session_state: st.session_state._original_tokens = []
 if "template_bytes" not in st.session_state: st.session_state.template_bytes = None
 if "saved_template_name" not in st.session_state: st.session_state.saved_template_name = None
 if "template_loaded" not in st.session_state: st.session_state.template_loaded = False
@@ -1084,7 +1045,6 @@ if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = F
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
-if "token_order" not in st.session_state: st.session_state.token_order = []
 
 # --- APP ROUTER ---
 if st.session_state.active_map_editor_token:
@@ -1136,7 +1096,6 @@ else:
                         st.session_state.saved_template_name = None
                         st.session_state.template_loaded = False
                         st.session_state.tokens = []
-                        st.session_state._original_tokens = []
                         st.session_state.temp_form_data = {}
                         st.session_state.show_delete_confirm = False
                         st.session_state.template_to_delete = None
@@ -1156,7 +1115,6 @@ else:
                     if template_bytes:
                         if st.session_state.saved_template_name != template_name:
                             st.session_state.temp_form_data = {}
-                            st.session_state.token_order = []
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
                         st.session_state.template_loaded = True
@@ -1164,9 +1122,6 @@ else:
                         config_data = load_config_from_file(template_name.replace('.pptx', '').replace('.docx', '') + '_config.json')
                         if config_data: st.session_state.custom_mapping = config_data
                         st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
-                        st.session_state._original_tokens = st.session_state.tokens.copy()
-                        # Initialize token order
-                        st.session_state.token_order = list(range(len(st.session_state.tokens)))
                         restore_form_data_from_session()
                     break
 
@@ -1182,8 +1137,6 @@ else:
             st.session_state.template_loaded = True
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
-            st.session_state._original_tokens = st.session_state.tokens.copy()
-            st.session_state.token_order = list(range(len(st.session_state.tokens)))
             st.session_state.temp_form_data = {}
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
@@ -1208,10 +1161,6 @@ else:
     text_data, image_data, field_types = {}, {}, {}
 
     if st.session_state.template_bytes is not None and st.session_state.tokens:
-        # Apply any token order changes
-        if st.session_state.token_order:
-            apply_token_order()
-        
         tokens = st.session_state.tokens
         
         # --- CTA PRESETS - SIMPLIFIED ---
@@ -1243,91 +1192,35 @@ else:
                         st.rerun()
             st.markdown("---")
         
-        with st.expander("Data Type Mapping & Order", expanded=st.session_state.show_type_mapping):
-            st.markdown("Configure field types and set display order using the position dropdowns.")
-            st.markdown("*Multiple placeholders can share the same position number.*")
+        with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
+            st.markdown("Configure the data type for each placeholder field.")
             
-            # Create 3 columns for the mapping
-            col1, col2, col3 = st.columns(3)
-            cols_list = [col1, col2, col3]
-            
-            # Get current order
-            current_order = get_token_order()
-            
-            # Display each token in a 3-column grid
+            # Simple 2-column layout for type mapping
+            cols = st.columns(2)
             for idx, token in enumerate(tokens):
-                clean_label = token.replace("{", "").replace("}", "")
-                current_type = st.session_state.custom_mapping.get(token, "Text")
-                
-                # Determine which column to use (3-column layout)
-                target_col = cols_list[idx % 3]
-                
-                with target_col:
-                    # Create a container with a light background
-                    st.markdown(f'<div class="mapping-row">', unsafe_allow_html=True)
+                with cols[idx % 2]:
+                    clean_label = token.replace("{", "").replace("}", "")
+                    current_type = st.session_state.custom_mapping.get(token, "Text")
                     
-                    # 3 columns within: label, position dropdown, type dropdown
-                    col_label, col_pos, col_type = st.columns([1.4, 1.2, 1.4])
-                    
-                    with col_label:
-                        current_pos = idx + 1
-                        st.markdown(f'<span class="mapping-row-label"><span class="position-badge">{current_pos}</span> {clean_label}</span>', unsafe_allow_html=True)
-                    
-                    with col_pos:
-                        # Create position options (1 to N)
-                        pos_options = list(range(1, len(tokens) + 1))
-                        
-                        # Find the index of the current position
-                        current_idx = current_pos - 1
-                        
-                        # Create the selectbox with a unique key
-                        pos_key = f"pos_{token}_{idx}"
-                        
-                        selected_pos = st.selectbox(
-                            "",
-                            options=pos_options,
-                            index=current_idx,
-                            key=pos_key,
-                            label_visibility="collapsed"
-                        )
-                        
-                        # If position changed
-                        if selected_pos != current_pos:
-                            # Build new order by moving this token to the new position
-                            new_order = current_order.copy()
-                            # Remove current token from its position
-                            new_order.remove(idx)
-                            # Insert at new position
-                            new_order.insert(selected_pos - 1, idx)
-                            
-                            st.session_state.token_order = new_order
-                            st.rerun()
-                    
-                    with col_type:
+                    col_lbl, col_sel = st.columns([1, 1.5])
+                    with col_lbl:
+                        st.markdown(f'<span style="font-size:12px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
+                    with col_sel:
                         data_type = st.selectbox(
                             "", 
                             ["Text", "Image", "Map"], 
                             index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
-                            key=f"type_mapping_{token}_{idx}",
+                            key=f"type_mapping_{token}",
                             label_visibility="collapsed"
                         )
                         if data_type != current_type:
                             st.session_state.custom_mapping[token] = data_type
                             auto_save_config()
                             st.rerun()
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Reset button
-            col_reset1, col_reset2, col_reset3 = st.columns([1, 1, 1])
-            with col_reset2:
-                if st.button("🔄 Reset to Original Order", use_container_width=True):
-                    st.session_state.token_order = list(range(len(st.session_state.tokens)))
-                    st.rerun()
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
-        # --- RENDER FIELDS IN CURRENT ORDER ---
+        # --- RENDER FIELDS IN ORIGINAL ORDER (preserving detection order) ---
         for idx, token in enumerate(tokens):
             col_target = idx % 2
             if col_target == 0:
@@ -1349,7 +1242,7 @@ else:
                     cta_num = cta_match.group(1)
                     label_text = f"{clean_label} (CTA{cta_num})"
                 
-                st.markdown(f'<div class="placeholder-label">#{idx + 1} {label_text}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="placeholder-label">{label_text}</div>', unsafe_allow_html=True)
                 
                 if current_type == "Image" and st.session_state.template_type == 'pptx':
                     image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
