@@ -82,8 +82,6 @@ MINIMAL_CRE_SYSTEM = """
     .saved-indicator { background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 6px; }
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
-    div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
-    
     .placeholder-label {
         font-weight: 600 !important;
         font-size: 13px !important;
@@ -455,10 +453,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         if bottom <= top: bottom = top + 100
         cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # --- DRAW PIN MARKER ---
-    draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
-    
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
@@ -468,7 +463,43 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
+
+    # --- DRAW PRESET-BASED VISUAL HEADING CONE ---
+    fov_layer = Image.new("RGBA", cropped.size, (0, 0, 0, 0))
+    fov_draw = ImageDraw.Draw(fov_layer)
     
+    # Map layout direction angle calculations based on current preset location mapping
+    if popup_position == "Top-Left":
+        heading_deg = 315
+    elif popup_position == "Bottom-Right":
+        heading_deg = 135
+    elif popup_position == "Bottom-Left":
+        heading_deg = 225
+    else: # Top-Right
+        heading_deg = 45
+        
+    start_angle = math.radians(heading_deg - 22.5 - 90)
+    end_angle = math.radians(heading_deg + 22.5 - 90)
+    cone_radius_scaled = 180 * scale_factor
+
+    point_1 = (
+        pin_local_x + cone_radius_scaled * math.cos(start_angle),
+        pin_local_y + cone_radius_scaled * math.sin(start_angle)
+    )
+    point_2 = (
+        pin_local_x + cone_radius_scaled * math.cos(end_angle),
+        pin_local_y + cone_radius_scaled * math.sin(end_angle)
+    )
+
+    fov_draw.polygon(
+        [(pin_local_x, pin_local_y), point_1, point_2], 
+        fill=(255, 215, 0, 95),       # Transparent Yellow Cone
+        outline=(255, 165, 0, 140)     # Orange bounding line
+    )
+    cropped = Image.alpha_composite(cropped, fov_layer)
+    
+    # --- DRAW PIN MARKER ---
+    draw = ImageDraw.Draw(cropped)
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
     
@@ -521,7 +552,6 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                 popup_height = 0
             
             if popup_height > 0:
-                # Coordinate alignment based on Preset selection
                 if popup_position == "Top-Left":
                     popup_x = popup_padding
                     popup_y = popup_padding
@@ -531,7 +561,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                 elif popup_position == "Bottom-Left":
                     popup_x = popup_padding
                     popup_y = cropped.height - popup_height - popup_padding
-                else:  # Defaults cleanly to Top-Right
+                else:  # Top-Right
                     popup_x = cropped.width - popup_width - popup_padding
                     popup_y = popup_padding
                 
@@ -788,6 +818,33 @@ def render_isolated_map_editor():
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
+    # --- REAL-TIME EXPORT PREVIEW SNAPSHOT PANEL ---
+    st.markdown("### 🖼️ Live Export Preview Snapshot")
+    with st.container():
+        n, s, e, w = None, None, None, None
+        if st.session_state.get(bounds_key):
+            b = st.session_state[bounds_key]
+            if b and "_northEast" in b and "_southWest" in b:
+                n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
+                e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+                if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
+                    n, s, e, w = None, None, None, None
+                    
+        try:
+            preview_bytes = generate_static_map_bounds(
+                n=n, s=s, e=e, w=w, 
+                pin_lat=plat, pin_lon=plon, 
+                style=basemap_style, 
+                pin_color=pin_color, 
+                pin_size=int(pin_size),
+                property_name=st.session_state[popup_name_key],
+                property_image=st.session_state[popup_image_key],
+                popup_position=st.session_state[popup_pos_key]
+            )
+            st.image(preview_bytes, caption="This matches exactly what will append to your slides.", use_container_width=True)
+        except Exception as preview_err:
+            st.caption("Awaiting map boundary tiles loading for layout presentation processing...")
+
     # --- EXPORT LOGIC ---
     if st.session_state[export_trigger_key]:
         with st.spinner("Exporting Map... Please wait"):
@@ -803,7 +860,6 @@ def render_isolated_map_editor():
                         n, s, e, w = None, None, None, None
             
             property_name = st.session_state[popup_name_key] or ""
-            # FIX: Pull directly from the persistent upload file stream cache block instead of holder reference
             property_image = st.session_state.get(popup_image_key)
             
             map_img_bytes = generate_static_map_bounds(
@@ -836,7 +892,9 @@ def render_isolated_map_editor():
             time.sleep(0.5)
             st.rerun()
 
-    # --- DISPLAY MAP ---
+    # --- DISPLAY INTERACTIVE GEOMAP PANEL ---
+    st.markdown("---")
+    st.markdown("### 🗺️ Interactive Control Area")
     tiles_dict = {}
     attr_dict = {}
     for style in map_styles:
