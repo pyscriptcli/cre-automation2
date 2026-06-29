@@ -855,7 +855,7 @@ def clean_empty_placeholders(text):
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
-    """Replace text in paragraph while preserving formatting"""
+    """Replace text in paragraph while preserving formatting and spacing"""
     # Check if this paragraph contains any placeholders
     full_text = ""
     for run in paragraph.runs:
@@ -865,7 +865,7 @@ def replace_text_in_paragraph(paragraph, text_inputs):
     if not has_placeholder:
         return
     
-    # Process each run individually but handle placeholder replacements correctly
+    # Process each run individually
     for run in paragraph.runs:
         current_text = run.text
         modified_text = current_text
@@ -883,45 +883,22 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                 else:
                     modified_text = modified_text.replace(token, '')
         
-        # Fix spacing issues within this run only
-        modified_text = re.sub(r'([a-z])([A-Z])', r'\1 \2', modified_text)
-        modified_text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', modified_text)
-        modified_text = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', modified_text)
-        modified_text = re.sub(r' +', ' ', modified_text).strip()
-        
         # Only update the run if text actually changed
         if modified_text != current_text:
             run.text = modified_text
     
-    # Handle the case where placeholders span across multiple runs
-    # This can happen when PowerPoint splits text across runs
-    # We need to check if any placeholders remain after processing individual runs
-    full_text_after = ""
+    # Handle cross-run placeholders and fix spacing
+    # Combine all text after individual run processing
+    combined_text = ""
+    run_texts = []
     for run in paragraph.runs:
-        full_text_after += run.text
+        run_texts.append(run.text)
+        combined_text += run.text
     
-    # If placeholders still exist in the combined text, they span across runs
-    remaining_placeholders = any(token in full_text_after for token in text_inputs.keys())
+    # Check if any placeholders remain (they might span across runs)
+    remaining_placeholders = any(token in combined_text for token in text_inputs.keys())
+    
     if remaining_placeholders:
-        # Combine all text, replace placeholders, and redistribute preserving formatting
-        combined_text = ""
-        run_texts = []
-        run_formats = []
-        
-        for run in paragraph.runs:
-            run_texts.append(run.text)
-            combined_text += run.text
-            # Store format properties
-            run_formats.append({
-                'font': run.font,
-                'bold': run.font.bold,
-                'italic': run.font.italic,
-                'underline': run.font.underline,
-                'color': run.font.color,
-                'size': run.font.size,
-                'name': run.font.name
-            })
-        
         # Replace placeholders in combined text
         for token, value in text_inputs.items():
             if token in combined_text:
@@ -930,23 +907,32 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                 else:
                     combined_text = combined_text.replace(token, '')
         
-        # Fix spacing in combined text
+        # Fix spacing issues in combined text
+        # Add spaces between lowercase and uppercase letters
         combined_text = re.sub(r'([a-z])([A-Z])', r'\1 \2', combined_text)
+        # Add spaces between numbers and letters
         combined_text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', combined_text)
+        # Add spaces between letters and numbers
         combined_text = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', combined_text)
+        # Remove multiple spaces but keep single spaces
         combined_text = re.sub(r' +', ' ', combined_text).strip()
         
-        # Redistribute combined text back to runs, preserving formatting
+        # Put combined text in first run, clear others
         if len(paragraph.runs) > 0:
-            # Put all text in first run with its original formatting
             paragraph.runs[0].text = combined_text
-            # Clear other runs
             for i in range(1, len(paragraph.runs)):
                 paragraph.runs[i].text = ""
-    
-    # Final cleanup: ensure no extra spaces
-    for run in paragraph.runs:
-        run.text = re.sub(r' +', ' ', run.text).strip()
+    else:
+        # No cross-run placeholders, just clean up spacing in each run
+        for run in paragraph.runs:
+            if run.text:
+                # Fix spacing in this run
+                text = run.text
+                text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+                text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', text)
+                text = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', text)
+                text = re.sub(r' +', ' ', text).strip()
+                run.text = text
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
