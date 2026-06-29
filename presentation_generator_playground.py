@@ -567,75 +567,119 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
             pin_local_y + glow_radius_i
         ], outline=(255, 255, 255, alpha), width=1)
     
-    # --- ADD PROPERTY INFO OVERLAY ---
+    # --- ADD PROPERTY INFO AS STATIC OVERLAY (LIKE A POPUP) ---
     
-    # Add property name as text overlay at the bottom
-    if property_name:
-        # Create a semi-transparent background for text
-        text_bg_height = 50
-        text_bg = Image.new('RGBA', (cropped.width, text_bg_height), (0, 0, 0, 180))
-        cropped.paste(text_bg, (0, cropped.height - text_bg_height), text_bg)
+    # Create a popup-like overlay in the corner
+    if property_image or property_name:
+        # Calculate popup position (top-right corner with padding)
+        popup_padding = 20
+        popup_width = 220
+        popup_height = 260 if property_image else 60
+        popup_x = cropped.width - popup_width - popup_padding
+        popup_y = popup_padding
         
-        # Add text
-        try:
-            # Try to use a default font
+        # Create a popup background with shadow
+        popup_bg = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 240))
+        
+        # Add rounded corners to popup
+        mask = Image.new('L', (popup_width, popup_height), 0)
+        mask_draw = ImageDraw.Draw(mask)
+        mask_draw.rounded_rectangle([(0, 0), (popup_width, popup_height)], radius=12, fill=255)
+        popup_bg.putalpha(mask)
+        
+        # Add shadow effect
+        shadow = Image.new('RGBA', (popup_width + 10, popup_height + 10), (0, 0, 0, 30))
+        shadow_mask = Image.new('L', (popup_width + 10, popup_height + 10), 0)
+        shadow_draw = ImageDraw.Draw(shadow_mask)
+        shadow_draw.rounded_rectangle([(0, 0), (popup_width + 10, popup_height + 10)], radius=14, fill=255)
+        shadow.putalpha(shadow_mask)
+        
+        # Paste shadow
+        cropped.paste(shadow, (popup_x - 5, popup_y - 5), shadow)
+        
+        # Paste popup background
+        cropped.paste(popup_bg, (popup_x, popup_y), popup_bg)
+        
+        # Draw on the popup
+        popup_draw = ImageDraw.Draw(popup_bg)
+        
+        # Add image if provided
+        if property_image:
             try:
-                font = ImageFont.truetype("arial.ttf", 18)
-            except:
+                # Open and resize image
+                img = Image.open(io.BytesIO(property_image))
+                
+                # Convert to RGB if needed
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Calculate image size (fit within popup with padding)
+                img_padding = 10
+                img_max_width = popup_width - (img_padding * 2)
+                img_max_height = 150
+                
+                # Resize maintaining aspect ratio
+                img.thumbnail((img_max_width, img_max_height), Image.Resampling.LANCZOS)
+                
+                # Calculate position (centered horizontally, at top)
+                img_x = (popup_width - img.width) // 2
+                img_y = img_padding
+                
+                # Create mask for rounded image
+                img_mask = Image.new('L', img.size, 0)
+                img_mask_draw = ImageDraw.Draw(img_mask)
+                img_mask_draw.rounded_rectangle([(0, 0), img.size], radius=8, fill=255)
+                
+                # Paste image with rounded corners
+                popup_bg.paste(img, (img_x, img_y), img_mask)
+                
+                # Update popup for drawing text below image
+                popup_draw = ImageDraw.Draw(popup_bg)
+                
+            except Exception as e:
+                print(f"Could not add property image to popup: {e}")
+        
+        # Add property name text
+        if property_name:
+            try:
+                # Try different fonts
                 try:
-                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+                    font = ImageFont.truetype("arial.ttf", 14)
                 except:
-                    font = ImageFont.load_default()
-        except:
-            font = ImageFont.load_default()
-        
-        # Center the text
-        try:
-            # Get text bbox for proper centering
-            bbox = draw.textbbox((0, 0), property_name, font=font)
-            text_width = bbox[2] - bbox[0]
-        except:
-            text_width = len(property_name) * 10  # Fallback estimate
-        
-        text_x = (cropped.width - text_width) // 2
-        text_y = cropped.height - text_bg_height + 14
-        
-        draw.text((text_x, text_y), property_name, fill=(255, 255, 255, 255), font=font)
-    
-    # If property image is provided, add it as a small thumbnail in the corner
-    if property_image:
-        try:
-            # Resize and add image as thumbnail
-            img = Image.open(io.BytesIO(property_image))
+                    try:
+                        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+                    except:
+                        font = ImageFont.load_default()
+            except:
+                font = ImageFont.load_default()
             
-            # Convert to RGBA if needed
-            if img.mode != 'RGBA':
-                img = img.convert('RGBA')
+            # Calculate text position
+            text_y = 160 if property_image else 20
             
-            thumb_size = 80
-            # Calculate aspect ratio preserving thumbnail
-            img.thumbnail((thumb_size, thumb_size), Image.Resampling.LANCZOS)
+            # Add a small header line
+            try:
+                # Try bold font
+                try:
+                    bold_font = ImageFont.truetype("arialbd.ttf", 12)
+                except:
+                    try:
+                        bold_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
+                    except:
+                        bold_font = font
+            except:
+                bold_font = font
             
-            # Create rounded corners
-            mask = Image.new('L', img.size, 0)
-            mask_draw = ImageDraw.Draw(mask)
-            mask_draw.rounded_rectangle([(0, 0), img.size], radius=10, fill=255)
+            # Draw "Property" label
+            popup_draw.text((15, text_y), "PROPERTY", fill=(100, 100, 100, 200), font=bold_font)
             
-            # Create a composite image with rounded corners
-            rounded_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
-            rounded_img.putalpha(mask)
-            rounded_img.paste(img, (0, 0), mask)
+            # Draw property name
+            popup_draw.text((15, text_y + 18), property_name, fill=(30, 30, 30, 255), font=font)
             
-            # Add a subtle border
-            border = Image.new('RGBA', (img.size[0] + 4, img.size[1] + 4), (255, 255, 255, 200))
-            border.paste(rounded_img, (2, 2), rounded_img)
+            # Draw a small pin icon indicator
+            popup_draw.text((15, text_y + 40), "📍", fill=(200, 50, 50, 200), font=font)
             
-            # Paste in top-left corner with padding
-            padding = 10
-            cropped.paste(border, (padding, padding), border)
-            
-        except Exception as e:
-            print(f"Could not add property image: {e}")
+        # Paste the updated popup back
+        cropped.paste(popup_bg, (popup_x, popup_y), popup_bg)
     
     final_img = cropped.convert("RGB")
     img_byte_arr = io.BytesIO()
@@ -781,52 +825,52 @@ def render_isolated_map_editor():
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
-    if st.session_state[export_trigger_key]:
-        with st.spinner("Exporting Map... Please wait"):
-            n, s, e, w = None, None, None, None
-            
-            # Check if user drew a rectangle
-            if st.session_state.get(bounds_key):
-                b = st.session_state[bounds_key]
-                if b and "_northEast" in b and "_southWest" in b:
-                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
-                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
-                    
-                    # Validate bounds have reasonable size
-                    if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
-                        n, s, e, w = None, None, None, None
-            
-            # Get property info for the map
-            property_name = st.session_state[popup_name_key] or "Property Location"
-            property_image = st.session_state[popup_image_key]
-            
-            map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w, 
-                pin_lat=plat, pin_lon=plon, 
-                style=basemap_style, 
-                pin_color=pin_color, 
-                pin_size=int(pin_size),
-                property_name=property_name,
-                property_image=property_image
-            )
-            
-            # Store the generated map image
-            st.session_state[image_key] = map_img_bytes
-            st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
-            
-            # Save to temp data
-            if st.session_state.temp_form_data:
-                st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
-                temp_path = get_temp_config_path(st.session_state.saved_template_name)
-                with open(temp_path, 'w', encoding='utf-8') as f:
-                    json.dump(st.session_state.temp_form_data, f, indent=4)
-            
-            st.session_state[export_trigger_key] = False
-            st.session_state.restore_form_data = True
-            st.session_state.active_map_editor_token = None
-            st.success(f"Map with pin attached successfully!")
-            time.sleep(0.5)
-            st.rerun()
+if st.session_state[export_trigger_key]:
+    with st.spinner("Exporting Map... Please wait"):
+        n, s, e, w = None, None, None, None
+        
+        # Check if user drew a rectangle
+        if st.session_state.get(bounds_key):
+            b = st.session_state[bounds_key]
+            if b and "_northEast" in b and "_southWest" in b:
+                n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
+                e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+                
+                # Validate bounds have reasonable size
+                if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
+                    n, s, e, w = None, None, None, None
+        
+        # Get property info for the map
+        property_name = st.session_state[popup_name_key] or ""
+        property_image = st.session_state[popup_image_key]
+        
+        map_img_bytes = generate_static_map_bounds(
+            n=n, s=s, e=e, w=w, 
+            pin_lat=plat, pin_lon=plon, 
+            style=basemap_style, 
+            pin_color=pin_color, 
+            pin_size=int(pin_size),
+            property_name=property_name,
+            property_image=property_image
+        )
+        
+        # Store the generated map image
+        st.session_state[image_key] = map_img_bytes
+        st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
+        
+        # Save to temp data
+        if st.session_state.temp_form_data:
+            st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
+            temp_path = get_temp_config_path(st.session_state.saved_template_name)
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(st.session_state.temp_form_data, f, indent=4)
+        
+        st.session_state[export_trigger_key] = False
+        st.session_state.restore_form_data = True
+        st.session_state.active_map_editor_token = None
+        st.success(f"Map with pin attached successfully!")
+        time.sleep(0.5)
+        st.rerun()
 
     tiles_dict = {}
     attr_dict = {}
