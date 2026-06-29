@@ -106,6 +106,23 @@ MINIMAL_CRE_SYSTEM = """
         margin-top: 8px !important;
     }
     
+    .style-control-row {
+        display: flex !important;
+        gap: 8px !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        margin-top: 4px !important;
+        padding: 4px 8px !important;
+        background: #F8F9FA !important;
+        border-radius: 4px !important;
+    }
+    .style-control-label {
+        font-size: 11px !important;
+        font-weight: 500 !important;
+        color: #666 !important;
+        min-width: 30px !important;
+    }
+    
     /* Map editor controls */
     .map-controls-row {
         display: flex !important;
@@ -852,15 +869,12 @@ def clean_empty_placeholders(text):
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned
 
-def replace_text_in_paragraph(paragraph, text_inputs):
+def replace_text_in_paragraph(paragraph, text_inputs, style_mapping):
     """
-    NEW APPROACH: Replace placeholders first, then apply formatting.
-    
-    Step 1: Get the complete text from all runs
-    Step 2: Replace all placeholders in the complete text
-    Step 3: Capture formatting from the first run
-    Step 4: Clear all runs and set the new text
-    Step 5: Apply the captured formatting
+    Replace placeholders and apply manual styling from the style mapping.
+    Step 1: Get the complete text
+    Step 2: Replace all placeholders
+    Step 3: Apply styling from the mapping
     """
     # Check if we have any placeholders to replace
     full_text = paragraph.text
@@ -868,7 +882,7 @@ def replace_text_in_paragraph(paragraph, text_inputs):
     if not has_any:
         return
     
-    # STEP 1: Build the complete replaced text
+    # Build the complete replaced text
     result_text = full_text
     for token, value in text_inputs.items():
         if token in result_text:
@@ -883,43 +897,77 @@ def replace_text_in_paragraph(paragraph, text_inputs):
         paragraph.add_run(result_text)
         return
     
-    # STEP 2: Capture formatting from the first run
+    # Get the first run's basic formatting as base
     first_run = paragraph.runs[0]
-    font_props = {
-        'name': first_run.font.name,
-        'size': first_run.font.size,
-        'bold': first_run.font.bold,
-        'italic': first_run.font.italic,
-        'underline': first_run.font.underline,
-        'color': first_run.font.color.rgb if first_run.font.color else None
-    }
+    base_font_name = first_run.font.name
+    base_font_color = first_run.font.color.rgb if first_run.font.color else None
     
-    # STEP 3: Clear ALL runs
+    # Clear ALL runs
     for run in paragraph.runs:
         run.text = ""
     
-    # STEP 4: Set the new text in the first run
+    # Set the text in the first run
     first_run.text = result_text
     
-    # STEP 5: Apply the captured formatting
-    try:
-        if font_props['name']:
-            first_run.font.name = font_props['name']
-        if font_props['size']:
-            first_run.font.size = font_props['size']
-        if font_props['bold'] is not None:
-            first_run.font.bold = font_props['bold']
-        if font_props['italic'] is not None:
-            first_run.font.italic = font_props['italic']
-        if font_props['underline'] is not None:
-            first_run.font.underline = font_props['underline']
-        if font_props['color']:
-            first_run.font.color.rgb = font_props['color']
-    except Exception as e:
-        # Silently handle any font property errors
-        pass
+    # Apply base formatting from the first run
+    if base_font_name:
+        try:
+            first_run.font.name = base_font_name
+        except:
+            pass
+    if base_font_color:
+        try:
+            first_run.font.color.rgb = base_font_color
+        except:
+            pass
+    
+    # Now apply style overrides from the style mapping for each placeholder
+    # We'll need to find where each placeholder was and apply its style
+    # Since we've consolidated text, we apply styles to the entire text
+    # but we can apply style overrides per token
+    
+    # Find all tokens and their positions in the original text
+    token_positions = []
+    for token, value in text_inputs.items():
+        if token in full_text:
+            pos = full_text.find(token)
+            token_positions.append((token, pos, len(token), value))
+    
+    # Sort by position
+    token_positions.sort(key=lambda x: x[1])
+    
+    # If we have style mapping for any token, apply it to the entire paragraph
+    # Since we can't easily style substrings in a single run with python-pptx,
+    # we'll apply the first token's style to the entire paragraph as a default
+    
+    # Find the first token that has style mapping
+    for token, pos, length, value in token_positions:
+        if token in style_mapping:
+            style = style_mapping[token]
+            # Apply styles
+            if style.get('bold') is not None:
+                try:
+                    first_run.font.bold = style['bold']
+                except:
+                    pass
+            if style.get('italic') is not None:
+                try:
+                    first_run.font.italic = style['italic']
+                except:
+                    pass
+            if style.get('underline') is not None:
+                try:
+                    first_run.font.underline = style['underline']
+                except:
+                    pass
+            if style.get('size'):
+                try:
+                    first_run.font.size = Pt(style['size'])
+                except:
+                    pass
+            break  # Apply only the first found style
 
-def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
+def generate_pptx_bytes(template_bytes, text_inputs, image_inputs, style_mapping):
     prs = Presentation(io.BytesIO(template_bytes))
     for slide in prs.slides:
         shapes_to_delete, images_to_add = [], []
@@ -934,13 +982,13 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
             if shape not in shapes_to_delete:
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs: 
-                        replace_text_in_paragraph(paragraph, text_inputs)
+                        replace_text_in_paragraph(paragraph, text_inputs, style_mapping)
                 if hasattr(shape, 'table') and shape.table:
                     for row in shape.table.rows:
                         for cell in row.cells:
                             if cell.text_frame:
                                 for paragraph in cell.text_frame.paragraphs: 
-                                    replace_text_in_paragraph(paragraph, text_inputs)
+                                    replace_text_in_paragraph(paragraph, text_inputs, style_mapping)
         for img_file, left, top, width, height in images_to_add:
             try:
                 slide.shapes.add_picture(smart_crop_to_fit(img_file, width, height), left, top, width=width, height=height)
@@ -956,17 +1004,17 @@ def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs.save(pptx_stream)
     return pptx_stream.getvalue()
 
-def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
+def generate_docx_bytes(template_bytes, text_inputs, image_inputs, style_mapping):
     doc = Document(io.BytesIO(template_bytes))
     for paragraph in doc.paragraphs:
         if not any(img_token in paragraph.text for img_token in image_inputs.keys()):
-            replace_text_in_paragraph(paragraph, text_inputs)
+            replace_text_in_paragraph(paragraph, text_inputs, style_mapping)
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 if cell.paragraphs:
                     for paragraph in cell.paragraphs:
-                        replace_text_in_paragraph(paragraph, text_inputs)
+                        replace_text_in_paragraph(paragraph, text_inputs, style_mapping)
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
     return doc_stream.getvalue()
@@ -1046,6 +1094,7 @@ st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
 
 if "active_map_editor_token" not in st.session_state: st.session_state.active_map_editor_token = None
 if "custom_mapping" not in st.session_state: st.session_state.custom_mapping = {}
+if "style_mapping" not in st.session_state: st.session_state.style_mapping = {}
 if "tokens" not in st.session_state: st.session_state.tokens = []
 if "template_bytes" not in st.session_state: st.session_state.template_bytes = None
 if "saved_template_name" not in st.session_state: st.session_state.saved_template_name = None
@@ -1206,21 +1255,91 @@ else:
                         st.rerun()
             st.markdown("---")
         
-        with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
-            st.markdown("Configure the data type for each placeholder field.")
-            cols = st.columns(3)
+        with st.expander("Data Type & Style Mapping", expanded=st.session_state.show_type_mapping):
+            st.markdown("Configure data type and text styling for each placeholder field.")
+            
             for idx, token in enumerate(tokens):
-                with cols[idx % 3]:
-                    clean_label = token.replace("{", "").replace("}", "")
-                    current_type = st.session_state.custom_mapping.get(token, "Text")
-                    c_lbl, c_sel = st.columns([1, 1.5])
-                    with c_lbl: st.markdown(f'<span style="font-size:12px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
-                    with c_sel:
-                        data_type = st.selectbox("", ["Text", "Image", "Map"], index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0, key=f"type_mapping_{token}", label_visibility="collapsed")
-                        if data_type != current_type:
-                            st.session_state.custom_mapping[token] = data_type
-                            auto_save_config()
-                            st.rerun()
+                clean_label = token.replace("{", "").replace("}", "")
+                current_type = st.session_state.custom_mapping.get(token, "Text")
+                
+                st.markdown(f"**{clean_label}**")
+                
+                col_type, col_bold, col_italic, col_underline, col_size = st.columns([1.5, 0.8, 0.8, 0.8, 1.2])
+                
+                with col_type:
+                    data_type = st.selectbox(
+                        "Type", 
+                        ["Text", "Image", "Map"], 
+                        index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
+                        key=f"type_mapping_{token}",
+                        label_visibility="collapsed"
+                    )
+                    if data_type != current_type:
+                        st.session_state.custom_mapping[token] = data_type
+                        auto_save_config()
+                        st.rerun()
+                
+                # Style controls - only show for text type
+                if data_type == "Text":
+                    # Initialize style mapping if not exists
+                    if token not in st.session_state.style_mapping:
+                        st.session_state.style_mapping[token] = {
+                            'bold': False,
+                            'italic': False,
+                            'underline': False,
+                            'size': 12
+                        }
+                    
+                    with col_bold:
+                        bold = st.checkbox(
+                            "B", 
+                            value=st.session_state.style_mapping[token].get('bold', False),
+                            key=f"style_bold_{token}",
+                            label_visibility="collapsed"
+                        )
+                        st.session_state.style_mapping[token]['bold'] = bold
+                    
+                    with col_italic:
+                        italic = st.checkbox(
+                            "I", 
+                            value=st.session_state.style_mapping[token].get('italic', False),
+                            key=f"style_italic_{token}",
+                            label_visibility="collapsed"
+                        )
+                        st.session_state.style_mapping[token]['italic'] = italic
+                    
+                    with col_underline:
+                        underline = st.checkbox(
+                            "U", 
+                            value=st.session_state.style_mapping[token].get('underline', False),
+                            key=f"style_underline_{token}",
+                            label_visibility="collapsed"
+                        )
+                        st.session_state.style_mapping[token]['underline'] = underline
+                    
+                    with col_size:
+                        size = st.number_input(
+                            "Size",
+                            min_value=8,
+                            max_value=72,
+                            value=st.session_state.style_mapping[token].get('size', 12),
+                            step=1,
+                            key=f"style_size_{token}",
+                            label_visibility="collapsed"
+                        )
+                        st.session_state.style_mapping[token]['size'] = size
+                else:
+                    # Placeholder for non-text types
+                    with col_bold:
+                        st.caption("—")
+                    with col_italic:
+                        st.caption("—")
+                    with col_underline:
+                        st.caption("—")
+                    with col_size:
+                        st.caption("—")
+                
+                st.markdown("<hr style='margin: 4px 0;'>", unsafe_allow_html=True)
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
@@ -1329,7 +1448,12 @@ else:
                 st.button("Download PPTX", disabled=True, use_container_width=True)
             else:
                 try:
-                    pptx_data = generate_pptx_bytes(st.session_state.template_bytes, text_data, image_data)
+                    pptx_data = generate_pptx_bytes(
+                        st.session_state.template_bytes, 
+                        text_data, 
+                        image_data,
+                        st.session_state.style_mapping
+                    )
                     st.download_button(
                         label="Download PPTX", data=pptx_data, file_name=get_download_filename(base_template_name, "pptx"),
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -1343,7 +1467,12 @@ else:
                 st.button("Download DOCX", disabled=True, use_container_width=True)
             else:
                 try:
-                    docx_data = generate_docx_bytes(st.session_state.template_bytes, text_data, image_data)
+                    docx_data = generate_docx_bytes(
+                        st.session_state.template_bytes, 
+                        text_data, 
+                        image_data,
+                        st.session_state.style_mapping
+                    )
                     st.download_button(
                         label="Download DOCX", data=docx_data, file_name=get_download_filename(base_template_name, "docx"),
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
