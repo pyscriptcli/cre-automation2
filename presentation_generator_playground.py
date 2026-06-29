@@ -146,15 +146,18 @@ MINIMAL_CRE_SYSTEM = """
     /* Mapping row styling */
     .mapping-row {
         background-color: #F8F9FA;
-        padding: 10px 12px;
+        padding: 8px 10px;
         border-radius: 4px;
         border: 1px solid #E8E8E8;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
     .mapping-row-label {
         font-weight: 500;
         color: #1A1A1A;
-        font-size: 13px;
+        font-size: 12px;
+    }
+    .mapping-row .stSelectbox {
+        margin-bottom: 0 !important;
     }
 </style>
 """
@@ -1068,6 +1071,19 @@ def validate_token_order():
         return False
     return True
 
+def update_token_order(new_order):
+    """Update the token order with validation"""
+    # Validate the new order
+    if len(new_order) != len(st.session_state.tokens):
+        return False
+    if len(set(new_order)) != len(new_order):
+        return False
+    if max(new_order) >= len(st.session_state.tokens) or min(new_order) < 0:
+        return False
+    
+    st.session_state.token_order = new_order
+    return True
+
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -1088,6 +1104,7 @@ if "restore_form_data" not in st.session_state: st.session_state.restore_form_da
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
 if "token_order" not in st.session_state: st.session_state.token_order = []
+if "pending_order_update" not in st.session_state: st.session_state.pending_order_update = None
 
 # --- APP ROUTER ---
 if st.session_state.active_map_editor_token:
@@ -1246,10 +1263,11 @@ else:
         
         with st.expander("Data Type Mapping & Order", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field. Use the dropdown to set the display order (1 = first, 2 = second, etc.).")
-            st.markdown("*Note: Each position number can only be used once.*")
+            st.markdown("*Note: Each position number can only be used once. Changes are applied immediately.*")
             
-            # Create 2 columns for the mapping
-            col1, col2 = st.columns(2)
+            # Create 4 columns for the mapping
+            col1, col2, col3, col4 = st.columns(4)
+            cols_list = [col1, col2, col3, col4]
             
             # Get current order
             current_order = get_token_order()
@@ -1268,15 +1286,15 @@ else:
                 clean_label = token.replace("{", "").replace("}", "")
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                # Determine which column to use (2-column layout)
-                target_col = col1 if idx % 2 == 0 else col2
+                # Determine which column to use (4-column layout)
+                target_col = cols_list[idx % 4]
                 
                 with target_col:
                     # Create a container with a light background
                     st.markdown(f'<div class="mapping-row">', unsafe_allow_html=True)
                     
-                    # 3 columns: label, position dropdown, type dropdown
-                    col_label, col_pos, col_type = st.columns([1.8, 1.2, 1.5])
+                    # 3 columns within: label, position dropdown, type dropdown
+                    col_label, col_pos, col_type = st.columns([1.5, 1.2, 1.3])
                     
                     with col_label:
                         st.markdown(f'<span class="mapping-row-label">{clean_label}</span>', unsafe_allow_html=True)
@@ -1287,47 +1305,74 @@ else:
                         
                         # Create position options (1 to N)
                         pos_options = list(range(1, len(tokens) + 1))
-                        pos_labels = [str(i) for i in pos_options]
                         
                         # Determine which positions are already used (excluding this token's current position)
                         used_excluding_self = used_positions - {current_pos - 1}
                         
                         # Create a list of available positions for display
-                        # Disable options that are already used
                         def format_pos_option(pos):
                             pos_idx = pos - 1
                             if pos_idx in used_excluding_self:
                                 return f"{pos} (used)"
                             return str(pos)
                         
-                        pos_display_labels = [format_pos_option(p) for p in pos_options]
-                        
                         # Find the index of the current position
                         current_idx = current_pos - 1
                         
-                        # Create the selectbox
+                        # Create the selectbox with a unique key
+                        pos_key = f"pos_{token}_{idx}"
+                        
+                        # Use on_change to trigger update
+                        def on_pos_change(token_key, new_pos_val):
+                            # Store the pending update
+                            st.session_state.pending_order_update = (token_key, new_pos_val)
+                        
                         selected_pos = st.selectbox(
                             "",
                             options=pos_options,
                             format_func=lambda x: format_pos_option(x),
                             index=current_idx,
-                            key=f"pos_{token}",
+                            key=pos_key,
                             label_visibility="collapsed"
                         )
                         
-                        # Check if the selected position is valid (not used by another token)
-                        selected_idx = selected_pos - 1
-                        if selected_idx in used_excluding_self and selected_pos != current_pos:
-                            st.error(f"Position {selected_pos} is already used!")
-                            # Revert to current position
-                            selected_pos = current_pos
+                        # Check if we need to update the order
+                        if st.session_state.pending_order_update:
+                            pending_token, pending_pos = st.session_state.pending_order_update
+                            if pending_token == token:
+                                new_pos_idx = pending_pos - 1
+                                old_pos_idx = current_pos - 1
+                                
+                                # Only update if position changed and not used
+                                if new_pos_idx != old_pos_idx and new_pos_idx not in used_excluding_self:
+                                    # Build new order
+                                    new_order = []
+                                    for pos in range(len(tokens)):
+                                        if pos == new_pos_idx:
+                                            new_order.append(idx)
+                                        elif pos == old_pos_idx:
+                                            # Skip the old position
+                                            continue
+                                        else:
+                                            # Find which token is at this position
+                                            old_token_index = current_order[pos]
+                                            if old_token_index != idx:
+                                                new_order.append(old_token_index)
+                                    
+                                    # Ensure we have all tokens
+                                    if len(new_order) == len(tokens):
+                                        if update_token_order(new_order):
+                                            st.rerun()
+                                
+                                # Clear pending update
+                                st.session_state.pending_order_update = None
                     
                     with col_type:
                         data_type = st.selectbox(
                             "", 
                             ["Text", "Image", "Map"], 
                             index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
-                            key=f"type_mapping_{token}",
+                            key=f"type_mapping_{token}_{idx}",
                             label_visibility="collapsed"
                         )
                         if data_type != current_type:
@@ -1336,34 +1381,6 @@ else:
                             st.rerun()
                     
                     st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # Update the order if changed
-                    new_pos = selected_pos - 1
-                    if new_pos != current_pos - 1 and new_pos not in used_excluding_self:
-                        # Find the token that currently occupies the new position
-                        current_order = get_token_order()
-                        # Remove current token from its position
-                        token_index = tokens.index(token)
-                        # Update the order
-                        new_order = []
-                        for pos in range(len(tokens)):
-                            if pos == new_pos:
-                                new_order.append(token_index)
-                            elif pos == current_pos - 1:
-                                # Skip the old position
-                                continue
-                            else:
-                                # Find which token is at this position
-                                old_token_index = current_order[pos]
-                                if old_token_index != token_index:
-                                    new_order.append(old_token_index)
-                        # Ensure we have all tokens
-                        if len(new_order) != len(tokens):
-                            # If something went wrong, reset
-                            st.session_state.token_order = list(range(len(tokens)))
-                        else:
-                            st.session_state.token_order = new_order
-                        st.rerun()
             
             # Reset button
             if st.button("Reset to Original Order", use_container_width=True):
