@@ -509,7 +509,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         if bottom <= top: bottom = top + 100
         cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # --- DRAW PIN MARKER (ALWAYS INCLUDED AND CENTERED FOR NO BOUNDS) ---
+    # --- DRAW PIN MARKER ---
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
     
@@ -567,119 +567,150 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
             pin_local_y + glow_radius_i
         ], outline=(255, 255, 255, alpha), width=1)
     
-    # --- ADD PROPERTY INFO AS STATIC OVERLAY (LIKE A POPUP) ---
+    # --- ADD PROPERTY PHOTO AS STATIC OVERLAY (POPUP) ---
+    # This creates a popup-like overlay in the top-right corner of the map
     
-    # Create a popup-like overlay in the corner
-    if property_image or property_name:
-        # Calculate popup position (top-right corner with padding)
-        popup_padding = 20
-        popup_width = 220
-        popup_height = 260 if property_image else 60
-        popup_x = cropped.width - popup_width - popup_padding
-        popup_y = popup_padding
-        
-        # Create a popup background with shadow
-        popup_bg = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 240))
-        
-        # Add rounded corners to popup
-        mask = Image.new('L', (popup_width, popup_height), 0)
-        mask_draw = ImageDraw.Draw(mask)
-        mask_draw.rounded_rectangle([(0, 0), (popup_width, popup_height)], radius=12, fill=255)
-        popup_bg.putalpha(mask)
-        
-        # Add shadow effect
-        shadow = Image.new('RGBA', (popup_width + 10, popup_height + 10), (0, 0, 0, 30))
-        shadow_mask = Image.new('L', (popup_width + 10, popup_height + 10), 0)
-        shadow_draw = ImageDraw.Draw(shadow_mask)
-        shadow_draw.rounded_rectangle([(0, 0), (popup_width + 10, popup_height + 10)], radius=14, fill=255)
-        shadow.putalpha(shadow_mask)
-        
-        # Paste shadow
-        cropped.paste(shadow, (popup_x - 5, popup_y - 5), shadow)
-        
-        # Paste popup background
-        cropped.paste(popup_bg, (popup_x, popup_y), popup_bg)
-        
-        # Draw on the popup
-        popup_draw = ImageDraw.Draw(popup_bg)
-        
-        # Add image if provided
-        if property_image:
-            try:
-                # Open and resize image
-                img = Image.open(io.BytesIO(property_image))
+    if property_name or property_image:
+        try:
+            # Popup dimensions
+            popup_width = 220
+            popup_padding = 15
+            
+            # Calculate popup height based on content
+            if property_image and property_name:
+                popup_height = 280
+            elif property_image:
+                popup_height = 210
+            elif property_name:
+                popup_height = 80
+            else:
+                popup_height = 0
+            
+            if popup_height > 0:
+                # Position in top-right corner
+                popup_x = cropped.width - popup_width - popup_padding
+                popup_y = popup_padding
                 
-                # Convert to RGB if needed
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
+                # Create popup background with rounded corners and shadow
+                popup_img = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 245))
                 
-                # Calculate image size (fit within popup with padding)
-                img_padding = 10
-                img_max_width = popup_width - (img_padding * 2)
-                img_max_height = 150
+                # Draw rounded rectangle background
+                popup_draw = ImageDraw.Draw(popup_img)
+                popup_draw.rounded_rectangle(
+                    [(0, 0), (popup_width, popup_height)], 
+                    radius=12, 
+                    fill=(255, 255, 255, 245),
+                    outline=(200, 200, 200, 200),
+                    width=1
+                )
                 
-                # Resize maintaining aspect ratio
-                img.thumbnail((img_max_width, img_max_height), Image.Resampling.LANCZOS)
+                # Add shadow effect (draw a slightly offset dark rectangle behind)
+                shadow_img = Image.new('RGBA', (popup_width + 8, popup_height + 8), (0, 0, 0, 40))
+                shadow_draw = ImageDraw.Draw(shadow_img)
+                shadow_draw.rounded_rectangle(
+                    [(0, 0), (popup_width + 8, popup_height + 8)], 
+                    radius=14, 
+                    fill=(0, 0, 0, 40)
+                )
+                # Paste shadow first
+                cropped.paste(shadow_img, (popup_x - 4, popup_y - 4), shadow_img)
                 
-                # Calculate position (centered horizontally, at top)
-                img_x = (popup_width - img.width) // 2
-                img_y = img_padding
-                
-                # Create mask for rounded image
-                img_mask = Image.new('L', img.size, 0)
-                img_mask_draw = ImageDraw.Draw(img_mask)
-                img_mask_draw.rounded_rectangle([(0, 0), img.size], radius=8, fill=255)
-                
-                # Paste image with rounded corners
-                popup_bg.paste(img, (img_x, img_y), img_mask)
-                
-                # Update popup for drawing text below image
-                popup_draw = ImageDraw.Draw(popup_bg)
-                
-            except Exception as e:
-                print(f"Could not add property image to popup: {e}")
-        
-        # Add property name text
-        if property_name:
-            try:
-                # Try different fonts
-                try:
-                    font = ImageFont.truetype("arial.ttf", 14)
-                except:
+                # Add property image if provided
+                if property_image:
                     try:
-                        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+                        # Open and resize image
+                        img = Image.open(io.BytesIO(property_image))
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
+                        
+                        # Calculate image size (fit within popup with padding)
+                        img_padding = 10
+                        img_max_width = popup_width - (img_padding * 2)
+                        img_max_height = 150
+                        
+                        # Resize maintaining aspect ratio
+                        img.thumbnail((img_max_width, img_max_height), Image.Resampling.LANCZOS)
+                        
+                        # Calculate position (centered horizontally, at top)
+                        img_x = (popup_width - img.width) // 2
+                        img_y = img_padding
+                        
+                        # Create mask for rounded image corners
+                        img_mask = Image.new('L', img.size, 0)
+                        img_mask_draw = ImageDraw.Draw(img_mask)
+                        img_mask_draw.rounded_rectangle([(0, 0), img.size], radius=8, fill=255)
+                        
+                        # Create a copy of the popup to paste image onto
+                        popup_with_image = popup_img.copy()
+                        popup_with_image.paste(img, (img_x, img_y), img_mask)
+                        popup_img = popup_with_image
+                        
+                    except Exception as e:
+                        print(f"Error adding property image: {e}")
+                
+                # Add property name text
+                if property_name:
+                    try:
+                        # Get font
+                        try:
+                            font = ImageFont.truetype("arial.ttf", 14)
+                        except:
+                            try:
+                                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+                            except:
+                                font = ImageFont.load_default()
+                        
+                        # Try bold font for label
+                        try:
+                            bold_font = ImageFont.truetype("arialbd.ttf", 11)
+                        except:
+                            try:
+                                bold_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 11)
+                            except:
+                                bold_font = font
                     except:
                         font = ImageFont.load_default()
-            except:
-                font = ImageFont.load_default()
-            
-            # Calculate text position
-            text_y = 160 if property_image else 20
-            
-            # Add a small header line
-            try:
-                # Try bold font
-                try:
-                    bold_font = ImageFont.truetype("arialbd.ttf", 12)
-                except:
-                    try:
-                        bold_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
-                    except:
                         bold_font = font
-            except:
-                bold_font = font
-            
-            # Draw "Property" label
-            popup_draw.text((15, text_y), "PROPERTY", fill=(100, 100, 100, 200), font=bold_font)
-            
-            # Draw property name
-            popup_draw.text((15, text_y + 18), property_name, fill=(30, 30, 30, 255), font=font)
-            
-            # Draw a small pin icon indicator
-            popup_draw.text((15, text_y + 40), "📍", fill=(200, 50, 50, 200), font=font)
-            
-        # Paste the updated popup back
-        cropped.paste(popup_bg, (popup_x, popup_y), popup_bg)
+                    
+                    # Draw label
+                    if property_image:
+                        text_y = 165
+                    else:
+                        text_y = 15
+                    
+                    popup_draw = ImageDraw.Draw(popup_img)
+                    
+                    # Draw "PROPERTY" label
+                    popup_draw.text((15, text_y), "PROPERTY", fill=(100, 100, 100, 200), font=bold_font)
+                    
+                    # Draw property name (wrap if too long)
+                    name_y = text_y + 20
+                    max_chars_per_line = 18
+                    if len(property_name) > max_chars_per_line:
+                        # Split into multiple lines
+                        words = property_name.split()
+                        lines = []
+                        current_line = ""
+                        for word in words:
+                            if len(current_line + " " + word) <= max_chars_per_line:
+                                current_line += (" " + word if current_line else word)
+                            else:
+                                if current_line:
+                                    lines.append(current_line)
+                                current_line = word
+                        if current_line:
+                            lines.append(current_line)
+                        
+                        for i, line in enumerate(lines):
+                            popup_draw.text((15, name_y + i * 22), line, fill=(30, 30, 30, 255), font=font)
+                    else:
+                        popup_draw.text((15, name_y), property_name, fill=(30, 30, 30, 255), font=font)
+                
+                # Paste the popup onto the map
+                cropped.paste(popup_img, (popup_x, popup_y), popup_img)
+                
+        except Exception as e:
+            print(f"Error creating property overlay: {e}")
     
     final_img = cropped.convert("RGB")
     img_byte_arr = io.BytesIO()
