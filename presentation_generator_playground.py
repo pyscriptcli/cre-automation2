@@ -110,26 +110,6 @@ MINIMAL_CRE_SYSTEM = """
         color: #333 !important;
         white-space: nowrap !important;
     }
-    
-    /* Mapping row styling */
-    .mapping-row {
-        background-color: #F8F9FA;
-        padding: 8px 10px;
-        border-radius: 4px;
-        border: 1px solid #E8E8E8;
-        margin-bottom: 6px;
-    }
-    .mapping-row-label {
-        font-weight: 500;
-        color: #1A1A1A;
-        font-size: 12px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .mapping-row .stSelectbox {
-        margin-bottom: 0 !important;
-    }
 </style>
 """
 
@@ -220,6 +200,10 @@ def delete_template_file(template_name):
         config_path = os.path.join(storage_dir, config_name)
         if os.path.exists(config_path):
             os.remove(config_path)
+        tokens_name = template_name.replace('.pptx', '').replace('.docx', '') + '_tokens.json'
+        tokens_path = os.path.join(storage_dir, tokens_name)
+        if os.path.exists(tokens_path):
+            os.remove(tokens_path)
         temp_config = get_temp_config_path(template_name)
         if os.path.exists(temp_config):
             os.remove(temp_config)
@@ -245,6 +229,53 @@ def auto_save_config():
     if st.session_state.saved_template_name and st.session_state.custom_mapping:
         config_name = st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json'
         save_config_to_file(st.session_state.custom_mapping, config_name)
+
+# --- TOKEN PERSISTENCE FUNCTIONS ---
+def save_tokens_to_config(tokens, template_name):
+    """Save the token list to the config file for persistence"""
+    if not template_name:
+        return None
+    
+    storage_dir = get_storage_dir()
+    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
+    config_name = safe_name.replace('.pptx', '').replace('.docx', '') + '_tokens.json'
+    filepath = os.path.join(storage_dir, config_name)
+    
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(tokens, f, indent=4)
+        return filepath
+    except Exception as e:
+        st.warning(f"Could not save tokens: {e}")
+        return None
+
+def load_tokens_from_config(template_name):
+    """Load the token list from the config file"""
+    if not template_name:
+        return None
+    
+    storage_dir = get_storage_dir()
+    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
+    config_name = safe_name.replace('.pptx', '').replace('.docx', '') + '_tokens.json'
+    filepath = os.path.join(storage_dir, config_name)
+    
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return None
+    return None
+
+def get_tokens_file_path(template_name):
+    """Get the path to the tokens file for manual editing"""
+    if not template_name:
+        return None
+    
+    storage_dir = get_storage_dir()
+    safe_name = re.sub(r'[^\w\-_. ]', '_', template_name)
+    config_name = safe_name.replace('.pptx', '').replace('.docx', '') + '_tokens.json'
+    return os.path.join(storage_dir, config_name)
 
 # --- CTA PRESET FUNCTIONS ---
 def detect_cta_sets():
@@ -1115,13 +1146,34 @@ else:
                     if template_bytes:
                         if st.session_state.saved_template_name != template_name:
                             st.session_state.temp_form_data = {}
+                        
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
                         st.session_state.template_loaded = True
                         st.session_state.template_type = 'pptx' if template_name.endswith('.pptx') else 'docx'
+                        
+                        # Load config data
                         config_data = load_config_from_file(template_name.replace('.pptx', '').replace('.docx', '') + '_config.json')
-                        if config_data: st.session_state.custom_mapping = config_data
-                        st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+                        if config_data: 
+                            st.session_state.custom_mapping = config_data
+                        
+                        # Try to load tokens from config first (persistent storage)
+                        saved_tokens = load_tokens_from_config(template_name)
+                        if saved_tokens:
+                            st.session_state.tokens = saved_tokens
+                            st.info(f"Loaded {len(saved_tokens)} placeholders from tokens file. Edit the tokens file to reorder.")
+                        else:
+                            # If no saved tokens, extract from template and save
+                            st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+                            save_tokens_to_config(st.session_state.tokens, template_name)
+                            st.info(f"Extracted {len(st.session_state.tokens)} placeholders from template. Tokens saved to file.")
+                        
+                        # Show tokens file path for manual editing
+                        tokens_path = get_tokens_file_path(template_name)
+                        if tokens_path and os.path.exists(tokens_path):
+                            st.caption(f"📁 Tokens file: `{tokens_path}`")
+                            st.caption("💡 Edit this file to reorder placeholders. Then click 'Reload Tokens' below.")
+                        
                         restore_form_data_from_session()
                     break
 
@@ -1136,7 +1188,10 @@ else:
             st.session_state.saved_template_name = uploaded_template.name
             st.session_state.template_loaded = True
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
+            
+            # Extract tokens and save to config
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+            save_tokens_to_config(st.session_state.tokens, uploaded_template.name)
             st.session_state.temp_form_data = {}
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
@@ -1156,6 +1211,28 @@ else:
         template_name = st.session_state.saved_template_name or "Unsaved Template"
         is_github = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), template_name))
         st.markdown(f'<div class="saved-indicator">Active: {template_name}{"" if is_github else ""} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
+        
+        # Add reload tokens button
+        col_reload1, col_reload2, col_reload3 = st.columns([1, 2, 1])
+        with col_reload2:
+            if st.button("🔄 Reload Tokens from File", use_container_width=True):
+                saved_tokens = load_tokens_from_config(st.session_state.saved_template_name)
+                if saved_tokens:
+                    st.session_state.tokens = saved_tokens
+                    st.success(f"Reloaded {len(saved_tokens)} placeholders from tokens file!")
+                    st.rerun()
+                else:
+                    st.warning("No tokens file found. Extracting from template...")
+                    if st.session_state.template_bytes:
+                        st.session_state.tokens = extract_placeholders(st.session_state.template_bytes, st.session_state.template_type)
+                        save_tokens_to_config(st.session_state.tokens, st.session_state.saved_template_name)
+                        st.success(f"Extracted {len(st.session_state.tokens)} placeholders from template!")
+                        st.rerun()
+        
+        # Show current token count
+        if st.session_state.tokens:
+            st.caption(f"📋 {len(st.session_state.tokens)} placeholders loaded")
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
     text_data, image_data, field_types = {}, {}, {}
