@@ -854,9 +854,13 @@ def clean_empty_placeholders(text):
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """
-    SOLUTION C: Pre-Process Template Approach
-    Consolidates all runs into one before replacement to ensure reliability.
-    This handles placeholders that span across runs perfectly.
+    NEW APPROACH: Replace placeholders first, then apply formatting.
+    
+    Step 1: Get the complete text from all runs
+    Step 2: Replace all placeholders in the complete text
+    Step 3: Capture formatting from the first run
+    Step 4: Clear all runs and set the new text
+    Step 5: Apply the captured formatting
     """
     # Check if we have any placeholders to replace
     full_text = paragraph.text
@@ -864,7 +868,7 @@ def replace_text_in_paragraph(paragraph, text_inputs):
     if not has_any:
         return
     
-    # Build the complete replaced text
+    # STEP 1: Build the complete replaced text
     result_text = full_text
     for token, value in text_inputs.items():
         if token in result_text:
@@ -879,38 +883,38 @@ def replace_text_in_paragraph(paragraph, text_inputs):
         paragraph.add_run(result_text)
         return
     
-    # Get the first run's formatting to use as template
+    # STEP 2: Capture formatting from the first run
     first_run = paragraph.runs[0]
+    font_props = {
+        'name': first_run.font.name,
+        'size': first_run.font.size,
+        'bold': first_run.font.bold,
+        'italic': first_run.font.italic,
+        'underline': first_run.font.underline,
+        'color': first_run.font.color.rgb if first_run.font.color else None
+    }
     
-    # Store font properties from the first run
-    font_name = first_run.font.name
-    font_size = first_run.font.size
-    font_bold = first_run.font.bold
-    font_italic = first_run.font.italic
-    font_underline = first_run.font.underline
-    font_color = first_run.font.color.rgb if first_run.font.color else None
-    
-    # Clear ALL runs by setting them to empty
+    # STEP 3: Clear ALL runs
     for run in paragraph.runs:
         run.text = ""
     
-    # Set the first run to contain the result text
+    # STEP 4: Set the new text in the first run
     first_run.text = result_text
     
-    # Restore font properties to the first run
+    # STEP 5: Apply the captured formatting
     try:
-        if font_name:
-            first_run.font.name = font_name
-        if font_size:
-            first_run.font.size = font_size
-        if font_bold is not None:
-            first_run.font.bold = font_bold
-        if font_italic is not None:
-            first_run.font.italic = font_italic
-        if font_underline is not None:
-            first_run.font.underline = font_underline
-        if font_color:
-            first_run.font.color.rgb = font_color
+        if font_props['name']:
+            first_run.font.name = font_props['name']
+        if font_props['size']:
+            first_run.font.size = font_props['size']
+        if font_props['bold'] is not None:
+            first_run.font.bold = font_props['bold']
+        if font_props['italic'] is not None:
+            first_run.font.italic = font_props['italic']
+        if font_props['underline'] is not None:
+            first_run.font.underline = font_props['underline']
+        if font_props['color']:
+            first_run.font.color.rgb = font_props['color']
     except Exception as e:
         # Silently handle any font property errors
         pass
