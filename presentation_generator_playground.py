@@ -1134,7 +1134,7 @@ else:
     if st.session_state.template_bytes is not None:
         template_name = st.session_state.saved_template_name or "Unsaved Template"
         is_github = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), template_name))
-        st.markdown(f'<div class="saved-indicator">Active: {template_name}{" (GitHub)" if is_github else " (Stored)"} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="saved-indicator">Active: {template_name}{"" if is_github else ""} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     text_data, image_data, field_types = {}, {}, {}
