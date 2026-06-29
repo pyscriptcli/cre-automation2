@@ -825,53 +825,58 @@ def render_isolated_map_editor():
     except ValueError:
         plat, plon = 14.5995, 120.9842
 
-if st.session_state[export_trigger_key]:
-    with st.spinner("Exporting Map... Please wait"):
-        n, s, e, w = None, None, None, None
-        
-        # Check if user drew a rectangle
-        if st.session_state.get(bounds_key):
-            b = st.session_state[bounds_key]
-            if b and "_northEast" in b and "_southWest" in b:
-                n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
-                e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
-                
-                # Validate bounds have reasonable size
-                if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
-                    n, s, e, w = None, None, None, None
-        
-        # Get property info for the map
-        property_name = st.session_state[popup_name_key] or ""
-        property_image = st.session_state[popup_image_key]
-        
-        map_img_bytes = generate_static_map_bounds(
-            n=n, s=s, e=e, w=w, 
-            pin_lat=plat, pin_lon=plon, 
-            style=basemap_style, 
-            pin_color=pin_color, 
-            pin_size=int(pin_size),
-            property_name=property_name,
-            property_image=property_image
-        )
-        
-        # Store the generated map image
-        st.session_state[image_key] = map_img_bytes
-        st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
-        
-        # Save to temp data
-        if st.session_state.temp_form_data:
-            st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
-            temp_path = get_temp_config_path(st.session_state.saved_template_name)
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(st.session_state.temp_form_data, f, indent=4)
-        
-        st.session_state[export_trigger_key] = False
-        st.session_state.restore_form_data = True
-        st.session_state.active_map_editor_token = None
-        st.success(f"Map with pin attached successfully!")
-        time.sleep(0.5)
-        st.rerun()
+    # --- EXPORT LOGIC ---
+    if st.session_state[export_trigger_key]:
+        with st.spinner("Exporting Map... Please wait"):
+            n, s, e, w = None, None, None, None
+            
+            # Check if user drew a rectangle
+            if st.session_state.get(bounds_key):
+                b = st.session_state[bounds_key]
+                if b and "_northEast" in b and "_southWest" in b:
+                    n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
+                    e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+                    
+                    # Validate bounds have reasonable size
+                    if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
+                        n, s, e, w = None, None, None, None
+            
+            # Get property info for the map
+            property_name = st.session_state[popup_name_key] or ""
+            property_image = st.session_state[popup_image_key]
+            
+            map_img_bytes = generate_static_map_bounds(
+                n=n, s=s, e=e, w=w, 
+                pin_lat=plat, pin_lon=plon, 
+                style=basemap_style, 
+                pin_color=pin_color, 
+                pin_size=int(pin_size),
+                property_name=property_name,
+                property_image=property_image
+            )
+            
+            # Store the generated map image
+            st.session_state[image_key] = map_img_bytes
+            st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
+            
+            # Save to temp data
+            if st.session_state.temp_form_data:
+                st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
+                temp_path = get_temp_config_path(st.session_state.saved_template_name)
+                try:
+                    with open(temp_path, 'w', encoding='utf-8') as f:
+                        json.dump(st.session_state.temp_form_data, f, indent=4)
+                except Exception:
+                    pass
+            
+            st.session_state[export_trigger_key] = False
+            st.session_state.restore_form_data = True
+            st.session_state.active_map_editor_token = None
+            st.success("Map with pin attached successfully!")
+            time.sleep(0.5)
+            st.rerun()
 
+    # --- DISPLAY MAP ---
     tiles_dict = {}
     attr_dict = {}
     for style in map_styles:
@@ -893,11 +898,10 @@ if st.session_state[export_trigger_key]:
     </div>
     """
     
-    # Build popup HTML with image (for interactive map only)
-    property_name = st.session_state[popup_name_key] or "Property Location"
+    # Build popup HTML with image (for interactive map only - this won't appear in export)
+    property_name_display = st.session_state[popup_name_key] or "Property Location"
     
     if st.session_state[popup_image_key]:
-        # Use uploaded image
         import base64
         img_base64 = base64.b64encode(st.session_state[popup_image_key]).decode()
         img_src = f"data:image/jpeg;base64,{img_base64}"
@@ -905,19 +909,18 @@ if st.session_state[export_trigger_key]:
         <div style="width: 250px; font-family: Arial, sans-serif; border-radius: 8px; overflow: hidden;">
             <img src="{img_src}" style="width: 100%; height: auto; max-height: 180px; object-fit: cover; display: block;">
             <div style="padding: 10px 12px; background: white;">
-                <p style="margin: 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name}</p>
+                <p style="margin: 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name_display}</p>
                 <p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
             </div>
         </div>
         """
     else:
-        # Placeholder without image
         popup_html = f"""
         <div style="width: 220px; font-family: Arial, sans-serif; padding: 12px; background: white; border-radius: 8px;">
             <div style="width: 100%; height: 100px; background: #F0F4F8; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #999; font-size: 12px; border: 1px dashed #CCC;">
                 No Photo
             </div>
-            <p style="margin: 8px 0 0 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name}</p>
+            <p style="margin: 8px 0 0 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name_display}</p>
             <p style="margin: 2px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
         </div>
         """
