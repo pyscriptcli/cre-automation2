@@ -1064,28 +1064,6 @@ def apply_token_order():
         ordered_tokens = [st.session_state.tokens[i] for i in st.session_state.token_order]
         st.session_state.tokens = ordered_tokens
 
-def update_token_order_from_positions(position_map):
-    """Update token order based on position assignments"""
-    # Create a list of tokens sorted by their assigned position
-    sorted_tokens = sorted(position_map.items(), key=lambda x: x[1])
-    new_order = []
-    for token, pos in sorted_tokens:
-        # Find the original index of this token
-        original_tokens = st.session_state._original_tokens
-        if original_tokens:
-            idx = original_tokens.index(token)
-            new_order.append(idx)
-        else:
-            # Fallback: use current tokens list
-            idx = st.session_state.tokens.index(token)
-            new_order.append(idx)
-    
-    # Validate the order
-    if len(new_order) == len(st.session_state.tokens):
-        st.session_state.token_order = new_order
-        return True
-    return False
-
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -1267,7 +1245,7 @@ else:
         
         with st.expander("Data Type Mapping & Order", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure field types and set display order using the position dropdowns.")
-            st.markdown("*Each position number can only be used once. Changes are applied immediately.*")
+            st.markdown("*Multiple placeholders can share the same position number.*")
             
             # Create 3 columns for the mapping
             col1, col2, col3 = st.columns(3)
@@ -1275,15 +1253,6 @@ else:
             
             # Get current order
             current_order = get_token_order()
-            token_positions = {token: idx + 1 for idx, token in enumerate(tokens)}
-            
-            # Track used positions
-            used_positions = set(range(1, len(tokens) + 1))
-            
-            # Create position map for validation
-            position_to_token = {}
-            for idx, token in enumerate(tokens):
-                position_to_token[idx + 1] = token
             
             # Display each token in a 3-column grid
             for idx, token in enumerate(tokens):
@@ -1301,21 +1270,12 @@ else:
                     col_label, col_pos, col_type = st.columns([1.4, 1.2, 1.4])
                     
                     with col_label:
-                        current_pos = token_positions.get(token, idx + 1)
+                        current_pos = idx + 1
                         st.markdown(f'<span class="mapping-row-label"><span class="position-badge">{current_pos}</span> {clean_label}</span>', unsafe_allow_html=True)
                     
                     with col_pos:
                         # Create position options (1 to N)
                         pos_options = list(range(1, len(tokens) + 1))
-                        
-                        # Determine which positions are already used (excluding this token)
-                        used_excluding_self = used_positions - {current_pos}
-                        
-                        # Format options with "used" indicator
-                        def format_pos_option(pos):
-                            if pos != current_pos and pos in used_excluding_self:
-                                return f"{pos} 🔒"
-                            return str(pos)
                         
                         # Find the index of the current position
                         current_idx = current_pos - 1
@@ -1326,49 +1286,22 @@ else:
                         selected_pos = st.selectbox(
                             "",
                             options=pos_options,
-                            format_func=format_pos_option,
                             index=current_idx,
                             key=pos_key,
                             label_visibility="collapsed"
                         )
                         
-                        # If position changed and is available
-                        if selected_pos != current_pos and selected_pos not in used_excluding_self:
-                            # Build new order
-                            new_order = []
-                            # Get the token currently at the target position
-                            target_token = position_to_token.get(selected_pos)
+                        # If position changed
+                        if selected_pos != current_pos:
+                            # Build new order by moving this token to the new position
+                            new_order = current_order.copy()
+                            # Remove current token from its position
+                            new_order.remove(idx)
+                            # Insert at new position
+                            new_order.insert(selected_pos - 1, idx)
                             
-                            if target_token:
-                                # Swap positions
-                                for pos in range(1, len(tokens) + 1):
-                                    if pos == selected_pos:
-                                        new_order.append(idx)
-                                    elif pos == current_pos:
-                                        # Find the token at target position and put it here
-                                        target_idx = tokens.index(target_token)
-                                        new_order.append(target_idx)
-                                    else:
-                                        # Keep other tokens in place
-                                        pos_token = position_to_token.get(pos)
-                                        if pos_token:
-                                            new_order.append(tokens.index(pos_token))
-                            else:
-                                # Simple move
-                                for pos in range(1, len(tokens) + 1):
-                                    if pos == selected_pos:
-                                        new_order.append(idx)
-                                    elif pos == current_pos:
-                                        continue
-                                    else:
-                                        pos_token = position_to_token.get(pos)
-                                        if pos_token:
-                                            new_order.append(tokens.index(pos_token))
-                            
-                            # Ensure we have all tokens
-                            if len(new_order) == len(tokens):
-                                st.session_state.token_order = new_order
-                                st.rerun()
+                            st.session_state.token_order = new_order
+                            st.rerun()
                     
                     with col_type:
                         data_type = st.selectbox(
