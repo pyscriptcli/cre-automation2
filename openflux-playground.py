@@ -122,14 +122,12 @@ MINIMAL_CRE_SYSTEM = """
 
 # --- CONE PRESET CONFIGURATIONS ---
 CONE_PRESETS = {
-    "Default (Top-Right)": {"heading": 45, "fov": 60, "radius": 180},
     "Top-Left": {"heading": 135, "fov": 60, "radius": 180},
     "Top-Right": {"heading": 45, "fov": 60, "radius": 180},
     "Bottom-Left": {"heading": 225, "fov": 60, "radius": 180},
     "Bottom-Right": {"heading": 315, "fov": 60, "radius": 180},
     "Wide Angle": {"heading": 45, "fov": 90, "radius": 250},
-    "Narrow Focus": {"heading": 45, "fov": 30, "radius": 120},
-    "Custom": {"heading": 75, "fov": 45, "radius": 180}
+    "Narrow Focus": {"heading": 45, "fov": 30, "radius": 120}
 }
 
 # --- FILE MANAGEMENT FUNCTIONS ---
@@ -543,8 +541,8 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     # Draw semi-transparent heading sector polygon
     fov_draw.polygon(
         [(pin_local_x, pin_local_y), point_1, point_2], 
-        fill=(255, 215, 0, 95),       # Vibrant yellow with balanced transparent alpha blending
-        outline=(255, 165, 0, 140)     # Clean distinct outer edge boundary line
+        fill=(255, 215, 0, 95),
+        outline=(255, 165, 0, 140)
     )
     cropped = Image.alpha_composite(cropped, fov_layer)
     
@@ -593,6 +591,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
             popup_padding = 15
             popup_height = 210
             
+            # Calculate popup position (top-right corner)
             popup_x = cropped.width - popup_width - popup_padding
             popup_y = popup_padding
             
@@ -728,7 +727,7 @@ def render_isolated_map_editor():
     popup_image_key = f"popup_image_{token_key}"
     preset_key = f"cone_preset_{token_key}"
 
-    # Heading cone slider session states
+    # Heading cone session states
     fov_angle_key = f"map_fov_angle_{token_key}"
     heading_key = f"map_heading_{token_key}"
     cone_radius_key = f"map_cone_radius_{token_key}"
@@ -741,7 +740,7 @@ def render_isolated_map_editor():
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
     if popup_image_key not in st.session_state: st.session_state[popup_image_key] = None
-    if preset_key not in st.session_state: st.session_state[preset_key] = "Default (Top-Right)"
+    if preset_key not in st.session_state: st.session_state[preset_key] = "Top-Right"
     if fov_angle_key not in st.session_state: st.session_state[fov_angle_key] = 60
     if heading_key not in st.session_state: st.session_state[heading_key] = 45
     if cone_radius_key not in st.session_state: st.session_state[cone_radius_key] = 180
@@ -788,27 +787,27 @@ def render_isolated_map_editor():
     elif st.session_state[popup_image_key]:
         st.caption("Photo ready")
 
-    # --- CONE PRESETS SECTION ---
+    # --- CONE PRESETS SECTION (Dropdown only, no fine-tuning) ---
     st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
-    st.markdown("**Camera Field of View (Cone) - Presets**")
+    st.markdown("**Camera Field of View (Cone) - Select Preset**")
     
-    # Preset dropdown
-    col_preset1, col_preset2 = st.columns([2, 1])
-    with col_preset1:
-        selected_preset = st.selectbox(
-            "Select Cone Preset",
-            options=list(CONE_PRESETS.keys()),
-            key=preset_key,
-            label_visibility="collapsed"
-        )
+    # Preset dropdown - applies immediately on selection
+    selected_preset = st.selectbox(
+        "Select Cone Preset",
+        options=list(CONE_PRESETS.keys()),
+        key=preset_key,
+        label_visibility="collapsed"
+    )
     
-    with col_preset2:
-        if st.button("Apply Preset", key=f"apply_preset_{token_key}", use_container_width=True):
-            preset_values = CONE_PRESETS[selected_preset]
-            st.session_state[heading_key] = preset_values["heading"]
-            st.session_state[fov_angle_key] = preset_values["fov"]
-            st.session_state[cone_radius_key] = preset_values["radius"]
-            st.rerun()
+    # Apply preset values immediately when selection changes
+    preset_values = CONE_PRESETS[selected_preset]
+    if (st.session_state[heading_key] != preset_values["heading"] or 
+        st.session_state[fov_angle_key] != preset_values["fov"] or 
+        st.session_state[cone_radius_key] != preset_values["radius"]):
+        st.session_state[heading_key] = preset_values["heading"]
+        st.session_state[fov_angle_key] = preset_values["fov"]
+        st.session_state[cone_radius_key] = preset_values["radius"]
+        st.rerun()
     
     # Show current preset values
     st.markdown('<div class="preset-card">', unsafe_allow_html=True)
@@ -820,19 +819,6 @@ def render_isolated_map_editor():
     with col_r:
         st.markdown(f"**Cone Radius:** {st.session_state[cone_radius_key]}px")
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Fine-tuning sliders
-    st.markdown("**Fine-tune Cone Settings**")
-    col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1:
-        heading_val = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_slider_{token_key}")
-        st.session_state[heading_key] = heading_val
-    with col_f2:
-        fov_val = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_slider_{token_key}")
-        st.session_state[fov_angle_key] = fov_val
-    with col_f3:
-        radius_val = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_slider_{token_key}")
-        st.session_state[cone_radius_key] = radius_val
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
