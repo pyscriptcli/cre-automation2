@@ -838,65 +838,41 @@ def clean_empty_placeholders(text):
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
-    """
-    Replace text in paragraph by consolidating all runs.
-    This handles placeholders that span across runs.
-    """
-    # Check if we have any placeholders to replace
-    full_text = paragraph.text
-    has_any = any(token in full_text for token in text_inputs.keys())
-    if not has_any:
-        return
-    
-    # Build the complete replaced text
-    result_text = full_text
-    for token, value in text_inputs.items():
-        if token in result_text:
-            replacement = str(value) if value and str(value).strip() else ""
-            result_text = result_text.replace(token, replacement)
-    
-    # Clean up empty placeholders
-    result_text = clean_empty_placeholders(result_text)
-    
-    # If there are no runs, create one with the result
-    if not paragraph.runs:
-        paragraph.add_run(result_text)
-        return
-    
-    # Get the first run's formatting to use as template
-    first_run = paragraph.runs[0]
-    
-    # Store font properties from the first run
-    font_name = first_run.font.name
-    font_size = first_run.font.size
-    font_bold = first_run.font.bold
-    font_italic = first_run.font.italic
-    font_underline = first_run.font.underline
-    font_color = first_run.font.color.rgb if first_run.font.color else None
-    
-    # Clear ALL runs
+    """Replace text in paragraph, removing empty placeholders"""
+    # Process each run
     for run in paragraph.runs:
-        run.text = ""
+        current_text = run.text
+        for token, value in text_inputs.items():
+            if token in current_text:
+                if value and str(value).strip():  # Value exists and is not empty
+                    current_text = current_text.replace(token, str(value))
+                else:  # Value is empty, remove the placeholder
+                    current_text = current_text.replace(token, '')
+        # Clean up any remaining placeholders and extra whitespace
+        run.text = clean_empty_placeholders(current_text)
     
-    # Set the first run to contain the result text
-    first_run.text = result_text
-    
-    # Restore font properties to the first run
-    try:
-        if font_name:
-            first_run.font.name = font_name
-        if font_size:
-            first_run.font.size = font_size
-        if font_bold is not None:
-            first_run.font.bold = font_bold
-        if font_italic is not None:
-            first_run.font.italic = font_italic
-        if font_underline is not None:
-            first_run.font.underline = font_underline
-        if font_color:
-            first_run.font.color.rgb = font_color
-    except Exception as e:
-        pass
+    # Handle paragraph text if no runs exist or if there are still placeholders
+    if hasattr(paragraph, 'text') and paragraph.text:
+        current_text = paragraph.text
+        # Check if any placeholders remain
+        has_placeholder = any(token in current_text for token in text_inputs.keys())
+        if has_placeholder:
+            for token, value in text_inputs.items():
+                if token in current_text:
+                    if value and str(value).strip():
+                        current_text = current_text.replace(token, str(value))
+                    else:
+                        current_text = current_text.replace(token, '')
+            current_text = clean_empty_placeholders(current_text)
+            
+            if not paragraph.runs:
+                paragraph.add_run(current_text)
+            else:
+                # Update the first run with cleaned text
+                for run in paragraph.runs:
+                    if any(token in run.text for token in text_inputs.keys()):
+                        run.text = current_text
+                        break
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
