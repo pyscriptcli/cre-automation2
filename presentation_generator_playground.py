@@ -90,26 +90,6 @@ MINIMAL_CRE_SYSTEM = """
         color: #1A1A1A !important;
         margin-bottom: 4px;
     }
-    
-    /* Map editor controls */
-    .map-controls-row {
-        display: flex !important;
-        gap: 12px !important;
-        align-items: center !important;
-        flex-wrap: wrap !important;
-        margin-bottom: 12px !important;
-    }
-    .map-control-item {
-        display: flex !important;
-        align-items: center !important;
-        gap: 6px !important;
-    }
-    .map-control-item label {
-        font-size: 12px !important;
-        font-weight: 500 !important;
-        color: #333 !important;
-        white-space: nowrap !important;
-    }
 </style>
 """
 
@@ -258,14 +238,12 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
     
     tokens = cta_sets[cta_num]['tokens']
     
-    # Store current values for all tokens before modifying
     current_values = {}
     for token in st.session_state.tokens:
         val_key = f"val_{token}"
         if val_key in st.session_state:
             current_values[token] = st.session_state[val_key]
     
-    # Apply CTA values
     if 'NAME' in tokens:
         st.session_state[f"val_{tokens['NAME']}"] = advisor_name
         st.session_state.temp_form_data[tokens['NAME']] = advisor_name
@@ -276,7 +254,6 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
         st.session_state[f"val_{tokens['EMAIL']}"] = contact_info["email"]
         st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
     
-    # Restore all other values
     cta_tokens = set(tokens.values())
     for token, value in current_values.items():
         val_key = f"val_{token}"
@@ -295,19 +272,19 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
             return False
     return True
 
-# --- BASEMAP CONFIGURATION WITH IMPROVED RELIABILITY ---
+# --- BASEMAP CONFIGURATION ---
 BASEMAP_CONFIG = {
-    "Satellite (Labels)": {
-        "urls": [
-            "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-            "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
-        ],
-        "attribution": "Google"
-    },
     "Satellite (Streets)": {
         "urls": [
             "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
             "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
+        ],
+        "attribution": "Google"
+    },
+    "Satellite (Labels)": {
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+            "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
         ],
         "attribution": "Google"
     },
@@ -343,19 +320,16 @@ BASEMAP_CONFIG = {
 }
 
 def get_tile_urls(style_name):
-    """Get list of tile URLs with failover support"""
     config = BASEMAP_CONFIG.get(style_name)
     if not config:
-        return BASEMAP_CONFIG["Street Map"]["urls"]
+        return BASEMAP_CONFIG["Street Map (Streets)"]["urls"]
     return config["urls"]
 
 def get_attribution(style_name):
-    """Get attribution for a basemap style"""
     config = BASEMAP_CONFIG.get(style_name)
     return config["attribution"] if config else ""
 
 def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
-    """Fetch a tile with retry logic and multiple URL fallbacks"""
     for attempt in range(max_retries):
         url = url_template.format(z=zoom, x=x, y=y)
         try:
@@ -369,17 +343,14 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
     return None
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18, property_name="", property_image=None, fov_angle=45, heading=75, cone_radius=180):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18, property_name="", property_image=None, popup_position="Top-Right"):
     """Generates high-res map with pin always included - with 1km default radius if no bounds provided"""
     
     def calculate_1km_bounds(lat, lon):
-        """Calculate approximately 1km bounding box centered on the pin"""
         lat_deg_per_km = 1.0 / 111.32
         lon_deg_per_km = 1.0 / (111.32 * math.cos(math.radians(lat)))
-        
         lat_offset = lat_deg_per_km * 0.5
         lon_offset = lon_deg_per_km * 0.5
-        
         return lat + lat_offset, lat - lat_offset, lon + lon_offset, lon - lon_offset
     
     bounds_valid = all(x is not None for x in [n, s, e, w])
@@ -466,18 +437,10 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         stitched_width = width_tiles * tile_size * scale_factor
         stitched_height = height_tiles * tile_size * scale_factor
         
-        if left < 0:
-            right -= left
-            left = 0
-        if top < 0:
-            bottom -= top
-            top = 0
-        if right > stitched_width:
-            left -= (right - stitched_width)
-            right = stitched_width
-        if bottom > stitched_height:
-            top -= (bottom - stitched_height)
-            bottom = stitched_height
+        if left < 0: right -= left; left = 0
+        if top < 0: bottom -= top; top = 0
+        if right > stitched_width: left -= (right - stitched_width); right = stitched_width
+        if bottom > stitched_height: top -= (bottom - stitched_height); bottom = stitched_height
         
         if right <= left: right = left + 100
         if bottom <= top: bottom = top + 100
@@ -492,7 +455,10 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         if bottom <= top: bottom = top + 100
         cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
+    # --- DRAW PIN MARKER ---
+    draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
+    
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
@@ -502,35 +468,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
-
-    # --- DRAW FIELD OF VIEW (FOV) CONE ---
-    fov_layer = Image.new("RGBA", cropped.size, (0, 0, 0, 0))
-    fov_draw = ImageDraw.Draw(fov_layer)
-
-    # Convert map headings to math radians (correct offset for PIL coordinates system)
-    start_angle = math.radians(heading - (fov_angle / 2) - 90)
-    end_angle = math.radians(heading + (fov_angle / 2) - 90)
-
-    # Calculate outer edge triangle limits radiating outwards from the pin location
-    point_1 = (
-        pin_local_x + (cone_radius * scale_factor) * math.cos(start_angle),
-        pin_local_y + (cone_radius * scale_factor) * math.sin(start_angle)
-    )
-    point_2 = (
-        pin_local_x + (cone_radius * scale_factor) * math.cos(end_angle),
-        pin_local_y + (cone_radius * scale_factor) * math.sin(end_angle)
-    )
-
-    # Draw semi-transparent heading sector polygon
-    fov_draw.polygon(
-        [(pin_local_x, pin_local_y), point_1, point_2], 
-        fill=(255, 215, 0, 95),       # Vibrant yellow with balanced transparent alpha blending
-        outline=(255, 165, 0, 140)     # Clean distinct outer edge boundary line
-    )
-    cropped = Image.alpha_composite(cropped, fov_layer)
     
-    # --- DRAW PIN MARKER ---
-    draw = ImageDraw.Draw(cropped)
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
     
@@ -583,8 +521,19 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                 popup_height = 0
             
             if popup_height > 0:
-                popup_x = cropped.width - popup_width - popup_padding
-                popup_y = popup_padding
+                # Coordinate alignment based on Preset selection
+                if popup_position == "Top-Left":
+                    popup_x = popup_padding
+                    popup_y = popup_padding
+                elif popup_position == "Bottom-Right":
+                    popup_x = cropped.width - popup_width - popup_padding
+                    popup_y = cropped.height - popup_height - popup_padding
+                elif popup_position == "Bottom-Left":
+                    popup_x = popup_padding
+                    popup_y = cropped.height - popup_height - popup_padding
+                else:  # Defaults cleanly to Top-Right
+                    popup_x = cropped.width - popup_width - popup_padding
+                    popup_y = popup_padding
                 
                 popup_img = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 245))
                 popup_draw = ImageDraw.Draw(popup_img)
@@ -670,11 +619,9 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
                             if len(current_line + " " + word) <= max_chars_per_line:
                                 current_line += (" " + word if current_line else word)
                             else:
-                                if current_line:
-                                    lines.append(current_line)
+                                if current_line: lines.append(current_line)
                                 current_line = word
-                        if current_line:
-                            lines.append(current_line)
+                        if current_line: lines.append(current_line)
                         
                         for i, line in enumerate(lines):
                             popup_draw.text((15, name_y + i * 22), line, fill=(30, 30, 30, 255), font=font)
@@ -758,11 +705,7 @@ def render_isolated_map_editor():
     export_trigger_key = f"map_export_active_{token_key}"
     popup_image_key = f"popup_image_{token_key}"
     popup_name_key = f"popup_name_{token_key}"
-
-    # Heading cone slider session states
-    fov_angle_key = f"map_fov_angle_{token_key}"
-    heading_key = f"map_heading_{token_key}"
-    cone_radius_key = f"map_cone_radius_{token_key}"
+    popup_pos_key = f"popup_pos_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Satellite (Streets)"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
@@ -773,9 +716,7 @@ def render_isolated_map_editor():
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
     if popup_image_key not in st.session_state: st.session_state[popup_image_key] = None
     if popup_name_key not in st.session_state: st.session_state[popup_name_key] = ""
-    if fov_angle_key not in st.session_state: st.session_state[fov_angle_key] = 45
-    if heading_key not in st.session_state: st.session_state[heading_key] = 75
-    if cone_radius_key not in st.session_state: st.session_state[cone_radius_key] = 180
+    if popup_pos_key not in st.session_state: st.session_state[popup_pos_key] = "Top-Right"
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -802,11 +743,12 @@ def render_isolated_map_editor():
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # Add popup photo & Heading Cone configurations
+    # Add popup context tools
     st.markdown("---")
-    col_popup1, col_popup2 = st.columns([2, 1])
+    st.markdown("**Property Info Popup Configuration**")
+    
+    col_popup1, col_popup2, col_popup3 = st.columns([2, 1.2, 1])
     with col_popup1:
-        st.markdown("**Property Info (will appear on map)**")
         popup_name = st.text_input(
             "Property Name", 
             value=st.session_state[popup_name_key],
@@ -815,9 +757,18 @@ def render_isolated_map_editor():
         )
         if popup_name != st.session_state[popup_name_key]:
             st.session_state[popup_name_key] = popup_name
-    
+            
     with col_popup2:
-        st.markdown("**Property Photo**")
+        popup_pos = st.selectbox(
+            "Popup Card Location",
+            options=["Top-Right", "Top-Left", "Bottom-Right", "Bottom-Left"],
+            index=["Top-Right", "Top-Left", "Bottom-Right", "Bottom-Left"].index(st.session_state[popup_pos_key]),
+            key=f"popup_pos_input_{token_key}"
+        )
+        st.session_state[popup_pos_key] = popup_pos
+    
+    with col_popup3:
+        st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
         upload_key = f"popup_upload_{token_key}"
         uploaded_popup_image = st.file_uploader(
             "Upload Photo", 
@@ -830,20 +781,6 @@ def render_isolated_map_editor():
             st.success("Photo uploaded!")
         elif st.session_state[popup_image_key]:
             st.caption("Photo ready")
-
-    # Camera Field of View layout tools
-    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
-    st.markdown("**Camera Field of View Triangle (Heading Cone)**")
-    fov_c1, fov_c2, fov_c3 = st.columns(3)
-    with fov_c1:
-        ui_heading = st.slider("Camera Facing Direction (Heading °)", 0, 360, int(st.session_state[heading_key]), step=5, key=f"ui_head_{token_key}")
-        st.session_state[heading_key] = ui_heading
-    with fov_c2:
-        ui_fov = st.slider("Cone Opening Width (FOV Angle °)", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"ui_fov_{token_key}")
-        st.session_state[fov_angle_key] = ui_fov
-    with fov_c3:
-        ui_radius = st.slider("Cone Reach Length (Pixels)", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"ui_rad_{token_key}")
-        st.session_state[cone_radius_key] = ui_radius
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
@@ -866,7 +803,8 @@ def render_isolated_map_editor():
                         n, s, e, w = None, None, None, None
             
             property_name = st.session_state[popup_name_key] or ""
-            property_image = st.session_state[popup_image_key]
+            # FIX: Pull directly from the persistent upload file stream cache block instead of holder reference
+            property_image = st.session_state.get(popup_image_key)
             
             map_img_bytes = generate_static_map_bounds(
                 n=n, s=s, e=e, w=w, 
@@ -876,9 +814,7 @@ def render_isolated_map_editor():
                 pin_size=int(pin_size),
                 property_name=property_name,
                 property_image=property_image,
-                fov_angle=st.session_state[fov_angle_key],
-                heading=st.session_state[heading_key],
-                cone_radius=st.session_state[cone_radius_key]
+                popup_position=st.session_state[popup_pos_key]
             )
             
             st.session_state[image_key] = map_img_bytes
@@ -1041,7 +977,6 @@ def extract_placeholders(template_bytes, template_type):
     return []
 
 def clean_empty_placeholders(text):
-    """Remove any {{...}} placeholders that remain empty and clean up whitespace"""
     if not text:
         return text
     cleaned = re.sub(r'\{\{[^}]*\}\}', '', text)
@@ -1049,7 +984,6 @@ def clean_empty_placeholders(text):
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
-    """Replace text in paragraph, removing empty placeholders"""
     for run in paragraph.runs:
         current_text = run.text
         for token, value in text_inputs.items():
@@ -1133,11 +1067,9 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 def get_download_filename(template_name, file_type):
-    """Generate filename: Generated_TemplateName_Date"""
     base_name = re.sub(r'^template_', '', template_name or "Document")
     base_name = re.sub(r'\.(pptx|docx)$', '', base_name)
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
-    
     current_date = datetime.now().strftime('%m%d%Y')
     return f"Generated_{base_name}_{current_date}.{file_type}"
     
