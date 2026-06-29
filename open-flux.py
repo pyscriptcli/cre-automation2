@@ -272,6 +272,15 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
         return False
     
     tokens = cta_sets[cta_num]['tokens']
+    
+    # Store current values for all tokens before modifying
+    current_values = {}
+    for token in st.session_state.tokens:
+        val_key = f"val_{token}"
+        if val_key in st.session_state:
+            current_values[token] = st.session_state[val_key]
+    
+    # Apply CTA values
     if 'NAME' in tokens:
         st.session_state[f"val_{tokens['NAME']}"] = advisor_name
         st.session_state.temp_form_data[tokens['NAME']] = advisor_name
@@ -281,6 +290,15 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
     if 'EMAIL' in tokens:
         st.session_state[f"val_{tokens['EMAIL']}"] = contact_info["email"]
         st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
+    
+    # Restore all other values
+    cta_tokens = set(tokens.values())
+    for token, value in current_values.items():
+        val_key = f"val_{token}"
+        if token not in cta_tokens:
+            if val_key not in st.session_state or st.session_state[val_key] != value:
+                st.session_state[val_key] = value
+                st.session_state.temp_form_data[token] = value
         
     if st.session_state.saved_template_name:
         temp_path = get_temp_config_path(st.session_state.saved_template_name)
@@ -294,14 +312,14 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
 
 # --- BASEMAP CONFIGURATION WITH IMPROVED RELIABILITY ---
 BASEMAP_CONFIG = {
-    "Satellite (Streets)": {
+    "Satellite (Labels)": {
         "urls": [
             "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
             "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
         ],
         "attribution": "Google"
     },
-    "Satellite (Labels + Streets)": {
+    "Satellite (Streets)": {
         "urls": [
             "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
             "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
@@ -361,15 +379,42 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
             if resp.status_code == 200:
                 return resp.content
             elif resp.status_code == 418:
-                # Blocked - try different URL
                 continue
         except Exception:
             continue
     return None
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#DC3545", pin_size=12):
-    """Generates high-res map with pin included - NO radius"""
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18):
+    """Generates high-res map with pin always included - with 1km default radius if no bounds provided"""
+    
+    def calculate_1km_bounds(lat, lon):
+        """Calculate approximately 1km bounding box centered on the pin"""
+        # 1 degree latitude ≈ 111.32 km
+        # 1 degree longitude ≈ 111.32 * cos(latitude) km
+        lat_deg_per_km = 1.0 / 111.32
+        lon_deg_per_km = 1.0 / (111.32 * math.cos(math.radians(lat)))
+        
+        # 0.5km in each direction for 1km total (centered on pin)
+        lat_offset = lat_deg_per_km * 0.5
+        lon_offset = lon_deg_per_km * 0.5
+        
+        return lat + lat_offset, lat - lat_offset, lon + lon_offset, lon - lon_offset
+    
+    # Check if bounds are valid (not None and have reasonable size)
+    bounds_valid = all(x is not None for x in [n, s, e, w])
+    if bounds_valid:
+        # Check if bounds are too small or invalid
+        lat_span = abs(n - s)
+        lon_span = abs(e - w)
+        # If bounds are extremely small (less than 10 meters), use 1km
+        if lat_span < 0.0001 or lon_span < 0.0001:
+            bounds_valid = False
+    
+    if not bounds_valid:
+        # Use 1km radius centered on pin
+        n, s, e, w = calculate_1km_bounds(pin_lat, pin_lon)
+    
     lon_span = e - w
     lat_span = n - s
     target_width_tiles = 8
@@ -401,13 +446,12 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     stitched = Image.new('RGB', (width_tiles * tile_size * scale_factor, height_tiles * tile_size * scale_factor))
     headers = {"User-Agent": "Mozilla/5.0 (compatible; MapGenerator/1.0; +https://example.com)"}
     
-    # Get tile URLs with failover support
     tile_urls = get_tile_urls(style)
     
+    # Fetch and stitch tiles
     for x in range(x_min, x_max + 1):
         for y in range(y_min, y_max + 1):
             tile_data = None
-            # Try each URL in order
             for url_template in tile_urls:
                 tile_data = fetch_tile_with_retry(url_template, zoom, x, y, headers)
                 if tile_data is not None:
@@ -428,28 +472,81 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         px_y = (1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n_tiles * tile_size * scale_factor
         return px_x, px_y
     
+    # Calculate pixel positions for cropping
     px_w, py_n = num2px(n, w, zoom)
     px_e, py_s = num2px(s, e, zoom)
     base_x = x_min * tile_size * scale_factor
     base_y = y_min * tile_size * scale_factor
-    left = int(px_w - base_x)
-    top = int(py_n - base_y)
-    right = int(px_e - base_x)
-    bottom = int(py_s - base_y)
-    if right <= left: right = left + 100
-    if bottom <= top: bottom = top + 100
-    cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
+    # For no bounds case, ensure the crop is perfectly centered on pin
+    if not bounds_valid:
+        # Calculate pin pixel position in the stitched image
+        pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
+        
+        # Calculate crop dimensions
+        crop_width = int(px_e - px_w)
+        crop_height = int(py_s - py_n)
+        
+        # Center the crop on the pin
+        left = int(pin_px_x - base_x - crop_width // 2)
+        top = int(pin_px_y - base_y - crop_height // 2)
+        right = left + crop_width
+        bottom = top + crop_height
+        
+        # Ensure we don't go out of bounds
+        stitched_width = width_tiles * tile_size * scale_factor
+        stitched_height = height_tiles * tile_size * scale_factor
+        
+        if left < 0:
+            right -= left
+            left = 0
+        if top < 0:
+            bottom -= top
+            top = 0
+        if right > stitched_width:
+            left -= (right - stitched_width)
+            right = stitched_width
+        if bottom > stitched_height:
+            top -= (bottom - stitched_height)
+            bottom = stitched_height
+        
+        # Ensure valid crop dimensions
+        if right <= left: right = left + 100
+        if bottom <= top: bottom = top + 100
+        
+        cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
+    else:
+        # Use the bounds-based crop
+        left = int(px_w - base_x)
+        top = int(py_n - base_y)
+        right = int(px_e - base_x)
+        bottom = int(py_s - base_y)
+        if right <= left: right = left + 100
+        if bottom <= top: bottom = top + 100
+        cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
+    
+    # --- DRAW PIN MARKER (ALWAYS INCLUDED AND CENTERED FOR NO BOUNDS) ---
     draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
+    
+    # Calculate pin position relative to the crop
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
+    
+    # For no bounds case, the pin should be exactly in the center
+    if not bounds_valid:
+        pin_local_x = cropped.width // 2
+        pin_local_y = cropped.height // 2
+    
+    # Ensure pin is within bounds (clamp if needed)
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
     
-    # --- DRAW PIN (always included) ---
+    # Draw pin with shadow and star
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
+    
+    # Shadow
     draw.ellipse([
         pin_local_x - radius - shadow_offset, 
         pin_local_y - radius - shadow_offset, 
@@ -457,6 +554,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         pin_local_y + radius + shadow_offset
     ], fill=(0, 0, 0, 60))
     
+    # Pin circle
     draw.ellipse([
         pin_local_x - radius,
         pin_local_y - radius,
@@ -464,6 +562,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         pin_local_y + radius
     ], fill=pin_color, outline=(255, 255, 255), width=max(1, int(radius * 0.1)))
     
+    # Star
     star_size = int(radius * 0.55)
     star_points = []
     for i in range(10):
@@ -471,6 +570,18 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         r = star_size if i % 2 == 0 else star_size * 0.4
         star_points.append((pin_local_x + r * math.cos(angle), pin_local_y + r * math.sin(angle)))
     draw.polygon(star_points, fill=(255, 255, 255))
+    
+    # Add a small glow effect around the pin for visibility
+    glow_radius = int(radius * 1.5)
+    for i in range(3):
+        alpha = 30 - i * 10
+        glow_radius_i = glow_radius + i * 5
+        draw.ellipse([
+            pin_local_x - glow_radius_i,
+            pin_local_y - glow_radius_i,
+            pin_local_x + glow_radius_i,
+            pin_local_y + glow_radius_i
+        ], outline=(255, 255, 255, alpha), width=1)
     
     final_img = cropped.convert("RGB")
     img_byte_arr = io.BytesIO()
@@ -583,27 +694,36 @@ def render_isolated_map_editor():
         plat, plon = 14.5995, 120.9842
 
     if st.session_state[export_trigger_key]:
-        with st.spinner("Compiling ultra high-resolution map asset with pin... Please wait"):
+        with st.spinner("Exporting Map... Please wait"):
             n, s, e, w = None, None, None, None
+            
+            # Check if user drew a rectangle
             if st.session_state.get(bounds_key):
                 b = st.session_state[bounds_key]
                 if b and "_northEast" in b and "_southWest" in b:
                     n, s = b["_northEast"]["lat"], b["_southWest"]["lat"]
                     e, w = b["_northEast"]["lng"], b["_southWest"]["lng"]
+                    
+                    # Validate bounds have reasonable size
+                    if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
+                        n, s, e, w = None, None, None, None
             
-            if n is None:
-                buffer = 0.01
-                n, s = plat + buffer, plat - buffer
-                e, w = plon + buffer, plon - buffer
+            # If no valid bounds, use 1km radius (handled in generate_static_map_bounds)
+            # Pass None values - the function will calculate 1km bounds
             
-            # Generate map with pin included
             map_img_bytes = generate_static_map_bounds(
-                n=n, s=s, e=e, w=w, pin_lat=plat, pin_lon=plon, 
-                style=basemap_style, pin_color=pin_color, pin_size=int(pin_size)
+                n=n, s=s, e=e, w=w, 
+                pin_lat=plat, pin_lon=plon, 
+                style=basemap_style, 
+                pin_color=pin_color, 
+                pin_size=int(pin_size)
             )
+            
+            # Store the generated map image
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
             
+            # Save to temp data
             if st.session_state.temp_form_data:
                 st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
@@ -617,7 +737,6 @@ def render_isolated_map_editor():
             time.sleep(0.5)
             st.rerun()
 
-    # Build tiles dict for folium - use first URL from each config
     tiles_dict = {}
     attr_dict = {}
     for style in map_styles:
@@ -627,7 +746,6 @@ def render_isolated_map_editor():
     
     m = folium.Map(location=[plat, plon], zoom_start=15, tiles=tiles_dict[basemap_style], attr=attr_dict[basemap_style], zoom_control=True)
     
-    # --- ADD PIN MARKER ---
     icon_html = f"""
     <div style="position: relative; width: {pin_size}px; height: {pin_size}px;">
         <svg width="{pin_size}" height="{pin_size}" viewBox="0 0 40 40" style="width: 100%; height: 100%;">
@@ -641,7 +759,6 @@ def render_isolated_map_editor():
     """
     folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
     
-    # --- DRAW TOOL: ONLY RECTANGLE FOR CROP AREA ---
     Draw(
         export=False, 
         position='topleft',
@@ -731,30 +848,24 @@ def clean_empty_placeholders(text):
     """Remove any {{...}} placeholders that remain empty and clean up whitespace"""
     if not text:
         return text
-    # Remove any {{...}} pattern that might be left
     cleaned = re.sub(r'\{\{[^}]*\}\}', '', text)
-    # Clean up extra whitespace and newlines
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """Replace text in paragraph, removing empty placeholders"""
-    # Process each run
     for run in paragraph.runs:
         current_text = run.text
         for token, value in text_inputs.items():
             if token in current_text:
-                if value and str(value).strip():  # Value exists and is not empty
+                if value and str(value).strip():
                     current_text = current_text.replace(token, str(value))
-                else:  # Value is empty, remove the placeholder
+                else:
                     current_text = current_text.replace(token, '')
-        # Clean up any remaining placeholders and extra whitespace
         run.text = clean_empty_placeholders(current_text)
     
-    # Handle paragraph text if no runs exist or if there are still placeholders
     if hasattr(paragraph, 'text') and paragraph.text:
         current_text = paragraph.text
-        # Check if any placeholders remain
         has_placeholder = any(token in current_text for token in text_inputs.keys())
         if has_placeholder:
             for token, value in text_inputs.items():
@@ -768,7 +879,6 @@ def replace_text_in_paragraph(paragraph, text_inputs):
             if not paragraph.runs:
                 paragraph.add_run(current_text)
             else:
-                # Update the first run with cleaned text
                 for run in paragraph.runs:
                     if any(token in run.text for token in text_inputs.keys()):
                         run.text = current_text
@@ -827,10 +937,18 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 def get_download_filename(template_name, file_type):
-    base_name = re.sub(r'\.(pptx|docx)$', '', template_name or "Document")
+    """Generate filename: Generated_TemplateName_Date"""
+    # Remove template_ prefix and file extension
+    base_name = re.sub(r'^template_', '', template_name or "Document")
+    base_name = re.sub(r'\.(pptx|docx)$', '', base_name)
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
-    return f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_type}"
-
+    
+    # Get current date in MMDDYYYY format
+    current_date = datetime.now().strftime('%m%d%Y')
+    
+    # Format: Generated_TemplateName_Date.ext
+    return f"Generated_{base_name}_{current_date}.{file_type}"
+    
 def autosave_current_form_data():
     if not st.session_state.saved_template_name or not st.session_state.tokens:
         return False
@@ -1016,7 +1134,7 @@ else:
     if st.session_state.template_bytes is not None:
         template_name = st.session_state.saved_template_name or "Unsaved Template"
         is_github = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), template_name))
-        st.markdown(f'<div class="saved-indicator">Active: {template_name}{" (GitHub)" if is_github else " (Stored)"} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="saved-indicator">Active: {template_name}{"" if is_github else ""} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     text_data, image_data, field_types = {}, {}, {}
@@ -1024,12 +1142,10 @@ else:
     if st.session_state.template_bytes is not None and st.session_state.tokens:
         tokens = st.session_state.tokens
         
-        # --- CTA PRESETS USING STREAMLIT NATIVE COMPONENTS ---
+        # --- CTA PRESETS - SIMPLIFIED ---
         cta_sets = detect_cta_sets()
         if cta_sets:
-            st.subheader("Call to Action Presets")
-            st.caption("Select an advisor to auto-fill CTA fields")
-            
+            st.markdown("**CTA Presets**")
             num_ctas = len(cta_sets)
             cols = st.columns(num_ctas)
             
@@ -1040,7 +1156,7 @@ else:
                     if cta_name_token and f"val_{cta_name_token}" in st.session_state:
                         current_advisor = st.session_state[f"val_{cta_name_token}"]
                     
-                    st.markdown(f"**CTA{cta_num}**")
+                    st.caption(f"CTA{cta_num}")
                     
                     selected_advisor = st.selectbox(
                         f"Select advisor",
@@ -1053,6 +1169,7 @@ else:
                     if selected_advisor and selected_advisor != current_advisor:
                         apply_cta_preset_autofill(cta_num, selected_advisor)
                         st.rerun()
+            st.markdown("---")
         
         with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field.")
@@ -1141,7 +1258,11 @@ else:
                         st.session_state[f"val_{token}"] = current_value
                     
                     new_value = st.text_input(
-                        "", value=current_value, key=f"val_{token}", label_visibility="collapsed", placeholder="Enter value..."
+                        "", 
+                        value=current_value, 
+                        key=f"val_{token}", 
+                        label_visibility="collapsed", 
+                        placeholder=f"Enter {clean_label}..."
                     )
                     
                     if new_value != current_value:
