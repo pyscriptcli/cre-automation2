@@ -855,7 +855,7 @@ def clean_empty_placeholders(text):
 def replace_text_in_paragraph(paragraph, text_inputs):
     """
     Safely replace text in paragraph by processing each placeholder individually.
-    This preserves formatting by working on each run separately.
+    This preserves formatting and handles placeholders that span across runs.
     """
     # First, check if the paragraph text contains any placeholder we need to replace
     full_text = paragraph.text
@@ -863,38 +863,78 @@ def replace_text_in_paragraph(paragraph, text_inputs):
     if not has_any_placeholder:
         return
     
-    # Process each run individually to preserve formatting
-    for run in paragraph.runs:
-        current_text = run.text
-        
-        # Check if this run contains any placeholders
-        has_placeholder_in_run = any(token in current_text for token in text_inputs.keys())
-        if not has_placeholder_in_run:
-            continue
-        
-        # Process each placeholder one by one
-        for token, value in text_inputs.items():
-            if token in current_text:
-                # Replace this placeholder with its value (or empty string)
-                replacement = str(value) if value and str(value).strip() else ""
-                # Use string replacement to only affect this placeholder
-                current_text = current_text.replace(token, replacement)
-        
-        # Clean up any remaining empty placeholders
-        current_text = clean_empty_placeholders(current_text)
-        run.text = current_text
+    # Build the complete replaced text
+    replaced_text = full_text
+    for token, value in text_inputs.items():
+        if token in replaced_text:
+            replacement = str(value) if value and str(value).strip() else ""
+            replaced_text = replaced_text.replace(token, replacement)
     
-    # Handle case where paragraph has no runs but has text (e.g., from table cells)
-    if not paragraph.runs and paragraph.text:
-        current_text = paragraph.text
-        has_placeholder = any(token in current_text for token in text_inputs.keys())
-        if has_placeholder:
+    # Clean up any remaining empty placeholders
+    replaced_text = clean_empty_placeholders(replaced_text)
+    
+    # If there are no runs, create one
+    if not paragraph.runs:
+        paragraph.add_run(replaced_text)
+        return
+    
+    # Check if any placeholder spans across multiple runs
+    # We do this by checking if any token appears in the combined text but not fully in any single run
+    spans_across_runs = False
+    for token in text_inputs.keys():
+        if token in full_text:
+            # Check if the token is fully contained in any single run
+            token_fully_in_run = any(token in run.text for run in paragraph.runs)
+            if not token_fully_in_run:
+                spans_across_runs = True
+                break
+    
+    if spans_across_runs:
+        # If placeholders span across runs, we need to rebuild the text
+        # Keep the first run's formatting and clear others
+        first_run = paragraph.runs[0]
+        
+        # Store formatting from first run
+        font = first_run.font
+        
+        # Clear all runs and set the replaced text in the first run
+        for run in paragraph.runs[1:]:
+            run.text = ""
+        
+        first_run.text = replaced_text
+        # Restore formatting
+        first_run.font = font
+    else:
+        # Process each run individually (placeholders are contained within single runs)
+        for run in paragraph.runs:
+            current_text = run.text
+            
+            # Check if this run contains any placeholders
+            has_placeholder_in_run = any(token in current_text for token in text_inputs.keys())
+            if not has_placeholder_in_run:
+                continue
+            
+            # Process each placeholder one by one
             for token, value in text_inputs.items():
                 if token in current_text:
                     replacement = str(value) if value and str(value).strip() else ""
                     current_text = current_text.replace(token, replacement)
+            
+            # Clean up any remaining empty placeholders
             current_text = clean_empty_placeholders(current_text)
-            paragraph.add_run(current_text)
+            run.text = current_text
+        
+        # Handle case where paragraph has no runs but has text (e.g., from table cells)
+        if not paragraph.runs and paragraph.text:
+            current_text = paragraph.text
+            has_placeholder = any(token in current_text for token in text_inputs.keys())
+            if has_placeholder:
+                for token, value in text_inputs.items():
+                    if token in current_text:
+                        replacement = str(value) if value and str(value).strip() else ""
+                        current_text = current_text.replace(token, replacement)
+                current_text = clean_empty_placeholders(current_text)
+                paragraph.add_run(current_text)
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
