@@ -332,14 +332,6 @@ BASEMAP_CONFIG = {
             "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
         ],
         "attribution": "CartoDB"
-    },
-    "Open Street Map": {
-        "urls": [
-            "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        ],
-        "attribution": "OpenStreetMap"
     }
 }
 
@@ -652,7 +644,7 @@ def render_isolated_map_editor():
         del st.session_state[dragged_key]
 
     map_styles = ["Satellite (Streets)", "Satellite (Labels + Streets)", "Satellite (Clean)", 
-                  "Street Map", "OSM Carto Light", "Open Street Map"]
+                  "Street Map", "OSM Carto Light" ]
 
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
     with c_btn:
