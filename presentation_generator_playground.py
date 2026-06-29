@@ -466,42 +466,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
-
-    # --- DRAW PRESET-BASED VISUAL HEADING CONE ---
-    fov_layer = Image.new("RGBA", cropped.size, (0, 0, 0, 0))
-    fov_draw = ImageDraw.Draw(fov_layer)
     
-    if popup_position == "Top-Left":
-        heading_deg = 315
-    elif popup_position == "Bottom-Right":
-        heading_deg = 135
-    elif popup_position == "Bottom-Left":
-        heading_deg = 225
-    else:  # Top-Right
-        heading_deg = 45
-        
-    start_angle = math.radians(heading_deg - 22.5 - 90)
-    end_angle = math.radians(heading_deg + 22.5 - 90)
-    cone_radius_scaled = 180 * scale_factor
-
-    point_1 = (
-        pin_local_x + cone_radius_scaled * math.cos(start_angle),
-        pin_local_y + cone_radius_scaled * math.sin(start_angle)
-    )
-    point_2 = (
-        pin_local_x + cone_radius_scaled * math.cos(end_angle),
-        pin_local_y + cone_radius_scaled * math.sin(end_angle)
-    )
-
-    fov_draw.polygon(
-        [(pin_local_x, pin_local_y), point_1, point_2], 
-        fill=(255, 215, 0, 95),       # Transparent Yellow Heading Sector Cone Layer
-        outline=(255, 165, 0, 140)     # Amber outer lining edge
-    )
-    cropped = Image.alpha_composite(cropped, fov_layer)
-    
-    # --- DRAW PIN SHADOW AND OBJECT OVERLAYS ---
-    draw = ImageDraw.Draw(cropped)
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
     
@@ -537,14 +502,46 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
             pin_local_x + glow_radius_i,
             pin_local_y + glow_radius_i
         ], outline=(255, 255, 255, alpha), width=1)
+
+    # --- DRAW PRESET-BASED VISUAL HEADING CONE ---
+    fov_layer = Image.new("RGBA", cropped.size, (0, 0, 0, 0))
+    fov_draw = ImageDraw.Draw(fov_layer)
+    
+    if popup_position == "Top-Left":
+        heading_deg = 315
+    elif popup_position == "Bottom-Right":
+        heading_deg = 135
+    elif popup_position == "Bottom-Left":
+        heading_deg = 225
+    else:  # Top-Right
+        heading_deg = 45
+        
+    start_angle = math.radians(heading_deg - 22.5 - 90)
+    end_angle = math.radians(heading_deg + 22.5 - 90)
+    cone_radius_scaled = 180 * scale_factor
+
+    point_1 = (
+        pin_local_x + cone_radius_scaled * math.cos(start_angle),
+        pin_local_y + cone_radius_scaled * math.sin(start_angle)
+    )
+    point_2 = (
+        pin_local_x + cone_radius_scaled * math.cos(end_angle),
+        pin_local_y + cone_radius_scaled * math.sin(end_angle)
+    )
+
+    fov_draw.polygon(
+        [(pin_local_x, pin_local_y), point_1, point_2], 
+        fill=(255, 215, 0, 95),       
+        outline=(255, 165, 0, 140)     
+    )
+    cropped = Image.alpha_composite(cropped, fov_layer)
     
     # --- ADD PROPERTY PHOTO AS STATIC OVERLAY (POPUP) ---
     if property_image:
         try:
-            # Compact photo block sizing bounds parameters
             popup_width = 220
             popup_padding = 15
-            popup_height = 170  # Explicit image frame boundaries
+            popup_height = 170  
             
             if popup_position == "Top-Left":
                 popup_x = popup_padding
@@ -733,7 +730,7 @@ def render_isolated_map_editor():
     with col_popup2:
         upload_key = f"popup_upload_{token_key}"
         uploaded_popup_image = st.file_uploader(
-            "Upload Property Photo Overlay", 
+            f"Upload Photo Overlay for {token_key}", 
             type=["png", "jpg", "jpeg", "gif"],
             key=upload_key
         )
@@ -1233,7 +1230,7 @@ else:
                     st.caption(f"CTA{cta_num}")
                     
                     selected_advisor = st.selectbox(
-                        f"Select advisor",
+                        f"Select advisor for CTA{cta_num}",
                         options=[""] + list(contacts_database.keys()),
                         index=list(contacts_database.keys()).index(current_advisor) + 1 if current_advisor in contacts_database else 0,
                         key=f"cta_autofill_{cta_num}",
@@ -1259,7 +1256,7 @@ else:
                         st.markdown(f'<span style="font-size:12px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
                     with col_sel:
                         data_type = st.selectbox(
-                            "", 
+                            f"Data type selection for {clean_label}", 
                             ["Text", "Image", "Map"], 
                             index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
                             key=f"type_mapping_{token}",
@@ -1297,7 +1294,7 @@ else:
                 st.markdown(f'<div class="placeholder-label">{label_text}</div>', unsafe_allow_html=True)
                 
                 if current_type == "Image" and st.session_state.template_type == 'pptx':
-                    image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
+                    image_data[token] = st.file_uploader(f"Upload image for {clean_label}", type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
                     field_types[token] = "Image"
                     
                 elif current_type == "Map" and st.session_state.template_type == 'pptx':
@@ -1341,7 +1338,7 @@ else:
                         st.session_state[f"val_{token}"] = current_value
                     
                     new_value = st.text_input(
-                        "", 
+                        f"Input value for {clean_label}", 
                         value=current_value, 
                         key=f"val_{token}", 
                         label_visibility="collapsed", 
