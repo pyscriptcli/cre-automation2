@@ -887,84 +887,79 @@ def clean_empty_placeholders(text):
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned
 
-def replace_text_in_paragraph(paragraph, text_inputs, style_mapping):
-    """
-    Replace placeholders and apply manual styling if specified.
-    If no style override, follows the original placeholder formatting.
-    """
-    # Check if we have any placeholders to replace
-    full_text = paragraph.text
-    has_any = any(token in full_text for token in text_inputs.keys())
-    if not has_any:
-        return
-    
-    # Build the complete replaced text
-    result_text = full_text
-    for token, value in text_inputs.items():
-        if token in result_text:
-            replacement = str(value) if value and str(value).strip() else ""
-            result_text = result_text.replace(token, replacement)
-    
-    # Clean up empty placeholders
-    result_text = clean_empty_placeholders(result_text)
-    
-    # If there are no runs, create one with the result
-    if not paragraph.runs:
-        paragraph.add_run(result_text)
-        return
-    
-    # Get the first run's formatting as base
-    first_run = paragraph.runs[0]
-    
-    # Store ALL formatting from the first run
-    font_name = first_run.font.name
-    font_size = first_run.font.size
-    font_bold = first_run.font.bold
-    font_italic = first_run.font.italic
-    font_underline = first_run.font.underline
-    font_color = first_run.font.color.rgb if first_run.font.color else None
-    
-    # Clear ALL runs
+def replace_text_in_paragraph(paragraph, text_inputs):
+    """Replace text in paragraph, removing empty placeholders"""
+    # Process each run
     for run in paragraph.runs:
-        run.text = ""
+        current_text = run.text
+        for token, value in text_inputs.items():
+            if token in current_text:
+                if value and str(value).strip():  # Value exists and is not empty
+                    current_text = current_text.replace(token, str(value))
+                else:  # Value is empty, remove the placeholder
+                    current_text = current_text.replace(token, '')
+        # Clean up any remaining placeholders and extra whitespace
+        run.text = clean_empty_placeholders(current_text)
     
-    # Set the text in the first run
-    first_run.text = result_text
-    
-    # First, apply the original formatting from the template
-    try:
-        if font_name:
-            first_run.font.name = font_name
-        if font_size:
-            first_run.font.size = font_size
-        if font_color:
-            first_run.font.color.rgb = font_color
-    except:
-        pass
-    
-    # Then, check if we have style overrides and apply them
-    # Find the first token that has style mapping
-    for token in text_inputs.keys():
-        if token in style_mapping and style_mapping[token]:
-            style = style_mapping[token]
+    # Handle paragraph text if no runs exist or if there are still placeholders
+    if hasattr(paragraph, 'text') and paragraph.text:
+        current_text = paragraph.text
+        # Check if any placeholders remain
+        has_placeholder = any(token in current_text for token in text_inputs.keys())
+        if has_placeholder:
+            for token, value in text_inputs.items():
+                if token in current_text:
+                    if value and str(value).strip():
+                        current_text = current_text.replace(token, str(value))
+                    else:
+                        current_text = current_text.replace(token, '')
+            current_text = clean_empty_placeholders(current_text)
             
-            # Only override if explicitly set
-            if style.get('bold') is not None:
-                try:
-                    first_run.font.bold = style['bold']
-                except:
-                    pass
-            if style.get('italic') is not None:
-                try:
-                    first_run.font.italic = style['italic']
-                except:
-                    pass
-            if style.get('underline') is not None:
-                try:
-                    first_run.font.underline = style['underline']
-                except:
-                    pass
-            break  # Apply only the first found style
+            if not paragraph.runs:
+                paragraph.add_run(current_text)
+            else:
+                # Update the first run with cleaned text
+                for run in paragraph.runs:
+                    if any(token in run.text for token in text_inputs.keys()):
+                        run.text = current_text
+                        break
+
+def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
+    prs = Presentation(io.BytesIO(template_bytes))
+    for slide in prs.slides:
+        shapes_to_delete, images_to_add = [], []
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for img_token, img_file in image_inputs.items():
+                    if img_token in shape.text and img_file is not None:
+                        images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
+                        shapes_to_delete.append(shape)
+                        break
+        for shape in slide.shapes:
+            if shape not in shapes_to_delete:
+                if shape.has_text_frame:
+                    for paragraph in shape.text_frame.paragraphs: 
+                        replace_text_in_paragraph(paragraph, text_inputs)
+                if hasattr(shape, 'table') and shape.table:
+                    for row in shape.table.rows:
+                        for cell in row.cells:
+                            if cell.text_frame:
+                                for paragraph in cell.text_frame.paragraphs: 
+                                    replace_text_in_paragraph(paragraph, text_inputs)
+        for img_file, left, top, width, height in images_to_add:
+            try:
+                slide.shapes.add_picture(smart_crop_to_fit(img_file, width, height), left, top, width=width, height=height)
+            except Exception: 
+                pass
+        for old_shape in shapes_to_delete:
+            try:
+                sp = old_shape._element
+                sp.getparent().remove(sp)
+            except Exception: 
+                pass
+    pptx_stream = io.BytesIO()
+    prs.save(pptx_stream)
+    return pptx_stream.getvalue()
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs, style_mapping):
     prs = Presentation(io.BytesIO(template_bytes))
