@@ -368,7 +368,8 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
             continue
     return None
 
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18, property_name="", property_image=None, fov_angle=45, heading=75, cone_radius=180):
+# --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18, property_image=None, fov_angle=45, heading=75, cone_radius=180):
     """Generates high-res map with pin always included - with 1km default radius if no bounds provided"""
     
     def calculate_1km_bounds(lat, lon):
@@ -567,137 +568,68 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         ], outline=(255, 255, 255, alpha), width=1)
     
     # --- ADD PROPERTY PHOTO AS STATIC OVERLAY (on exported image) ---
-    if property_name or property_image:
+    if property_image:
         try:
             popup_width = 220
             popup_padding = 15
+            popup_height = 210
             
-            # Determine popup height based on content
-            if property_image and property_name:
-                popup_height = 280
-            elif property_image:
-                popup_height = 210
-            elif property_name:
-                popup_height = 80
-            else:
-                popup_height = 0
+            # Create popup background with rounded corners
+            popup_img = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 245))
+            popup_draw = ImageDraw.Draw(popup_img)
+            popup_draw.rounded_rectangle(
+                [(0, 0), (popup_width, popup_height)], 
+                radius=12, 
+                fill=(255, 255, 255, 245),
+                outline=(200, 200, 200, 200),
+                width=1
+            )
             
-            if popup_height > 0:
-                popup_x = cropped.width - popup_width - popup_padding
-                popup_y = popup_padding
+            # Add shadow
+            shadow_img = Image.new('RGBA', (popup_width + 8, popup_height + 8), (0, 0, 0, 40))
+            shadow_draw = ImageDraw.Draw(shadow_img)
+            shadow_draw.rounded_rectangle(
+                [(0, 0), (popup_width + 8, popup_height + 8)], 
+                radius=14, 
+                fill=(0, 0, 0, 40)
+            )
+            cropped.paste(shadow_img, (popup_x - 4, popup_y - 4), shadow_img)
+            
+            # Add property photo
+            try:
+                # Load the image
+                img = Image.open(io.BytesIO(property_image))
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
                 
-                # Create popup background with rounded corners
-                popup_img = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 245))
-                popup_draw = ImageDraw.Draw(popup_img)
-                popup_draw.rounded_rectangle(
-                    [(0, 0), (popup_width, popup_height)], 
-                    radius=12, 
-                    fill=(255, 255, 255, 245),
-                    outline=(200, 200, 200, 200),
-                    width=1
-                )
+                # Calculate dimensions
+                img_padding = 10
+                img_max_width = popup_width - (img_padding * 2)
+                img_max_height = 170
                 
-                # Add shadow
-                shadow_img = Image.new('RGBA', (popup_width + 8, popup_height + 8), (0, 0, 0, 40))
-                shadow_draw = ImageDraw.Draw(shadow_img)
-                shadow_draw.rounded_rectangle(
-                    [(0, 0), (popup_width + 8, popup_height + 8)], 
-                    radius=14, 
-                    fill=(0, 0, 0, 40)
-                )
-                cropped.paste(shadow_img, (popup_x - 4, popup_y - 4), shadow_img)
+                # Resize while maintaining aspect ratio
+                img.thumbnail((img_max_width, img_max_height), Image.Resampling.LANCZOS)
                 
-                # Add property photo
-                if property_image:
-                    try:
-                        # Load the image
-                        img = Image.open(io.BytesIO(property_image))
-                        if img.mode != 'RGB':
-                            img = img.convert('RGB')
-                        
-                        # Calculate dimensions
-                        img_padding = 10
-                        img_max_width = popup_width - (img_padding * 2)
-                        img_max_height = 150
-                        
-                        # Resize while maintaining aspect ratio
-                        img.thumbnail((img_max_width, img_max_height), Image.Resampling.LANCZOS)
-                        
-                        # Center the image horizontally
-                        img_x = (popup_width - img.width) // 2
-                        img_y = img_padding
-                        
-                        # Create rounded corners mask for the image
-                        img_mask = Image.new('L', img.size, 0)
-                        img_mask_draw = ImageDraw.Draw(img_mask)
-                        img_mask_draw.rounded_rectangle([(0, 0), img.size], radius=8, fill=255)
-                        
-                        # Paste image onto popup
-                        popup_with_image = popup_img.copy()
-                        popup_with_image.paste(img, (img_x, img_y), img_mask)
-                        popup_img = popup_with_image
-                        
-                    except Exception as e:
-                        print(f"Error adding property image: {e}")
+                # Center the image horizontally
+                img_x = (popup_width - img.width) // 2
+                img_y = img_padding
                 
-                # Add property name text
-                if property_name:
-                    try:
-                        # Load fonts
-                        try:
-                            font = ImageFont.truetype("arial.ttf", 14)
-                        except:
-                            try:
-                                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
-                            except:
-                                font = ImageFont.load_default()
-                        
-                        try:
-                            bold_font = ImageFont.truetype("arialbd.ttf", 11)
-                        except:
-                            try:
-                                bold_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 11)
-                            except:
-                                bold_font = font
-                    except:
-                        font = ImageFont.load_default()
-                        bold_font = font
-                    
-                    # Position text based on whether there's an image
-                    if property_image:
-                        text_y = 165
-                    else:
-                        text_y = 15
-                    
-                    # Draw "PROPERTY" label
-                    popup_draw = ImageDraw.Draw(popup_img)
-                    popup_draw.text((15, text_y), "PROPERTY", fill=(100, 100, 100, 200), font=bold_font)
-                    
-                    # Draw property name with word wrap
-                    name_y = text_y + 20
-                    max_chars_per_line = 18
-                    if len(property_name) > max_chars_per_line:
-                        words = property_name.split()
-                        lines = []
-                        current_line = ""
-                        for word in words:
-                            if len(current_line + " " + word) <= max_chars_per_line:
-                                current_line += (" " + word if current_line else word)
-                            else:
-                                if current_line:
-                                    lines.append(current_line)
-                                current_line = word
-                        if current_line:
-                            lines.append(current_line)
-                        
-                        for i, line in enumerate(lines):
-                            popup_draw.text((15, name_y + i * 22), line, fill=(30, 30, 30, 255), font=font)
-                    else:
-                        popup_draw.text((15, name_y), property_name, fill=(30, 30, 30, 255), font=font)
+                # Create rounded corners mask for the image
+                img_mask = Image.new('L', img.size, 0)
+                img_mask_draw = ImageDraw.Draw(img_mask)
+                img_mask_draw.rounded_rectangle([(0, 0), img.size], radius=8, fill=255)
                 
-                # Composite the popup onto the main image
-                cropped.paste(popup_img, (popup_x, popup_y), popup_img)
+                # Paste image onto popup
+                popup_with_image = popup_img.copy()
+                popup_with_image.paste(img, (img_x, img_y), img_mask)
+                popup_img = popup_with_image
                 
+            except Exception as e:
+                print(f"Error adding property image: {e}")
+            
+            # Composite the popup onto the main image
+            cropped.paste(popup_img, (popup_x, popup_y), popup_img)
+            
         except Exception as e:
             print(f"Error creating property overlay: {e}")
     
@@ -772,7 +704,6 @@ def render_isolated_map_editor():
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
     popup_image_key = f"popup_image_{token_key}"
-    popup_name_key = f"popup_name_{token_key}"
 
     # Heading cone slider session states
     fov_angle_key = f"map_fov_angle_{token_key}"
@@ -787,7 +718,6 @@ def render_isolated_map_editor():
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
     if popup_image_key not in st.session_state: st.session_state[popup_image_key] = None
-    if popup_name_key not in st.session_state: st.session_state[popup_name_key] = ""
     if fov_angle_key not in st.session_state: st.session_state[fov_angle_key] = 45
     if heading_key not in st.session_state: st.session_state[heading_key] = 75
     if cone_radius_key not in st.session_state: st.session_state[cone_radius_key] = 180
@@ -817,48 +747,72 @@ def render_isolated_map_editor():
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # Add popup photo & Heading Cone configurations
+    # Add popup photo upload (removed property name)
     st.markdown("---")
-    col_popup1, col_popup2 = st.columns([2, 1])
-    with col_popup1:
-        st.markdown("**Property Info (will appear on map)**")
-        popup_name = st.text_input(
-            "Property Name", 
-            value=st.session_state[popup_name_key],
-            key=f"popup_name_input_{token_key}",
-            placeholder="Enter property name..."
-        )
-        if popup_name != st.session_state[popup_name_key]:
-            st.session_state[popup_name_key] = popup_name
-    
-    with col_popup2:
-        st.markdown("**Property Photo**")
-        upload_key = f"popup_upload_{token_key}"
-        uploaded_popup_image = st.file_uploader(
-            "Upload Photo", 
-            type=["png", "jpg", "jpeg", "gif"],
-            key=upload_key,
-            label_visibility="collapsed"
-        )
-        if uploaded_popup_image:
-            st.session_state[popup_image_key] = uploaded_popup_image.getvalue()
-            st.success("Photo uploaded!")
-        elif st.session_state[popup_image_key]:
-            st.caption("Photo ready")
+    st.markdown("**Property Photo (will appear on map)**")
+    upload_key = f"popup_upload_{token_key}"
+    uploaded_popup_image = st.file_uploader(
+        "Upload Photo", 
+        type=["png", "jpg", "jpeg", "gif"],
+        key=upload_key,
+        label_visibility="collapsed"
+    )
+    if uploaded_popup_image:
+        st.session_state[popup_image_key] = uploaded_popup_image.getvalue()
+        st.success("Photo uploaded!")
+    elif st.session_state[popup_image_key]:
+        st.caption("Photo ready")
 
-    # Camera Field of View layout tools
+    # Camera Field of View layout tools - 2x2 grid
     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
     st.markdown("**Camera Field of View Triangle (Heading Cone)**")
-    fov_c1, fov_c2, fov_c3 = st.columns(3)
+    
+    # Create 2x2 grid
+    fov_c1, fov_c2 = st.columns(2)
     with fov_c1:
-        ui_heading = st.slider("Camera Facing Direction (Heading °)", 0, 360, int(st.session_state[heading_key]), step=5, key=f"ui_head_{token_key}")
-        st.session_state[heading_key] = ui_heading
+        st.markdown("**Top Left**")
+        heading_top_left = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_tl_{token_key}")
+        st.session_state[heading_key] = heading_top_left
+        
+        fov_top_left = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_tl_{token_key}")
+        st.session_state[fov_angle_key] = fov_top_left
+        
+        radius_top_left = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_tl_{token_key}")
+        st.session_state[cone_radius_key] = radius_top_left
+    
     with fov_c2:
-        ui_fov = st.slider("Cone Opening Width (FOV Angle °)", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"ui_fov_{token_key}")
-        st.session_state[fov_angle_key] = ui_fov
+        st.markdown("**Top Right**")
+        heading_top_right = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_tr_{token_key}")
+        st.session_state[heading_key] = heading_top_right
+        
+        fov_top_right = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_tr_{token_key}")
+        st.session_state[fov_angle_key] = fov_top_right
+        
+        radius_top_right = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_tr_{token_key}")
+        st.session_state[cone_radius_key] = radius_top_right
+    
+    fov_c3, fov_c4 = st.columns(2)
     with fov_c3:
-        ui_radius = st.slider("Cone Reach Length (Pixels)", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"ui_rad_{token_key}")
-        st.session_state[cone_radius_key] = ui_radius
+        st.markdown("**Bottom Left**")
+        heading_bottom_left = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_bl_{token_key}")
+        st.session_state[heading_key] = heading_bottom_left
+        
+        fov_bottom_left = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_bl_{token_key}")
+        st.session_state[fov_angle_key] = fov_bottom_left
+        
+        radius_bottom_left = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_bl_{token_key}")
+        st.session_state[cone_radius_key] = radius_bottom_left
+    
+    with fov_c4:
+        st.markdown("**Bottom Right**")
+        heading_bottom_right = st.slider("Heading", 0, 360, int(st.session_state[heading_key]), step=5, key=f"heading_br_{token_key}")
+        st.session_state[heading_key] = heading_bottom_right
+        
+        fov_bottom_right = st.slider("FOV Angle", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"fov_br_{token_key}")
+        st.session_state[fov_angle_key] = fov_bottom_right
+        
+        radius_bottom_right = st.slider("Cone Radius", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"radius_br_{token_key}")
+        st.session_state[cone_radius_key] = radius_bottom_right
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
@@ -880,7 +834,6 @@ def render_isolated_map_editor():
                     if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
                         n, s, e, w = None, None, None, None
             
-            property_name = st.session_state[popup_name_key] or ""
             property_image = st.session_state[popup_image_key]
             
             map_img_bytes = generate_static_map_bounds(
@@ -889,7 +842,6 @@ def render_isolated_map_editor():
                 style=basemap_style, 
                 pin_color=pin_color, 
                 pin_size=int(pin_size),
-                property_name=property_name,
                 property_image=property_image,
                 fov_angle=st.session_state[fov_angle_key],
                 heading=st.session_state[heading_key],
@@ -937,8 +889,6 @@ def render_isolated_map_editor():
     </div>
     """
     
-    property_name_display = st.session_state[popup_name_key] or "Property Location"
-    
     if st.session_state[popup_image_key]:
         import base64
         img_base64 = base64.b64encode(st.session_state[popup_image_key]).decode()
@@ -947,8 +897,7 @@ def render_isolated_map_editor():
         <div style="width: 250px; font-family: Arial, sans-serif; border-radius: 8px; overflow: hidden;">
             <img src="{img_src}" style="width: 100%; height: auto; max-height: 180px; object-fit: cover; display: block;">
             <div style="padding: 10px 12px; background: white;">
-                <p style="margin: 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name_display}</p>
-                <p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
+                <p style="margin: 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
             </div>
         </div>
         """
@@ -958,8 +907,7 @@ def render_isolated_map_editor():
             <div style="width: 100%; height: 100px; background: #F0F4F8; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #999; font-size: 12px; border: 1px dashed #CCC;">
                 No Photo
             </div>
-            <p style="margin: 8px 0 0 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name_display}</p>
-            <p style="margin: 2px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
+            <p style="margin: 8px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
         </div>
         """
     
