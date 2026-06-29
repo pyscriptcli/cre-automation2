@@ -691,10 +691,12 @@ def render_isolated_map_editor():
             st.session_state[popup_name_key] = popup_name
     
     with col_popup2:
+        # Use a simpler key that doesn't conflict
+        upload_key = f"popup_upload_{token_key}"
         uploaded_popup_image = st.file_uploader(
             "Upload Photo", 
             type=["png", "jpg", "jpeg", "gif"],
-            key=popup_image_key,
+            key=upload_key,
             label_visibility="collapsed"
         )
         if uploaded_popup_image:
