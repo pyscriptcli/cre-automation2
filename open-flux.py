@@ -848,22 +848,32 @@ def clean_empty_placeholders(text):
     """Remove any {{...}} placeholders that remain empty and clean up whitespace"""
     if not text:
         return text
+    # Remove empty placeholders but keep surrounding spaces
     cleaned = re.sub(r'\{\{[^}]*\}\}', '', text)
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    # Normalize multiple spaces but keep single spaces between words
+    cleaned = re.sub(r' +', ' ', cleaned).strip()
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
-    """Replace text in paragraph, removing empty placeholders"""
+    """Replace text in paragraph, removing empty placeholders but preserving spaces"""
     for run in paragraph.runs:
         current_text = run.text
         for token, value in text_inputs.items():
             if token in current_text:
                 if value and str(value).strip():
+                    # Replace token with value, preserving spaces
                     current_text = current_text.replace(token, str(value))
                 else:
-                    current_text = current_text.replace(token, '')
-        run.text = clean_empty_placeholders(current_text)
+                    # Remove empty token but keep the space if it's there
+                    # Check if there's a space before and after the token
+                    parts = current_text.split(token)
+                    # Rejoin parts, keeping the space if it was there
+                    current_text = ''.join(parts)
+        # Clean up multiple spaces but keep single spaces
+        current_text = re.sub(r' +', ' ', current_text).strip()
+        run.text = current_text
     
+    # Handle paragraph text for cases where runs don't catch everything
     if hasattr(paragraph, 'text') and paragraph.text:
         current_text = paragraph.text
         has_placeholder = any(token in current_text for token in text_inputs.keys())
@@ -874,15 +884,22 @@ def replace_text_in_paragraph(paragraph, text_inputs):
                         current_text = current_text.replace(token, str(value))
                     else:
                         current_text = current_text.replace(token, '')
-            current_text = clean_empty_placeholders(current_text)
+            # Clean up multiple spaces but keep single spaces
+            current_text = re.sub(r' +', ' ', current_text).strip()
             
             if not paragraph.runs:
                 paragraph.add_run(current_text)
             else:
+                # Find the first run that contains the token and update it
+                updated = False
                 for run in paragraph.runs:
                     if any(token in run.text for token in text_inputs.keys()):
                         run.text = current_text
+                        updated = True
                         break
+                if not updated and paragraph.runs:
+                    # If no run had the token, update the first run
+                    paragraph.runs[0].text = current_text
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
