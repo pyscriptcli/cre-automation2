@@ -1394,6 +1394,6 @@ else:
                     )
                 except Exception as e:
                     st.error(f"Error generating document: {str(e)}")
-        st.markdown('</div>', unsafe_allow_html.html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("Please upload or select a template to begin")
