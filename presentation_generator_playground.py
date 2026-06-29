@@ -142,6 +142,20 @@ MINIMAL_CRE_SYSTEM = """
         font-size: 16px !important;
         padding: 0 4px !important;
     }
+    
+    /* Mapping row styling */
+    .mapping-row {
+        background-color: #F8F9FA;
+        padding: 10px 12px;
+        border-radius: 4px;
+        border: 1px solid #E8E8E8;
+        margin-bottom: 8px;
+    }
+    .mapping-row-label {
+        font-weight: 500;
+        color: #1A1A1A;
+        font-size: 13px;
+    }
 </style>
 """
 
@@ -1028,13 +1042,31 @@ def purge_all_temporary_data():
     st.session_state.temp_form_data = {}
 
 # --- TOKEN ORDER MANAGEMENT FUNCTIONS ---
-def reorder_tokens(token_list, old_index, new_index):
-    """Reorder tokens in the list"""
-    if old_index == new_index:
-        return token_list
-    token = token_list.pop(old_index)
-    token_list.insert(new_index, token)
-    return token_list
+def get_token_order():
+    """Get or initialize token order from session state"""
+    order_key = "token_order"
+    if order_key not in st.session_state or len(st.session_state[order_key]) != len(st.session_state.tokens):
+        # Initialize with original order
+        st.session_state[order_key] = list(range(len(st.session_state.tokens)))
+    return st.session_state[order_key]
+
+def apply_token_order():
+    """Apply the current token order to the tokens list"""
+    if "token_order" in st.session_state and len(st.session_state.token_order) == len(st.session_state.tokens):
+        ordered_tokens = [st.session_state.tokens[i] for i in st.session_state.token_order]
+        st.session_state.tokens = ordered_tokens
+
+def validate_token_order():
+    """Validate that all positions are unique and within range"""
+    order = get_token_order()
+    if len(order) != len(set(order)):
+        # Duplicate detected - reset
+        st.session_state.token_order = list(range(len(st.session_state.tokens)))
+        return False
+    if max(order) >= len(st.session_state.tokens) or min(order) < 0:
+        st.session_state.token_order = list(range(len(st.session_state.tokens)))
+        return False
+    return True
 
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
@@ -1055,7 +1087,7 @@ if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = F
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
-if "token_order_modified" not in st.session_state: st.session_state.token_order_modified = False
+if "token_order" not in st.session_state: st.session_state.token_order = []
 
 # --- APP ROUTER ---
 if st.session_state.active_map_editor_token:
@@ -1126,7 +1158,7 @@ else:
                     if template_bytes:
                         if st.session_state.saved_template_name != template_name:
                             st.session_state.temp_form_data = {}
-                            st.session_state.token_order_modified = False
+                            st.session_state.token_order = []
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
                         st.session_state.template_loaded = True
@@ -1134,6 +1166,8 @@ else:
                         config_data = load_config_from_file(template_name.replace('.pptx', '').replace('.docx', '') + '_config.json')
                         if config_data: st.session_state.custom_mapping = config_data
                         st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+                        # Initialize token order
+                        st.session_state.token_order = list(range(len(st.session_state.tokens)))
                         restore_form_data_from_session()
                     break
 
@@ -1149,8 +1183,8 @@ else:
             st.session_state.template_loaded = True
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
+            st.session_state.token_order = list(range(len(st.session_state.tokens)))
             st.session_state.temp_form_data = {}
-            st.session_state.token_order_modified = False
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 save_template_to_file(template_bytes, uploaded_template.name)
@@ -1174,6 +1208,11 @@ else:
     text_data, image_data, field_types = {}, {}, {}
 
     if st.session_state.template_bytes is not None and st.session_state.tokens:
+        # Apply any token order changes
+        if st.session_state.token_order:
+            validate_token_order()
+            apply_token_order()
+        
         tokens = st.session_state.tokens
         
         # --- CTA PRESETS - SIMPLIFIED ---
@@ -1206,64 +1245,130 @@ else:
             st.markdown("---")
         
         with st.expander("Data Type Mapping & Order", expanded=st.session_state.show_type_mapping):
-            st.markdown("Configure the data type for each placeholder field. Use the ↑↓ buttons to reorder fields.")
+            st.markdown("Configure the data type for each placeholder field. Use the dropdown to set the display order (1 = first, 2 = second, etc.).")
+            st.markdown("*Note: Each position number can only be used once.*")
             
-            # Display tokens with reorder controls
+            # Create 2 columns for the mapping
+            col1, col2 = st.columns(2)
+            
+            # Get current order
+            current_order = get_token_order()
+            
+            # Create a mapping from token to its current position
+            token_to_position = {}
+            for idx, token_index in enumerate(current_order):
+                if token_index < len(tokens):
+                    token_to_position[tokens[token_index]] = idx + 1
+            
+            # Track which positions are already used
+            used_positions = set(current_order)
+            
+            # Display each token with its position dropdown
             for idx, token in enumerate(tokens):
                 clean_label = token.replace("{", "").replace("}", "")
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                col_reorder, col_label, col_type = st.columns([0.6, 1.5, 1.5])
+                # Determine which column to use (2-column layout)
+                target_col = col1 if idx % 2 == 0 else col2
                 
-                with col_reorder:
-                    # Create a horizontal container for the buttons
-                    btn_col1, btn_col2 = st.columns(2)
-                    with btn_col1:
-                        # Up button
-                        if idx > 0:
-                            if st.button("↑", key=f"move_up_{token}", help="Move up"):
-                                new_tokens = reorder_tokens(tokens.copy(), idx, idx - 1)
-                                st.session_state.tokens = new_tokens
-                                st.session_state.token_order_modified = True
-                                st.rerun()
-                        else:
-                            st.button("↑", key=f"move_up_{token}_disabled", disabled=True)
+                with target_col:
+                    # Create a container with a light background
+                    st.markdown(f'<div class="mapping-row">', unsafe_allow_html=True)
                     
-                    with btn_col2:
-                        # Down button
-                        if idx < len(tokens) - 1:
-                            if st.button("↓", key=f"move_down_{token}", help="Move down"):
-                                new_tokens = reorder_tokens(tokens.copy(), idx, idx + 1)
-                                st.session_state.tokens = new_tokens
-                                st.session_state.token_order_modified = True
-                                st.rerun()
+                    # 3 columns: label, position dropdown, type dropdown
+                    col_label, col_pos, col_type = st.columns([1.8, 1.2, 1.5])
+                    
+                    with col_label:
+                        st.markdown(f'<span class="mapping-row-label">{clean_label}</span>', unsafe_allow_html=True)
+                    
+                    with col_pos:
+                        # Get current position for this token (if it has one)
+                        current_pos = token_to_position.get(token, idx + 1)
+                        
+                        # Create position options (1 to N)
+                        pos_options = list(range(1, len(tokens) + 1))
+                        pos_labels = [str(i) for i in pos_options]
+                        
+                        # Determine which positions are already used (excluding this token's current position)
+                        used_excluding_self = used_positions - {current_pos - 1}
+                        
+                        # Create a list of available positions for display
+                        # Disable options that are already used
+                        def format_pos_option(pos):
+                            pos_idx = pos - 1
+                            if pos_idx in used_excluding_self:
+                                return f"{pos} (used)"
+                            return str(pos)
+                        
+                        pos_display_labels = [format_pos_option(p) for p in pos_options]
+                        
+                        # Find the index of the current position
+                        current_idx = current_pos - 1
+                        
+                        # Create the selectbox
+                        selected_pos = st.selectbox(
+                            "",
+                            options=pos_options,
+                            format_func=lambda x: format_pos_option(x),
+                            index=current_idx,
+                            key=f"pos_{token}",
+                            label_visibility="collapsed"
+                        )
+                        
+                        # Check if the selected position is valid (not used by another token)
+                        selected_idx = selected_pos - 1
+                        if selected_idx in used_excluding_self and selected_pos != current_pos:
+                            st.error(f"Position {selected_pos} is already used!")
+                            # Revert to current position
+                            selected_pos = current_pos
+                    
+                    with col_type:
+                        data_type = st.selectbox(
+                            "", 
+                            ["Text", "Image", "Map"], 
+                            index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
+                            key=f"type_mapping_{token}",
+                            label_visibility="collapsed"
+                        )
+                        if data_type != current_type:
+                            st.session_state.custom_mapping[token] = data_type
+                            auto_save_config()
+                            st.rerun()
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # Update the order if changed
+                    new_pos = selected_pos - 1
+                    if new_pos != current_pos - 1 and new_pos not in used_excluding_self:
+                        # Find the token that currently occupies the new position
+                        current_order = get_token_order()
+                        # Remove current token from its position
+                        token_index = tokens.index(token)
+                        # Update the order
+                        new_order = []
+                        for pos in range(len(tokens)):
+                            if pos == new_pos:
+                                new_order.append(token_index)
+                            elif pos == current_pos - 1:
+                                # Skip the old position
+                                continue
+                            else:
+                                # Find which token is at this position
+                                old_token_index = current_order[pos]
+                                if old_token_index != token_index:
+                                    new_order.append(old_token_index)
+                        # Ensure we have all tokens
+                        if len(new_order) != len(tokens):
+                            # If something went wrong, reset
+                            st.session_state.token_order = list(range(len(tokens)))
                         else:
-                            st.button("↓", key=f"move_down_{token}_disabled", disabled=True)
-                
-                with col_label:
-                    st.markdown(f'<span style="font-size:13px; font-weight:500; color:#1A1A1A;">{clean_label}</span>', unsafe_allow_html=True)
-                
-                with col_type:
-                    data_type = st.selectbox(
-                        "", 
-                        ["Text", "Image", "Map"], 
-                        index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
-                        key=f"type_mapping_{token}",
-                        label_visibility="collapsed"
-                    )
-                    if data_type != current_type:
-                        st.session_state.custom_mapping[token] = data_type
-                        auto_save_config()
+                            st.session_state.token_order = new_order
                         st.rerun()
             
             # Reset button
-            if st.session_state.token_order_modified:
-                if st.button("Reset to Original Order", use_container_width=True):
-                    if st.session_state.template_bytes:
-                        original_tokens = extract_placeholders(st.session_state.template_bytes, st.session_state.template_type)
-                        st.session_state.tokens = original_tokens
-                        st.session_state.token_order_modified = False
-                        st.rerun()
+            if st.button("Reset to Original Order", use_container_width=True):
+                st.session_state.token_order = list(range(len(st.session_state.tokens)))
+                st.rerun()
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
