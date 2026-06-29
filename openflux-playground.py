@@ -130,6 +130,14 @@ CONE_PRESETS = {
     "Narrow Focus": {"heading": 45, "fov": 30, "radius": 120}
 }
 
+# Photo placeholder mapping based on preset
+PHOTO_PLACEHOLDER_MAPPING = {
+    "Top-Left": "LM_POP_TL",
+    "Top-Right": "LM_POP_TR",
+    "Bottom-Left": "LM_POP_BL",
+    "Bottom-Right": "LM_POP_BR"
+}
+
 # --- FILE MANAGEMENT FUNCTIONS ---
 def get_storage_dir():
     storage_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stored_templates")
@@ -725,14 +733,6 @@ def render_isolated_map_editor():
     export_trigger_key = f"map_export_active_{token_key}"
     popup_image_key = f"popup_image_{token_key}"
     preset_key = f"cone_preset_{token_key}"
-    
-    # Photo placeholder mapping based on preset
-    photo_placeholder_mapping = {
-        "Top-Left": "LM_POP_TL",
-        "Top-Right": "LM_POP_TR",
-        "Bottom-Left": "LM_POP_BL",
-        "Bottom-Right": "LM_POP_BR"
-    }
 
     # Heading cone session states
     fov_angle_key = f"map_fov_angle_{token_key}"
@@ -783,9 +783,9 @@ def render_isolated_map_editor():
     
     # Get current preset to show which placeholder will be used
     current_preset = st.session_state[preset_key]
-    current_placeholder = photo_placeholder_mapping.get(current_preset, "LM_POP_TR")
+    current_placeholder = PHOTO_PLACEHOLDER_MAPPING.get(current_preset, "LM_POP_TR")
     
-    st.markdown(f"**Property Photo (will appear in {{{{{current_placeholder}}}}})**")
+    st.markdown(f"**Property Photo (will appear in {current_placeholder})**")
     st.caption(f"Photo will be placed in {current_placeholder} placeholder based on cone preset selection")
     
     upload_key = f"popup_upload_{token_key}"
@@ -874,7 +874,7 @@ def render_isolated_map_editor():
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
             
             # Update the correct placeholder in temp_form_data
-            if st.session_state.temp_form_data:
+            if st.session_state.temp_form_data is not None:
                 # Store the photo in the appropriate placeholder
                 placeholder_key = f"{{{{{current_placeholder}}}}}"
                 st.session_state.temp_form_data[placeholder_key] = st.session_state[popup_image_key]
@@ -1160,6 +1160,10 @@ def restore_form_data_from_session():
         return True
     if st.session_state.temp_form_data:
         for token, value in st.session_state.temp_form_data.items():
+            # Skip LM_POP tokens - they're handled by the map editor
+            clean_token = token.replace("{", "").replace("}", "")
+            if clean_token.startswith("LM_POP"):
+                continue
             current_type = st.session_state.custom_mapping.get(token, "Text")
             if current_type != "Image" and f"val_{token}" not in st.session_state:
                 st.session_state[f"val_{token}"] = value
@@ -1171,6 +1175,10 @@ def restore_form_data_from_session():
                 loaded_data = json.load(f)
                 st.session_state.temp_form_data = loaded_data
                 for token, value in loaded_data.items():
+                    # Skip LM_POP tokens - they're handled by the map editor
+                    clean_token = token.replace("{", "").replace("}", "")
+                    if clean_token.startswith("LM_POP"):
+                        continue
                     current_type = st.session_state.custom_mapping.get(token, "Text")
                     if current_type != "Image" and f"val_{token}" not in st.session_state:
                         st.session_state[f"val_{token}"] = value
@@ -1187,6 +1195,10 @@ def purge_all_temporary_data():
             except Exception: pass
     if st.session_state.tokens:
         for token in st.session_state.tokens:
+            # Skip LM_POP tokens - they're handled separately
+            clean_token = token.replace("{", "").replace("}", "")
+            if clean_token.startswith("LM_POP"):
+                continue
             if f"val_{token}" in st.session_state: del st.session_state[f"val_{token}"]
             if f"map_bytes_holder_{token}" in st.session_state: del st.session_state[f"map_bytes_holder_{token}"]
     st.session_state.temp_form_data = {}
@@ -1386,6 +1398,11 @@ else:
         
         # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
+            # Skip LM_POP placeholders - they should only appear in the map editor
+            clean_label_raw = token.replace("{", "").replace("}", "")
+            if clean_label_raw.startswith("LM_POP"):
+                continue
+                
             col_target = idx % 2
             if col_target == 0:
                 ui_col_1, ui_col_2 = st.columns(2)
