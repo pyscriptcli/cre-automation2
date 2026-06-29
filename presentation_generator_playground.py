@@ -318,14 +318,14 @@ BASEMAP_CONFIG = {
         ],
         "attribution": "Google"
     },
-    "Street Map": {
+    "Street Map (Labels)": {
         "urls": [
             "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
             "https://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
         ],
         "attribution": "Google"
     },
-    "Street Map (Clean)": {
+    "Street Map (Streets)": {
         "urls": [
             "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
             "https://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
