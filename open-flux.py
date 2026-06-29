@@ -1145,7 +1145,7 @@ else:
         # --- CTA PRESETS - SIMPLIFIED ---
         cta_sets = detect_cta_sets()
         if cta_sets:
-            st.markdown("**CTA Presets**")
+            st.markdown("**Call to Action Presets**")
             num_ctas = len(cta_sets)
             cols = st.columns(num_ctas)
             
