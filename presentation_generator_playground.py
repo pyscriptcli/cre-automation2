@@ -238,6 +238,7 @@ def save_tokens_to_config(tokens):
     try:
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(tokens, f, indent=4)
+        print(f"Tokens saved to {filepath}")
         return filepath
     except Exception as e:
         print(f"Could not save tokens: {e}")
@@ -249,11 +250,29 @@ def load_tokens_from_config():
     if os.path.exists(filepath):
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                tokens = json.load(f)
+                print(f"Tokens loaded from {filepath}: {len(tokens)} tokens")
+                return tokens
         except Exception as e:
             print(f"Could not load tokens: {e}")
             return None
-    return None
+    else:
+        print(f"Token file not found: {filepath}")
+        return None
+
+def ensure_tokens_file_exists():
+    """Ensure the config-token.json file exists, create with empty array if not"""
+    filepath = get_tokens_file_path()
+    if not os.path.exists(filepath):
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump([], f, indent=4)
+            print(f"Created empty token file: {filepath}")
+            return True
+        except Exception as e:
+            print(f"Could not create token file: {e}")
+            return False
+    return True
 
 # --- CTA PRESET FUNCTIONS ---
 def detect_cta_sets():
@@ -1055,6 +1074,9 @@ if "restore_form_data" not in st.session_state: st.session_state.restore_form_da
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
 
+# Ensure token file exists
+ensure_tokens_file_exists()
+
 # --- APP ROUTER ---
 if st.session_state.active_map_editor_token:
     render_isolated_map_editor()
@@ -1137,12 +1159,14 @@ else:
                         
                         # Try to load tokens from central config file
                         saved_tokens = load_tokens_from_config()
-                        if saved_tokens:
+                        if saved_tokens and len(saved_tokens) > 0:
                             st.session_state.tokens = saved_tokens
+                            st.success(f"Loaded {len(saved_tokens)} placeholders from config-token.json")
                         else:
                             # If no saved tokens, extract from template and save
                             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
                             save_tokens_to_config(st.session_state.tokens)
+                            st.success(f"Extracted and saved {len(st.session_state.tokens)} placeholders to config-token.json")
                         
                         restore_form_data_from_session()
                     break
@@ -1162,6 +1186,7 @@ else:
             # Extract tokens and save to central config
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             save_tokens_to_config(st.session_state.tokens)
+            st.success(f"Extracted and saved {len(st.session_state.tokens)} placeholders to config-token.json")
             st.session_state.temp_form_data = {}
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
@@ -1182,24 +1207,24 @@ else:
         is_github = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), template_name))
         st.markdown(f'<div class="saved-indicator">Active: {template_name}{"" if is_github else ""} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
         
-        # Reload tokens button (backend only - no frontend display of file path)
+        # Reload tokens button
         col_reload1, col_reload2, col_reload3 = st.columns([1, 2, 1])
         with col_reload2:
-            if st.button("🔄 Reload Tokens", use_container_width=True):
+            if st.button("🔄 Reload Tokens from config-token.json", use_container_width=True):
                 saved_tokens = load_tokens_from_config()
-                if saved_tokens:
+                if saved_tokens and len(saved_tokens) > 0:
                     st.session_state.tokens = saved_tokens
                     st.success(f"Reloaded {len(saved_tokens)} placeholders from config-token.json!")
                     st.rerun()
                 else:
-                    st.warning("No tokens file found. Extracting from template...")
+                    st.warning("No tokens found in config-token.json. Extracting from template...")
                     if st.session_state.template_bytes:
                         st.session_state.tokens = extract_placeholders(st.session_state.template_bytes, st.session_state.template_type)
                         save_tokens_to_config(st.session_state.tokens)
-                        st.success(f"Extracted {len(st.session_state.tokens)} placeholders from template!")
+                        st.success(f"Extracted and saved {len(st.session_state.tokens)} placeholders to config-token.json!")
                         st.rerun()
         
-        # Show current token count only (no file path)
+        # Show current token count
         if st.session_state.tokens:
             st.caption(f"📋 {len(st.session_state.tokens)} placeholders loaded")
     
