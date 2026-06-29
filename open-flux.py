@@ -854,106 +854,83 @@ def clean_empty_placeholders(text):
 
 def replace_text_in_paragraph(paragraph, text_inputs):
     """
-    Safely replace text in paragraph by processing each placeholder individually.
-    This preserves formatting and handles placeholders that span across runs.
+    A completely different approach: rebuild the entire paragraph text
+    while preserving the first run's formatting as the base style.
+    This handles placeholders that span across runs reliably.
     """
-    # First, check if the paragraph text contains any placeholder we need to replace
+    # Check if we have any placeholders to replace
     full_text = paragraph.text
-    has_any_placeholder = any(token in full_text for token in text_inputs.keys())
-    if not has_any_placeholder:
+    has_any = any(token in full_text for token in text_inputs.keys())
+    if not has_any:
         return
     
     # Build the complete replaced text
-    replaced_text = full_text
+    result_text = full_text
     for token, value in text_inputs.items():
-        if token in replaced_text:
+        if token in result_text:
             replacement = str(value) if value and str(value).strip() else ""
-            replaced_text = replaced_text.replace(token, replacement)
+            result_text = result_text.replace(token, replacement)
     
-    # Clean up any remaining empty placeholders
-    replaced_text = clean_empty_placeholders(replaced_text)
+    # Clean up empty placeholders
+    result_text = clean_empty_placeholders(result_text)
     
-    # If there are no runs, create one
+    # If there are no runs, create one with the result
     if not paragraph.runs:
-        paragraph.add_run(replaced_text)
+        paragraph.add_run(result_text)
         return
     
-    # Check if any placeholder spans across multiple runs
-    # We do this by checking if any token appears in the combined text but not fully in any single run
-    spans_across_runs = False
-    for token in text_inputs.keys():
-        if token in full_text:
-            # Check if the token is fully contained in any single run
-            token_fully_in_run = any(token in run.text for run in paragraph.runs)
-            if not token_fully_in_run:
-                spans_across_runs = True
-                break
+    # Get the first run's formatting to use as template
+    first_run = paragraph.runs[0]
     
-    if spans_across_runs:
-        # If placeholders span across runs, we need to rebuild the text
-        # Store the first run's formatting
-        first_run = paragraph.runs[0]
-        
-        # Store font properties from the first run
-        font_props = {
-            'name': first_run.font.name,
-            'size': first_run.font.size,
-            'bold': first_run.font.bold,
-            'italic': first_run.font.italic,
-            'underline': first_run.font.underline,
-            'color': first_run.font.color.rgb if first_run.font.color else None
-        }
-        
-        # Clear all runs and set the replaced text in the first run
-        for run in paragraph.runs[1:]:
-            run.text = ""
-        
-        first_run.text = replaced_text
-        
-        # Restore font properties
-        if font_props['name']:
-            first_run.font.name = font_props['name']
-        if font_props['size']:
-            first_run.font.size = font_props['size']
-        if font_props['bold'] is not None:
-            first_run.font.bold = font_props['bold']
-        if font_props['italic'] is not None:
-            first_run.font.italic = font_props['italic']
-        if font_props['underline'] is not None:
-            first_run.font.underline = font_props['underline']
-        if font_props['color']:
-            first_run.font.color.rgb = font_props['color']
-    else:
-        # Process each run individually (placeholders are contained within single runs)
-        for run in paragraph.runs:
-            current_text = run.text
-            
-            # Check if this run contains any placeholders
-            has_placeholder_in_run = any(token in current_text for token in text_inputs.keys())
-            if not has_placeholder_in_run:
-                continue
-            
-            # Process each placeholder one by one
-            for token, value in text_inputs.items():
-                if token in current_text:
-                    replacement = str(value) if value and str(value).strip() else ""
-                    current_text = current_text.replace(token, replacement)
-            
-            # Clean up any remaining empty placeholders
-            current_text = clean_empty_placeholders(current_text)
-            run.text = current_text
-        
-        # Handle case where paragraph has no runs but has text (e.g., from table cells)
-        if not paragraph.runs and paragraph.text:
-            current_text = paragraph.text
-            has_placeholder = any(token in current_text for token in text_inputs.keys())
-            if has_placeholder:
-                for token, value in text_inputs.items():
-                    if token in current_text:
-                        replacement = str(value) if value and str(value).strip() else ""
-                        current_text = current_text.replace(token, replacement)
-                current_text = clean_empty_placeholders(current_text)
-                paragraph.add_run(current_text)
+    # Store all font properties from the first run
+    font_style = {
+        'name': first_run.font.name,
+        'size': first_run.font.size,
+        'bold': first_run.font.bold,
+        'italic': first_run.font.italic,
+        'underline': first_run.font.underline,
+        'color': first_run.font.color.rgb if first_run.font.color else None
+    }
+    
+    # Clear all existing runs and create a single new run with the result text
+    # We need to clear runs differently for PPTX
+    for run in paragraph.runs:
+        run.text = ""
+    
+    # Set the first run to contain the result text
+    first_run.text = result_text
+    
+    # Restore font properties
+    if font_style['name']:
+        try:
+            first_run.font.name = font_style['name']
+        except:
+            pass
+    if font_style['size']:
+        try:
+            first_run.font.size = font_style['size']
+        except:
+            pass
+    if font_style['bold'] is not None:
+        try:
+            first_run.font.bold = font_style['bold']
+        except:
+            pass
+    if font_style['italic'] is not None:
+        try:
+            first_run.font.italic = font_style['italic']
+        except:
+            pass
+    if font_style['underline'] is not None:
+        try:
+            first_run.font.underline = font_style['underline']
+        except:
+            pass
+    if font_style['color']:
+        try:
+            first_run.font.color.rgb = font_style['color']
+        except:
+            pass
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
