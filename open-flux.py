@@ -855,7 +855,7 @@ def clean_empty_placeholders(text):
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
-    """Replace text in paragraph while preserving formatting and exact spacing"""
+    """Replace text in paragraph while preserving formatting and exact spacing from template"""
     # Check if this paragraph contains any placeholders
     full_text = ""
     for run in paragraph.runs:
@@ -865,81 +865,133 @@ def replace_text_in_paragraph(paragraph, text_inputs):
     if not has_placeholder:
         return
     
-    # Process each run individually
+    # Get the complete original text with all spacing preserved
+    original_complete_text = ""
     for run in paragraph.runs:
-        current_text = run.text
-        modified_text = current_text
-        
-        # Check if this run contains any placeholders
-        run_has_placeholder = any(token in current_text for token in text_inputs.keys())
-        if not run_has_placeholder:
-            continue
-        
-        # Replace placeholders in this run
-        for token, value in text_inputs.items():
-            if token in modified_text:
-                if value and str(value).strip():
-                    modified_text = modified_text.replace(token, str(value))
-                else:
-                    modified_text = modified_text.replace(token, '')
-        
-        # Only update the run if text actually changed
-        if modified_text != current_text:
-            run.text = modified_text
+        original_complete_text += run.text
     
-    # Handle cross-run placeholders
-    # Combine all text after individual run processing
-    combined_text = ""
-    for run in paragraph.runs:
-        combined_text += run.text
+    # Create a modified version by replacing placeholders
+    modified_complete_text = original_complete_text
+    for token, value in text_inputs.items():
+        if token in modified_complete_text:
+            if value and str(value).strip():
+                modified_complete_text = modified_complete_text.replace(token, str(value))
+            else:
+                modified_complete_text = modified_complete_text.replace(token, '')
     
-    # Check if any placeholders remain (they might span across runs)
-    remaining_placeholders = any(token in combined_text for token in text_inputs.keys())
+    # IMPORTANT: DO NOT compress spaces - preserve exact spacing from template
+    # Only remove trailing spaces if they exist
+    modified_complete_text = modified_complete_text.rstrip()
     
-    if remaining_placeholders:
-        # Replace placeholders in combined text
-        for token, value in text_inputs.items():
-            if token in combined_text:
-                if value and str(value).strip():
-                    combined_text = combined_text.replace(token, str(value))
-                else:
-                    combined_text = combined_text.replace(token, '')
+    # Apply the modified text to the first run while preserving its formatting
+    if len(paragraph.runs) > 0:
+        # Store the first run's formatting
+        first_run = paragraph.runs[0]
         
-        # IMPORTANT: Only fix spacing issues that are clearly errors
-        # Add spaces between lowercase and uppercase letters (e.g., "sqmCommercial" -> "sqm Commercial")
-        combined_text = re.sub(r'([a-z])([A-Z])', r'\1 \2', combined_text)
-        # Add spaces between numbers and letters when no space exists (e.g., "30meters" -> "30 meters")
-        combined_text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', combined_text)
-        # Add spaces between letters and numbers when no space exists (e.g., "sqm2" -> "sqm 2")
-        combined_text = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', combined_text)
+        # Store formatting properties safely
+        try:
+            bold = first_run.font.bold
+        except:
+            bold = None
+        try:
+            italic = first_run.font.italic
+        except:
+            italic = None
+        try:
+            underline = first_run.font.underline
+        except:
+            underline = None
+        try:
+            color = first_run.font.color
+        except:
+            color = None
+        try:
+            size = first_run.font.size
+        except:
+            size = None
+        try:
+            name = first_run.font.name
+        except:
+            name = None
         
-        # DO NOT compress multiple spaces - preserve exact spacing from template
-        # Remove only if there are 3+ spaces and replace with exact count from template
-        # Actually, we should preserve whatever spacing was in the template
-        # So we only trim leading/trailing spaces
-        combined_text = combined_text.strip()
+        # Update the text
+        first_run.text = modified_complete_text
         
-        # Put combined text in first run, clear others
-        if len(paragraph.runs) > 0:
-            paragraph.runs[0].text = combined_text
-            for i in range(1, len(paragraph.runs)):
-                paragraph.runs[i].text = ""
+        # Restore formatting safely
+        try:
+            if bold is not None:
+                first_run.font.bold = bold
+        except:
+            pass
+        try:
+            if italic is not None:
+                first_run.font.italic = italic
+        except:
+            pass
+        try:
+            if underline is not None:
+                first_run.font.underline = underline
+        except:
+            pass
+        try:
+            if color is not None:
+                first_run.font.color = color
+        except:
+            pass
+        try:
+            if size is not None:
+                first_run.font.size = size
+        except:
+            pass
+        try:
+            if name is not None:
+                first_run.font.name = name
+        except:
+            pass
+        
+        # Clear all other runs to prevent duplication
+        for i in range(1, len(paragraph.runs)):
+            paragraph.runs[i].text = ""
     else:
-        # No cross-run placeholders, preserve exact spacing in each run
-        for run in paragraph.runs:
-            if run.text:
-                # Only fix obvious spacing errors, don't compress intentional spaces
-                text = run.text
-                # Add spaces between lowercase and uppercase letters
-                text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
-                # Add spaces between numbers and letters
-                text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', text)
-                # Add spaces between letters and numbers
-                text = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', text)
-                # Don't compress multiple spaces - preserve them
-                # Only strip leading/trailing spaces
-                text = text.strip()
-                run.text = text
+        # If no runs exist, create one
+        paragraph.add_run(modified_complete_text)
+
+def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
+    prs = Presentation(io.BytesIO(template_bytes))
+    for slide in prs.slides:
+        shapes_to_delete, images_to_add = [], []
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for img_token, img_file in image_inputs.items():
+                    if img_token in shape.text and img_file is not None:
+                        images_to_add.append((img_file, shape.left, shape.top, shape.width, shape.height))
+                        shapes_to_delete.append(shape)
+                        break
+        for shape in slide.shapes:
+            if shape not in shapes_to_delete:
+                if shape.has_text_frame:
+                    for paragraph in shape.text_frame.paragraphs: 
+                        replace_text_in_paragraph(paragraph, text_inputs)
+                if hasattr(shape, 'table') and shape.table:
+                    for row in shape.table.rows:
+                        for cell in row.cells:
+                            if cell.text_frame:
+                                for paragraph in cell.text_frame.paragraphs: 
+                                    replace_text_in_paragraph(paragraph, text_inputs)
+        for img_file, left, top, width, height in images_to_add:
+            try:
+                slide.shapes.add_picture(smart_crop_to_fit(img_file, width, height), left, top, width=width, height=height)
+            except Exception: 
+                pass
+        for old_shape in shapes_to_delete:
+            try:
+                sp = old_shape._element
+                sp.getparent().remove(sp)
+            except Exception: 
+                pass
+    pptx_stream = io.BytesIO()
+    prs.save(pptx_stream)
+    return pptx_stream.getvalue()
 
 def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     doc = Document(io.BytesIO(template_bytes))
