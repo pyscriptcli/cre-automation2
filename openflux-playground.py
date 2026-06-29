@@ -1160,9 +1160,13 @@ def restore_form_data_from_session():
         return True
     if st.session_state.temp_form_data:
         for token, value in st.session_state.temp_form_data.items():
-            # Skip LM_POP tokens - they're handled by the map editor
+            # For LM_POP tokens, restore them to image_data
             clean_token = token.replace("{", "").replace("}", "")
             if clean_token.startswith("LM_POP"):
+                if value is not None:
+                    # Store in image_data for export
+                    if 'image_data' in st.session_state:
+                        st.session_state.image_data[token] = value
                 continue
             current_type = st.session_state.custom_mapping.get(token, "Text")
             if current_type != "Image" and f"val_{token}" not in st.session_state:
@@ -1175,9 +1179,13 @@ def restore_form_data_from_session():
                 loaded_data = json.load(f)
                 st.session_state.temp_form_data = loaded_data
                 for token, value in loaded_data.items():
-                    # Skip LM_POP tokens - they're handled by the map editor
+                    # For LM_POP tokens, restore them to image_data
                     clean_token = token.replace("{", "").replace("}", "")
                     if clean_token.startswith("LM_POP"):
+                        if value is not None:
+                            # Store in image_data for export
+                            if 'image_data' in st.session_state:
+                                st.session_state.image_data[token] = value
                         continue
                     current_type = st.session_state.custom_mapping.get(token, "Text")
                     if current_type != "Image" and f"val_{token}" not in st.session_state:
@@ -1222,6 +1230,7 @@ if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = F
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
+if "image_data" not in st.session_state: st.session_state.image_data = {}
 
 # --- APP ROUTER ---
 if st.session_state.active_map_editor_token:
@@ -1274,6 +1283,7 @@ else:
                         st.session_state.template_loaded = False
                         st.session_state.tokens = []
                         st.session_state.temp_form_data = {}
+                        st.session_state.image_data = {}
                         st.session_state.show_delete_confirm = False
                         st.session_state.template_to_delete = None
                         st.rerun()
@@ -1292,6 +1302,7 @@ else:
                     if template_bytes:
                         if st.session_state.saved_template_name != template_name:
                             st.session_state.temp_form_data = {}
+                            st.session_state.image_data = {}
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
                         st.session_state.template_loaded = True
@@ -1315,6 +1326,7 @@ else:
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.temp_form_data = {}
+            st.session_state.image_data = {}
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 save_template_to_file(template_bytes, uploaded_template.name)
@@ -1398,9 +1410,21 @@ else:
         
         # --- RENDER FIELDS IN ORIGINAL ORDER ---
         for idx, token in enumerate(tokens):
-            # Skip LM_POP placeholders - they should only appear in the map editor
+            # Check if this is an LM_POP placeholder
             clean_label_raw = token.replace("{", "").replace("}", "")
-            if clean_label_raw.startswith("LM_POP"):
+            is_lm_pop = clean_label_raw.startswith("LM_POP")
+            
+            # For LM_POP placeholders, just track them but don't render UI
+            if is_lm_pop:
+                # Check if there's a photo stored in temp_form_data for this token
+                if token in st.session_state.temp_form_data and st.session_state.temp_form_data[token] is not None:
+                    # If it's an image, add it to image_data for export
+                    image_data[token] = st.session_state.temp_form_data[token]
+                    field_types[token] = "Image"
+                else:
+                    # Still track it but with no value
+                    field_types[token] = "Image"
+                    image_data[token] = None
                 continue
                 
             col_target = idx % 2
