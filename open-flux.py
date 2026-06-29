@@ -91,36 +91,65 @@ MINIMAL_CRE_SYSTEM = """
         margin-bottom: 4px;
     }
     
-    /* Type mapping section */
-    .type-mapping-section {
+    /* Style mapping row */
+    .style-mapping-row {
         background-color: #F8F9FA !important;
-        border: 1px solid #E0E0E0 !important;
+        border: 1px solid #E8E8E8 !important;
         border-radius: 6px !important;
-        padding: 12px !important;
-        margin: 8px 0 12px 0 !important;
-    }
-    .type-mapping-grid {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr 1fr !important;
-        gap: 6px 16px !important;
-        margin-top: 8px !important;
-    }
-    
-    .style-control-row {
+        padding: 10px 14px !important;
+        margin-bottom: 6px !important;
         display: flex !important;
-        gap: 8px !important;
         align-items: center !important;
-        flex-wrap: wrap !important;
-        margin-top: 4px !important;
-        padding: 4px 8px !important;
-        background: #F8F9FA !important;
-        border-radius: 4px !important;
     }
-    .style-control-label {
+    .style-field-name {
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        color: #1A1A1A !important;
+        min-width: 180px !important;
+    }
+    .style-controls {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        flex-wrap: wrap !important;
+    }
+    .style-control-group {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }
+    .style-label {
         font-size: 11px !important;
-        font-weight: 500 !important;
         color: #666 !important;
-        min-width: 30px !important;
+        margin-right: 2px !important;
+        min-width: 20px !important;
+    }
+    .style-checkbox {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .style-checkbox > label {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        padding: 2px 6px !important;
+        background: #FFFFFF !important;
+        border: 1px solid #CCCCCC !important;
+        border-radius: 4px !important;
+        min-width: 28px !important;
+        text-align: center !important;
+        cursor: pointer !important;
+    }
+    .style-checkbox > label:hover {
+        background: #E8F0FE !important;
+        border-color: #003366 !important;
+    }
+    .style-size-input {
+        max-width: 60px !important;
+    }
+    .style-size-input input {
+        text-align: center !important;
+        padding: 2px 4px !important;
+        font-size: 13px !important;
     }
     
     /* Map editor controls */
@@ -872,9 +901,6 @@ def clean_empty_placeholders(text):
 def replace_text_in_paragraph(paragraph, text_inputs, style_mapping):
     """
     Replace placeholders and apply manual styling from the style mapping.
-    Step 1: Get the complete text
-    Step 2: Replace all placeholders
-    Step 3: Apply styling from the mapping
     """
     # Check if we have any placeholders to replace
     full_text = paragraph.text
@@ -921,28 +947,9 @@ def replace_text_in_paragraph(paragraph, text_inputs, style_mapping):
         except:
             pass
     
-    # Now apply style overrides from the style mapping for each placeholder
-    # We'll need to find where each placeholder was and apply its style
-    # Since we've consolidated text, we apply styles to the entire text
-    # but we can apply style overrides per token
-    
-    # Find all tokens and their positions in the original text
-    token_positions = []
-    for token, value in text_inputs.items():
-        if token in full_text:
-            pos = full_text.find(token)
-            token_positions.append((token, pos, len(token), value))
-    
-    # Sort by position
-    token_positions.sort(key=lambda x: x[1])
-    
-    # If we have style mapping for any token, apply it to the entire paragraph
-    # Since we can't easily style substrings in a single run with python-pptx,
-    # we'll apply the first token's style to the entire paragraph as a default
-    
-    # Find the first token that has style mapping
-    for token, pos, length, value in token_positions:
-        if token in style_mapping:
+    # Find the first token that has style mapping and apply it
+    for token in text_inputs.keys():
+        if token in style_mapping and style_mapping[token]:
             style = style_mapping[token]
             # Apply styles
             if style.get('bold') is not None:
@@ -1258,17 +1265,38 @@ else:
         with st.expander("Data Type & Style Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure data type and text styling for each placeholder field.")
             
+            # Header row with consistent spacing
+            col_header1, col_header2, col_header3, col_header4, col_header5 = st.columns([1.8, 1.0, 0.8, 0.8, 1.0])
+            with col_header1:
+                st.markdown("**Field**")
+            with col_header2:
+                st.markdown("**Type**")
+            with col_header3:
+                st.markdown("**B**")
+            with col_header4:
+                st.markdown("**I**")
+            with col_header5:
+                st.markdown("**Size**")
+            
+            st.markdown("<hr style='margin: 2px 0 8px 0;'>", unsafe_allow_html=True)
+            
             for idx, token in enumerate(tokens):
                 clean_label = token.replace("{", "").replace("}", "")
                 current_type = st.session_state.custom_mapping.get(token, "Text")
                 
-                st.markdown(f"**{clean_label}**")
+                # Create a styled row container
+                st.markdown(f"""
+                <div class="style-mapping-row">
+                    <span class="style-field-name">{clean_label}</span>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                col_type, col_bold, col_italic, col_underline, col_size = st.columns([1.5, 0.8, 0.8, 0.8, 1.2])
+                # Controls in a single row with columns
+                col_type, col_bold, col_italic, col_size, col_spacer = st.columns([1.8, 0.8, 0.8, 1.2, 0.5])
                 
                 with col_type:
                     data_type = st.selectbox(
-                        "Type", 
+                        "", 
                         ["Text", "Image", "Map"], 
                         index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
                         key=f"type_mapping_{token}",
@@ -1308,18 +1336,9 @@ else:
                         )
                         st.session_state.style_mapping[token]['italic'] = italic
                     
-                    with col_underline:
-                        underline = st.checkbox(
-                            "U", 
-                            value=st.session_state.style_mapping[token].get('underline', False),
-                            key=f"style_underline_{token}",
-                            label_visibility="collapsed"
-                        )
-                        st.session_state.style_mapping[token]['underline'] = underline
-                    
                     with col_size:
                         size = st.number_input(
-                            "Size",
+                            "",
                             min_value=8,
                             max_value=72,
                             value=st.session_state.style_mapping[token].get('size', 12),
@@ -1334,12 +1353,11 @@ else:
                         st.caption("—")
                     with col_italic:
                         st.caption("—")
-                    with col_underline:
-                        st.caption("—")
                     with col_size:
                         st.caption("—")
                 
-                st.markdown("<hr style='margin: 4px 0;'>", unsafe_allow_html=True)
+                with col_spacer:
+                    pass
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
