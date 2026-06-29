@@ -325,6 +325,13 @@ BASEMAP_CONFIG = {
         ],
         "attribution": "Google"
     },
+    "Street Map (Clean)": {
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
+            "https://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
+        ],
+        "attribution": "Google"
+    },
     "OSM Carto Light": {
         "urls": [
             "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
@@ -643,8 +650,8 @@ def render_isolated_map_editor():
         st.session_state[coord_key] = st.session_state[dragged_key]
         del st.session_state[dragged_key]
 
-    map_styles = ["Satellite (Streets)", "Satellite (Labels + Streets)", "Satellite (Clean)", 
-                  "Street Map", "OSM Carto Light" ]
+    map_styles = ["Satellite (Streets)", "Satellite (Labels)", "Satellite (Clean)", 
+              "Street Map", "Street Map (Clean)", "OSM Carto Light"]
 
     c_btn, c_style, c_color, c_size, c_coord = st.columns([1.4, 1.8, 0.8, 1.0, 2.8])
     with c_btn:
