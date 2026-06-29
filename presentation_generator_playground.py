@@ -637,6 +637,8 @@ def render_isolated_map_editor():
     image_key = f"map_bytes_holder_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
+    popup_image_key = f"popup_image_{token_key}"
+    popup_name_key = f"popup_name_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Satellite (Streets)"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
@@ -645,6 +647,8 @@ def render_isolated_map_editor():
     if image_key not in st.session_state: st.session_state[image_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
+    if popup_image_key not in st.session_state: st.session_state[popup_image_key] = None
+    if popup_name_key not in st.session_state: st.session_state[popup_name_key] = ""
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -670,6 +674,34 @@ def render_isolated_map_editor():
         pin_size = st.number_input(label="Pin Size", min_value=8, max_value=64, step=1, value=st.session_state[size_key], key=size_key, label_visibility="collapsed")
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
+    
+    # Add popup photo section
+    st.markdown("---")
+    st.markdown("**Popup Photo (Optional)**")
+    
+    col_popup1, col_popup2 = st.columns([2, 1])
+    with col_popup1:
+        popup_name = st.text_input(
+            "Property Name", 
+            value=st.session_state[popup_name_key],
+            key=f"popup_name_input_{token_key}",
+            placeholder="Enter property name..."
+        )
+        if popup_name != st.session_state[popup_name_key]:
+            st.session_state[popup_name_key] = popup_name
+    
+    with col_popup2:
+        uploaded_popup_image = st.file_uploader(
+            "Upload Photo", 
+            type=["png", "jpg", "jpeg", "gif"],
+            key=popup_image_key,
+            label_visibility="collapsed"
+        )
+        if uploaded_popup_image:
+            st.session_state[popup_image_key] = uploaded_popup_image.getvalue()
+            st.success("Photo uploaded!")
+        elif st.session_state[popup_image_key]:
+            st.caption("Photo ready")
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
@@ -741,7 +773,42 @@ def render_isolated_map_editor():
         </svg>
     </div>
     """
-    folium.Marker([plat, plon], draggable=True, icon=folium.DivIcon(html=icon_html)).add_to(m)
+    
+    # Build popup HTML with image
+    property_name = st.session_state[popup_name_key] or "Property Location"
+    
+    if st.session_state[popup_image_key]:
+        # Use uploaded image
+        import base64
+        img_base64 = base64.b64encode(st.session_state[popup_image_key]).decode()
+        img_src = f"data:image/jpeg;base64,{img_base64}"
+        popup_html = f"""
+        <div style="width: 250px; font-family: Arial, sans-serif; border-radius: 8px; overflow: hidden;">
+            <img src="{img_src}" style="width: 100%; height: auto; max-height: 180px; object-fit: cover; display: block;">
+            <div style="padding: 10px 12px; background: white;">
+                <p style="margin: 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name}</p>
+                <p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
+            </div>
+        </div>
+        """
+    else:
+        # Placeholder without image
+        popup_html = f"""
+        <div style="width: 220px; font-family: Arial, sans-serif; padding: 12px; background: white; border-radius: 8px;">
+            <div style="width: 100%; height: 100px; background: #F0F4F8; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #999; font-size: 12px; border: 1px dashed #CCC;">
+                No Photo
+            </div>
+            <p style="margin: 8px 0 0 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name}</p>
+            <p style="margin: 2px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
+        </div>
+        """
+    
+    folium.Marker(
+        [plat, plon], 
+        draggable=True, 
+        popup=folium.Popup(popup_html, max_width=300),
+        icon=folium.DivIcon(html=icon_html)
+    ).add_to(m)
     
     Draw(
         export=False, 
