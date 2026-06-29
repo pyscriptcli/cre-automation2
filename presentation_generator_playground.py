@@ -110,6 +110,38 @@ MINIMAL_CRE_SYSTEM = """
         color: #333 !important;
         white-space: nowrap !important;
     }
+    
+    /* Reorder controls */
+    .reorder-container {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        margin: 4px 0 !important;
+        padding: 6px 8px !important;
+        background: #F8F9FA !important;
+        border-radius: 4px !important;
+        border: 1px solid #E8E8E8 !important;
+    }
+    .reorder-container .stButton button {
+        min-width: 32px !important;
+        width: 32px !important;
+        padding: 0 !important;
+        height: 28px !important;
+        font-size: 14px !important;
+        line-height: 1 !important;
+    }
+    .reorder-label {
+        flex: 1 !important;
+        font-weight: 500 !important;
+        color: #1A1A1A !important;
+        font-size: 13px !important;
+    }
+    .reorder-drag-handle {
+        cursor: grab !important;
+        color: #888 !important;
+        font-size: 16px !important;
+        padding: 0 4px !important;
+    }
 </style>
 """
 
@@ -995,6 +1027,15 @@ def purge_all_temporary_data():
             if f"map_bytes_holder_{token}" in st.session_state: del st.session_state[f"map_bytes_holder_{token}"]
     st.session_state.temp_form_data = {}
 
+# --- TOKEN ORDER MANAGEMENT FUNCTIONS ---
+def reorder_tokens(token_list, old_index, new_index):
+    """Reorder tokens in the list"""
+    if old_index == new_index:
+        return token_list
+    token = token_list.pop(old_index)
+    token_list.insert(new_index, token)
+    return token_list
+
 # --- INIT APP ---
 st.set_page_config(page_title="OpenFlux", layout="wide", initial_sidebar_state="collapsed")
 st.markdown(MINIMAL_CRE_SYSTEM, unsafe_allow_html=True)
@@ -1014,6 +1055,7 @@ if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = F
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
+if "token_order_modified" not in st.session_state: st.session_state.token_order_modified = False
 
 # --- APP ROUTER ---
 if st.session_state.active_map_editor_token:
@@ -1084,6 +1126,7 @@ else:
                     if template_bytes:
                         if st.session_state.saved_template_name != template_name:
                             st.session_state.temp_form_data = {}
+                            st.session_state.token_order_modified = False
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
                         st.session_state.template_loaded = True
@@ -1107,6 +1150,7 @@ else:
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.temp_form_data = {}
+            st.session_state.token_order_modified = False
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 save_template_to_file(template_bytes, uploaded_template.name)
@@ -1161,35 +1205,69 @@ else:
                         st.rerun()
             st.markdown("---")
         
-        with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
-            st.markdown("Configure the data type for each placeholder field.")
+        with st.expander("Data Type Mapping & Order", expanded=st.session_state.show_type_mapping):
+            st.markdown("Configure the data type for each placeholder field. Use the ↑↓ buttons to reorder fields.")
             
-            # Simple 2-column layout for type mapping
-            cols = st.columns(2)
+            # Display tokens with reorder controls
             for idx, token in enumerate(tokens):
-                with cols[idx % 2]:
-                    clean_label = token.replace("{", "").replace("}", "")
-                    current_type = st.session_state.custom_mapping.get(token, "Text")
+                clean_label = token.replace("{", "").replace("}", "")
+                current_type = st.session_state.custom_mapping.get(token, "Text")
+                
+                col_reorder, col_label, col_type = st.columns([0.6, 1.5, 1.5])
+                
+                with col_reorder:
+                    # Create a horizontal container for the buttons
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        # Up button
+                        if idx > 0:
+                            if st.button("↑", key=f"move_up_{token}", help="Move up"):
+                                new_tokens = reorder_tokens(tokens.copy(), idx, idx - 1)
+                                st.session_state.tokens = new_tokens
+                                st.session_state.token_order_modified = True
+                                st.rerun()
+                        else:
+                            st.button("↑", key=f"move_up_{token}_disabled", disabled=True)
                     
-                    col_lbl, col_sel = st.columns([1, 1.5])
-                    with col_lbl:
-                        st.markdown(f'<span style="font-size:12px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
-                    with col_sel:
-                        data_type = st.selectbox(
-                            "", 
-                            ["Text", "Image", "Map"], 
-                            index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
-                            key=f"type_mapping_{token}",
-                            label_visibility="collapsed"
-                        )
-                        if data_type != current_type:
-                            st.session_state.custom_mapping[token] = data_type
-                            auto_save_config()
-                            st.rerun()
+                    with btn_col2:
+                        # Down button
+                        if idx < len(tokens) - 1:
+                            if st.button("↓", key=f"move_down_{token}", help="Move down"):
+                                new_tokens = reorder_tokens(tokens.copy(), idx, idx + 1)
+                                st.session_state.tokens = new_tokens
+                                st.session_state.token_order_modified = True
+                                st.rerun()
+                        else:
+                            st.button("↓", key=f"move_down_{token}_disabled", disabled=True)
+                
+                with col_label:
+                    st.markdown(f'<span style="font-size:13px; font-weight:500; color:#1A1A1A;">{clean_label}</span>', unsafe_allow_html=True)
+                
+                with col_type:
+                    data_type = st.selectbox(
+                        "", 
+                        ["Text", "Image", "Map"], 
+                        index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
+                        key=f"type_mapping_{token}",
+                        label_visibility="collapsed"
+                    )
+                    if data_type != current_type:
+                        st.session_state.custom_mapping[token] = data_type
+                        auto_save_config()
+                        st.rerun()
+            
+            # Reset button
+            if st.session_state.token_order_modified:
+                if st.button("Reset to Original Order", use_container_width=True):
+                    if st.session_state.template_bytes:
+                        original_tokens = extract_placeholders(st.session_state.template_bytes, st.session_state.template_type)
+                        st.session_state.tokens = original_tokens
+                        st.session_state.token_order_modified = False
+                        st.rerun()
         
         st.markdown('<div class="section-header">Placeholder Values</div>', unsafe_allow_html=True)
         
-        # --- RENDER FIELDS IN ORIGINAL ORDER (preserving detection order) ---
+        # --- RENDER FIELDS IN CURRENT ORDER ---
         for idx, token in enumerate(tokens):
             col_target = idx % 2
             if col_target == 0:
@@ -1316,6 +1394,6 @@ else:
                     )
                 except Exception as e:
                     st.error(f"Error generating document: {str(e)}")
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html.html=True)
     else:
         st.info("Please upload or select a template to begin")
