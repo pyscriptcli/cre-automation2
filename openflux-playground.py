@@ -82,11 +82,33 @@ MINIMAL_CRE_SYSTEM = """
     .saved-indicator { background-color: #E8F5E9; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #2E7D32; border-left: 3px solid #2E7D32; margin-top: 6px; }
     hr { margin: 12px 0 !important; border-color: #E0E0E0 !important; }
     
+    div[data-testid="stForm"] { border: 1px solid #E0E0E0 !important; border-radius: 6px !important; padding: 1rem !important; background-color: #FFFFFF; }
+    
     .placeholder-label {
         font-weight: 600 !important;
         font-size: 13px !important;
         color: #1A1A1A !important;
         margin-bottom: 4px;
+    }
+    
+    /* Map editor controls */
+    .map-controls-row {
+        display: flex !important;
+        gap: 12px !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+        margin-bottom: 12px !important;
+    }
+    .map-control-item {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+    .map-control-item label {
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        color: #333 !important;
+        white-space: nowrap !important;
     }
 </style>
 """
@@ -236,12 +258,14 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
     
     tokens = cta_sets[cta_num]['tokens']
     
+    # Store current values for all tokens before modifying
     current_values = {}
     for token in st.session_state.tokens:
         val_key = f"val_{token}"
         if val_key in st.session_state:
             current_values[token] = st.session_state[val_key]
     
+    # Apply CTA values
     if 'NAME' in tokens:
         st.session_state[f"val_{tokens['NAME']}"] = advisor_name
         st.session_state.temp_form_data[tokens['NAME']] = advisor_name
@@ -252,6 +276,7 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
         st.session_state[f"val_{tokens['EMAIL']}"] = contact_info["email"]
         st.session_state.temp_form_data[tokens['EMAIL']] = contact_info["email"]
     
+    # Restore all other values
     cta_tokens = set(tokens.values())
     for token, value in current_values.items():
         val_key = f"val_{token}"
@@ -270,19 +295,19 @@ def apply_cta_preset_autofill(cta_num, advisor_name):
             return False
     return True
 
-# --- BASEMAP CONFIGURATION ---
+# --- BASEMAP CONFIGURATION WITH IMPROVED RELIABILITY ---
 BASEMAP_CONFIG = {
-    "Satellite (Streets)": {
-        "urls": [
-            "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
-            "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
-        ],
-        "attribution": "Google"
-    },
     "Satellite (Labels)": {
         "urls": [
             "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
             "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+        ],
+        "attribution": "Google"
+    },
+    "Satellite (Streets)": {
+        "urls": [
+            "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff",
+            "https://mt0.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff"
         ],
         "attribution": "Google"
     },
@@ -318,16 +343,19 @@ BASEMAP_CONFIG = {
 }
 
 def get_tile_urls(style_name):
+    """Get list of tile URLs with failover support"""
     config = BASEMAP_CONFIG.get(style_name)
     if not config:
-        return BASEMAP_CONFIG["Street Map (Streets)"]["urls"]
+        return BASEMAP_CONFIG["Street Map"]["urls"]
     return config["urls"]
 
 def get_attribution(style_name):
+    """Get attribution for a basemap style"""
     config = BASEMAP_CONFIG.get(style_name)
     return config["attribution"] if config else ""
 
 def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
+    """Fetch a tile with retry logic and multiple URL fallbacks"""
     for attempt in range(max_retries):
         url = url_template.format(z=zoom, x=x, y=y)
         try:
@@ -340,15 +368,17 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
             continue
     return None
 
-# --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18, property_image=None, popup_position="Top-Right"):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18, property_name="", property_image=None, fov_angle=45, heading=75, cone_radius=180):
     """Generates high-res map with pin always included - with 1km default radius if no bounds provided"""
     
     def calculate_1km_bounds(lat, lon):
+        """Calculate approximately 1km bounding box centered on the pin"""
         lat_deg_per_km = 1.0 / 111.32
         lon_deg_per_km = 1.0 / (111.32 * math.cos(math.radians(lat)))
+        
         lat_offset = lat_deg_per_km * 0.5
         lon_offset = lon_deg_per_km * 0.5
+        
         return lat + lat_offset, lat - lat_offset, lon + lon_offset, lon - lon_offset
     
     bounds_valid = all(x is not None for x in [n, s, e, w])
@@ -435,10 +465,18 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         stitched_width = width_tiles * tile_size * scale_factor
         stitched_height = height_tiles * tile_size * scale_factor
         
-        if left < 0: right -= left; left = 0
-        if top < 0: bottom -= top; top = 0
-        if right > stitched_width: left -= (right - stitched_width); right = stitched_width
-        if bottom > stitched_height: top -= (bottom - stitched_height); bottom = stitched_height
+        if left < 0:
+            right -= left
+            left = 0
+        if top < 0:
+            bottom -= top
+            top = 0
+        if right > stitched_width:
+            left -= (right - stitched_width)
+            right = stitched_width
+        if bottom > stitched_height:
+            top -= (bottom - stitched_height)
+            bottom = stitched_height
         
         if right <= left: right = left + 100
         if bottom <= top: bottom = top + 100
@@ -453,10 +491,7 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
         if bottom <= top: bottom = top + 100
         cropped = stitched.crop((left, top, right, bottom)).convert("RGBA")
     
-    # --- DRAW PIN MARKER ---
-    draw = ImageDraw.Draw(cropped)
     pin_px_x, pin_px_y = num2px(pin_lat, pin_lon, zoom)
-    
     pin_local_x = int(pin_px_x - base_x) - left
     pin_local_y = int(pin_px_y - base_y) - top
     
@@ -466,7 +501,35 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
     
     pin_local_x = max(0, min(pin_local_x, cropped.width - 1))
     pin_local_y = max(0, min(pin_local_y, cropped.height - 1))
+
+    # --- DRAW FIELD OF VIEW (FOV) CONE ---
+    fov_layer = Image.new("RGBA", cropped.size, (0, 0, 0, 0))
+    fov_draw = ImageDraw.Draw(fov_layer)
+
+    # Convert map headings to math radians (correct offset for PIL coordinates system)
+    start_angle = math.radians(heading - (fov_angle / 2) - 90)
+    end_angle = math.radians(heading + (fov_angle / 2) - 90)
+
+    # Calculate outer edge triangle limits radiating outwards from the pin location
+    point_1 = (
+        pin_local_x + (cone_radius * scale_factor) * math.cos(start_angle),
+        pin_local_y + (cone_radius * scale_factor) * math.sin(start_angle)
+    )
+    point_2 = (
+        pin_local_x + (cone_radius * scale_factor) * math.cos(end_angle),
+        pin_local_y + (cone_radius * scale_factor) * math.sin(end_angle)
+    )
+
+    # Draw semi-transparent heading sector polygon
+    fov_draw.polygon(
+        [(pin_local_x, pin_local_y), point_1, point_2], 
+        fill=(255, 215, 0, 95),       # Vibrant yellow with balanced transparent alpha blending
+        outline=(255, 165, 0, 140)     # Clean distinct outer edge boundary line
+    )
+    cropped = Image.alpha_composite(cropped, fov_layer)
     
+    # --- DRAW PIN MARKER ---
+    draw = ImageDraw.Draw(cropped)
     radius = int((pin_size / 2) * scale_factor)
     shadow_offset = max(1, int(radius * 0.15))
     
@@ -502,105 +565,138 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
             pin_local_x + glow_radius_i,
             pin_local_y + glow_radius_i
         ], outline=(255, 255, 255, alpha), width=1)
-
-    # --- DRAW PRESET-BASED VISUAL HEADING CONE ---
-    fov_layer = Image.new("RGBA", cropped.size, (0, 0, 0, 0))
-    fov_draw = ImageDraw.Draw(fov_layer)
     
-    if popup_position == "Top-Left":
-        heading_deg = 315
-    elif popup_position == "Bottom-Right":
-        heading_deg = 135
-    elif popup_position == "Bottom-Left":
-        heading_deg = 225
-    else:  # Top-Right
-        heading_deg = 45
-        
-    start_angle = math.radians(heading_deg - 22.5 - 90)
-    end_angle = math.radians(heading_deg + 22.5 - 90)
-    cone_radius_scaled = 180 * scale_factor
-
-    point_1 = (
-        pin_local_x + cone_radius_scaled * math.cos(start_angle),
-        pin_local_y + cone_radius_scaled * math.sin(start_angle)
-    )
-    point_2 = (
-        pin_local_x + cone_radius_scaled * math.cos(end_angle),
-        pin_local_y + cone_radius_scaled * math.sin(end_angle)
-    )
-
-    fov_draw.polygon(
-        [(pin_local_x, pin_local_y), point_1, point_2], 
-        fill=(255, 215, 0, 95),       
-        outline=(255, 165, 0, 140)     
-    )
-    cropped = Image.alpha_composite(cropped, fov_layer)
-    
-    # --- ADD PROPERTY PHOTO AS STATIC OVERLAY (POPUP) ---
-    if property_image:
+    # --- ADD PROPERTY PHOTO AS STATIC OVERLAY (on exported image) ---
+    if property_name or property_image:
         try:
             popup_width = 220
             popup_padding = 15
-            popup_height = 170  
             
-            if popup_position == "Top-Left":
-                popup_x = popup_padding
-                popup_y = popup_padding
-            elif popup_position == "Bottom-Right":
+            # Determine popup height based on content
+            if property_image and property_name:
+                popup_height = 280
+            elif property_image:
+                popup_height = 210
+            elif property_name:
+                popup_height = 80
+            else:
+                popup_height = 0
+            
+            if popup_height > 0:
                 popup_x = cropped.width - popup_width - popup_padding
-                popup_y = cropped.height - popup_height - popup_padding
-            elif popup_position == "Bottom-Left":
-                popup_x = popup_padding
-                popup_y = cropped.height - popup_height - popup_padding
-            else:  # Top-Right
-                popup_x = cropped.width - popup_width - popup_padding
                 popup_y = popup_padding
-            
-            popup_img = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 245))
-            popup_draw = ImageDraw.Draw(popup_img)
-            popup_draw.rounded_rectangle(
-                [(0, 0), (popup_width, popup_height)], 
-                radius=12, 
-                fill=(255, 255, 255, 245),
-                outline=(200, 200, 200, 200),
-                width=1
-            )
-            
-            shadow_img = Image.new('RGBA', (popup_width + 8, popup_height + 8), (0, 0, 0, 40))
-            shadow_draw = ImageDraw.Draw(shadow_img)
-            shadow_draw.rounded_rectangle(
-                [(0, 0), (popup_width + 8, popup_height + 8)], 
-                radius=14, 
-                fill=(0, 0, 0, 40)
-            )
-            cropped.paste(shadow_img, (popup_x - 4, popup_y - 4), shadow_img)
-            
-            try:
-                img = Image.open(io.BytesIO(property_image))
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
                 
-                img_padding = 10
-                img_max_width = popup_width - (img_padding * 2)
-                img_max_height = popup_height - (img_padding * 2)
+                # Create popup background with rounded corners
+                popup_img = Image.new('RGBA', (popup_width, popup_height), (255, 255, 255, 245))
+                popup_draw = ImageDraw.Draw(popup_img)
+                popup_draw.rounded_rectangle(
+                    [(0, 0), (popup_width, popup_height)], 
+                    radius=12, 
+                    fill=(255, 255, 255, 245),
+                    outline=(200, 200, 200, 200),
+                    width=1
+                )
                 
-                img.thumbnail((img_max_width, img_max_height), Image.Resampling.LANCZOS)
+                # Add shadow
+                shadow_img = Image.new('RGBA', (popup_width + 8, popup_height + 8), (0, 0, 0, 40))
+                shadow_draw = ImageDraw.Draw(shadow_img)
+                shadow_draw.rounded_rectangle(
+                    [(0, 0), (popup_width + 8, popup_height + 8)], 
+                    radius=14, 
+                    fill=(0, 0, 0, 40)
+                )
+                cropped.paste(shadow_img, (popup_x - 4, popup_y - 4), shadow_img)
                 
-                img_x = (popup_width - img.width) // 2
-                img_y = (popup_height - img.height) // 2
+                # Add property photo
+                if property_image:
+                    try:
+                        # Load the image
+                        img = Image.open(io.BytesIO(property_image))
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
+                        
+                        # Calculate dimensions
+                        img_padding = 10
+                        img_max_width = popup_width - (img_padding * 2)
+                        img_max_height = 150
+                        
+                        # Resize while maintaining aspect ratio
+                        img.thumbnail((img_max_width, img_max_height), Image.Resampling.LANCZOS)
+                        
+                        # Center the image horizontally
+                        img_x = (popup_width - img.width) // 2
+                        img_y = img_padding
+                        
+                        # Create rounded corners mask for the image
+                        img_mask = Image.new('L', img.size, 0)
+                        img_mask_draw = ImageDraw.Draw(img_mask)
+                        img_mask_draw.rounded_rectangle([(0, 0), img.size], radius=8, fill=255)
+                        
+                        # Paste image onto popup
+                        popup_with_image = popup_img.copy()
+                        popup_with_image.paste(img, (img_x, img_y), img_mask)
+                        popup_img = popup_with_image
+                        
+                    except Exception as e:
+                        print(f"Error adding property image: {e}")
                 
-                img_mask = Image.new('L', img.size, 0)
-                img_mask_draw = ImageDraw.Draw(img_mask)
-                img_mask_draw.rounded_rectangle([(0, 0), img.size], radius=8, fill=255)
+                # Add property name text
+                if property_name:
+                    try:
+                        # Load fonts
+                        try:
+                            font = ImageFont.truetype("arial.ttf", 14)
+                        except:
+                            try:
+                                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+                            except:
+                                font = ImageFont.load_default()
+                        
+                        try:
+                            bold_font = ImageFont.truetype("arialbd.ttf", 11)
+                        except:
+                            try:
+                                bold_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 11)
+                            except:
+                                bold_font = font
+                    except:
+                        font = ImageFont.load_default()
+                        bold_font = font
+                    
+                    # Position text based on whether there's an image
+                    if property_image:
+                        text_y = 165
+                    else:
+                        text_y = 15
+                    
+                    # Draw "PROPERTY" label
+                    popup_draw = ImageDraw.Draw(popup_img)
+                    popup_draw.text((15, text_y), "PROPERTY", fill=(100, 100, 100, 200), font=bold_font)
+                    
+                    # Draw property name with word wrap
+                    name_y = text_y + 20
+                    max_chars_per_line = 18
+                    if len(property_name) > max_chars_per_line:
+                        words = property_name.split()
+                        lines = []
+                        current_line = ""
+                        for word in words:
+                            if len(current_line + " " + word) <= max_chars_per_line:
+                                current_line += (" " + word if current_line else word)
+                            else:
+                                if current_line:
+                                    lines.append(current_line)
+                                current_line = word
+                        if current_line:
+                            lines.append(current_line)
+                        
+                        for i, line in enumerate(lines):
+                            popup_draw.text((15, name_y + i * 22), line, fill=(30, 30, 30, 255), font=font)
+                    else:
+                        popup_draw.text((15, name_y), property_name, fill=(30, 30, 30, 255), font=font)
                 
-                popup_with_image = popup_img.copy()
-                popup_with_image.paste(img, (img_x, img_y), img_mask)
-                popup_img = popup_with_image
-                
-            except Exception as e:
-                print(f"Error adding property image: {e}")
-            
-            cropped.paste(popup_img, (popup_x, popup_y), popup_img)
+                # Composite the popup onto the main image
+                cropped.paste(popup_img, (popup_x, popup_y), popup_img)
                 
         except Exception as e:
             print(f"Error creating property overlay: {e}")
@@ -676,7 +772,12 @@ def render_isolated_map_editor():
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
     popup_image_key = f"popup_image_{token_key}"
-    popup_pos_key = f"popup_pos_{token_key}"
+    popup_name_key = f"popup_name_{token_key}"
+
+    # Heading cone slider session states
+    fov_angle_key = f"map_fov_angle_{token_key}"
+    heading_key = f"map_heading_{token_key}"
+    cone_radius_key = f"map_cone_radius_{token_key}"
     
     if style_key not in st.session_state: st.session_state[style_key] = "Satellite (Streets)"
     if coord_key not in st.session_state: st.session_state[coord_key] = "14.5995, 120.9842"
@@ -686,7 +787,10 @@ def render_isolated_map_editor():
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
     if popup_image_key not in st.session_state: st.session_state[popup_image_key] = None
-    if popup_pos_key not in st.session_state: st.session_state[popup_pos_key] = "Top-Right"
+    if popup_name_key not in st.session_state: st.session_state[popup_name_key] = ""
+    if fov_angle_key not in st.session_state: st.session_state[fov_angle_key] = 45
+    if heading_key not in st.session_state: st.session_state[heading_key] = 75
+    if cone_radius_key not in st.session_state: st.session_state[cone_radius_key] = 180
     
     if dragged_key in st.session_state:
         st.session_state[coord_key] = st.session_state[dragged_key]
@@ -713,32 +817,48 @@ def render_isolated_map_editor():
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # Add popup photo configuration
+    # Add popup photo & Heading Cone configurations
     st.markdown("---")
-    st.markdown("**Property Info Popup Configuration**")
-    
-    col_popup1, col_popup2 = st.columns([1.5, 2])
+    col_popup1, col_popup2 = st.columns([2, 1])
     with col_popup1:
-        popup_pos = st.selectbox(
-            "Popup Card Location",
-            options=["Top-Right", "Top-Left", "Bottom-Right", "Bottom-Left"],
-            index=["Top-Right", "Top-Left", "Bottom-Right", "Bottom-Left"].index(st.session_state[popup_pos_key]),
-            key=f"popup_pos_input_{token_key}"
+        st.markdown("**Property Info (will appear on map)**")
+        popup_name = st.text_input(
+            "Property Name", 
+            value=st.session_state[popup_name_key],
+            key=f"popup_name_input_{token_key}",
+            placeholder="Enter property name..."
         )
-        st.session_state[popup_pos_key] = popup_pos
+        if popup_name != st.session_state[popup_name_key]:
+            st.session_state[popup_name_key] = popup_name
     
     with col_popup2:
+        st.markdown("**Property Photo**")
         upload_key = f"popup_upload_{token_key}"
         uploaded_popup_image = st.file_uploader(
-            f"Upload Photo Overlay for {token_key}", 
+            "Upload Photo", 
             type=["png", "jpg", "jpeg", "gif"],
-            key=upload_key
+            key=upload_key,
+            label_visibility="collapsed"
         )
         if uploaded_popup_image:
             st.session_state[popup_image_key] = uploaded_popup_image.getvalue()
             st.success("Photo uploaded!")
         elif st.session_state[popup_image_key]:
             st.caption("Photo ready")
+
+    # Camera Field of View layout tools
+    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+    st.markdown("**Camera Field of View Triangle (Heading Cone)**")
+    fov_c1, fov_c2, fov_c3 = st.columns(3)
+    with fov_c1:
+        ui_heading = st.slider("Camera Facing Direction (Heading °)", 0, 360, int(st.session_state[heading_key]), step=5, key=f"ui_head_{token_key}")
+        st.session_state[heading_key] = ui_heading
+    with fov_c2:
+        ui_fov = st.slider("Cone Opening Width (FOV Angle °)", 15, 120, int(st.session_state[fov_angle_key]), step=5, key=f"ui_fov_{token_key}")
+        st.session_state[fov_angle_key] = ui_fov
+    with fov_c3:
+        ui_radius = st.slider("Cone Reach Length (Pixels)", 50, 400, int(st.session_state[cone_radius_key]), step=10, key=f"ui_rad_{token_key}")
+        st.session_state[cone_radius_key] = ui_radius
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
@@ -760,7 +880,8 @@ def render_isolated_map_editor():
                     if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
                         n, s, e, w = None, None, None, None
             
-            property_image = st.session_state.get(popup_image_key)
+            property_name = st.session_state[popup_name_key] or ""
+            property_image = st.session_state[popup_image_key]
             
             map_img_bytes = generate_static_map_bounds(
                 n=n, s=s, e=e, w=w, 
@@ -768,8 +889,11 @@ def render_isolated_map_editor():
                 style=basemap_style, 
                 pin_color=pin_color, 
                 pin_size=int(pin_size),
+                property_name=property_name,
                 property_image=property_image,
-                popup_position=st.session_state[popup_pos_key]
+                fov_angle=st.session_state[fov_angle_key],
+                heading=st.session_state[heading_key],
+                cone_radius=st.session_state[cone_radius_key]
             )
             
             st.session_state[image_key] = map_img_bytes
@@ -813,21 +937,29 @@ def render_isolated_map_editor():
     </div>
     """
     
+    property_name_display = st.session_state[popup_name_key] or "Property Location"
+    
     if st.session_state[popup_image_key]:
         import base64
         img_base64 = base64.b64encode(st.session_state[popup_image_key]).decode()
         img_src = f"data:image/jpeg;base64,{img_base64}"
         popup_html = f"""
-        <div style="width: 240px; font-family: Arial, sans-serif; border-radius: 8px; overflow: hidden; padding: 4px; background: white;">
-            <img src="{img_src}" style="width: 100%; height: auto; max-height: 180px; object-fit: cover; display: block; border-radius: 6px;">
+        <div style="width: 250px; font-family: Arial, sans-serif; border-radius: 8px; overflow: hidden;">
+            <img src="{img_src}" style="width: 100%; height: auto; max-height: 180px; object-fit: cover; display: block;">
+            <div style="padding: 10px 12px; background: white;">
+                <p style="margin: 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name_display}</p>
+                <p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
+            </div>
         </div>
         """
     else:
         popup_html = f"""
         <div style="width: 220px; font-family: Arial, sans-serif; padding: 12px; background: white; border-radius: 8px;">
             <div style="width: 100%; height: 100px; background: #F0F4F8; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #999; font-size: 12px; border: 1px dashed #CCC;">
-                No Photo Uploaded
+                No Photo
             </div>
+            <p style="margin: 8px 0 0 0; font-weight: bold; font-size: 14px; color: #1A1A1A;">{property_name_display}</p>
+            <p style="margin: 2px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
         </div>
         """
     
@@ -924,6 +1056,7 @@ def extract_placeholders(template_bytes, template_type):
     return []
 
 def clean_empty_placeholders(text):
+    """Remove any {{...}} placeholders that remain empty and clean up whitespace"""
     if not text:
         return text
     cleaned = re.sub(r'\{\{[^}]*\}\}', '', text)
@@ -931,6 +1064,7 @@ def clean_empty_placeholders(text):
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
+    """Replace text in paragraph, removing empty placeholders"""
     for run in paragraph.runs:
         current_text = run.text
         for token, value in text_inputs.items():
@@ -1014,9 +1148,11 @@ def generate_docx_bytes(template_bytes, text_inputs, image_inputs):
     return doc_stream.getvalue()
 
 def get_download_filename(template_name, file_type):
+    """Generate filename: Generated_TemplateName_Date"""
     base_name = re.sub(r'^template_', '', template_name or "Document")
     base_name = re.sub(r'\.(pptx|docx)$', '', base_name)
     base_name = re.sub(r'[^\w\-_. ]', '_', base_name)
+    
     current_date = datetime.now().strftime('%m%d%Y')
     return f"Generated_{base_name}_{current_date}.{file_type}"
     
@@ -1230,7 +1366,7 @@ else:
                     st.caption(f"CTA{cta_num}")
                     
                     selected_advisor = st.selectbox(
-                        f"Select advisor for CTA{cta_num}",
+                        f"Select advisor",
                         options=[""] + list(contacts_database.keys()),
                         index=list(contacts_database.keys()).index(current_advisor) + 1 if current_advisor in contacts_database else 0,
                         key=f"cta_autofill_{cta_num}",
@@ -1256,7 +1392,7 @@ else:
                         st.markdown(f'<span style="font-size:12px; font-weight:500;">{clean_label}</span>', unsafe_allow_html=True)
                     with col_sel:
                         data_type = st.selectbox(
-                            f"Data type selection for {clean_label}", 
+                            "", 
                             ["Text", "Image", "Map"], 
                             index=["Text", "Image", "Map"].index(current_type) if current_type in ["Text", "Image", "Map"] else 0,
                             key=f"type_mapping_{token}",
@@ -1294,7 +1430,7 @@ else:
                 st.markdown(f'<div class="placeholder-label">{label_text}</div>', unsafe_allow_html=True)
                 
                 if current_type == "Image" and st.session_state.template_type == 'pptx':
-                    image_data[token] = st.file_uploader(f"Upload image for {clean_label}", type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
+                    image_data[token] = st.file_uploader(clean_label, type=["png", "jpg", "jpeg"], key=f"val_{token}", label_visibility="collapsed")
                     field_types[token] = "Image"
                     
                 elif current_type == "Map" and st.session_state.template_type == 'pptx':
@@ -1338,7 +1474,7 @@ else:
                         st.session_state[f"val_{token}"] = current_value
                     
                     new_value = st.text_input(
-                        f"Input value for {clean_label}", 
+                        "", 
                         value=current_value, 
                         key=f"val_{token}", 
                         label_visibility="collapsed", 
