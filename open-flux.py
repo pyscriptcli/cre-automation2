@@ -855,51 +855,52 @@ def clean_empty_placeholders(text):
     return cleaned
 
 def replace_text_in_paragraph(paragraph, text_inputs):
-    """Replace text in paragraph, removing empty placeholders but preserving spaces"""
+    """Replace text in paragraph, properly handling spaces between placeholders"""
+    # First, combine all runs into a single text string
+    full_text = ""
+    run_texts = []
     for run in paragraph.runs:
-        current_text = run.text
-        for token, value in text_inputs.items():
-            if token in current_text:
-                if value and str(value).strip():
-                    # Replace token with value, preserving spaces
-                    current_text = current_text.replace(token, str(value))
-                else:
-                    # Remove empty token but keep the space if it's there
-                    # Check if there's a space before and after the token
-                    parts = current_text.split(token)
-                    # Rejoin parts, keeping the space if it was there
-                    current_text = ''.join(parts)
-        # Clean up multiple spaces but keep single spaces
-        current_text = re.sub(r' +', ' ', current_text).strip()
-        run.text = current_text
+        run_texts.append(run.text)
+        full_text += run.text
     
-    # Handle paragraph text for cases where runs don't catch everything
-    if hasattr(paragraph, 'text') and paragraph.text:
-        current_text = paragraph.text
-        has_placeholder = any(token in current_text for token in text_inputs.keys())
-        if has_placeholder:
-            for token, value in text_inputs.items():
-                if token in current_text:
-                    if value and str(value).strip():
-                        current_text = current_text.replace(token, str(value))
-                    else:
-                        current_text = current_text.replace(token, '')
-            # Clean up multiple spaces but keep single spaces
-            current_text = re.sub(r' +', ' ', current_text).strip()
-            
-            if not paragraph.runs:
-                paragraph.add_run(current_text)
+    # Check if this paragraph contains any placeholders
+    has_placeholder = any(token in full_text for token in text_inputs.keys())
+    if not has_placeholder:
+        return
+    
+    # Replace placeholders in the full text
+    modified_text = full_text
+    for token, value in text_inputs.items():
+        if token in modified_text:
+            if value and str(value).strip():
+                modified_text = modified_text.replace(token, str(value))
             else:
-                # Find the first run that contains the token and update it
-                updated = False
-                for run in paragraph.runs:
-                    if any(token in run.text for token in text_inputs.keys()):
-                        run.text = current_text
-                        updated = True
-                        break
-                if not updated and paragraph.runs:
-                    # If no run had the token, update the first run
-                    paragraph.runs[0].text = current_text
+                modified_text = modified_text.replace(token, '')
+    
+    # Fix spacing issues - ensure single spaces between words
+    # This handles cases like "sqmCommercial" -> "sqm Commercial"
+    modified_text = re.sub(r'([a-z])([A-Z])', r'\1 \2', modified_text)
+    # Handle numbers followed by letters: "30meters" -> "30 meters"
+    modified_text = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', modified_text)
+    # Handle letters followed by numbers: "sqm2" -> "sqm 2"
+    modified_text = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', modified_text)
+    # Remove multiple spaces but keep single spaces
+    modified_text = re.sub(r' +', ' ', modified_text).strip()
+    
+    # Distribute the modified text back to runs
+    if len(paragraph.runs) == 0:
+        # No runs, add a new one
+        paragraph.add_run(modified_text)
+    else:
+        # Set the first run to the full modified text
+        paragraph.runs[0].text = modified_text
+        # Clear all other runs
+        for i in range(1, len(paragraph.runs)):
+            paragraph.runs[i].text = ""
+    
+    # Also handle the paragraph text directly (for safety)
+    if hasattr(paragraph, 'text'):
+        paragraph.text = modified_text
 
 def generate_pptx_bytes(template_bytes, text_inputs, image_inputs):
     prs = Presentation(io.BytesIO(template_bytes))
