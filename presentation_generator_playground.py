@@ -110,6 +110,14 @@ MINIMAL_CRE_SYSTEM = """
         color: #333 !important;
         white-space: nowrap !important;
     }
+    
+    /* Hidden config buttons */
+    .hidden-config {
+        display: none !important;
+    }
+    .config-visible {
+        display: block !important;
+    }
 </style>
 """
 
@@ -238,7 +246,6 @@ def save_tokens_to_config(tokens):
     try:
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(tokens, f, indent=4)
-        print(f"Tokens saved to {filepath}")
         return filepath
     except Exception as e:
         print(f"Could not save tokens: {e}")
@@ -251,14 +258,11 @@ def load_tokens_from_config():
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 tokens = json.load(f)
-                print(f"Tokens loaded from {filepath}: {len(tokens)} tokens")
                 return tokens
         except Exception as e:
             print(f"Could not load tokens: {e}")
             return None
-    else:
-        print(f"Token file not found: {filepath}")
-        return None
+    return None
 
 def ensure_tokens_file_exists():
     """Ensure the config-token.json file exists, create with empty array if not"""
@@ -267,7 +271,6 @@ def ensure_tokens_file_exists():
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump([], f, indent=4)
-            print(f"Created empty token file: {filepath}")
             return True
         except Exception as e:
             print(f"Could not create token file: {e}")
@@ -1073,6 +1076,7 @@ if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = F
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
+if "show_config_buttons" not in st.session_state: st.session_state.show_config_buttons = False
 
 # Ensure token file exists
 ensure_tokens_file_exists()
@@ -1161,12 +1165,10 @@ else:
                         saved_tokens = load_tokens_from_config()
                         if saved_tokens and len(saved_tokens) > 0:
                             st.session_state.tokens = saved_tokens
-                            st.success(f"Loaded {len(saved_tokens)} placeholders from config-token.json")
                         else:
                             # If no saved tokens, extract from template and save
                             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
                             save_tokens_to_config(st.session_state.tokens)
-                            st.success(f"Extracted and saved {len(st.session_state.tokens)} placeholders to config-token.json")
                         
                         restore_form_data_from_session()
                     break
@@ -1186,7 +1188,6 @@ else:
             # Extract tokens and save to central config
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             save_tokens_to_config(st.session_state.tokens)
-            st.success(f"Extracted and saved {len(st.session_state.tokens)} placeholders to config-token.json")
             st.session_state.temp_form_data = {}
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
@@ -1207,26 +1208,58 @@ else:
         is_github = os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), template_name))
         st.markdown(f'<div class="saved-indicator">Active: {template_name}{"" if is_github else ""} ({st.session_state.template_type.upper()})</div>', unsafe_allow_html=True)
         
-        # Reload tokens button
-        col_reload1, col_reload2, col_reload3 = st.columns([1, 2, 1])
-        with col_reload2:
-            if st.button("🔄 Reload Tokens from config-token.json", use_container_width=True):
+        # Config buttons - hidden by default, shown with Ctrl+Shift+S
+        config_visible_class = "config-visible" if st.session_state.show_config_buttons else "hidden-config"
+        
+        st.markdown(f'<div class="{config_visible_class}">', unsafe_allow_html=True)
+        col_config1, col_config2, col_config3 = st.columns([1, 1, 1])
+        
+        with col_config1:
+            # Save Config button
+            if st.button("Save Config", use_container_width=True):
+                # Save current tokens
+                save_tokens_to_config(st.session_state.tokens)
+                # Save current mapping
+                auto_save_config()
+                st.success("Config saved successfully!")
+        
+        with col_config2:
+            # Load Config button
+            if st.button("Load Config", use_container_width=True):
                 saved_tokens = load_tokens_from_config()
                 if saved_tokens and len(saved_tokens) > 0:
                     st.session_state.tokens = saved_tokens
-                    st.success(f"Reloaded {len(saved_tokens)} placeholders from config-token.json!")
+                    # Also reload mapping config
+                    if st.session_state.saved_template_name:
+                        config_data = load_config_from_file(st.session_state.saved_template_name.replace('.pptx', '').replace('.docx', '') + '_config.json')
+                        if config_data:
+                            st.session_state.custom_mapping = config_data
+                    st.success(f"Config loaded successfully! {len(saved_tokens)} placeholders loaded.")
                     st.rerun()
                 else:
-                    st.warning("No tokens found in config-token.json. Extracting from template...")
-                    if st.session_state.template_bytes:
-                        st.session_state.tokens = extract_placeholders(st.session_state.template_bytes, st.session_state.template_type)
-                        save_tokens_to_config(st.session_state.tokens)
-                        st.success(f"Extracted and saved {len(st.session_state.tokens)} placeholders to config-token.json!")
-                        st.rerun()
+                    st.warning("No config file found or config is empty.")
         
-        # Show current token count
+        with col_config3:
+            # Download Config Token button
+            token_file_path = get_tokens_file_path()
+            if os.path.exists(token_file_path):
+                with open(token_file_path, 'r', encoding='utf-8') as f:
+                    token_content = f.read()
+                st.download_button(
+                    label="Download Config Token",
+                    data=token_content,
+                    file_name="config-token.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+            else:
+                st.button("Download Config Token", disabled=True, use_container_width=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Show token count
         if st.session_state.tokens:
-            st.caption(f"📋 {len(st.session_state.tokens)} placeholders loaded")
+            st.caption(f"{len(st.session_state.tokens)} placeholders loaded")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1422,3 +1455,30 @@ else:
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("Please upload or select a template to begin")
+
+# --- KEYBOARD SHORTCUT HANDLER (Ctrl+Shift+S) ---
+# This runs at the end of each render cycle
+# Check if Ctrl+Shift+S was pressed via JavaScript
+st.markdown("""
+<script>
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's')) {
+        e.preventDefault();
+        // Send a message to Streamlit to toggle config visibility
+        const event = new CustomEvent('streamlit:setComponentValue', {
+            detail: {
+                key: 'toggle_config',
+                value: 'toggle'
+            }
+        });
+        window.dispatchEvent(event);
+    }
+});
+</script>
+""", unsafe_allow_html=True)
+
+# Handle the toggle
+if st.session_state.get('toggle_config') == 'toggle':
+    st.session_state.show_config_buttons = not st.session_state.show_config_buttons
+    st.session_state.toggle_config = None
+    st.rerun()
