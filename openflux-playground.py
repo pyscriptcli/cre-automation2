@@ -122,20 +122,12 @@ MINIMAL_CRE_SYSTEM = """
 
 # --- CONE PRESET CONFIGURATIONS ---
 CONE_PRESETS = {
-    "Top-Left": {"heading": 135, "fov": 60, "radius": 180},
-    "Top-Right": {"heading": 45, "fov": 60, "radius": 180},
-    "Bottom-Left": {"heading": 225, "fov": 60, "radius": 180},
-    "Bottom-Right": {"heading": 315, "fov": 60, "radius": 180},
-    "Wide Angle": {"heading": 45, "fov": 90, "radius": 250},
-    "Narrow Focus": {"heading": 45, "fov": 30, "radius": 120}
-}
-
-# Photo placeholder mapping based on preset
-PHOTO_PLACEHOLDER_MAPPING = {
-    "Top-Left": "LM_POP_TL",
-    "Top-Right": "LM_POP_TR",
-    "Bottom-Left": "LM_POP_BL",
-    "Bottom-Right": "LM_POP_BR"
+    "Top-Left": {"heading": 135, "fov": 60, "radius": 180, "placeholder": "LM_POP_TL"},
+    "Top-Right": {"heading": 45, "fov": 60, "radius": 180, "placeholder": "LM_POP_TR"},
+    "Bottom-Left": {"heading": 225, "fov": 60, "radius": 180, "placeholder": "LM_POP_BL"},
+    "Bottom-Right": {"heading": 315, "fov": 60, "radius": 180, "placeholder": "LM_POP_BR"},
+    "Wide Angle": {"heading": 45, "fov": 90, "radius": 250, "placeholder": "LM_POP_TR"},
+    "Narrow Focus": {"heading": 45, "fov": 30, "radius": 120, "placeholder": "LM_POP_TR"}
 }
 
 # --- FILE MANAGEMENT FUNCTIONS ---
@@ -778,63 +770,53 @@ def render_isolated_map_editor():
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # --- PROPERTY PHOTO UPLOAD ---
+    # --- PROPERTY PHOTO UPLOAD & CONE PRESET IN ONE ROW ---
     st.markdown("---")
     
-    # Get current preset to show which placeholder will be used
-    current_preset = st.session_state[preset_key]
-    current_placeholder = PHOTO_PLACEHOLDER_MAPPING.get(current_preset, "LM_POP_TR")
+    # Create two columns for photo upload and cone preset
+    col_photo, col_preset = st.columns([2, 1])
     
-    st.markdown(f"**Property Photo (will appear in {current_placeholder})**")
-    st.caption(f"Photo will be placed in {current_placeholder} placeholder based on cone preset selection")
+    with col_photo:
+        # Get current preset to show which placeholder will be used
+        current_preset = st.session_state[preset_key]
+        current_placeholder = CONE_PRESETS.get(current_preset, {}).get("placeholder", "LM_POP_TR")
+        # Get display name (remove dash and capitalize)
+        display_name = current_preset.replace("-", " ")
+        
+        st.markdown(f"**Property Photo (will appear in {display_name})**")
+        
+        upload_key = f"popup_upload_{token_key}"
+        uploaded_popup_image = st.file_uploader(
+            "Upload Photo", 
+            type=["png", "jpg", "jpeg", "gif"],
+            key=upload_key,
+            label_visibility="collapsed"
+        )
+        if uploaded_popup_image:
+            st.session_state[popup_image_key] = uploaded_popup_image.getvalue()
+            st.success(f"Photo uploaded! Will appear in {display_name}")
+        elif st.session_state[popup_image_key]:
+            st.caption(f"Photo ready for {display_name}")
     
-    upload_key = f"popup_upload_{token_key}"
-    uploaded_popup_image = st.file_uploader(
-        "Upload Photo", 
-        type=["png", "jpg", "jpeg", "gif"],
-        key=upload_key,
-        label_visibility="collapsed"
-    )
-    if uploaded_popup_image:
-        st.session_state[popup_image_key] = uploaded_popup_image.getvalue()
-        st.success(f"Photo uploaded! Will appear in {current_placeholder}")
-    elif st.session_state[popup_image_key]:
-        st.caption(f"Photo ready for {current_placeholder}")
-
-    # --- CONE PRESETS SECTION ---
-    st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
-    st.markdown("**Camera Field of View (Cone) - Select Preset**")
-    
-    # Preset dropdown - applies immediately on selection
-    selected_preset = st.selectbox(
-        "Select Cone Preset",
-        options=list(CONE_PRESETS.keys()),
-        key=preset_key,
-        label_visibility="collapsed"
-    )
-    
-    # Apply preset values immediately when selection changes
-    preset_values = CONE_PRESETS[selected_preset]
-    if (st.session_state[heading_key] != preset_values["heading"] or 
-        st.session_state[fov_angle_key] != preset_values["fov"] or 
-        st.session_state[cone_radius_key] != preset_values["radius"]):
-        st.session_state[heading_key] = preset_values["heading"]
-        st.session_state[fov_angle_key] = preset_values["fov"]
-        st.session_state[cone_radius_key] = preset_values["radius"]
-        st.rerun()
-    
-    # Show current preset values and placeholder mapping
-    st.markdown('<div class="preset-card">', unsafe_allow_html=True)
-    col_h, col_f, col_r, col_p = st.columns(4)
-    with col_h:
-        st.markdown(f"**Heading:** {st.session_state[heading_key]}°")
-    with col_f:
-        st.markdown(f"**FOV Angle:** {st.session_state[fov_angle_key]}°")
-    with col_r:
-        st.markdown(f"**Cone Radius:** {st.session_state[cone_radius_key]}px")
-    with col_p:
-        st.markdown(f"**Photo →** {current_placeholder}")
-    st.markdown('</div>', unsafe_allow_html=True)
+    with col_preset:
+        st.markdown("**Cone Preset**")
+        # Preset dropdown - applies immediately on selection
+        selected_preset = st.selectbox(
+            "Select Preset",
+            options=list(CONE_PRESETS.keys()),
+            key=preset_key,
+            label_visibility="collapsed"
+        )
+        
+        # Apply preset values immediately when selection changes
+        preset_values = CONE_PRESETS[selected_preset]
+        if (st.session_state[heading_key] != preset_values["heading"] or 
+            st.session_state[fov_angle_key] != preset_values["fov"] or 
+            st.session_state[cone_radius_key] != preset_values["radius"]):
+            st.session_state[heading_key] = preset_values["heading"]
+            st.session_state[fov_angle_key] = preset_values["fov"]
+            st.session_state[cone_radius_key] = preset_values["radius"]
+            st.rerun()
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
@@ -873,14 +855,18 @@ def render_isolated_map_editor():
             st.session_state[image_key] = map_img_bytes
             st.session_state[f"coord_{token_key}"] = f"{plat}, {plon}"
             
+            # Get the current placeholder
+            current_preset = st.session_state[preset_key]
+            current_placeholder = CONE_PRESETS.get(current_preset, {}).get("placeholder", "LM_POP_TR")
+            
             # Update the correct placeholder in temp_form_data
             if st.session_state.temp_form_data is not None:
                 # Store the photo in the appropriate placeholder
                 placeholder_key = f"{{{{{current_placeholder}}}}}"
                 st.session_state.temp_form_data[placeholder_key] = st.session_state[popup_image_key]
                 
-                # Also store coordinates
-                st.session_state.temp_form_data[token_key] = f"{plat}, {plon}"
+                # Also store the map image for the token
+                st.session_state.temp_form_data[token_key] = map_img_bytes
                 
                 temp_path = get_temp_config_path(st.session_state.saved_template_name)
                 try:
@@ -918,6 +904,10 @@ def render_isolated_map_editor():
     </div>
     """
     
+    current_preset = st.session_state[preset_key]
+    current_placeholder = CONE_PRESETS.get(current_preset, {}).get("placeholder", "LM_POP_TR")
+    display_name = current_preset.replace("-", " ")
+    
     if st.session_state[popup_image_key]:
         import base64
         img_base64 = base64.b64encode(st.session_state[popup_image_key]).decode()
@@ -927,7 +917,7 @@ def render_isolated_map_editor():
             <img src="{img_src}" style="width: 100%; height: auto; max-height: 180px; object-fit: cover; display: block;">
             <div style="padding: 10px 12px; background: white;">
                 <p style="margin: 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
-                <p style="margin: 4px 0 0 0; font-size: 10px; color: #999;">Photo → {current_placeholder}</p>
+                <p style="margin: 4px 0 0 0; font-size: 10px; color: #999;">Photo → {display_name}</p>
             </div>
         </div>
         """
@@ -938,7 +928,7 @@ def render_isolated_map_editor():
                 No Photo
             </div>
             <p style="margin: 8px 0 0 0; font-size: 11px; color: #666;">📍 {plat}, {plon}</p>
-            <p style="margin: 4px 0 0 0; font-size: 10px; color: #999;">Photo → {current_placeholder}</p>
+            <p style="margin: 4px 0 0 0; font-size: 10px; color: #999;">Photo → {display_name}</p>
         </div>
         """
     
@@ -1160,13 +1150,11 @@ def restore_form_data_from_session():
         return True
     if st.session_state.temp_form_data:
         for token, value in st.session_state.temp_form_data.items():
-            # For LM_POP tokens, restore them to image_data
+            # For LM_POP tokens, store them in map_bytes_holder
             clean_token = token.replace("{", "").replace("}", "")
             if clean_token.startswith("LM_POP"):
                 if value is not None:
-                    # Store in image_data for export
-                    if 'image_data' in st.session_state:
-                        st.session_state.image_data[token] = value
+                    st.session_state[f"map_bytes_holder_{token}"] = value
                 continue
             current_type = st.session_state.custom_mapping.get(token, "Text")
             if current_type != "Image" and f"val_{token}" not in st.session_state:
@@ -1179,13 +1167,11 @@ def restore_form_data_from_session():
                 loaded_data = json.load(f)
                 st.session_state.temp_form_data = loaded_data
                 for token, value in loaded_data.items():
-                    # For LM_POP tokens, restore them to image_data
+                    # For LM_POP tokens, store them in map_bytes_holder
                     clean_token = token.replace("{", "").replace("}", "")
                     if clean_token.startswith("LM_POP"):
                         if value is not None:
-                            # Store in image_data for export
-                            if 'image_data' in st.session_state:
-                                st.session_state.image_data[token] = value
+                            st.session_state[f"map_bytes_holder_{token}"] = value
                         continue
                     current_type = st.session_state.custom_mapping.get(token, "Text")
                     if current_type != "Image" and f"val_{token}" not in st.session_state:
@@ -1230,7 +1216,6 @@ if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = F
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
-if "image_data" not in st.session_state: st.session_state.image_data = {}
 
 # --- APP ROUTER ---
 if st.session_state.active_map_editor_token:
@@ -1283,7 +1268,6 @@ else:
                         st.session_state.template_loaded = False
                         st.session_state.tokens = []
                         st.session_state.temp_form_data = {}
-                        st.session_state.image_data = {}
                         st.session_state.show_delete_confirm = False
                         st.session_state.template_to_delete = None
                         st.rerun()
@@ -1302,7 +1286,6 @@ else:
                     if template_bytes:
                         if st.session_state.saved_template_name != template_name:
                             st.session_state.temp_form_data = {}
-                            st.session_state.image_data = {}
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
                         st.session_state.template_loaded = True
@@ -1326,7 +1309,6 @@ else:
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.temp_form_data = {}
-            st.session_state.image_data = {}
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 save_template_to_file(template_bytes, uploaded_template.name)
