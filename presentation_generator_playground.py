@@ -8,7 +8,7 @@ import math
 import streamlit as st
 from pptx import Presentation
 from pptx.util import Pt
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
 from docx import Document
 from docx.shared import Inches, Pt as DocxPt
@@ -369,7 +369,7 @@ def fetch_tile_with_retry(url_template, zoom, x, y, headers, max_retries=3):
     return None
 
 # --- DYNAMIC ULTRA HIGH-RESOLUTION BOUNDING BOX GENERATOR ---
-def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18):
+def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (Streets)", pin_color="#003366", pin_size=18, property_name="", property_image=None):
     """Generates high-res map with pin always included - with 1km default radius if no bounds provided"""
     
     def calculate_1km_bounds(lat, lon):
@@ -567,6 +567,76 @@ def generate_static_map_bounds(n, s, e, w, pin_lat, pin_lon, style="Satellite (S
             pin_local_y + glow_radius_i
         ], outline=(255, 255, 255, alpha), width=1)
     
+    # --- ADD PROPERTY INFO OVERLAY ---
+    
+    # Add property name as text overlay at the bottom
+    if property_name:
+        # Create a semi-transparent background for text
+        text_bg_height = 50
+        text_bg = Image.new('RGBA', (cropped.width, text_bg_height), (0, 0, 0, 180))
+        cropped.paste(text_bg, (0, cropped.height - text_bg_height), text_bg)
+        
+        # Add text
+        try:
+            # Try to use a default font
+            try:
+                font = ImageFont.truetype("arial.ttf", 18)
+            except:
+                try:
+                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+                except:
+                    font = ImageFont.load_default()
+        except:
+            font = ImageFont.load_default()
+        
+        # Center the text
+        try:
+            # Get text bbox for proper centering
+            bbox = draw.textbbox((0, 0), property_name, font=font)
+            text_width = bbox[2] - bbox[0]
+        except:
+            text_width = len(property_name) * 10  # Fallback estimate
+        
+        text_x = (cropped.width - text_width) // 2
+        text_y = cropped.height - text_bg_height + 14
+        
+        draw.text((text_x, text_y), property_name, fill=(255, 255, 255, 255), font=font)
+    
+    # If property image is provided, add it as a small thumbnail in the corner
+    if property_image:
+        try:
+            # Resize and add image as thumbnail
+            img = Image.open(io.BytesIO(property_image))
+            
+            # Convert to RGBA if needed
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+            
+            thumb_size = 80
+            # Calculate aspect ratio preserving thumbnail
+            img.thumbnail((thumb_size, thumb_size), Image.Resampling.LANCZOS)
+            
+            # Create rounded corners
+            mask = Image.new('L', img.size, 0)
+            mask_draw = ImageDraw.Draw(mask)
+            mask_draw.rounded_rectangle([(0, 0), img.size], radius=10, fill=255)
+            
+            # Create a composite image with rounded corners
+            rounded_img = Image.new('RGBA', img.size, (0, 0, 0, 0))
+            rounded_img.putalpha(mask)
+            rounded_img.paste(img, (0, 0), mask)
+            
+            # Add a subtle border
+            border = Image.new('RGBA', (img.size[0] + 4, img.size[1] + 4), (255, 255, 255, 200))
+            border.paste(rounded_img, (2, 2), rounded_img)
+            
+            # Paste in top-left corner with padding
+            padding = 10
+            cropped.paste(border, (padding, padding), border)
+            
+        except Exception as e:
+            print(f"Could not add property image: {e}")
+    
     final_img = cropped.convert("RGB")
     img_byte_arr = io.BytesIO()
     final_img.save(img_byte_arr, format='PNG', quality=100, optimize=True)
@@ -677,7 +747,7 @@ def render_isolated_map_editor():
     
     # Add popup photo section
     st.markdown("---")
-    st.markdown("**Popup Photo (Optional)**")
+    st.markdown("**Property Info (will appear on map)**")
     
     col_popup1, col_popup2 = st.columns([2, 1])
     with col_popup1:
@@ -726,15 +796,18 @@ def render_isolated_map_editor():
                     if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
                         n, s, e, w = None, None, None, None
             
-            # If no valid bounds, use 1km radius (handled in generate_static_map_bounds)
-            # Pass None values - the function will calculate 1km bounds
+            # Get property info for the map
+            property_name = st.session_state[popup_name_key] or "Property Location"
+            property_image = st.session_state[popup_image_key]
             
             map_img_bytes = generate_static_map_bounds(
                 n=n, s=s, e=e, w=w, 
                 pin_lat=plat, pin_lon=plon, 
                 style=basemap_style, 
                 pin_color=pin_color, 
-                pin_size=int(pin_size)
+                pin_size=int(pin_size),
+                property_name=property_name,
+                property_image=property_image
             )
             
             # Store the generated map image
@@ -776,7 +849,7 @@ def render_isolated_map_editor():
     </div>
     """
     
-    # Build popup HTML with image
+    # Build popup HTML with image (for interactive map only)
     property_name = st.session_state[popup_name_key] or "Property Location"
     
     if st.session_state[popup_image_key]:
