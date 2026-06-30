@@ -21,7 +21,7 @@ st.sidebar.header("Controls")
 uploaded_file = st.sidebar.file_uploader("Upload site plot (PNG/JPG)", type=["png", "jpg", "jpeg"])
 
 # Opacity slider
-opacity = st.sidebar.slider("Overlay opacity", 0.0, 1.0, 0.6)
+opacity = st.sidebar.slider("Overlay opacity", 0.0, 1.0, 0.6, 0.01)
 
 # Basemap selection - simplified to two options
 basemap = st.sidebar.radio("Basemap", ["Satellite", "OpenStreetMap"])
@@ -39,11 +39,11 @@ if 'overlay_bounds' not in st.session_state:
         'east': 120
     }
 
-# Bounds sliders
-south = st.sidebar.slider("South (bottom)", -90, 90, st.session_state.overlay_bounds['south'], -90, 90)
-north = st.sidebar.slider("North (top)", -90, 90, st.session_state.overlay_bounds['north'], -90, 90)
-west = st.sidebar.slider("West (left)", -180, 180, st.session_state.overlay_bounds['west'], -180, 180)
-east = st.sidebar.slider("East (right)", -180, 180, st.session_state.overlay_bounds['east'], -180, 180)
+# Bounds sliders with proper step parameters
+south = st.sidebar.slider("South (bottom)", -90, 90, st.session_state.overlay_bounds['south'], 1)
+north = st.sidebar.slider("North (top)", -90, 90, st.session_state.overlay_bounds['north'], 1)
+west = st.sidebar.slider("West (left)", -180, 180, st.session_state.overlay_bounds['west'], 1)
+east = st.sidebar.slider("East (right)", -180, 180, st.session_state.overlay_bounds['east'], 1)
 
 # Update bounds in session state
 st.session_state.overlay_bounds = {
@@ -56,9 +56,9 @@ st.session_state.overlay_bounds = {
 # Polygon style
 st.sidebar.subheader("Polygon Style")
 fill_color = st.sidebar.color_picker("Fill color", "#ff0000")
-fill_opacity = st.sidebar.slider("Fill opacity", 0.0, 1.0, 0.3)
+fill_opacity = st.sidebar.slider("Fill opacity", 0.0, 1.0, 0.3, 0.01)
 outline_color = st.sidebar.color_picker("Outline color", "#0000ff")
-outline_weight = st.sidebar.slider("Outline weight", 1, 10, 3)
+outline_weight = st.sidebar.slider("Outline weight", 1, 10, 3, 1)
 
 # Initialize session state for polygons
 if 'polygons' not in st.session_state:
@@ -70,10 +70,10 @@ if 'temp_image_path' not in st.session_state:
 if 'last_uploaded_name' not in st.session_state:
     st.session_state.last_uploaded_name = None
 
-# Create map
+# Create map with explicit URLs
 def get_basemap():
     if basemap == "Satellite":
-        # Use Esri Satellite imagery
+        # Esri Satellite imagery
         return folium.Map(
             location=[0, 0], 
             zoom_start=2, 
@@ -81,11 +81,12 @@ def get_basemap():
             attr='Esri'
         )
     else:
-        # OpenStreetMap
+        # OpenStreetMap standard tiles
         return folium.Map(
             location=[0, 0], 
             zoom_start=2, 
-            tiles='OpenStreetMap'
+            tiles='https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attr='OpenStreetMap'
         )
 
 m = get_basemap()
