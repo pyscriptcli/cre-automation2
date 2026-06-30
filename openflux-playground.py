@@ -122,10 +122,10 @@ MINIMAL_CRE_SYSTEM = """
 
 # --- CONE PRESET CONFIGURATIONS ---
 CONE_PRESETS = {
-    "Top-Left": {"heading": 135, "fov": 60, "radius": 180, "placeholder": "LM_POP_TL"},
-    "Top-Right": {"heading": 45, "fov": 60, "radius": 180, "placeholder": "LM_POP_TR"},
-    "Bottom-Left": {"heading": 225, "fov": 60, "radius": 180, "placeholder": "LM_POP_BL"},
-    "Bottom-Right": {"heading": 315, "fov": 60, "radius": 180, "placeholder": "LM_POP_BR"},
+    "Top Right": {"heading": 45, "fov": 60, "radius": 180, "placeholder": "LM_POP_TR"},
+    "Top Left": {"heading": 135, "fov": 60, "radius": 180, "placeholder": "LM_POP_TL"},
+    "Bottom Right": {"heading": 315, "fov": 60, "radius": 180, "placeholder": "LM_POP_BR"},
+    "Bottom Left": {"heading": 225, "fov": 60, "radius": 180, "placeholder": "LM_POP_BL"},
     "Wide Angle": {"heading": 45, "fov": 90, "radius": 250, "placeholder": "LM_POP_TR"},
     "Narrow Focus": {"heading": 45, "fov": 30, "radius": 120, "placeholder": "LM_POP_TR"}
 }
@@ -723,7 +723,6 @@ def render_isolated_map_editor():
     image_key = f"map_bytes_holder_{token_key}"
     bounds_key = f"map_bounds_{token_key}"
     export_trigger_key = f"map_export_active_{token_key}"
-    popup_image_key = f"popup_image_{token_key}"
     preset_key = f"cone_preset_{token_key}"
 
     # Heading cone session states
@@ -738,8 +737,7 @@ def render_isolated_map_editor():
     if image_key not in st.session_state: st.session_state[image_key] = None
     if bounds_key not in st.session_state: st.session_state[bounds_key] = None
     if export_trigger_key not in st.session_state: st.session_state[export_trigger_key] = False
-    if popup_image_key not in st.session_state: st.session_state[popup_image_key] = None
-    if preset_key not in st.session_state: st.session_state[preset_key] = "Top-Right"
+    if preset_key not in st.session_state: st.session_state[preset_key] = "Top Right"
     if fov_angle_key not in st.session_state: st.session_state[fov_angle_key] = 60
     if heading_key not in st.session_state: st.session_state[heading_key] = 45
     if cone_radius_key not in st.session_state: st.session_state[cone_radius_key] = 180
@@ -770,53 +768,27 @@ def render_isolated_map_editor():
     with c_coord:
         coord_input = st.text_input(label="Enter Coordinates", key=coord_key, placeholder="Lat, Lon")
     
-    # --- PROPERTY PHOTO UPLOAD & CONE PRESET IN ONE ROW ---
+    # --- Cone Preset (only, no photo upload here) ---
     st.markdown("---")
+    st.markdown("**Cone Preset**")
     
-    # Create two columns for photo upload and cone preset
-    col_photo, col_preset = st.columns([2, 1])
+    # Preset dropdown
+    selected_preset = st.selectbox(
+        "Select Preset",
+        options=list(CONE_PRESETS.keys()),
+        key=preset_key,
+        label_visibility="collapsed"
+    )
     
-    with col_photo:
-        # Get current preset to show which placeholder will be used
-        current_preset = st.session_state[preset_key]
-        current_placeholder = CONE_PRESETS.get(current_preset, {}).get("placeholder", "LM_POP_TR")
-        # Get display name (remove dash and capitalize)
-        display_name = current_preset.replace("-", " ")
-        
-        st.markdown(f"**Property Photo (will appear in {display_name})**")
-        
-        upload_key = f"popup_upload_{token_key}"
-        uploaded_popup_image = st.file_uploader(
-            "Upload Photo", 
-            type=["png", "jpg", "jpeg", "gif"],
-            key=upload_key,
-            label_visibility="collapsed"
-        )
-        if uploaded_popup_image:
-            st.session_state[popup_image_key] = uploaded_popup_image.getvalue()
-            st.success(f"Photo uploaded! Will appear in {display_name}")
-        elif st.session_state[popup_image_key]:
-            st.caption(f"Photo ready for {display_name}")
-    
-    with col_preset:
-        st.markdown("**Cone Preset**")
-        # Preset dropdown - applies immediately on selection
-        selected_preset = st.selectbox(
-            "Select Preset",
-            options=list(CONE_PRESETS.keys()),
-            key=preset_key,
-            label_visibility="collapsed"
-        )
-        
-        # Apply preset values immediately when selection changes
-        preset_values = CONE_PRESETS[selected_preset]
-        if (st.session_state[heading_key] != preset_values["heading"] or 
-            st.session_state[fov_angle_key] != preset_values["fov"] or 
-            st.session_state[cone_radius_key] != preset_values["radius"]):
-            st.session_state[heading_key] = preset_values["heading"]
-            st.session_state[fov_angle_key] = preset_values["fov"]
-            st.session_state[cone_radius_key] = preset_values["radius"]
-            st.rerun()
+    # Apply preset values immediately when selection changes
+    preset_values = CONE_PRESETS[selected_preset]
+    if (st.session_state[heading_key] != preset_values["heading"] or 
+        st.session_state[fov_angle_key] != preset_values["fov"] or 
+        st.session_state[cone_radius_key] != preset_values["radius"]):
+        st.session_state[heading_key] = preset_values["heading"]
+        st.session_state[fov_angle_key] = preset_values["fov"]
+        st.session_state[cone_radius_key] = preset_values["radius"]
+        st.rerun()
     
     st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
     try:
@@ -838,7 +810,8 @@ def render_isolated_map_editor():
                     if abs(n - s) < 0.0001 or abs(e - w) < 0.0001:
                         n, s, e, w = None, None, None, None
             
-            property_image = st.session_state[popup_image_key]
+            # Get the property image from session state (uploaded in main view)
+            property_image = st.session_state.get("popup_property_image", None)
             
             map_img_bytes = generate_static_map_bounds(
                 n=n, s=s, e=e, w=w, 
@@ -863,7 +836,7 @@ def render_isolated_map_editor():
             if st.session_state.temp_form_data is not None:
                 # Store the photo in the appropriate placeholder
                 placeholder_key = f"{{{{{current_placeholder}}}}}"
-                st.session_state.temp_form_data[placeholder_key] = st.session_state[popup_image_key]
+                st.session_state.temp_form_data[placeholder_key] = property_image
                 
                 # Also store the map image for the token
                 st.session_state.temp_form_data[token_key] = map_img_bytes
@@ -906,11 +879,13 @@ def render_isolated_map_editor():
     
     current_preset = st.session_state[preset_key]
     current_placeholder = CONE_PRESETS.get(current_preset, {}).get("placeholder", "LM_POP_TR")
-    display_name = current_preset.replace("-", " ")
+    display_name = current_preset
     
-    if st.session_state[popup_image_key]:
+    property_image = st.session_state.get("popup_property_image", None)
+    
+    if property_image:
         import base64
-        img_base64 = base64.b64encode(st.session_state[popup_image_key]).decode()
+        img_base64 = base64.b64encode(property_image).decode()
         img_src = f"data:image/jpeg;base64,{img_base64}"
         popup_html = f"""
         <div style="width: 250px; font-family: Arial, sans-serif; border-radius: 8px; overflow: hidden;">
@@ -1216,6 +1191,8 @@ if "clear_uploader" not in st.session_state: st.session_state.clear_uploader = F
 if "restore_form_data" not in st.session_state: st.session_state.restore_form_data = False
 if "show_type_mapping" not in st.session_state: st.session_state.show_type_mapping = False
 if "temp_form_data" not in st.session_state: st.session_state.temp_form_data = {}
+if "popup_property_image" not in st.session_state: st.session_state.popup_property_image = None
+if "popup_placement" not in st.session_state: st.session_state.popup_placement = "Top Right"
 
 # --- APP ROUTER ---
 if st.session_state.active_map_editor_token:
@@ -1268,6 +1245,7 @@ else:
                         st.session_state.template_loaded = False
                         st.session_state.tokens = []
                         st.session_state.temp_form_data = {}
+                        st.session_state.popup_property_image = None
                         st.session_state.show_delete_confirm = False
                         st.session_state.template_to_delete = None
                         st.rerun()
@@ -1286,6 +1264,7 @@ else:
                     if template_bytes:
                         if st.session_state.saved_template_name != template_name:
                             st.session_state.temp_form_data = {}
+                            st.session_state.popup_property_image = None
                         st.session_state.template_bytes = template_bytes
                         st.session_state.saved_template_name = template_name
                         st.session_state.template_loaded = True
@@ -1309,6 +1288,7 @@ else:
             st.session_state.template_type = 'pptx' if uploaded_template.name.endswith('.pptx') else 'docx'
             st.session_state.tokens = extract_placeholders(template_bytes, st.session_state.template_type)
             st.session_state.temp_form_data = {}
+            st.session_state.popup_property_image = None
             
             if st.button("Save Template", key="save_template_btn", use_container_width=True):
                 save_template_to_file(template_bytes, uploaded_template.name)
@@ -1363,6 +1343,43 @@ else:
                         st.rerun()
             st.markdown("---")
         
+        # --- POPUP PROPERTY PHOTO UPLOAD (outside map editor) ---
+        st.markdown('<div class="section-header">POP UP PROPERTY PHOTO</div>', unsafe_allow_html=True)
+        
+        # Two columns: photo upload and placement dropdown
+        col_photo, col_placement = st.columns([2, 1])
+        
+        with col_photo:
+            uploaded_popup_image = st.file_uploader(
+                "Upload Property Photo", 
+                type=["png", "jpg", "jpeg", "gif"],
+                key="popup_property_upload",
+                label_visibility="collapsed"
+            )
+            if uploaded_popup_image:
+                st.session_state.popup_property_image = uploaded_popup_image.getvalue()
+                st.success("Photo uploaded successfully!")
+            elif st.session_state.popup_property_image:
+                st.caption("Photo ready for placement")
+        
+        with col_placement:
+            st.markdown("**Placement**")
+            placement_options = ["Top Right", "Top Left", "Bottom Right", "Bottom Left"]
+            selected_placement = st.selectbox(
+                "Select placement",
+                options=placement_options,
+                index=placement_options.index(st.session_state.popup_placement) if st.session_state.popup_placement in placement_options else 0,
+                key="popup_placement_select",
+                label_visibility="collapsed"
+            )
+            if selected_placement != st.session_state.popup_placement:
+                st.session_state.popup_placement = selected_placement
+                # Update the preset to match placement
+                st.session_state.popup_preset = selected_placement
+                st.rerun()
+        
+        st.markdown("---")
+        
         with st.expander("Data Type Mapping", expanded=st.session_state.show_type_mapping):
             st.markdown("Configure the data type for each placeholder field.")
             
@@ -1396,17 +1413,27 @@ else:
             clean_label_raw = token.replace("{", "").replace("}", "")
             is_lm_pop = clean_label_raw.startswith("LM_POP")
             
-            # For LM_POP placeholders, just track them but don't render UI
+            # For LM_POP placeholders, map them to the uploaded photo
             if is_lm_pop:
-                # Check if there's a photo stored in temp_form_data for this token
-                if token in st.session_state.temp_form_data and st.session_state.temp_form_data[token] is not None:
-                    # If it's an image, add it to image_data for export
-                    image_data[token] = st.session_state.temp_form_data[token]
-                    field_types[token] = "Image"
+                # Get the placement mapping
+                placement_map = {
+                    "Top Right": "LM_POP_TR",
+                    "Top Left": "LM_POP_TL",
+                    "Bottom Right": "LM_POP_BR",
+                    "Bottom Left": "LM_POP_BL"
+                }
+                target_placeholder = placement_map.get(st.session_state.popup_placement, "LM_POP_TR")
+                
+                # Only add the photo if this token matches the selected placement
+                if clean_label_raw == target_placeholder:
+                    if st.session_state.popup_property_image is not None:
+                        image_data[token] = st.session_state.popup_property_image
+                        st.session_state.temp_form_data[token] = st.session_state.popup_property_image
+                    else:
+                        image_data[token] = None
                 else:
-                    # Still track it but with no value
-                    field_types[token] = "Image"
                     image_data[token] = None
+                field_types[token] = "Image"
                 continue
                 
             col_target = idx % 2
