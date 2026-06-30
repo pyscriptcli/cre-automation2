@@ -38,6 +38,8 @@ if 'polygons' not in st.session_state:
     st.session_state.polygons = []
 if 'polygon_counter' not in st.session_state:
     st.session_state.polygon_counter = 0
+if 'temp_image_path' not in st.session_state:
+    st.session_state.temp_image_path = None
 
 # Create map
 def get_basemap():
@@ -48,25 +50,34 @@ def get_basemap():
 
 m = get_basemap()
 
-# Add overlay if image uploaded
+# Handle image upload
 if uploaded_file:
-    # Read image
-    image = Image.open(uploaded_file)
-    # Convert to base64
-    buffered = BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode()
+    # Save uploaded image to temporary file
+    if st.session_state.temp_image_path is None or uploaded_file.name != getattr(st.session_state, 'last_uploaded_name', ''):
+        # Clean up old temp file if exists
+        if st.session_state.temp_image_path and os.path.exists(st.session_state.temp_image_path):
+            try:
+                os.unlink(st.session_state.temp_image_path)
+            except:
+                pass
+        
+        # Save new temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
+            tmp.write(uploaded_file.getvalue())
+            st.session_state.temp_image_path = tmp.name
+            st.session_state.last_uploaded_name = uploaded_file.name
     
-    # Create overlay
-    overlay = folium.raster_layers.ImageOverlay(
-        image=image,
-        bounds=[[-60, -120], [60, 120]],  # Default bounds, user can adjust
-        opacity=opacity,
-        interactive=True,
-        cross_origin=False,
-        zindex=1
-    )
-    overlay.add_to(m)
+    # Add overlay using the temp file path
+    if st.session_state.temp_image_path and os.path.exists(st.session_state.temp_image_path):
+        overlay = folium.raster_layers.ImageOverlay(
+            image=st.session_state.temp_image_path,
+            bounds=[[-60, -120], [60, 120]],  # Default bounds, user can adjust
+            opacity=opacity,
+            interactive=True,
+            cross_origin=False,
+            zindex=1
+        )
+        overlay.add_to(m)
 
 # Display existing polygons
 for poly_data in st.session_state.polygons:
@@ -126,7 +137,7 @@ if st_data and 'last_active_drawing' in st_data:
             # Convert to lat/lng format
             lat_lng = [[lat, lng] for lng, lat in coords]
             
-            # Add to session state
+            # Show label input
             st.session_state.polygon_counter += 1
             label = st.text_input(f"Label for polygon {st.session_state.polygon_counter}", 
                                  f"Polygon {st.session_state.polygon_counter}")
@@ -202,3 +213,15 @@ if st.sidebar.button("Clear All Polygons"):
     st.session_state.polygons = []
     st.session_state.polygon_counter = 0
     st.rerun()
+
+# Cleanup temp file on session end
+def cleanup():
+    if st.session_state.temp_image_path and os.path.exists(st.session_state.temp_image_path):
+        try:
+            os.unlink(st.session_state.temp_image_path)
+        except:
+            pass
+
+# Register cleanup
+import atexit
+atexit.register(cleanup)
