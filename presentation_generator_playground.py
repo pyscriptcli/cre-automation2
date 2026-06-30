@@ -23,8 +23,35 @@ uploaded_file = st.sidebar.file_uploader("Upload site plot (PNG/JPG)", type=["pn
 # Opacity slider
 opacity = st.sidebar.slider("Overlay opacity", 0.0, 1.0, 0.6)
 
-# Basemap selection
-basemap = st.sidebar.radio("Basemap", ["OpenStreetMap", "Clean Satellite"])
+# Basemap selection - simplified to two options
+basemap = st.sidebar.radio("Basemap", ["Satellite", "OpenStreetMap"])
+
+# Overlay bounds controls (draggable and resizable)
+st.sidebar.subheader("Overlay Position & Size")
+st.sidebar.markdown("Adjust the overlay position and size using the sliders below:")
+
+# Initialize bounds in session state
+if 'overlay_bounds' not in st.session_state:
+    st.session_state.overlay_bounds = {
+        'south': -60,
+        'north': 60,
+        'west': -120,
+        'east': 120
+    }
+
+# Bounds sliders
+south = st.sidebar.slider("South (bottom)", -90, 90, st.session_state.overlay_bounds['south'], -90, 90)
+north = st.sidebar.slider("North (top)", -90, 90, st.session_state.overlay_bounds['north'], -90, 90)
+west = st.sidebar.slider("West (left)", -180, 180, st.session_state.overlay_bounds['west'], -180, 180)
+east = st.sidebar.slider("East (right)", -180, 180, st.session_state.overlay_bounds['east'], -180, 180)
+
+# Update bounds in session state
+st.session_state.overlay_bounds = {
+    'south': south,
+    'north': north,
+    'west': west,
+    'east': east
+}
 
 # Polygon style
 st.sidebar.subheader("Polygon Style")
@@ -40,20 +67,33 @@ if 'polygon_counter' not in st.session_state:
     st.session_state.polygon_counter = 0
 if 'temp_image_path' not in st.session_state:
     st.session_state.temp_image_path = None
+if 'last_uploaded_name' not in st.session_state:
+    st.session_state.last_uploaded_name = None
 
 # Create map
 def get_basemap():
-    if basemap == "Clean Satellite":
-        return folium.Map(location=[0, 0], zoom_start=2, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
+    if basemap == "Satellite":
+        # Use Esri Satellite imagery
+        return folium.Map(
+            location=[0, 0], 
+            zoom_start=2, 
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 
+            attr='Esri'
+        )
     else:
-        return folium.Map(location=[0, 0], zoom_start=2)
+        # OpenStreetMap
+        return folium.Map(
+            location=[0, 0], 
+            zoom_start=2, 
+            tiles='OpenStreetMap'
+        )
 
 m = get_basemap()
 
 # Handle image upload
 if uploaded_file:
     # Save uploaded image to temporary file
-    if st.session_state.temp_image_path is None or uploaded_file.name != getattr(st.session_state, 'last_uploaded_name', ''):
+    if st.session_state.temp_image_path is None or uploaded_file.name != st.session_state.last_uploaded_name:
         # Clean up old temp file if exists
         if st.session_state.temp_image_path and os.path.exists(st.session_state.temp_image_path):
             try:
@@ -67,17 +107,28 @@ if uploaded_file:
             st.session_state.temp_image_path = tmp.name
             st.session_state.last_uploaded_name = uploaded_file.name
     
-    # Add overlay using the temp file path
+    # Add overlay using the temp file path with current bounds
     if st.session_state.temp_image_path and os.path.exists(st.session_state.temp_image_path):
+        bounds = [[south, west], [north, east]]
         overlay = folium.raster_layers.ImageOverlay(
             image=st.session_state.temp_image_path,
-            bounds=[[-60, -120], [60, 120]],  # Default bounds, user can adjust
+            bounds=bounds,
             opacity=opacity,
             interactive=True,
             cross_origin=False,
             zindex=1
         )
         overlay.add_to(m)
+        
+        # Add a rectangle to show the overlay bounds
+        folium.Rectangle(
+            bounds=bounds,
+            color='white',
+            weight=1,
+            fill=False,
+            dash_array='5, 5',
+            popup='Overlay Bounds'
+        ).add_to(m)
 
 # Display existing polygons
 for poly_data in st.session_state.polygons:
@@ -201,17 +252,31 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 ### Instructions
 1. Upload your site plot image
-2. Adjust opacity with slider
-3. Use the draw tool (top-left) to draw polygons/rectangles
-4. Add labels to your polygons
-5. View and manage polygons in the list
-6. Export all polygons to KML
+2. **Adjust position & size** using the sliders
+3. Adjust opacity with slider
+4. Choose basemap (Satellite or OpenStreetMap)
+5. Use the draw tool (top-left) to draw polygons/rectangles
+6. Add labels to your polygons
+7. View and manage polygons in the list
+8. Export all polygons to KML
+
+💡 **Tip**: The overlay bounds are shown with a dashed white rectangle
 """)
 
 # Clear all polygons
 if st.sidebar.button("Clear All Polygons"):
     st.session_state.polygons = []
     st.session_state.polygon_counter = 0
+    st.rerun()
+
+# Reset overlay position
+if st.sidebar.button("Reset Overlay Position"):
+    st.session_state.overlay_bounds = {
+        'south': -60,
+        'north': 60,
+        'west': -120,
+        'east': 120
+    }
     st.rerun()
 
 # Cleanup temp file on session end
