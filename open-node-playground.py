@@ -915,6 +915,6 @@ leaflet_html = (leaflet_template
                 .replace("__LAYER_META_JSON__", layer_meta_json)
                 .replace("__GEOJSON__", geojson_str))
 
-# The fix: sandbox must be a list, not a string
+# FIX: sandbox must be a string (space-separated tokens), not a list
 st.components.v1.html(leaflet_html, height=850, scrolling=False,
-                      sandbox=["allow-scripts", "allow-forms", "allow-same-origin", "allow-modals", "allow-popups", "allow-fullscreen"])
+                      sandbox="allow-scripts allow-forms allow-same-origin allow-modals allow-popups allow-fullscreen")
