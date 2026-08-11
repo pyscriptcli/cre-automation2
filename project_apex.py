@@ -17,11 +17,15 @@ st.set_page_config(
 )
 
 # ============================================================================
-# CUSTOM CSS - Full map with floating panels
+# CUSTOM CSS - Hide toolbar, full map, floating panels
 # ============================================================================
 st.markdown("""
     <style>
-    /* Remove default padding and margins */
+    /* Hide Streamlit toolbar */
+    .stAppToolbar, .stMainMenu, #MainMenu, footer {
+        display: none !important;
+    }
+    /* Remove default padding */
     .main > div {
         padding: 0 !important;
         margin: 0 !important;
@@ -31,8 +35,7 @@ st.markdown("""
         margin: 0 !important;
         max-width: 100% !important;
     }
-
-    /* Sidebar styling - overlay on left */
+    /* Sidebar overlay */
     section[data-testid="stSidebar"] {
         background-color: rgba(255, 255, 255, 0.92);
         backdrop-filter: blur(6px);
@@ -42,15 +45,6 @@ st.markdown("""
         width: 320px !important;
         box-shadow: 2px 0 12px rgba(0,0,0,0.08);
     }
-
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3 {
-        color: #1a1a2e;
-        font-weight: 600;
-    }
-
-    /* Sidebar section headers */
     .sidebar-section {
         font-size: 0.8rem;
         font-weight: 700;
@@ -62,8 +56,15 @@ st.markdown("""
         padding-bottom: 0.25rem;
         border-bottom: 1px solid #e9ecef;
     }
-
-    /* Map container - full screen */
+    .app-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1a1a2e;
+        padding: 0.5rem 0 0.2rem 0;
+        border-bottom: 2px solid #4a90d9;
+        display: inline-block;
+    }
+    /* Full‑screen map */
     .map-container {
         position: fixed;
         top: 0;
@@ -72,8 +73,7 @@ st.markdown("""
         height: 100vh;
         z-index: 0;
     }
-
-    /* Floating details panel - right side */
+    /* Floating details panel */
     .floating-panel {
         position: fixed;
         top: 20px;
@@ -88,9 +88,7 @@ st.markdown("""
         padding: 1.2rem 1.5rem;
         z-index: 999;
         border: 1px solid rgba(255,255,255,0.2);
-        transition: all 0.2s ease;
     }
-
     .floating-panel h4 {
         margin-top: 0;
         margin-bottom: 0.5rem;
@@ -99,7 +97,6 @@ st.markdown("""
         border-bottom: 2px solid #4a90d9;
         padding-bottom: 0.4rem;
     }
-
     .floating-panel .detail-label {
         font-size: 0.7rem;
         font-weight: 600;
@@ -107,19 +104,16 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.3px;
     }
-
     .floating-panel .detail-value {
         font-size: 0.9rem;
         color: #1a1a2e;
         margin-bottom: 0.3rem;
     }
-
     .floating-panel .divider {
         border: none;
         border-top: 1px solid #f1f3f5;
         margin: 0.6rem 0;
     }
-
     .floating-panel .close-btn {
         float: right;
         background: none;
@@ -131,8 +125,6 @@ st.markdown("""
     .floating-panel .close-btn:hover {
         color: #495057;
     }
-
-    /* Scrollbar */
     .floating-panel::-webkit-scrollbar {
         width: 4px;
     }
@@ -144,62 +136,6 @@ st.markdown("""
         background: #c1c7cd;
         border-radius: 4px;
     }
-
-    /* Dropdown styling */
-    .stSelectbox label {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: #495057;
-    }
-
-    /* Checkbox styling */
-    .stCheckbox label {
-        font-size: 0.85rem;
-        color: #495057;
-    }
-
-    /* Expander styling */
-    .streamlit-expanderHeader {
-        font-weight: 600;
-        color: #1a1a2e;
-        background: #f8f9fa;
-        border-radius: 6px;
-    }
-
-    /* Title in sidebar */
-    .app-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #1a1a2e;
-        padding: 0.5rem 0 0.2rem 0;
-        border-bottom: 2px solid #4a90d9;
-        display: inline-block;
-    }
-
-    /* Badge for metrics */
-    .badge {
-        display: inline-block;
-        padding: 0.15rem 0.5rem;
-        font-size: 0.7rem;
-        font-weight: 600;
-        border-radius: 12px;
-        background: #e9ecef;
-        color: #495057;
-    }
-    .badge-primary {
-        background: #4a90d9;
-        color: white;
-    }
-    .badge-success {
-        background: #28a745;
-        color: white;
-    }
-    .badge-warning {
-        background: #ffc107;
-        color: #1a1a2e;
-    }
-
-    /* Footer in sidebar */
     .footer {
         font-size: 0.65rem;
         color: #adb5bd;
@@ -208,24 +144,6 @@ st.markdown("""
         border-top: 1px solid #e9ecef;
         margin-top: 0.5rem;
     }
-
-    /* Layer list - single column */
-    .layer-item {
-        display: flex;
-        align-items: center;
-        padding: 0.2rem 0;
-        font-size: 0.85rem;
-    }
-    .layer-item .color-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        margin-right: 0.5rem;
-        display: inline-block;
-        border: 1px solid #dee2e6;
-    }
-
-    /* Responsive */
     @media (max-width: 768px) {
         .floating-panel {
             width: 300px;
@@ -238,15 +156,11 @@ st.markdown("""
             width: 280px !important;
         }
     }
-
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
 # ============================================================================
-# SESSION STATE INIT
+# SESSION STATE
 # ============================================================================
 if "selected_feature" not in st.session_state:
     st.session_state.selected_feature = None
@@ -258,16 +172,25 @@ if "map_center" not in st.session_state:
     st.session_state.map_center = [14.8500, 120.9500]
 if "map_zoom" not in st.session_state:
     st.session_state.map_zoom = 11
-if "details_expanded" not in st.session_state:
-    st.session_state.details_expanded = True
-if "layers_visible" not in st.session_state:
-    st.session_state.layers_visible = {
-        "hazards": True,
+
+# Sub‑layer visibility: all sub‑layers toggled individually
+if "sub_layers" not in st.session_state:
+    st.session_state.sub_layers = {
+        "earthquake": True,
+        "floods": True,
+        "landslide": False,
+        "tsunami": False,
+        "volcanic": False,
         "roads": True,
         "boundaries": True,
         "zoning": False,
-        "valuation": False
+        "valuation": False,
+        "rental_rate": False,
+        "prime_core": False,
+        "lamudi": False,
+        "other_platforms": False
     }
+
 if "basemap" not in st.session_state:
     st.session_state.basemap = "CartoDB Positron"
 if "panel_visible" not in st.session_state:
@@ -317,20 +240,14 @@ sample_polygons = [
 # FUNCTIONS
 # ============================================================================
 def parse_location_input(text):
-    """Try to parse as coordinates or match a location name."""
     text = text.strip()
-    # Check for coordinate pattern: lat, lng
     coord_pattern = re.compile(r'^\s*([-+]?\d*\.?\d+)\s*[,;]\s*([-+]?\d*\.?\d+)\s*$')
     match = coord_pattern.match(text)
     if match:
-        lat = float(match.group(1))
-        lng = float(match.group(2))
-        return {"lat": lat, "lng": lng, "type": "coordinates"}
-    # Try to match location name
+        return {"lat": float(match.group(1)), "lng": float(match.group(2)), "type": "coordinates"}
     for loc in sample_locations:
         if text.lower() in loc["name"].lower():
             return {"lat": loc["lat"], "lng": loc["lng"], "type": "location", "name": loc["name"]}
-    # If not found, return None
     return None
 
 # ============================================================================
@@ -339,9 +256,7 @@ def parse_location_input(text):
 with st.sidebar:
     st.markdown('<div class="app-title">Project APEX</div>', unsafe_allow_html=True)
 
-    # ========================================================================
-    # LOCATION INPUT - Text field + search button
-    # ========================================================================
+    # Location input
     st.markdown('<div class="sidebar-section">Location</div>', unsafe_allow_html=True)
     loc_input = st.text_input("Enter coordinates (lat, lng) or place name", key="loc_input",
                               placeholder="e.g. 14.8875, 120.8567 or Plaridel")
@@ -354,28 +269,37 @@ with st.sidebar:
         else:
             st.warning("Location not found. Try coordinates like '14.8875, 120.8567'")
 
-    # ========================================================================
-    # LAYERS - Single column list
-    # ========================================================================
-    st.markdown('<div class="sidebar-section">Layers</div>', unsafe_allow_html=True)
+    # Data Layers - collapsible expander with checkboxes for sub‑layers
+    with st.expander("Data Layers", expanded=True):
+        # Hazards sub‑layers
+        st.markdown("**Hazards**")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.session_state.sub_layers["earthquake"] = st.checkbox("Earthquake", value=st.session_state.sub_layers["earthquake"])
+            st.session_state.sub_layers["floods"] = st.checkbox("Floods", value=st.session_state.sub_layers["floods"])
+            st.session_state.sub_layers["landslide"] = st.checkbox("Landslide", value=st.session_state.sub_layers["landslide"])
+        with col2:
+            st.session_state.sub_layers["tsunami"] = st.checkbox("Tsunami", value=st.session_state.sub_layers["tsunami"])
+            st.session_state.sub_layers["volcanic"] = st.checkbox("Volcanic", value=st.session_state.sub_layers["volcanic"])
 
-    # Single column checkboxes
-    layers_hazards = st.checkbox("Hazards", value=st.session_state.layers_visible["hazards"], key="layer_hazards")
-    layers_roads = st.checkbox("Roads", value=st.session_state.layers_visible["roads"], key="layer_roads")
-    layers_boundaries = st.checkbox("Boundaries", value=st.session_state.layers_visible["boundaries"], key="layer_boundaries")
-    layers_zoning = st.checkbox("Zoning", value=st.session_state.layers_visible["zoning"], key="layer_zoning")
-    layers_valuation = st.checkbox("Valuation", value=st.session_state.layers_visible["valuation"], key="layer_valuation")
+        st.markdown("**Infrastructure**")
+        st.session_state.sub_layers["roads"] = st.checkbox("Roads", value=st.session_state.sub_layers["roads"])
+        st.session_state.sub_layers["boundaries"] = st.checkbox("Boundaries (Cities, Province, Region)", value=st.session_state.sub_layers["boundaries"])
+        st.session_state.sub_layers["zoning"] = st.checkbox("Zoning (LGU Restrictions, CLUP)", value=st.session_state.sub_layers["zoning"])
 
-    st.session_state.layers_visible["hazards"] = layers_hazards
-    st.session_state.layers_visible["roads"] = layers_roads
-    st.session_state.layers_visible["boundaries"] = layers_boundaries
-    st.session_state.layers_visible["zoning"] = layers_zoning
-    st.session_state.layers_visible["valuation"] = layers_valuation
+        st.markdown("**Valuation**")
+        st.session_state.sub_layers["valuation"] = st.checkbox("Valuation (general)", value=st.session_state.sub_layers["valuation"])
+        # Sub‑options for valuation (optional)
+        if st.session_state.sub_layers["valuation"]:
+            st.session_state.sub_layers["rental_rate"] = st.checkbox("Rental Rate", value=st.session_state.sub_layers["rental_rate"])
+            st.session_state.sub_layers["prime_core"] = st.checkbox("PRIME Core", value=st.session_state.sub_layers["prime_core"])
+            st.session_state.sub_layers["lamudi"] = st.checkbox("Lamudi", value=st.session_state.sub_layers["lamudi"])
+            st.session_state.sub_layers["other_platforms"] = st.checkbox("Other Platforms", value=st.session_state.sub_layers["other_platforms"])
 
-    # Manage layer button
+    # Manage layer button (keep for compatibility, but can be removed)
     st.button("Manage layer", use_container_width=True, key="manage_layer")
 
-    # Base map selector
+    # Basemap selector (still in sidebar for convenience)
     basemap_options = {
         "CartoDB Positron": "CartoDB Positron",
         "CartoDB Dark_Matter": "CartoDB Dark_Matter",
@@ -388,47 +312,6 @@ with st.sidebar:
         st.session_state.basemap = basemap_options[selected_basemap]
         st.rerun()
 
-    # ========================================================================
-    # DROPDOWNS - Hazards, Infrastructure, Valuation
-    # ========================================================================
-    st.markdown('<div class="sidebar-section">Data Layers</div>', unsafe_allow_html=True)
-
-    with st.expander("Hazards", expanded=False):
-        hazard_sel = st.multiselect(
-            "Select hazard types",
-            ["Earthquake", "Floods", "Landslide", "Tsunami", "Volcanic"],
-            default=["Earthquake", "Floods"],
-            key="hazard_sel"
-        )
-        if hazard_sel:
-            st.caption(f"Showing: {', '.join(hazard_sel)}")
-        else:
-            st.caption("No hazards selected")
-
-    with st.expander("Infrastructure", expanded=False):
-        infra_sel = st.multiselect(
-            "Select infrastructure layers",
-            ["Roads", "Boundaries (Cities)", "Boundaries (Province)", "Boundaries (Region)",
-             "Zoning (LGU Restrictions)", "CLUP"],
-            default=["Roads", "Boundaries (Cities)"],
-            key="infra_sel"
-        )
-        if infra_sel:
-            st.caption(f"Showing: {', '.join(infra_sel)}")
-
-    with st.expander("Valuation", expanded=False):
-        val_sel = st.multiselect(
-            "Select valuation sources",
-            ["Rental Rate", "PRIME Core", "Lamudi", "Other Platforms"],
-            default=["Rental Rate", "PRIME Core"],
-            key="val_sel"
-        )
-        st.caption("Smart Comparable Analysis: Finds and analyzes comparable properties with advanced scoring algorithms")
-        st.caption("Tiering: Primary / Secondary sources")
-
-    # ========================================================================
-    # FOOTER
-    # ========================================================================
     st.markdown('<div class="footer">Map tiles by CartoDB under CC BY-SA 3.0<br>Data © OpenStreetMap contributors</div>', unsafe_allow_html=True)
 
 # ============================================================================
@@ -448,68 +331,103 @@ with map_container:
 
     MousePosition().add_to(m)
 
-    # Add sample markers
-    if st.session_state.layers_visible.get("hazards", True) or st.session_state.layers_visible.get("boundaries", True):
-        for loc in sample_locations:
-            if "Highway" in loc["type"] or "Road" in loc["type"]:
-                if not st.session_state.layers_visible.get("roads", True):
-                    continue
-            else:
-                if not st.session_state.layers_visible.get("boundaries", True):
-                    continue
+    # ========================================================================
+    # ADD BASEMAP SWITCHER (LayerControl) - appears in top-right corner
+    # ========================================================================
+    # Define additional tile layers for switching
+    folium.TileLayer('CartoDB Dark_Matter', name='Dark').add_to(m)
+    folium.TileLayer('OpenStreetMap', name='OSM').add_to(m)
+    folium.TileLayer('Stamen Terrain', name='Terrain').add_to(m)
+    folium.TileLayer('Stamen Toner', name='Toner').add_to(m)
+    # Add LayerControl after tiles
+    folium.LayerControl(collapsed=False).add_to(m)
 
-            color = "#dc3545" if "City" in loc["type"] else "#4a90d9" if "Municipality" in loc["type"] else "#28a745"
-            icon_type = "star" if "City" in loc["type"] else "circle" if "Municipality" in loc["type"] else "road"
-            popup_html = f"""
-            <div style="min-width:200px;">
-                <h4 style="margin:0 0 4px 0;">{loc['name']}</h4>
-                <div style="font-size:0.8rem; color:#6c757d;">{loc['type']}</div>
-                <hr style="margin:4px 0;">
-                <div style="font-size:0.85rem;">
-                    <strong>Population:</strong> {loc['population']}<br>
-                    <strong>Area:</strong> {loc['area_km2']} km²<br>
-                    <strong>Hazard Risk:</strong> {loc['hazard_risk']}<br>
-                    <strong>Infrastructure:</strong> {loc['infrastructure']}
-                </div>
-                <div style="margin-top:6px; font-size:0.75rem; color:#adb5bd;">Click for full details</div>
+    # ========================================================================
+    # ADD SAMPLE MARKERS WITH SUB‑LAYER FILTERING
+    # ========================================================================
+    # We'll show markers based on sub‑layer toggles:
+    # - If "roads" is on, show road/highway markers
+    # - If "boundaries" is on, show municipality/city markers
+    # - "hazards" are shown via polygons; we also show hazard markers if any
+
+    # Filter markers based on sub‑layer visibility
+    show_roads = st.session_state.sub_layers.get("roads", True)
+    show_boundaries = st.session_state.sub_layers.get("boundaries", True)
+    show_hazards = st.session_state.sub_layers.get("floods", True) or st.session_state.sub_layers.get("earthquake", True)  # etc.
+
+    for loc in sample_locations:
+        # Determine if this marker should be shown
+        is_road = "Road" in loc["type"] or "Highway" in loc["type"]
+        is_boundary = "Municipality" in loc["type"] or "City" in loc["type"]
+        if is_road and not show_roads:
+            continue
+        if is_boundary and not show_boundaries:
+            continue
+        # For hazards, we might have specific markers, but we'll show all if any hazard sub‑layer is on
+        # Actually we don't have hazard-specific markers, so we'll show all if hazards are on
+        # But we already filtered by roads/boundaries, so we show everything else
+        # if not show_hazards and not is_road and not is_boundary: continue  # but we have no others
+
+        color = "#dc3545" if "City" in loc["type"] else "#4a90d9" if "Municipality" in loc["type"] else "#28a745"
+        popup_html = f"""
+        <div style="min-width:200px;">
+            <h4 style="margin:0 0 4px 0;">{loc['name']}</h4>
+            <div style="font-size:0.8rem; color:#6c757d;">{loc['type']}</div>
+            <hr style="margin:4px 0;">
+            <div style="font-size:0.85rem;">
+                <strong>Population:</strong> {loc['population']}<br>
+                <strong>Area:</strong> {loc['area_km2']} km²<br>
+                <strong>Hazard Risk:</strong> {loc['hazard_risk']}<br>
+                <strong>Infrastructure:</strong> {loc['infrastructure']}
             </div>
-            """
-            folium.Marker(
-                location=[loc["lat"], loc["lng"]],
-                popup=folium.Popup(popup_html, max_width=300),
-                tooltip=f"{loc['name']} ({loc['type']})",
-                icon=folium.Icon(color="red" if "City" in loc["type"] else "blue" if "Municipality" in loc["type"] else "green",
-                                 icon="info-sign" if "Municipality" in loc["type"] else "star" if "City" in loc["type"] else "road",
-                                 prefix="fa")
-            ).add_to(m)
+            <div style="margin-top:6px; font-size:0.75rem; color:#adb5bd;">Click for full details</div>
+        </div>
+        """
+        folium.Marker(
+            location=[loc["lat"], loc["lng"]],
+            popup=folium.Popup(popup_html, max_width=300),
+            tooltip=f"{loc['name']} ({loc['type']})",
+            icon=folium.Icon(color="red" if "City" in loc["type"] else "blue" if "Municipality" in loc["type"] else "green",
+                             icon="info-sign" if "Municipality" in loc["type"] else "star" if "City" in loc["type"] else "road",
+                             prefix="fa")
+        ).add_to(m)
+        folium.CircleMarker(
+            location=[loc["lat"], loc["lng"]],
+            radius=8,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.3,
+            tooltip=loc["name"]
+        ).add_to(m)
 
-            folium.CircleMarker(
-                location=[loc["lat"], loc["lng"]],
-                radius=8,
-                color=color,
-                fill=True,
-                fill_color=color,
-                fill_opacity=0.3,
-                tooltip=loc["name"]
-            ).add_to(m)
+    # ========================================================================
+    # ADD POLYGONS - filtered by hazard sub‑layers
+    # ========================================================================
+    show_floods = st.session_state.sub_layers.get("floods", True)
+    show_zoning = st.session_state.sub_layers.get("zoning", True)
 
-    # Add polygons
-    if st.session_state.layers_visible.get("hazards", True):
-        for poly in sample_polygons:
-            color = "#dc3545" if "Flood" in poly["name"] else "#4a90d9"
-            fill_color = color
-            folium.Polygon(
-                locations=poly["coordinates"],
-                color=color,
-                weight=2,
-                fill=True,
-                fill_color=fill_color,
-                fill_opacity=0.2,
-                popup=f"<b>{poly['name']}</b><br>{poly['description']}<br>Risk: {poly['risk_level']}<br>Area: {poly['area_km2']} km²",
-                tooltip=poly["name"]
-            ).add_to(m)
+    for poly in sample_polygons:
+        if "Flood" in poly["name"] and not show_floods:
+            continue
+        if "Commercial" in poly["name"] and not show_zoning:
+            continue
+        color = "#dc3545" if "Flood" in poly["name"] else "#4a90d9"
+        fill_color = color
+        folium.Polygon(
+            locations=poly["coordinates"],
+            color=color,
+            weight=2,
+            fill=True,
+            fill_color=fill_color,
+            fill_opacity=0.2,
+            popup=f"<b>{poly['name']}</b><br>{poly['description']}<br>Risk: {poly['risk_level']}<br>Area: {poly['area_km2']} km²",
+            tooltip=poly["name"]
+        ).add_to(m)
 
-    # Draw plugin
+    # ========================================================================
+    # DRAW PLUGIN (still active for defining assessment areas)
+    # ========================================================================
     draw = Draw(
         export=False,
         position='topleft',
@@ -536,9 +454,8 @@ with map_container:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================================
-# FLOATING DETAILS PANEL (right side overlay)
+# FLOATING DETAILS PANEL (right side)
 # ============================================================================
-# Determine selected feature from map interactions
 selected_info = None
 
 if map_data and map_data.get("last_object_clicked"):
@@ -588,7 +505,6 @@ if not selected_info and map_data and map_data.get("last_clicked"):
                                   "description": "Point clicked on map",
                                   "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
 
-# Build the HTML for the floating panel
 panel_html = '<div class="floating-panel" id="floating-panel">'
 
 if selected_info:
@@ -675,7 +591,6 @@ if selected_info:
     """
 
 else:
-    # Default panel
     panel_html += """
     <h4 style="margin-top:0;">Details</h4>
     <div style="color:#6c757d; font-size:0.9rem;">Click on a marker, polygon, or draw on the map to see details here.</div>
@@ -700,6 +615,4 @@ else:
     """
 
 panel_html += "</div>"
-
-# Render the floating panel using st.markdown with unsafe_allow_html
 st.markdown(panel_html, unsafe_allow_html=True)
