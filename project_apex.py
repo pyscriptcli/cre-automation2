@@ -19,11 +19,8 @@ st.set_page_config(
 # ============================================================================
 # HANDLE CLOSE PANEL VIA QUERY PARAM
 # ============================================================================
-# Check if the close parameter is present
-query_params = st.query_params
-if "close_panel" in query_params:
+if "close_panel" in st.query_params:
     st.session_state.panel_visible = False
-    # Remove the parameter to avoid re-triggering on rerun
     st.query_params.clear()
     st.rerun()
 
@@ -185,7 +182,7 @@ if "map_center" not in st.session_state:
 if "map_zoom" not in st.session_state:
     st.session_state.map_zoom = 11
 if "panel_visible" not in st.session_state:
-    st.session_state.panel_visible = True  # default: show panel
+    st.session_state.panel_visible = True
 
 # Sub‑layer visibility
 if "sub_layers" not in st.session_state:
@@ -207,7 +204,7 @@ if "sub_layers" not in st.session_state:
 
 # For managing drawn items
 if "drawn_features" not in st.session_state:
-    st.session_state.drawn_features = []  # store list of drawn objects with id, geometry, etc.
+    st.session_state.drawn_features = []
 
 if "basemap" not in st.session_state:
     st.session_state.basemap = "CartoDB Positron"
@@ -265,26 +262,6 @@ def parse_location_input(text):
         if text.lower() in loc["name"].lower():
             return {"lat": loc["lat"], "lng": loc["lng"], "type": "location", "name": loc["name"]}
     return None
-
-def get_drawn_features_from_map(map_data):
-    """Extract drawn features from map_data and store in session state."""
-    if map_data and map_data.get("all_drawings"):
-        # We'll store them with a unique id
-        # For simplicity, we'll just keep the list in session state
-        # But we need to avoid duplicates; we'll compare with existing
-        existing = st.session_state.drawn_features
-        new_drawings = map_data["all_drawings"]
-        # For each drawing, check if it's already stored (by geometry)
-        # We'll use a simple approach: store all new ones if they don't match any existing
-        # We'll compare stringified geometry
-        existing_geom_strs = [json.dumps(f.get("geometry", {})) for f in existing]
-        for draw in new_drawings:
-            geom_str = json.dumps(draw.get("geometry", {}))
-            if geom_str not in existing_geom_strs:
-                # Add a unique id
-                draw["id"] = f"draw_{len(existing)+1}"
-                existing.append(draw)
-        st.session_state.drawn_features = existing
 
 # ============================================================================
 # SIDEBAR
@@ -344,7 +321,6 @@ with st.sidebar:
                     st.caption(f"#{i+1}: {geom_type}")
                 with col2:
                     if st.button("Delete", key=f"del_{i}"):
-                        # Remove from session state
                         del st.session_state.drawn_features[i]
                         st.rerun()
         else:
@@ -370,8 +346,10 @@ with map_container:
     MousePosition().add_to(m)
 
     # ========================================================================
-    # BASEMAP SWITCHER (LayerControl)
+    # BASEMAP SWITCHER – using LayerControl placed in top-left
+    # This creates a button group that appears just below the draw toolbar.
     # ========================================================================
+    # Add alternative tile layers with proper attribution
     folium.TileLayer(
         'CartoDB Dark_Matter',
         name='Dark',
@@ -393,6 +371,7 @@ with map_container:
         attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.'
     ).add_to(m)
 
+    # Add the layer control; it will appear in the top-left, below the draw control.
     folium.LayerControl(collapsed=False).add_to(m)
 
     # ========================================================================
@@ -495,18 +474,11 @@ with map_container:
 
     # Update drawn features in session state
     if map_data and map_data.get("all_drawings"):
-        # Store the drawings in session state for the Manage Layer section
-        # We'll update the list, but we need to avoid duplicates on rerun.
-        # We'll use a simple approach: store only if new drawings exist.
-        # For now, we'll just store everything (but we need to handle persistence)
-        # Since st_folium returns drawings each time, we need to merge.
-        # Let's just store them in a set based on geometry string.
         existing_geoms = {json.dumps(f.get("geometry", {})) for f in st.session_state.drawn_features}
         new_drawings = map_data["all_drawings"]
         for d in new_drawings:
             geom_str = json.dumps(d.get("geometry", {}))
             if geom_str not in existing_geoms:
-                # Assign a simple id
                 d["id"] = f"draw_{len(st.session_state.drawn_features)+1}"
                 st.session_state.drawn_features.append(d)
                 existing_geoms.add(geom_str)
@@ -516,7 +488,6 @@ with map_container:
 # ============================================================================
 # FLOATING DETAILS PANEL (right side) – conditionally shown
 # ============================================================================
-# Determine selected info from map interactions
 selected_info = None
 if map_data and map_data.get("last_object_clicked"):
     clicked = map_data["last_object_clicked"]
