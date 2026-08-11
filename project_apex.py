@@ -7,16 +7,43 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Industrial Intelligence", layout="wide", initial_sidebar_state="collapsed")
 
-# Hide Streamlit chrome and force the component iframe to fill the viewport,
-# so the clone behaves like a full-screen native app.
+# Hide Streamlit chrome, completely disable scrolling, and force the 
+# component iframe to fill the entire viewport exactly.
 st.markdown("""
 <style>
-html, body {margin:0; padding:0; overflow:hidden; background:#2a2a2a;}
-#MainMenu, header, footer {display:none !important;}
-.main .block-container {padding:0 !important; max-width:none !important; margin:0 !important;}
-div[data-testid="stAppViewContainer"] > section.main {background:#2a2a2a;}
-div[data-testid="stIFrame"] {position:fixed !important; top:0; left:0; width:100vw !important; height:100vh !important; margin:0 !important; padding:0 !important; border:none !important;}
-div[data-testid="stIFrame"] iframe {width:100% !important; height:100% !important; border:none !important;}
+/* Reset all margins, paddings, and hide overflow globally */
+html, body, [data-testid="stAppViewContainer"], .main, .block-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    background: #2a2a2a;
+}
+
+/* Hide header and footer */
+header[data-testid="stHeader"], footer, #MainMenu {
+    display: none !important;
+}
+
+/* Remove scrollbars */
+::-webkit-scrollbar {
+    display: none !important;
+}
+
+/* Force the iframe to lock to the viewport boundaries */
+iframe[title="streamlit_components.components.html"] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 999999 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -29,9 +56,11 @@ APP_HTML = r"""
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 <style>
 * {box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI', -apple-system, Helvetica, Arial, sans-serif;}
-html, body {height:100%;}
+html, body {height:100%; width:100%; overflow:hidden;}
 body {background:#2a2a2a;}
-#app {position:absolute; inset:8px; overflow:hidden; background:#fff;} /* dark frame like screenshot */
+
+/* Removed inset to make the UI true full-screen */
+#app {position:absolute; top:0; left:0; right:0; bottom:0; overflow:hidden; background:#fff;}
 
 svg {vertical-align:middle;}
 button {background:none; border:none; cursor:pointer; color:inherit; font:inherit;}
@@ -138,8 +167,11 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
     <button id="zoomout" title="Zoom out"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
     <div class="tsep"></div>
     <button id="searchbtn" title="Search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg></button>
-    <div class="tsep"></div>
     <button class="tool" data-tool="polyline" title="Draw line"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg></button>
+    
+    <!-- Data Browser icon added here -->
+    <button id="togglebrowser" title="Toggle Data Browser"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/><path d="M2 12l10 6 10-6"/><path d="M2 16l10 6 10-6"/></svg></button>
+    
     <button class="tool" data-tool="polygon" title="Draw polygon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"/></svg></button>
     <button class="tool" data-tool="rectangle" title="Draw rectangle"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"/></svg></button>
     <button class="tool" data-tool="circle" title="Draw circle"><svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg></button>
@@ -267,6 +299,12 @@ try {
   document.getElementById('zoomin').onclick = function () { map.zoomIn(); };
   document.getElementById('zoomout').onclick = function () { map.zoomOut(); };
   document.getElementById('clearbtn').onclick = function () { drawnItems.clearLayers(); updateCount(); };
+  
+  // Data browser toggle wiring
+  document.getElementById('togglebrowser').onclick = function () { 
+      var db = document.getElementById('databrowser');
+      db.style.display = (db.style.display === 'none' || db.style.display === '') ? 'flex' : 'none';
+  };
 
   // Drawing tools via Leaflet.draw handlers (default toolbar hidden, custom buttons used)
   var drawOpts = {shapeOptions: {color: '#d33', weight: 3}};
@@ -327,4 +365,5 @@ try {
 </html>
 """
 
-components.html(APP_HTML, height=1080, scrolling=False)
+# Force height via CSS above instead of relying on the iframe height attribute to eliminate scrollbars natively.
+components.html(APP_HTML, scrolling=False)
