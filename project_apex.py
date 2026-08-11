@@ -1,415 +1,330 @@
 import streamlit as st
-import pandas as pd
-import pydeck as pdk
+import streamlit.components.v1 as components
 
-# Page configuration
-st.set_page_config(layout="wide", page_title="Industrial Intelligence", initial_sidebar_state="collapsed")
+# Requires: pip install streamlit
+# Run: streamlit run app.py
+# Internet needed at runtime for Leaflet CDN + OSM tiles.
 
-# Inject CSS
+st.set_page_config(page_title="Industrial Intelligence", layout="wide", initial_sidebar_state="collapsed")
+
+# Hide Streamlit chrome and force the component iframe to fill the viewport,
+# so the clone behaves like a full-screen native app.
 st.markdown("""
 <style>
-    /* Hide Streamlit defaults */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-
-    /* Reset block container to fill screen */
-    .block-container {
-        padding-top: 0rem !important;
-        padding-right: 0rem !important;
-        padding-left: 0rem !important;
-        max-width: 100% !important;
-    }
-    .stApp {
-        background-color: #f0f2f5;
-        margin: 0;
-        overflow: hidden;
-    }
-
-    /* Top Bar */
-    .top-bar {
-        background-color: #ffffff;
-        border-bottom: 1px solid #eaeaea;
-        height: 50px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 20px;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 2000;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        box-sizing: border-box;
-    }
-    .top-bar-left { display: flex; align-items: center; gap: 15px; }
-    .logo { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: #333; }
-    .logo-svg { width: 18px; height: 18px; }
-    .breadcrumb { background: #f5f5f5; padding: 3px 12px; border-radius: 4px; font-size: 11px; color: #666; border: 1px solid #e0e0e0; display: flex; align-items: center; gap: 5px; }
-    .breadcrumb-dot { width: 6px; height: 6px; background: #8bc34a; border-radius: 50%; display: inline-block; }
-    .top-bar-right { display: flex; align-items: center; gap: 15px; font-size: 12px; color: #666; }
-    .top-bar-btn { padding: 4px 8px; border: 1px solid #e0e0e0; border-radius: 4px; background: white; font-size: 11px; color: #555; display: flex; align-items: center; gap: 5px; }
-    .profile-circle { width: 28px; height: 28px; background: #333; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: 500; }
-    .top-separator { color: #e0e0e0; }
-
-    /* Floating Left Panel */
-    .left-panel {
-        position: fixed;
-        top: 65px;
-        left: 15px;
-        width: 320px;
-        max-height: calc(100vh - 80px);
-        background: white;
-        border-radius: 6px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        padding: 15px;
-        z-index: 1000;
-        overflow-y: auto;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        border: 1px solid #f0f0f0;
-        box-sizing: border-box;
-    }
-    
-    /* Floating Right Panel */
-    .right-panel {
-        position: fixed;
-        top: 65px;
-        right: 15px;
-        width: 350px;
-        max-height: calc(100vh - 80px);
-        background: white;
-        border-radius: 6px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        padding: 15px;
-        z-index: 1000;
-        overflow-y: auto;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        border: 1px solid #f0f0f0;
-        box-sizing: border-box;
-    }
-
-    /* Left Panel Components */
-    .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0; padding-bottom: 12px; margin-bottom: 12px; }
-    .panel-title { font-weight: 600; font-size: 16px; color: #333; }
-    .close-btn { cursor: pointer; display: flex; align-items: center; }
-    
-    .filter-section { border: 1px solid #f0f0f0; border-radius: 4px; padding: 6px 10px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #555; background: #fafafa; }
-    .filter-icon { display: flex; align-items: center; }
-
-    .layer-header { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; color: #333; margin-bottom: 8px; }
-    .layer-actions { display: flex; gap: 6px; color: #888; }
-    
-    .layer-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; color: #444; }
-    .layer-item-left { display: flex; align-items: center; gap: 10px; }
-    .layer-color { width: 14px; height: 14px; border-radius: 2px; border: 1px solid #ddd; }
-    .layer-item-right { display: flex; align-items: center; gap: 8px; color: #888; }
-    .layer-item-right .icon { cursor: pointer; display: flex; align-items: center; }
-
-    /* Right Panel Components */
-    .details-placeholder {
-        background: #f9f9f9;
-        border-radius: 6px;
-        padding: 15px;
-        text-align: center;
-        font-size: 13px;
-        color: #666;
-        margin-bottom: 15px;
-        line-height: 1.4;
-        border: 1px solid #f0f0f0;
-    }
-    .detail-row { margin-bottom: 12px; }
-    .detail-label { font-weight: bold; color: #333; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .detail-value { color: #999; font-size: 13px; margin-top: 2px; display: block; }
-
-    .analytics-wrap { margin-top: 15px; }
-    .analytics-title {
-        color: #2c6eb2;
-        font-size: 16px;
-        font-weight: 500;
-        border-bottom: 2px solid #2c6eb2;
-        padding-bottom: 8px;
-        margin-bottom: 15px;
-        display: inline-block;
-    }
-
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-    .stat-item { display: flex; flex-direction: column; }
-    .stat-label { font-size: 10px; font-weight: bold; color: #888; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.3px; }
-    .stat-value { font-size: 18px; font-weight: 500; color: #222; margin-bottom: 1px; }
-    .stat-delta { font-size: 11px; color: #4caf50; font-weight: 500; }
-    
-    .footer-text {
-        margin-top: 20px;
-        font-size: 10px;
-        color: #999;
-        border-top: 1px solid #f0f0f0;
-        padding-top: 12px;
-        line-height: 1.4;
-    }
-
-    /* Map Wrapper */
-    .map-container {
-        position: fixed;
-        top: 50px;
-        left: 0;
-        width: 100%;
-        height: calc(100vh - 50px);
-        z-index: 1;
-    }
+html, body {margin:0; padding:0; overflow:hidden; background:#2a2a2a;}
+#MainMenu, header, footer {display:none !important;}
+.main .block-container {padding:0 !important; max-width:none !important; margin:0 !important;}
+div[data-testid="stAppViewContainer"] > section.main {background:#2a2a2a;}
+div[data-testid="stIFrame"] {position:fixed !important; top:0; left:0; width:100vw !important; height:100vh !important; margin:0 !important; padding:0 !important; border:none !important;}
+div[data-testid="stIFrame"] iframe {width:100% !important; height:100% !important; border:none !important;}
 </style>
 """, unsafe_allow_html=True)
 
-# Top Bar HTML
-st.markdown("""
-<div class="top-bar">
-    <div class="top-bar-left">
-        <div class="logo">
-            <svg class="logo-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="12" fill="#222"/>
-                <path d="M8 8L16 12L8 16V8Z" fill="white"/>
-            </svg>
-            Industrial Intelligence
-        </div>
-        <div class="breadcrumb">
-            <span class="breadcrumb-dot"></span> Visibility: Simple (private)
-        </div>
-    </div>
-    <div class="top-bar-right">
-        <span>Saved</span>
-        <span class="top-separator">|</span>
-        <span>Help</span>
-        <span class="top-separator">|</span>
-        <span>View</span>
-        <span class="top-separator">|</span>
-        <span>Save as...</span>
-        <div class="profile-circle">U</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+APP_HTML = r"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+<style>
+* {box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI', -apple-system, Helvetica, Arial, sans-serif;}
+html, body {height:100%;}
+body {background:#2a2a2a;}
+#app {position:absolute; inset:8px; overflow:hidden; background:#fff;} /* dark frame like screenshot */
 
-# Left Panel HTML
-st.markdown("""
-<div class="left-panel">
-    <div class="panel-header">
-        <div class="panel-title">Data browser</div>
-        <div class="close-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-        </div>
-    </div>
-    
-    <div class="filter-section">
-        <span class="filter-icon">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="22 3 2 3 10 13 10 21 14 18 14 13 22 3"></polygon>
-            </svg>
-        </span>
-        <span>Filters</span>
-    </div>
+svg {vertical-align:middle;}
+button {background:none; border:none; cursor:pointer; color:inherit; font:inherit;}
 
-    <div class="layer-header">
+/* ---------- Top bar ---------- */
+#topbar {position:absolute; top:0; left:0; right:0; height:34px; background:#141414; color:#ddd;
+  display:flex; align-items:center; justify-content:space-between; padding:0 10px; z-index:1200; font-size:12px;}
+.tb-left, .tb-right {display:flex; align-items:center; gap:8px;}
+.logo {width:20px; height:20px; background:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center;}
+.app-title {font-weight:700; color:#fff; font-size:12px;}
+.vis-badge {display:flex; align-items:center; gap:5px; background:#262626; border:1px solid #3a3a3a; color:#bbb;
+  padding:2px 8px; border-radius:3px; font-size:11px;}
+.tb-icon {color:#8a8a8a; padding:2px;}
+.tb-icon:hover {color:#fff;}
+.user {display:flex; align-items:center; gap:5px; color:#ccc; font-size:11px;}
+.vsep {width:1px; height:14px; background:#444;}
+.help {display:flex; align-items:center; gap:5px; color:#ccc; font-size:11px;}
+.pill {display:flex; align-items:center; gap:6px; background:#2e2e2e; border:1px solid #555; color:#ddd;
+  padding:3px 12px; border-radius:12px; font-size:11px;}
+.pill:hover {background:#3a3a3a;}
+.pill.save {background:#242424; border-color:#333; color:#666; cursor:default;}
+
+/* ---------- Left toolbar ---------- */
+#toolbar {position:absolute; top:34px; left:0; bottom:0; width:38px; background:#fff; border-right:1px solid #bbb;
+  display:flex; flex-direction:column; align-items:center; padding-top:6px; gap:2px; z-index:1100;}
+#toolbar button {width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:#444; border-radius:3px;}
+#toolbar button:hover {background:#eee;}
+#toolbar button.active {background:#e0e0e0; box-shadow:inset 0 0 0 1px #888;}
+.tsep {width:22px; height:1px; background:#ddd; margin:4px 0;}
+
+/* ---------- Data browser ---------- */
+#databrowser {position:absolute; top:42px; left:46px; bottom:120px; width:300px; background:#fff;
+  box-shadow:0 1px 4px rgba(0,0,0,.3); z-index:1100; display:flex; flex-direction:column;}
+.db-head {display:flex; align-items:center; gap:8px; padding:12px 12px 8px 12px; font-size:14px; position:relative;}
+.db-head b {font-size:14px;}
+.db-actions {position:absolute; right:8px; top:8px; display:flex; gap:4px;}
+.db-actions button {width:22px; height:22px; border:1px solid #ccc; background:#fff; color:#555; border-radius:2px;
+  display:flex; align-items:center; justify-content:center;}
+.db-actions button:hover {background:#eee;}
+.db-body {padding:4px 12px; overflow:auto; flex:1;}
+.filters-btn {display:flex; align-items:center; gap:6px; border:1px solid #ccc; background:#fff; color:#333;
+  padding:5px 12px; border-radius:3px; font-size:12px; margin:6px 0 12px 0;}
+.filters-btn:hover {background:#f2f2f2;}
+.layers-head {display:flex; justify-content:space-between; align-items:center; border-top:1px solid #ddd; padding-top:10px;}
+.layers-head span:first-child {font-weight:700; font-size:13px;}
+.lh-icons {display:flex; gap:8px; color:#777;}
+.layer-row {display:flex; align-items:center; gap:8px; background:#ededed; border:2px solid transparent;
+  border-radius:2px; padding:7px 8px; margin:8px 0; font-size:12px; color:#333; cursor:pointer;}
+.layer-row.selected {border-color:#222;}
+.layer-row.disabled {color:#a5a5a5; background:#ececec;}
+.lname {flex:1;}
+.row-icons {display:flex; gap:6px; color:#b5b5b5;}
+
+/* ---------- Details panel ---------- */
+#details {position:absolute; top:42px; right:10px; width:292px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.3);
+  z-index:1100; padding:16px; max-height:calc(100% - 160px); overflow:auto;}
+#details-close {position:absolute; right:10px; top:10px; color:#999;}
+#details-close:hover {color:#333;}
+#details h1 {font-size:22px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:8px; margin-bottom:12px;}
+#details h2 {font-size:15px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:6px; margin-top:14px;}
+.hint {font-size:13px; color:#6b7c93; line-height:1.5; margin-bottom:10px;}
+.lbl {font-size:10px; letter-spacing:.5px; color:#8a8a8a; text-transform:uppercase; margin-top:10px;}
+.val {font-size:13px; color:#333; margin-top:2px;}
+#details hr {border:none; border-top:1px solid #ddd; margin:12px 0;}
+.metrics {display:grid; grid-template-columns:1fr 1fr; gap:14px 10px; margin-top:12px;}
+.metric .lbl {margin-top:0; font-size:9px;}
+.metric .mval {font-size:13px; font-weight:700; color:#222; margin-top:3px;}
+.delta {font-size:11px; font-weight:600; margin-left:4px;}
+.up {color:#188038;} .down {color:#d93025;} .flat {color:#80868b;}
+.foot {font-size:11px; color:#8a8a8a; line-height:1.5; margin-top:10px;}
+
+/* ---------- Map ---------- */
+#map {position:absolute; top:34px; left:0; right:0; bottom:0; z-index:1; background:#cfe9e4;}
+.leaflet-container {font:inherit;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Top bar -->
+  <div id="topbar">
+    <div class="tb-left">
+      <div class="logo"><svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 2l7 10-7 10L5 12z" fill="#111"/></svg></div>
+      <span class="app-title">Industrial Intelligence</span>
+      <span class="vis-badge"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>Visibility: Draft (private)</span>
+      <button class="tb-icon" title="Undo"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 7 4 7 10"/><path d="M3.5 15a9 9 0 1 0 2-9.4L1 10"/></svg></button>
+      <button class="tb-icon" title="Redo"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 17 4 17 10"/><path d="M20.5 15a9 9 0 1 1-2-9.4L23 10"/></svg></button>
+    </div>
+    <div class="tb-right">
+      <span class="user"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>User1306</span>
+      <span class="vsep"></span>
+      <span class="help"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Help</span>
+      <button class="pill"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>View</button>
+      <button class="pill save" disabled><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save draft</button>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- Left toolbar -->
+  <div id="toolbar">
+    <button id="zoomin" title="Zoom in"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    <button id="zoomout" title="Zoom out"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    <div class="tsep"></div>
+    <button id="searchbtn" title="Search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg></button>
+    <div class="tsep"></div>
+    <button class="tool" data-tool="polyline" title="Draw line"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg></button>
+    <button class="tool" data-tool="polygon" title="Draw polygon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"/></svg></button>
+    <button class="tool" data-tool="rectangle" title="Draw rectangle"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"/></svg></button>
+    <button class="tool" data-tool="circle" title="Draw circle"><svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg></button>
+    <button class="tool" data-tool="marker" title="Place marker"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></button>
+    <div class="tsep"></div>
+    <button id="editbtn" title="Edit drawings"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"/><path d="M18 2l4 4-10 10H8v-4z"/></svg></button>
+    <button id="clearbtn" title="Clear drawings"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
+  </div>
+
+  <!-- Data browser -->
+  <div id="databrowser">
+    <div class="db-head">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#333" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/><path d="M2 12l10 6 10-6"/><path d="M2 16l10 6 10-6"/></svg>
+      <b>Data browser</b>
+      <div class="db-actions">
+        <button id="db-collapse" title="Collapse"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="14 6 8 12 14 18"/></svg></button>
+        <button id="db-close" title="Close"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+      </div>
+    </div>
+    <div class="db-body" id="db-body">
+      <button class="filters-btn"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9v7l4 2v-9z"/></svg>Filters</button>
+      <div class="layers-head">
         <span>Layers</span>
-        <div class="layer-actions">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-            </svg>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-        </div>
-    </div>
+        <span class="lh-icons">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M11 12l9-9"/><path d="M17 6l3 3"/></svg>
+        </span>
+      </div>
 
-    <div class="layer-item">
-        <div class="layer-item-left">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <path d="M9 12l2 2 4-4"></path>
-            </svg>
-            <div class="layer-color" style="background:#6b6b6b;"></div>
-            <span>Roads</span>
-        </div>
-        <div class="layer-item-right">
-            <span class="icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-            </span>
-            <span class="icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 3l4 4-10 10-4-4 10-10z"></path>
-                    <path d="M21 15v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"></path>
-                </svg>
-            </span>
-            <span class="icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-            </span>
-        </div>
-    </div>
+      <div class="layer-row selected" id="layer-roads">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+        <span class="lname">Roads</span>
+        <span class="row-icons">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M11 12l9-9"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
+        </span>
+      </div>
 
-    <div class="layer-item">
-        <div class="layer-item-left">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <path d="M9 12l2 2 4-4"></path>
-            </svg>
-            <div class="layer-color" style="background:#8bc34a;"></div>
-            <span>Boundaries</span>
-        </div>
-        <div class="layer-item-right">
-            <span class="icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-            </span>
-            <span class="icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 3l4 4-10 10-4-4 10-10z"></path>
-                    <path d="M21 15v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"></path>
-                </svg>
-            </span>
-            <span class="icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-            </span>
-        </div>
+      <div class="layer-row disabled" id="layer-boundaries">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+        <span class="lname">Boundaries</span>
+        <span class="row-icons">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M11 12l9-9"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
+        </span>
+      </div>
     </div>
+  </div>
+
+  <!-- Details panel -->
+  <div id="details">
+    <button id="details-close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    <h1>Details</h1>
+    <p class="hint">Click on a marker, polygon, or draw on the map to see details here.</p>
+    <div class="lbl">Last click</div>
+    <div class="val" id="lastclick">-</div>
+    <div class="lbl">Active drawings</div>
+    <div class="val" id="drawcount">0</div>
+    <hr>
+    <h2>Advanced Analytics</h2>
+    <div class="metrics">
+      <div class="metric"><div class="lbl">Avg rental rate</div><div class="mval">&#8369; 850/m&#178;<span class="delta up">+3.2%</span></div></div>
+      <div class="metric"><div class="lbl">Prime core index</div><div class="mval">87.5<span class="delta up">+1.8%</span></div></div>
+      <div class="metric"><div class="lbl">Road density</div><div class="mval">2.4 km/km&#178;<span class="delta up">+0.3</span></div></div>
+      <div class="metric"><div class="lbl">Zoning compliance</div><div class="mval">94%<span class="delta up">+2%</span></div></div>
+      <div class="metric"><div class="lbl">Flood risk index</div><div class="mval">Medium (4.2)<span class="delta down">+0.5</span></div></div>
+      <div class="metric"><div class="lbl">Earthquake suscept.</div><div class="mval">Low (2.1)<span class="delta flat">+0.0</span></div></div>
+    </div>
+    <hr>
+    <p class="foot">Smart Comparable Analysis: Advanced scoring algorithms for property valuation</p>
+  </div>
+
 </div>
-""", unsafe_allow_html=True)
 
-# Right Panel HTML
-st.markdown("""
-<div class="right-panel">
-    <div class="panel-header">
-        <div class="panel-title">Details</div>
-        <div class="close-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-        </div>
-    </div>
-    
-    <div class="details-placeholder">
-        Click on a marker, polygon, or draw on the map to see details here.
-    </div>
-    
-    <div class="detail-row">
-        <span class="detail-label">LAST CLICK</span>
-        <span class="detail-value">-</span>
-    </div>
-    <div class="detail-row">
-        <span class="detail-label">ACTIVE DRAWINGS</span>
-        <span class="detail-value">0</span>
-    </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script>
+try {
+  // Map centered on Metro Manila to mirror the screenshot view
+  var map = L.map('map', {zoomControl: false}).setView([14.63, 121.00], 11);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors under ODbL'
+  }).addTo(map);
+  L.control.scale({position: 'bottomleft'}).addTo(map);
 
-    <div class="analytics-wrap">
-        <div class="analytics-title">Advanced Analytics</div>
-        <div class="stats-grid">
-            <div class="stat-item">
-                <div class="stat-label">AVG RENTAL RATE</div>
-                <div class="stat-value">&#8369; 850/m&sup2;</div>
-                <div class="stat-delta">+3.2%</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">PRIME CORE INDEX</div>
-                <div class="stat-value">87.5</div>
-                <div class="stat-delta">+1.8%</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">ROAD DENSITY</div>
-                <div class="stat-value">2.4 km/km&sup2;</div>
-                <div class="stat-delta">+0.3</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">ZONING COMPLIANCE</div>
-                <div class="stat-value">94%</div>
-                <div class="stat-delta">+2%</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">FLOOD RISK INDEX</div>
-                <div class="stat-value" style="font-size: 15px;">Medium (4.2)</div>
-                <div class="stat-delta">+0.5</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">EARTHQUAKE SUSCEPT.</div>
-                <div class="stat-value" style="font-size: 15px;">Low (2.1)</div>
-                <div class="stat-delta">+0.0</div>
-            </div>
-        </div>
-    </div>
+  // Green boundary polygons (east metro / eco parks), visible like the photo
+  var boundaries = L.layerGroup([
+    L.polygon([[14.72,121.02],[14.76,121.03],[14.78,121.06],[14.74,121.07],[14.71,121.05]], {color:'#2f9e44', weight:2, fillColor:'#66bb6a', fillOpacity:0.6}),
+    L.polygon([[14.75,121.10],[14.80,121.12],[14.85,121.15],[14.80,121.18],[14.70,121.16],[14.68,121.12]], {color:'#2f9e44', weight:2, fillColor:'#66bb6a', fillOpacity:0.6}),
+    L.polygon([[14.60,121.10],[14.64,121.11],[14.66,121.14],[14.62,121.16],[14.58,121.13],[14.57,121.11]], {color:'#2f9e44', weight:2, fillColor:'#66bb6a', fillOpacity:0.5}),
+    L.polygon([[14.52,121.11],[14.55,121.12],[14.56,121.15],[14.52,121.16],[14.50,121.13]], {color:'#2f9e44', weight:2, fillColor:'#66bb6a', fillOpacity:0.5})
+  ]).addTo(map);
 
-    <div class="footer-text">
-        Smart Comparable Analysis: Advanced scoring algorithms for property valuation
-    </div>
-</div>
-""", unsafe_allow_html=True)
+  // Hatched blue shipping lane across Manila Bay
+  L.polyline([[14.30,120.82],[14.40,120.87],[14.50,120.93],[14.585,120.985]],
+    {color:'#7ea6e0', weight:8, opacity:0.7, dashArray:'2 6', lineCap:'butt'}).addTo(map);
 
-# Define Map Data
-# Approximate coordinates for Manila, Philippines
-view_state = pdk.ViewState(
-    latitude=14.55,
-    longitude=121.03,
-    zoom=11,
-    pitch=0
-)
+  // Roads highlight overlay (toggled by the Roads layer row)
+  var roads = L.layerGroup([
+    L.polyline([[14.67,121.03],[14.63,121.01],[14.58,120.99],[14.53,120.98],[14.50,120.96]], {color:'#e07b39', weight:3, opacity:0.7}),
+    L.polyline([[14.55,121.00],[14.60,121.05],[14.65,121.10]], {color:'#e07b39', weight:3, opacity:0.7})
+  ]);
 
-# Generate dummy polygons (Boundaries)
-polygons_data = [
-    {"polygon": [[121.00, 14.58], [121.04, 14.58], [121.05, 14.62], [121.01, 14.63]]},
-    {"polygon": [[121.05, 14.55], [121.09, 14.56], [121.10, 14.59], [121.06, 14.60]]},
-    {"polygon": [[121.11, 14.61], [121.15, 14.62], [121.16, 14.65], [121.12, 14.66]]},
-    {"polygon": [[121.02, 14.50], [121.06, 14.51], [121.07, 14.54], [121.03, 14.55]]},
-]
-poly_df = pd.DataFrame(polygons_data)
+  // Drawn shapes storage
+  var drawnItems = L.featureGroup().addTo(map);
+  function updateCount() {
+    document.getElementById('drawcount').textContent = drawnItems.getLayers().length;
+  }
+  map.on(L.Draw.Event.CREATED, function (e) { drawnItems.addLayer(e.layer); updateCount(); });
 
-# Polygons Layer (Green Overlay)
-polygon_layer = pdk.Layer(
-    "PolygonLayer",
-    poly_df,
-    get_polygon="polygon",
-    get_fill_color=[139, 195, 74, 150],
-    get_line_color=[0, 0, 0, 0],
-    pickable=True
-)
+  // Last click readout
+  map.on('click', function (e) {
+    document.getElementById('lastclick').textContent = e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4);
+  });
 
-# Generate dummy paths (Roads)
-roads_data = [
-    {"path": [[121.00, 14.54], [121.02, 14.54], [121.05, 14.54], [121.08, 14.54]]},
-    {"path": [[121.03, 14.53], [121.03, 14.56], [121.03, 14.59], [121.03, 14.62]]},
-    {"path": [[121.01, 14.59], [121.04, 14.60], [121.07, 14.59], [121.10, 14.58]]},
-    {"path": [[121.05, 14.55], [121.05, 14.58], [121.05, 14.61]]},
-    {"path": [[121.01, 14.52], [121.04, 14.53], [121.07, 14.52]]},
-]
-road_df = pd.DataFrame(roads_data)
+  // Toolbar wiring
+  document.getElementById('zoomin').onclick = function () { map.zoomIn(); };
+  document.getElementById('zoomout').onclick = function () { map.zoomOut(); };
+  document.getElementById('clearbtn').onclick = function () { drawnItems.clearLayers(); updateCount(); };
 
-# Paths Layer (Grey Lines)
-path_layer = pdk.Layer(
-    "PathLayer",
-    road_df,
-    get_path="path",
-    get_width=2,
-    get_color=[80, 80, 80, 150],
-    width_min_pixels=1.5
-)
+  // Drawing tools via Leaflet.draw handlers (default toolbar hidden, custom buttons used)
+  var drawOpts = {shapeOptions: {color: '#d33', weight: 3}};
+  var handlers = {
+    polyline:  new L.Draw.Polyline(map, drawOpts),
+    polygon:   new L.Draw.Polygon(map, drawOpts),
+    rectangle: new L.Draw.Rectangle(map, drawOpts),
+    circle:    new L.Draw.Circle(map, drawOpts),
+    marker:    new L.Draw.Marker(map)
+  };
+  var activeHandler = null;
+  document.querySelectorAll('.tool').forEach(function (btn) {
+    btn.onclick = function () {
+      document.querySelectorAll('.tool').forEach(function (b) { b.classList.remove('active'); });
+      if (activeHandler) { activeHandler.disable(); activeHandler = null; }
+      activeHandler = handlers[btn.dataset.tool];
+      activeHandler.enable();
+      btn.classList.add('active');
+    };
+  });
 
-# Compose Deck
-deck = pdk.Deck(
-    layers=[path_layer, polygon_layer],
-    initial_view_state=view_state,
-    map_style="light"
-)
+  // Vertex editing toggle for drawn shapes
+  var editMode = null, editing = false;
+  document.getElementById('editbtn').onclick = function () {
+    try {
+      if (!editMode) editMode = new L.EditToolbar.Edit(map, {featureGroup: drawnItems});
+      editing = !editing;
+      editing ? editMode.enable() : editMode.disable();
+      this.classList.toggle('active', editing);
+    } catch (err) { console.warn('Edit mode unavailable:', err); }
+  };
 
-# Render Map (Must be the last element to sit behind the fixed panels)
-st.pydeck_chart(deck, height=1200, use_container_width=True)
+  // Layer rows: toggle visibility + selected/disabled styling
+  function bindLayer(id, layer, initialOn) {
+    var row = document.getElementById(id);
+    var on = initialOn;
+    row.onclick = function () {
+      on = !on;
+      if (on) { map.addLayer(layer); row.classList.remove('disabled'); row.classList.add('selected'); }
+      else { map.removeLayer(layer); row.classList.add('disabled'); row.classList.remove('selected'); }
+    };
+  }
+  bindLayer('layer-roads', roads, false);      // selected in photo but base map already shows roads
+  bindLayer('layer-boundaries', boundaries, true); // visible in photo, row styled disabled
+
+  // Panel controls
+  document.getElementById('db-close').onclick = function () { document.getElementById('databrowser').style.display = 'none'; };
+  document.getElementById('db-collapse').onclick = function () {
+    var b = document.getElementById('db-body');
+    b.style.display = (b.style.display === 'none') ? '' : 'none';
+  };
+  document.getElementById('details-close').onclick = function () { document.getElementById('details').style.display = 'none'; };
+} catch (err) {
+  console.error('Map init failed:', err); // UI panels still render if CDN is blocked
+}
+</script>
+</body>
+</html>
+"""
+
+components.html(APP_HTML, height=1080, scrolling=False)
