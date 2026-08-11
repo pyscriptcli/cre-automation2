@@ -1,13 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Requires: pip install streamlit
-# Run: streamlit run app.py
-# Internet needed at runtime for Leaflet CDN + OSM tiles.
-
 st.set_page_config(page_title="Project Apex", layout="wide", initial_sidebar_state="collapsed")
 
-# Full-screen chrome stripping: no scrollbars, iframe pinned to viewport (1920x1080 safe).
 st.markdown("""
 <style>
 html, body, #root, .stApp {
@@ -73,6 +68,21 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 #toolbar button.active {background:#e0e0e0; box-shadow:inset 0 0 0 1px #888;}
 .tsep {width:22px; height:1px; background:#ddd; margin:4px 0;}
 
+/* ---------- Modals (Drawing Save/Cancel + Group Layer) ---------- */
+.modal-overlay {position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:3000; display:none; align-items:center; justify-content:center;}
+.modal-content {background:#fff; border-radius:6px; padding:20px; width:320px; max-width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.3);}
+.modal-content.wide {width:420px;}
+.modal-title {font-size:15px; font-weight:600; color:#222; margin-bottom:12px;}
+.modal-actions {display:flex; gap:10px; justify-content:flex-end; margin-top:16px;}
+.modal-btn {padding:6px 14px; border-radius:3px; font-size:13px; cursor:pointer;}
+.modal-btn.primary {background:#021a3d; color:#fff;}
+.modal-btn.secondary {background:#eee; color:#444;}
+.modal-btn.primary:hover {opacity:0.9;}
+.modal-btn.secondary:hover {background:#ddd;}
+.modal-input {width:100%; padding:6px; border:1px solid #ccc; border-radius:3px; font-size:13px; margin-bottom:8px;}
+.group-check-list {max-height:180px; overflow-y:auto; margin:8px 0; border:1px solid #eee; padding:6px; border-radius:3px;}
+.group-check-item {display:flex; align-items:center; gap:8px; padding:4px 0; font-size:12px;}
+
 /* ---------- Basemap panel ---------- */
 #basemap-panel {position:absolute; left:46px; top:140px; width:180px; background:#fff; z-index:1150;
   box-shadow:0 1px 5px rgba(0,0,0,.35); border-radius:3px; padding:6px; display:none;}
@@ -134,7 +144,7 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .row-icons svg:hover {color:#333;}
 .empty-note {font-size:11px; color:#999; padding:8px 4px;}
 
-/* ---------- Hazard Panel (User requested widget) ---------- */
+/* ---------- Hazard Panel ---------- */
 #hazard-panel {position:absolute; top:42px; right:10px; width:340px; background:#fff; 
   box-shadow:0 1px 4px rgba(0,0,0,.3); z-index:1100; padding:16px; max-height:calc(100% - 80px); overflow:auto; display:none;}
 #hazard-panel.open {display:block;}
@@ -152,11 +162,12 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .hazard-notes ul li {margin-bottom:2px;}
 .hazard-db-list {margin-top:8px; font-size:11px; font-weight:600; color:#555; line-height:1.5;}
 
-/* ---------- Details panel ---------- */
+/* ---------- Details panel (Dynamic layout) ---------- */
 #details {position:absolute; top:42px; right:10px; width:292px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.3);
   z-index:1090; padding:16px; max-height:calc(100% - 160px); overflow:auto; display:block;}
 #details-close {position:absolute; right:10px; top:10px; color:#999;}
 #details-close:hover {color:#333;}
+
 #details h1 {font-size:22px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:8px; margin-bottom:12px;}
 #details h2 {font-size:15px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:6px; margin-top:14px;}
 .hint {font-size:13px; color:#6b7c93; line-height:1.5; margin-bottom:10px;}
@@ -239,7 +250,32 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
     </div>
   </div>
 
-  <!-- Hazard Levels Panel (Matching the User's Image) -->
+  <!-- Drawing Save/Cancel Modal -->
+  <div class="modal-overlay" id="draw-modal">
+    <div class="modal-content">
+      <div class="modal-title">Save Drawing?</div>
+      <p style="font-size:13px; color:#555; margin-bottom:12px;">Do you want to keep this shape on the map?</p>
+      <div class="modal-actions">
+        <button class="modal-btn secondary" id="draw-cancel">Cancel</button>
+        <button class="modal-btn primary" id="draw-save">Save Drawing</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Group Layers Modal -->
+  <div class="modal-overlay" id="group-modal">
+    <div class="modal-content wide">
+      <div class="modal-title">Create Layer Group</div>
+      <input type="text" class="modal-input" id="group-name-input" placeholder="Group name">
+      <div class="group-check-list" id="group-layer-list"></div>
+      <div class="modal-actions">
+        <button class="modal-btn secondary" id="group-cancel">Cancel</button>
+        <button class="modal-btn primary" id="group-save">Save Group</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hazard Levels Panel -->
   <div id="hazard-panel">
     <div class="hazard-title">Hazard Levels In Your Area</div>
     
@@ -301,6 +337,12 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
       </div>
     </div>
     <div class="db-body" id="db-body">
+
+      <!-- Layer Grouping Button -->
+      <div style="display:flex; justify-content:flex-end; padding-top:8px;">
+        <button id="group-btn" style="background:#021a3d; color:#fff; padding:4px 10px; border-radius:3px; font-size:11px; font-weight:600;">+ Group Layers</button>
+      </div>
+      <div id="grouped-layers-container" style="border-bottom:1px solid #eee; margin-bottom:6px;"></div>
 
       <!-- Groups sit directly under the Data browser header -->
       <div class="layer-group" id="grp-hazards">
@@ -378,21 +420,21 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
     </div>
   </div>
 
-  <!-- Details panel -->
+  <!-- Details panel (Dynamic) -->
   <div id="details">
-    <button id="details-close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+    <button id="details-close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg></button>
     <h1>Details</h1>
     <p class="hint">Click on a marker, polygon, or draw on the map to see details here.</p>
     <div class="lbl">Last click</div>
-    <div class="val" id="lastclick">-</div>
+    <div class="val" id="lastclick">14.6142, 121.0110</div>
     <div class="lbl">Active drawings</div>
     <div class="val" id="drawcount">0</div>
     <hr>
     <h2>Advanced Analytics</h2>
     <div class="metrics">
-      <div class="metric"><div class="lbl">Avg rental rate</div><div class="mval">&#8369; 850/m&#178;<span class="delta up">+3.2%</span></div></div>
+      <div class="metric"><div class="lbl">Avg rental rate</div><div class="mval">₱ 850/m²<span class="delta up">+3.2%</span></div></div>
       <div class="metric"><div class="lbl">Prime core index</div><div class="mval">87.5<span class="delta up">+1.8%</span></div></div>
-      <div class="metric"><div class="lbl">Road density</div><div class="mval">2.4 km/km&#178;<span class="delta up">+0.3</span></div></div>
+      <div class="metric"><div class="lbl">Road density</div><div class="mval">2.4 km/km²<span class="delta up">+0.3</span></div></div>
       <div class="metric"><div class="lbl">Zoning compliance</div><div class="mval">94%<span class="delta up">+2%</span></div></div>
       <div class="metric"><div class="lbl">Flood risk index</div><div class="mval">Medium (4.2)<span class="delta down">+0.5</span></div></div>
       <div class="metric"><div class="lbl">Earthquake suscept.</div><div class="mval">Low (2.1)<span class="delta flat">+0.0</span></div></div>
@@ -423,7 +465,7 @@ try {
   bmBtn.onclick = function (e) {
     e.stopPropagation();
     bmPanel.classList.toggle('open');
-    bmPanel.style.top = (34 + bmBtn.offsetTop - 4) + 'px'; // align with button
+    bmPanel.style.top = (34 + bmBtn.offsetTop - 4) + 'px'; 
     bmBtn.classList.toggle('active', bmPanel.classList.contains('open'));
   };
   document.querySelectorAll('.bm-opt').forEach(function (o) {
@@ -434,7 +476,6 @@ try {
       this.classList.add('active');
     };
   });
-  // close picker when clicking anywhere else
   document.addEventListener('click', function (e) {
     if (!bmPanel.contains(e.target) && !e.target.closest('#basemap-btn')) {
       bmPanel.classList.remove('open');
@@ -473,8 +514,12 @@ try {
   }
   var rental = dots([[14.58,120.98],[14.62,121.01],[14.67,121.03],[14.52,121.00]], '#fbbc04');
   var prime  = dots([[14.55,121.02],[14.60,120.99],[14.65,121.05]], '#34a853');
-  var lamudi  = L.layerGroup(); // placeholder for scraper feed
-  var tiering = L.layerGroup(); // placeholder for tiering logic
+  var lamudi  = L.layerGroup(); 
+  var tiering = L.layerGroup(); 
+
+  // Add Valuation Popups
+  rental.eachLayer(function(l) { l.bindPopup('<b>Property Price</b><br>₱ 850/m²'); });
+  prime.eachLayer(function(l) { l.bindPopup('<b>Property Price</b><br>₱ 1,200/m²'); });
 
   var overlays = {earthquake:earthquake, floods:floods, roads:roads, boundaries:boundaries,
                   zoning:zoning, rental:rental, prime:prime, lamudi:lamudi, tiering:tiering};
@@ -490,20 +535,15 @@ try {
     h.onclick = function () { h.parentElement.classList.toggle('collapsed'); };
   });
 
-  // ----- Thematic sublayer toggling & Hazard Widget Logic -----
+  // ----- Thematic sublayer toggling & Hazard Widget -----
   var hazardPanel = document.getElementById('hazard-panel');
-  
   function checkHazardPanel() {
     var eqRow = document.querySelector('.layer-row[data-key="earthquake"]');
     var floodRow = document.querySelector('.layer-row[data-key="floods"]');
     var eqActive = eqRow && eqRow.classList.contains('selected');
     var floodActive = floodRow && floodRow.classList.contains('selected');
-    
-    if (eqActive || floodActive) {
-      hazardPanel.classList.add('open');
-    } else {
-      hazardPanel.classList.remove('open');
-    }
+    if (eqActive || floodActive) hazardPanel.classList.add('open');
+    else hazardPanel.classList.remove('open');
   }
 
   document.querySelectorAll('.layer-row[data-key]').forEach(function (row) {
@@ -512,13 +552,42 @@ try {
       var on = row.classList.contains('disabled');
       if (on) { overlays[key].addTo(map); row.classList.remove('disabled'); row.classList.add('selected'); }
       else { map.removeLayer(overlays[key]); row.classList.add('disabled'); row.classList.remove('selected'); }
-      
-      // Trigger Hazard panel update if earthquake or floods
-      if (key === 'earthquake' || key === 'floods') {
-        checkHazardPanel();
-      }
+      if (key === 'earthquake' || key === 'floods') checkHazardPanel();
     };
   });
+
+  // ----- Dynamic Details Panel Logic -----
+  var detailsPanel = document.getElementById('details');
+  var lastClickSpan = document.getElementById('lastclick');
+  function updateDetails(lat, lng, count) {
+    lastClickSpan.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+    document.getElementById('drawcount').textContent = count || '0';
+  }
+
+  // ----- Drawing Save/Cancel Modal Logic -----
+  var drawModal = document.getElementById('draw-modal');
+  var pendingLayer = null;
+  var drawSaveBtn = document.getElementById('draw-save');
+  var drawCancelBtn = document.getElementById('draw-cancel');
+
+  drawSaveBtn.onclick = function() {
+    if (pendingLayer) {
+      drawnItems.addLayer(pendingLayer);
+      var t = pendingLayer.layerType || 'polygon'; // fallback
+      addDrawnUIItem(pendingLayer, t);
+      refreshDrawnUI();
+      pendingLayer = null;
+    }
+    drawModal.style.display = 'none';
+  };
+
+  drawCancelBtn.onclick = function() {
+    if (pendingLayer) {
+      map.removeLayer(pendingLayer);
+      pendingLayer = null;
+    }
+    drawModal.style.display = 'none';
+  };
 
   // ----- Drawings + Layers section list -----
   var drawnItems = L.featureGroup().addTo(map);
@@ -543,9 +612,7 @@ try {
     emptyNote.style.display = n ? 'none' : '';
   }
 
-  map.on(L.Draw.Event.CREATED, function (e) {
-    drawnItems.addLayer(e.layer);
-    var t = e.layerType;
+  function addDrawnUIItem(layer, t) {
     counters[t] = (counters[t] || 0) + 1;
     var meta = typeMeta[t] || {name:t, svg:''};
 
@@ -554,35 +621,44 @@ try {
     row.innerHTML = meta.svg + '<span class="lname">' + meta.name + ' ' + counters[t] + '</span>' +
       '<span class="row-icons">' + eyeSvg + trashSvg + '</span>';
 
-    // row click = zoom to shape
+    // Zoom to shape
     row.onclick = function () {
       try {
-        if (e.layer.getBounds) map.fitBounds(e.layer.getBounds(), {padding:[30,30]});
-        else map.setView(e.layer.getLatLng(), 15);
+        if (layer.getBounds) map.fitBounds(layer.getBounds(), {padding:[30,30]});
+        else map.setView(layer.getLatLng(), 15);
       } catch (err) { console.warn('Zoom failed:', err); }
     };
     // eye = show/hide
     row.querySelector('.ic-eye').onclick = function (ev) {
       ev.stopPropagation();
-      var visible = map.hasLayer(e.layer);
-      if (visible) map.removeLayer(e.layer); else map.addLayer(e.layer);
+      var visible = map.hasLayer(layer);
+      if (visible) map.removeLayer(layer); else map.addLayer(layer);
       row.classList.toggle('disabled', visible);
       row.classList.toggle('selected', !visible);
     };
     // trash = delete
     row.querySelector('.ic-trash').onclick = function (ev) {
       ev.stopPropagation();
-      drawnItems.removeLayer(e.layer);
+      drawnItems.removeLayer(layer);
       row.remove();
       refreshDrawnUI();
     };
-
     drawnList.appendChild(row);
-    refreshDrawnUI();
+  }
+
+  // Intercept drawing creation with modal
+  map.on(L.Draw.Event.CREATED, function (e) {
+    pendingLayer = e.layer;
+    var t = e.layerType;
+    drawModal.style.display = 'flex';
   });
 
+  // Add standard map Click
   map.on('click', function (e) {
-    document.getElementById('lastclick').textContent = e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4);
+    var lat = e.latlng.lat;
+    var lng = e.latlng.lng;
+    var count = drawnItems.getLayers().length;
+    updateDetails(lat, lng, count);
   });
 
   // ----- Toolbar -----
@@ -629,7 +705,7 @@ try {
     } catch (err) { console.warn('Edit mode unavailable:', err); }
   };
 
-  // ----- Search Panel Logic (Container like Data Browser) -----
+  // ----- Search Panel Logic -----
   var searchPanel = document.getElementById('search-panel');
   var searchInput = document.getElementById('search-input');
   var searchResults = document.getElementById('search-results');
@@ -673,6 +749,65 @@ try {
     }).catch(() => { searchResults.classList.remove('open'); });
   });
 
+  // ----- Layer Grouping Logic -----
+  var groupModal = document.getElementById('group-modal');
+  var groupNameInput = document.getElementById('group-name-input');
+  var groupLayerList = document.getElementById('group-layer-list');
+  var groupedContainer = document.getElementById('grouped-layers-container');
+  var groupCount = 0;
+
+  document.getElementById('group-btn').onclick = function() {
+    groupNameInput.value = '';
+    groupLayerList.innerHTML = '';
+    // Populate available layers
+    var availableLayerNames = Object.keys(overlays);
+    availableLayerNames.forEach(function(key) {
+      var div = document.createElement('div');
+      div.className = 'group-check-item';
+      div.innerHTML = '<input type="checkbox" value="'+key+'"> <label>'+key.charAt(0).toUpperCase() + key.slice(1)+'</label>';
+      groupLayerList.appendChild(div);
+    });
+    groupModal.style.display = 'flex';
+  };
+
+  document.getElementById('group-cancel').onclick = function() {
+    groupModal.style.display = 'none';
+  };
+
+  document.getElementById('group-save').onclick = function() {
+    var name = groupNameInput.value.trim();
+    if (!name) { alert('Please enter a group name.'); return; }
+    var selectedKeys = [];
+    groupLayerList.querySelectorAll('input[type="checkbox"]:checked').forEach(function(cb) {
+      selectedKeys.push(cb.value);
+    });
+    if (selectedKeys.length === 0) { alert('Please select at least one layer.'); return; }
+    
+    // Create Group
+    var layersToGroup = selectedKeys.map(function(k) { return overlays[k]; });
+    var newGroup = L.layerGroup(layersToGroup);
+    map.addLayer(newGroup);
+    
+    // Add UI group container
+    var groupDiv = document.createElement('div');
+    groupDiv.className = 'layer-row selected';
+    groupDiv.style.marginTop = '4px';
+    groupDiv.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M4 4h16v16H4z"/></svg><span class="lname">'+name+'</span>';
+    groupDiv.onclick = function() {
+      if (map.hasLayer(newGroup)) {
+        map.removeLayer(newGroup);
+        groupDiv.classList.remove('selected');
+        groupDiv.classList.add('disabled');
+      } else {
+        map.addLayer(newGroup);
+        groupDiv.classList.remove('disabled');
+        groupDiv.classList.add('selected');
+      }
+    };
+    groupedContainer.appendChild(groupDiv);
+    groupModal.style.display = 'none';
+  };
+
   // ----- Panel controls -----
   document.getElementById('db-close').onclick = function () { document.getElementById('databrowser').style.display = 'none'; };
   document.getElementById('db-collapse').onclick = function () {
@@ -682,7 +817,7 @@ try {
   document.getElementById('details-close').onclick = function () { document.getElementById('details').style.display = 'none'; };
 
   refreshDrawnUI();
-  checkHazardPanel(); // Initial check for hazard widget
+  checkHazardPanel();
 } catch (err) {
   console.error('Map init failed:', err);
 }
