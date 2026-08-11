@@ -1,652 +1,426 @@
 import streamlit as st
-import folium
-from streamlit_folium import st_folium
-from folium.plugins import Draw, MousePosition
-import json
-from datetime import datetime
-import re
+import streamlit.components.v1 as components
 
-# ============================================================================
-# PAGE CONFIG
-# ============================================================================
-st.set_page_config(
-    page_title="Project APEX - GIS Analysis",
-    page_icon=":globe_with_meridians:",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Configure the page layout to wide and remove default padding to fit the dashboard look
+st.set_page_config(layout="wide", page_title="Industrial Intelligence - Visuality")
 
-# ============================================================================
-# HANDLE CLOSE PANEL VIA QUERY PARAM
-# ============================================================================
-if "close_panel" in st.query_params:
-    st.session_state.panel_visible = False
-    st.query_params.clear()
-    st.rerun()
-
-# ============================================================================
-# CUSTOM CSS - Hide toolbar, header, footer; full map; floating panel
-# ============================================================================
+# Custom CSS to mimic the exact dark header, panels, fonts, and layout of the reference image
 st.markdown("""
-    <style>
-    /* Hide all Streamlit chrome */
-    .stAppToolbar, .stMainMenu, #MainMenu, footer, .stAppHeader {
-        display: none !important;
-    }
-    /* Remove default padding */
-    .main > div {
-        padding: 0 !important;
-        margin: 0 !important;
-    }
+<style>
+    /* Hide default Streamlit elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     .block-container {
         padding: 0 !important;
-        margin: 0 !important;
         max-width: 100% !important;
     }
-    /* Sidebar overlay */
-    section[data-testid="stSidebar"] {
-        background-color: rgba(255, 255, 255, 0.92);
-        backdrop-filter: blur(6px);
-        border-right: 1px solid rgba(0,0,0,0.08);
-        padding-top: 1rem;
-        z-index: 1000;
-        width: 320px !important;
-        box-shadow: 2px 0 12px rgba(0,0,0,0.08);
+    
+    /* Global styling */
+    body {
+        background-color: #1e1e1e;
+        color: #333333;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
-    .sidebar-section {
-        font-size: 0.8rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #6c757d;
-        margin-top: 0.75rem;
-        margin-bottom: 0.25rem;
-        padding-bottom: 0.25rem;
-        border-bottom: 1px solid #e9ecef;
+
+    /* Top Navigation Bar */
+    .top-nav {
+        background-color: #262626;
+        color: #d1d5db;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 16px;
+        font-size: 13px;
+        border-bottom: 1px solid #383838;
+        height: 40px;
     }
-    .app-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #1a1a2e;
-        padding: 0.5rem 0 0.2rem 0;
-        border-bottom: 2px solid #4a90d9;
-        display: inline-block;
+    .top-nav-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
     }
-    /* Full‑screen map – behind everything */
-    .map-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        z-index: 0;
-    }
-    /* Floating details panel */
-    .floating-panel {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        width: 360px;
-        max-height: calc(100vh - 40px);
-        overflow-y: auto;
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(8px);
-        border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-        padding: 1.2rem 1.5rem;
-        z-index: 999;
-        border: 1px solid rgba(255,255,255,0.2);
-    }
-    .floating-panel h4 {
-        margin-top: 0;
-        margin-bottom: 0.5rem;
+    .brand-title {
+        color: #ffffff;
         font-weight: 600;
-        color: #1a1a2e;
-        border-bottom: 2px solid #4a90d9;
-        padding-bottom: 0.4rem;
-    }
-    .floating-panel .detail-label {
-        font-size: 0.7rem;
-        font-weight: 600;
-        color: #6c757d;
-        text-transform: uppercase;
+        font-size: 14px;
         letter-spacing: 0.3px;
     }
-    .floating-panel .detail-value {
-        font-size: 0.9rem;
-        color: #1a1a2e;
-        margin-bottom: 0.3rem;
+    .sub-title {
+        color: #9ca3af;
+        font-style: italic;
     }
-    .floating-panel .divider {
-        border: none;
-        border-top: 1px solid #f1f3f5;
-        margin: 0.6rem 0;
+    .top-nav-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        color: #9ca3af;
     }
-    .floating-panel .close-btn {
-        float: right;
-        background: none;
+    .user-profile {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #d1d5db;
+    }
+    .action-btn {
+        background: #374151;
+        color: #ffffff;
         border: none;
-        font-size: 1.2rem;
-        color: #adb5bd;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
         cursor: pointer;
-        text-decoration: none;
     }
-    .floating-panel .close-btn:hover {
-        color: #495057;
-    }
-    .floating-panel::-webkit-scrollbar {
-        width: 4px;
-    }
-    .floating-panel::-webkit-scrollbar-track {
-        background: #f1f1f1;
+
+    /* Floating Data Browser Panel */
+    .data-browser-panel {
+        position: absolute;
+        top: 60px;
+        left: 20px;
+        width: 320px;
+        background: #ffffff;
         border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 999;
+        border: 1px solid #e5e7eb;
     }
-    .floating-panel::-webkit-scrollbar-thumb {
-        background: #c1c7cd;
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        font-weight: 600;
+        font-size: 14px;
+        color: #1f2937;
+    }
+    .panel-controls {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .filter-btn {
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        padding: 4px 12px;
         border-radius: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #374151;
+        cursor: pointer;
     }
-    .footer {
-        font-size: 0.65rem;
-        color: #adb5bd;
-        text-align: center;
-        padding: 0.5rem 0;
-        border-top: 1px solid #e9ecef;
-        margin-top: 0.5rem;
+    .layers-section {
+        padding: 12px 16px;
     }
-    @media (max-width: 768px) {
-        .floating-panel {
-            width: 300px;
-            right: 10px;
-            top: 10px;
-            max-height: calc(100vh - 20px);
-            padding: 1rem;
-        }
-        section[data-testid="stSidebar"] {
-            width: 280px !important;
-        }
+    .layer-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #4b5563;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        letter-spacing: 0.5px;
     }
-    </style>
+    .layer-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f9fafb;
+        padding: 8px 10px;
+        border-radius: 4px;
+        margin-bottom: 6px;
+        border: 1px solid #e5e7eb;
+        font-size: 13px;
+        color: #374151;
+    }
+
+    /* Floating Details Panel */
+    .details-panel {
+        position: absolute;
+        top: 60px;
+        right: 20px;
+        width: 360px;
+        background: #ffffff;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 999;
+        border: 1px solid #e5e7eb;
+        padding: 16px;
+    }
+    .details-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+    }
+    .details-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+    }
+    .details-instruction {
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+    .metric-section-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #1f2937;
+        margin-top: 16px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 4px;
+    }
+    .analytics-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+    .analytics-card {
+        background: #ffffff;
+    }
+    .analytics-label {
+        font-size: 11px;
+        color: #6b7280;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+    .analytics-value {
+        font-size: 15px;
+        font-weight: 600;
+        color: #111827;
+        margin-top: 2px;
+    }
+    .trend-positive {
+        color: #10b981;
+        font-size: 11px;
+        font-weight: 500;
+        margin-left: 4px;
+    }
+    .trend-negative {
+        color: #ef4444;
+        font-size: 11px;
+        font-weight: 500;
+        margin-left: 4px;
+    }
+    .trend-neutral {
+        color: #6b7280;
+        font-size: 11px;
+        font-weight: 500;
+        margin-left: 4px;
+    }
+    .footer-note {
+        font-size: 11px;
+        color: #6b7280;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 10px;
+        margin-top: 10px;
+        line-height: 1.4;
+    }
+</style>
+
+<!-- Top Navigation Bar -->
+<div class="top-nav">
+    <div class="top-nav-left">
+        <span class="brand-title">Industrial Intelligence</span>
+        <span style="color: #4b5563;">|</span>
+        <span class="sub-title">Visuality: Draft (rebuild)</span>
+    </div>
+    <div class="top-nav-right">
+        <div class="user-profile">
+            <span>Dewet73M</span>
+        </div>
+        <span>|</span>
+        <span>Help</span>
+        <span>|</span>
+        <button class="action-btn">View</button>
+        <button class="action-btn" style="background: #2563eb;">Save draft</button>
+    </div>
+</div>
 """, unsafe_allow_html=True)
 
-# ============================================================================
-# SESSION STATE
-# ============================================================================
-if "selected_feature" not in st.session_state:
-    st.session_state.selected_feature = None
-if "selected_feature_type" not in st.session_state:
-    st.session_state.selected_feature_type = None
-if "drawings" not in st.session_state:
-    st.session_state.drawings = []
-if "map_center" not in st.session_state:
-    st.session_state.map_center = [14.8500, 120.9500]
-if "map_zoom" not in st.session_state:
-    st.session_state.map_zoom = 11
-if "panel_visible" not in st.session_state:
-    st.session_state.panel_visible = True
+# Leaflet Map integrated via HTML/JS Component mimicking the exact Manila/Metro area view and polygon overlays
+leaflet_map_html = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        html, body, #map {
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            background: #f2efe9;
+        }
+        /* Custom styling for leaflet controls to match interface */
+        .leaflet-control-zoom {
+            border: 1px solid #ccc !important;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2) !important;
+            border-radius: 4px !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        // Initialize map centered around Metro Manila / San Jose del Monte area matching the image
+        var map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([14.75, 121.05], 11);
 
-# Sub‑layer visibility
-if "sub_layers" not in st.session_state:
-    st.session_state.sub_layers = {
-        "earthquake": True,
-        "floods": True,
-        "landslide": False,
-        "tsunami": False,
-        "volcanic": False,
-        "roads": True,
-        "boundaries": True,
-        "zoning": False,
-        "valuation": False,
-        "rental_rate": False,
-        "prime_core": False,
-        "lamudi": False,
-        "other_platforms": False
-    }
+        // Add standard OSM tile layer styled similar to the reference map background
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
 
-# For managing drawn items
-if "drawn_features" not in st.session_state:
-    st.session_state.drawn_features = []
+        // Add custom zoom control to top-left area below UI elements
+        L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
 
-if "basemap" not in st.session_state:
-    st.session_state.basemap = "CartoDB Positron"
+        // Custom polygon overlays simulating the green zones shown in the image
+        var greenStyle = {
+            color: '#2d8a39',
+            weight: 2,
+            fillColor: '#43a047',
+            fillOpacity: 0.4
+        };
 
-# ============================================================================
-# SAMPLE DATA
-# ============================================================================
-sample_locations = [
-    {"id": 1, "name": "Plaridel", "lat": 14.8875, "lng": 120.8567, "type": "Municipality",
-     "description": "Municipal hall and town center", "population": "41,000", "area_km2": "32.44",
-     "hazard_risk": "Moderate", "infrastructure": "Good road network"},
-    {"id": 2, "name": "Tabang Spur Road", "lat": 14.8950, "lng": 120.8700, "type": "Road Junction",
-     "description": "Major intersection connecting to MacArthur Highway", "population": "N/A",
-     "area_km2": "N/A", "hazard_risk": "Low", "infrastructure": "Highway junction"},
-    {"id": 3, "name": "MacArthur Highway", "lat": 14.8980, "lng": 120.8780, "type": "Highway",
-     "description": "Primary north-south thoroughfare", "population": "N/A", "area_km2": "N/A",
-     "hazard_risk": "Low", "infrastructure": "Major highway"},
-    {"id": 4, "name": "Santa Maria", "lat": 14.8183, "lng": 120.9567, "type": "Municipality",
-     "description": "Town center with commercial district", "population": "289,000", "area_km2": "90.92",
-     "hazard_risk": "Moderate", "infrastructure": "Developing urban center"},
-    {"id": 5, "name": "San Jose del Monte", "lat": 14.8139, "lng": 121.0450, "type": "City",
-     "description": "Component city, major residential area", "population": "651,000", "area_km2": "105.53",
-     "hazard_risk": "High (flooding)", "infrastructure": "Expanding infrastructure"},
-    {"id": 6, "name": "Meycauayan", "lat": 14.7333, "lng": 120.9500, "type": "City",
-     "description": "Industrial and commercial hub", "population": "225,000", "area_km2": "32.10",
-     "hazard_risk": "Moderate", "infrastructure": "Well-developed"},
-    {"id": 7, "name": "Montalban (Rodriguez)", "lat": 14.7000, "lng": 121.1167, "type": "Municipality",
-     "description": "Growing suburban area", "population": "370,000", "area_km2": "172.53",
-     "hazard_risk": "Moderate", "infrastructure": "Developing"}
-]
+        // Polygon 1 (San Jose del Monte / Montalban area simulation)
+        var polyCoords1 = [
+            [14.82, 121.02],
+            [14.80, 121.07],
+            [14.73, 121.08],
+            [14.73, 121.03],
+            [14.78, 121.01]
+        ];
+        L.polygon(polyCoords1, greenStyle).addTo(map);
 
-sample_polygons = [
-    {"id": 101, "name": "Flood Zone A - Santa Maria", "type": "Hazard Zone",
-     "description": "High risk flood area along river basin",
-     "coordinates": [[14.8350, 120.9400], [14.8300, 120.9600], [14.8100, 120.9650],
-                     [14.8000, 120.9450], [14.8150, 120.9300]],
-     "risk_level": "High", "area_km2": "8.5"},
-    {"id": 102, "name": "Commercial Zone - Meycauayan", "type": "Zoning",
-     "description": "Designated commercial and industrial zone",
-     "coordinates": [[14.7450, 120.9450], [14.7400, 120.9600], [14.7250, 120.9550],
-                     [14.7280, 120.9400]],
-     "risk_level": "Low", "area_km2": "3.2"}
-]
+        // Polygon 2 (Rodriguez / Wawa area simulation)
+        var polyCoords2 = [
+            [14.78, 121.12],
+            [14.79, 121.16],
+            [14.73, 121.18],
+            [14.70, 121.14],
+            [14.72, 121.10]
+        ];
+        L.polygon(polyCoords2, greenStyle).addTo(map);
 
-# ============================================================================
-# FUNCTIONS
-# ============================================================================
-def parse_location_input(text):
-    text = text.strip()
-    coord_pattern = re.compile(r'^\s*([-+]?\d*\.?\d+)\s*[,;]\s*([-+]?\d*\.?\d+)\s*$')
-    match = coord_pattern.match(text)
-    if match:
-        return {"lat": float(match.group(1)), "lng": float(match.group(2)), "type": "coordinates"}
-    for loc in sample_locations:
-        if text.lower() in loc["name"].lower():
-            return {"lat": loc["lat"], "lng": loc["lng"], "type": "location", "name": loc["name"]}
-    return None
+        // Blue dashed line simulation across Manila Bay area
+        var lineCoords = [
+            [14.50, 120.90],
+            [14.58, 120.98],
+            [14.62, 121.02]
+        ];
+        L.polyline(lineCoords, {
+            color: '#3b82f6',
+            weight: 3,
+            dashArray: '5, 10'
+        }).addTo(map);
+    </script>
+</body>
+</html>
+"""
 
-# ============================================================================
-# SIDEBAR
-# ============================================================================
-with st.sidebar:
-    st.markdown('<div class="app-title">Project APEX</div>', unsafe_allow_html=True)
+# Render the interactive map filling the screen
+components.html(leaflet_map_html, height=920, scrolling=False)
 
-    # Location input
-    st.markdown('<div class="sidebar-section">Location</div>', unsafe_allow_html=True)
-    loc_input = st.text_input("Enter coordinates (lat, lng) or place name", key="loc_input",
-                              placeholder="e.g. 14.8875, 120.8567 or Plaridel")
-    if st.button("Search Location", use_container_width=True):
-        result = parse_location_input(loc_input)
-        if result:
-            st.session_state.map_center = [result["lat"], result["lng"]]
-            st.session_state.map_zoom = 13
-            st.rerun()
-        else:
-            st.warning("Location not found. Try coordinates like '14.8875, 120.8567'")
-
-    # Data Layers - separate expanders for each category
-    st.markdown('<div class="sidebar-section">Data Layers</div>', unsafe_allow_html=True)
-
-    # Hazards dropdown
-    with st.expander("Hazards", expanded=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.session_state.sub_layers["earthquake"] = st.checkbox("Earthquake", value=st.session_state.sub_layers["earthquake"])
-            st.session_state.sub_layers["floods"] = st.checkbox("Floods", value=st.session_state.sub_layers["floods"])
-            st.session_state.sub_layers["landslide"] = st.checkbox("Landslide", value=st.session_state.sub_layers["landslide"])
-        with col2:
-            st.session_state.sub_layers["tsunami"] = st.checkbox("Tsunami", value=st.session_state.sub_layers["tsunami"])
-            st.session_state.sub_layers["volcanic"] = st.checkbox("Volcanic", value=st.session_state.sub_layers["volcanic"])
-
-    # Infrastructure dropdown
-    with st.expander("Infrastructure", expanded=False):
-        st.session_state.sub_layers["roads"] = st.checkbox("Roads", value=st.session_state.sub_layers["roads"])
-        st.session_state.sub_layers["boundaries"] = st.checkbox("Boundaries (Cities, Province, Region)", value=st.session_state.sub_layers["boundaries"])
-        st.session_state.sub_layers["zoning"] = st.checkbox("Zoning (LGU Restrictions, CLUP)", value=st.session_state.sub_layers["zoning"])
-
-    # Valuation dropdown
-    with st.expander("Valuation", expanded=False):
-        st.session_state.sub_layers["valuation"] = st.checkbox("Valuation (general)", value=st.session_state.sub_layers["valuation"])
-        if st.session_state.sub_layers["valuation"]:
-            st.session_state.sub_layers["rental_rate"] = st.checkbox("Rental Rate", value=st.session_state.sub_layers["rental_rate"])
-            st.session_state.sub_layers["prime_core"] = st.checkbox("PRIME Core", value=st.session_state.sub_layers["prime_core"])
-            st.session_state.sub_layers["lamudi"] = st.checkbox("Lamudi", value=st.session_state.sub_layers["lamudi"])
-            st.session_state.sub_layers["other_platforms"] = st.checkbox("Other Platforms", value=st.session_state.sub_layers["other_platforms"])
-
-    # Manage Layer - collapsible section for drawn features
-    with st.expander("Manage Layer", expanded=False):
-        if st.session_state.drawn_features:
-            for i, feat in enumerate(st.session_state.drawn_features):
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    geom_type = feat.get("geometry", {}).get("type", "Unknown")
-                    st.caption(f"#{i+1}: {geom_type}")
-                with col2:
-                    if st.button("Delete", key=f"del_{i}"):
-                        del st.session_state.drawn_features[i]
-                        st.rerun()
-        else:
-            st.info("No drawn features yet. Use the drawing tools on the map.")
-
-    st.markdown('<div class="footer">Map tiles by CartoDB under CC BY-SA 3.0<br>Data © OpenStreetMap contributors</div>', unsafe_allow_html=True)
-
-# ============================================================================
-# MAIN MAP (full screen)
-# ============================================================================
-map_container = st.container()
-with map_container:
-    st.markdown('<div class="map-container" id="map-container">', unsafe_allow_html=True)
-
-    # Create map with selected basemap
-    m = folium.Map(
-        location=st.session_state.map_center,
-        zoom_start=st.session_state.map_zoom,
-        tiles=st.session_state.basemap,
-        attr='Map tiles by CartoDB under CC BY-SA 3.0. Data © OpenStreetMap contributors'
-    )
-
-    MousePosition().add_to(m)
-
-    # ========================================================================
-    # BASEMAP SWITCHER – using LayerControl placed in top-left
-    # This creates a button group that appears just below the draw toolbar.
-    # ========================================================================
-    # Add alternative tile layers with proper attribution
-    folium.TileLayer(
-        'CartoDB Dark_Matter',
-        name='Dark',
-        attr='Map tiles by CartoDB, under CC BY-SA 3.0. Data © OpenStreetMap contributors'
-    ).add_to(m)
-    folium.TileLayer(
-        'OpenStreetMap',
-        name='OSM',
-        attr='Map data © OpenStreetMap contributors, under ODbL'
-    ).add_to(m)
-    folium.TileLayer(
-        'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
-        name='Terrain',
-        attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.'
-    ).add_to(m)
-    folium.TileLayer(
-        'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
-        name='Toner',
-        attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.'
-    ).add_to(m)
-
-    # Add the layer control; it will appear in the top-left, below the draw control.
-    folium.LayerControl(collapsed=False).add_to(m)
-
-    # ========================================================================
-    # ADD SAMPLE MARKERS (filtered by sub‑layers)
-    # ========================================================================
-    show_roads = st.session_state.sub_layers.get("roads", True)
-    show_boundaries = st.session_state.sub_layers.get("boundaries", True)
-
-    for loc in sample_locations:
-        is_road = "Road" in loc["type"] or "Highway" in loc["type"]
-        is_boundary = "Municipality" in loc["type"] or "City" in loc["type"]
-        if is_road and not show_roads:
-            continue
-        if is_boundary and not show_boundaries:
-            continue
-
-        color = "#dc3545" if "City" in loc["type"] else "#4a90d9" if "Municipality" in loc["type"] else "#28a745"
-        popup_html = f"""
-        <div style="min-width:200px;">
-            <h4 style="margin:0 0 4px 0;">{loc['name']}</h4>
-            <div style="font-size:0.8rem; color:#6c757d;">{loc['type']}</div>
-            <hr style="margin:4px 0;">
-            <div style="font-size:0.85rem;">
-                <strong>Population:</strong> {loc['population']}<br>
-                <strong>Area:</strong> {loc['area_km2']} km²<br>
-                <strong>Hazard Risk:</strong> {loc['hazard_risk']}<br>
-                <strong>Infrastructure:</strong> {loc['infrastructure']}
+# Floating Data Browser Panel (HTML Overlay)
+st.markdown("""
+<div class="data-browser-panel">
+    <div class="panel-header">
+        <span>Data browser</span>
+        <span style="cursor: pointer; color: #9ca3af; font-size: 16px;">&times;</span>
+    </div>
+    <div class="panel-controls">
+        <button class="filter-btn">Filters</button>
+    </div>
+    <div class="layers-section">
+        <div class="layer-title">Layers</div>
+        <div class="layer-item">
+            <span>Roads</span>
+            <div style="display: flex; gap: 10px; color: #6b7280; font-size: 12px;">
+                <span>&#128065;</span>
+                <span>&#9998;</span>
+                <span>&#128465;</span>
             </div>
-            <div style="margin-top:6px; font-size:0.75rem; color:#adb5bd;">Click for full details</div>
         </div>
-        """
-        folium.Marker(
-            location=[loc["lat"], loc["lng"]],
-            popup=folium.Popup(popup_html, max_width=300),
-            tooltip=f"{loc['name']} ({loc['type']})",
-            icon=folium.Icon(color="red" if "City" in loc["type"] else "blue" if "Municipality" in loc["type"] else "green",
-                             icon="info-sign" if "Municipality" in loc["type"] else "star" if "City" in loc["type"] else "road",
-                             prefix="fa")
-        ).add_to(m)
-        folium.CircleMarker(
-            location=[loc["lat"], loc["lng"]],
-            radius=8,
-            color=color,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.3,
-            tooltip=loc["name"]
-        ).add_to(m)
-
-    # ========================================================================
-    # ADD POLYGONS (filtered by sub‑layers)
-    # ========================================================================
-    show_floods = st.session_state.sub_layers.get("floods", True)
-    show_zoning = st.session_state.sub_layers.get("zoning", True)
-
-    for poly in sample_polygons:
-        if "Flood" in poly["name"] and not show_floods:
-            continue
-        if "Commercial" in poly["name"] and not show_zoning:
-            continue
-        color = "#dc3545" if "Flood" in poly["name"] else "#4a90d9"
-        fill_color = color
-        folium.Polygon(
-            locations=poly["coordinates"],
-            color=color,
-            weight=2,
-            fill=True,
-            fill_color=fill_color,
-            fill_opacity=0.2,
-            popup=f"<b>{poly['name']}</b><br>{poly['description']}<br>Risk: {poly['risk_level']}<br>Area: {poly['area_km2']} km²",
-            tooltip=poly["name"]
-        ).add_to(m)
-
-    # ========================================================================
-    # DRAW PLUGIN
-    # ========================================================================
-    draw = Draw(
-        export=False,
-        position='topleft',
-        draw_options={
-            'polygon': {'allowIntersection': False, 'showArea': True, 'shapeOptions': {'color': '#4a90d9', 'weight': 2}},
-            'polyline': {'shapeOptions': {'color': '#28a745', 'weight': 3}},
-            'circle': {'shapeOptions': {'color': '#ffc107', 'weight': 2}},
-            'rectangle': {'shapeOptions': {'color': '#dc3545', 'weight': 2}},
-            'marker': True,
-            'circlemarker': False
-        },
-        edit_options={'poly': {'allowIntersection': False}}
-    )
-    draw.add_to(m)
-
-    # Render map and get interactions
-    map_data = st_folium(
-        m,
-        width="100%",
-        height=800,
-        returned_objects=["last_clicked", "last_object_clicked", "all_drawings", "bounds"],
-        key="gis_map"
-    )
-
-    # Update drawn features in session state
-    if map_data and map_data.get("all_drawings"):
-        existing_geoms = {json.dumps(f.get("geometry", {})) for f in st.session_state.drawn_features}
-        new_drawings = map_data["all_drawings"]
-        for d in new_drawings:
-            geom_str = json.dumps(d.get("geometry", {}))
-            if geom_str not in existing_geoms:
-                d["id"] = f"draw_{len(st.session_state.drawn_features)+1}"
-                st.session_state.drawn_features.append(d)
-                existing_geoms.add(geom_str)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ============================================================================
-# FLOATING DETAILS PANEL (right side) – conditionally shown
-# ============================================================================
-selected_info = None
-if map_data and map_data.get("last_object_clicked"):
-    clicked = map_data["last_object_clicked"]
-    if clicked and "lat" in clicked and "lng" in clicked:
-        lat = clicked["lat"]
-        lng = clicked["lng"]
-        for loc in sample_locations:
-            dist = ((loc["lat"] - lat) ** 2 + (loc["lng"] - lng) ** 2) ** 0.5
-            if dist < 0.005:
-                selected_info = {"type": "Location", "data": loc, "name": loc["name"]}
-                break
-
-if not selected_info and map_data and map_data.get("all_drawings"):
-    drawings = map_data["all_drawings"]
-    if drawings and len(drawings) > 0:
-        last_drawing = drawings[-1]
-        geom_type = last_drawing.get("geometry", {}).get("type", "Unknown")
-        coords = last_drawing.get("geometry", {}).get("coordinates", [])
-        if geom_type == "Point":
-            selected_info = {"type": "Point", "name": "Drawn Point",
-                             "data": {"name": "Drawn Point", "coordinates": coords,
-                                      "description": "Point drawn on map",
-                                      "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
-        elif geom_type == "Polygon":
-            selected_info = {"type": "Polygon", "name": "Drawn Polygon",
-                             "data": {"name": "Drawn Polygon", "coordinates": coords,
-                                      "description": "Polygon drawn on map", "area": "Calculated on server",
-                                      "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
-        elif geom_type == "LineString":
-            selected_info = {"type": "Street", "name": "Drawn Street",
-                             "data": {"name": "Drawn Street", "coordinates": coords,
-                                      "description": "Street segment drawn on map", "length": "Calculated on server",
-                                      "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
-        elif geom_type == "Circle":
-            selected_info = {"type": "Radius", "name": "Drawn Radius",
-                             "data": {"name": "Drawn Radius", "coordinates": coords,
-                                      "description": "Radius drawn on map", "radius": "Calculated on server",
-                                      "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
-
-if not selected_info and map_data and map_data.get("last_clicked"):
-    click_loc = map_data["last_clicked"]
-    if click_loc and "lat" in click_loc and "lng" in click_loc:
-        selected_info = {"type": "Map Click", "name": f"{click_loc['lat']:.5f}, {click_loc['lng']:.5f}",
-                         "data": {"name": "Selected Location",
-                                  "coordinates": [click_loc["lat"], click_loc["lng"]],
-                                  "description": "Point clicked on map",
-                                  "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
-
-# Show panel only if panel_visible is True
-if st.session_state.panel_visible:
-    panel_html = '<div class="floating-panel" id="floating-panel">'
-
-    # Close button as a link with query parameter
-    close_link = "?close_panel=true"
-    panel_html += f'<a href="{close_link}" class="close-btn" style="float:right; text-decoration:none;">&times;</a>'
-
-    if selected_info:
-        info_type = selected_info.get("type", "Unknown")
-        data = selected_info.get("data", {})
-        name = selected_info.get("name", "Unnamed")
-
-        panel_html += f"""
-        <h4 style="margin-top:0;">{name}</h4>
-        <div style="font-size:0.8rem; color:#6c757d; margin-bottom:0.5rem;">Type: {info_type}</div>
-        <hr class="divider">
-        """
-
-        if info_type == "Location" and data:
-            fields = [
-                ("Name", data.get("name", "N/A")),
-                ("Type", data.get("type", "N/A")),
-                ("Population", data.get("population", "N/A")),
-                ("Area", f"{data.get('area_km2', 'N/A')} km²"),
-                ("Hazard Risk", data.get("hazard_risk", "N/A")),
-                ("Infrastructure", data.get("infrastructure", "N/A")),
-                ("Coordinates", f"{data.get('lat', 'N/A')}, {data.get('lng', 'N/A')}")
-            ]
-            for label, value in fields:
-                panel_html += f'<div class="detail-label">{label}</div><div class="detail-value">{value}</div>'
-
-        elif info_type in ["Point", "Map Click"] and data:
-            coords = data.get("coordinates", [])
-            if coords:
-                if isinstance(coords[0], list):
-                    lat_str = f"{coords[0][0]:.5f}" if len(coords[0]) > 0 else "N/A"
-                    lng_str = f"{coords[0][1]:.5f}" if len(coords[0]) > 1 else "N/A"
-                    panel_html += f'<div class="detail-label">Coordinates</div><div class="detail-value">{lat_str}, {lng_str}</div>'
-                else:
-                    panel_html += f'<div class="detail-label">Coordinates</div><div class="detail-value">{coords[0]:.5f}, {coords[1]:.5f}</div>'
-            panel_html += f'<div class="detail-label">Description</div><div class="detail-value">{data.get("description", "No description")}</div>'
-            panel_html += f'<div class="detail-label">Created</div><div class="detail-value">{data.get("created", "N/A")}</div>'
-
-        elif info_type == "Polygon" and data:
-            coords = data.get("coordinates", [])
-            if coords and isinstance(coords[0], list):
-                panel_html += f'<div class="detail-label">Number of vertices</div><div class="detail-value">{len(coords[0])}</div>'
-                panel_html += f'<div class="detail-label">Area</div><div class="detail-value">{data.get("area", "Calculating...")}</div>'
-            panel_html += f'<div class="detail-label">Description</div><div class="detail-value">{data.get("description", "No description")}</div>'
-            panel_html += f'<div class="detail-label">Created</div><div class="detail-value">{data.get("created", "N/A")}</div>'
-
-        elif info_type == "Street" and data:
-            coords = data.get("coordinates", [])
-            if coords and isinstance(coords[0], list):
-                panel_html += f'<div class="detail-label">Number of points</div><div class="detail-value">{len(coords[0])}</div>'
-                panel_html += f'<div class="detail-label">Length</div><div class="detail-value">{data.get("length", "Calculating...")}</div>'
-            panel_html += f'<div class="detail-label">Description</div><div class="detail-value">{data.get("description", "No description")}</div>'
-            panel_html += f'<div class="detail-label">Created</div><div class="detail-value">{data.get("created", "N/A")}</div>'
-
-        elif info_type == "Radius" and data:
-            coords = data.get("coordinates", [])
-            if coords and isinstance(coords[0], list):
-                panel_html += f'<div class="detail-label">Center</div><div class="detail-value">{coords[0][0]:.5f}, {coords[0][1]:.5f}</div>'
-                panel_html += f'<div class="detail-label">Radius</div><div class="detail-value">{data.get("radius", "Calculating...")}</div>'
-            panel_html += f'<div class="detail-label">Description</div><div class="detail-value">{data.get("description", "No description")}</div>'
-            panel_html += f'<div class="detail-label">Created</div><div class="detail-value">{data.get("created", "N/A")}</div>'
-
-        else:
-            panel_html += "<div>No details available for this selection.</div>"
-
-        # Advanced Analytics section
-        panel_html += """
-        <hr class="divider">
-        <h4 style="font-size:1rem; margin-top:0.8rem;">Advanced Analytics</h4>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.85rem;">
-            <div><span class="detail-label">Avg Rental Rate</span><br><span class="detail-value" style="font-weight:600;">₱ 850/m²</span> <span style="color:#28a745;">↑3.2%</span></div>
-            <div><span class="detail-label">PRIME Core Index</span><br><span class="detail-value" style="font-weight:600;">87.5</span> <span style="color:#28a745;">↑1.8%</span></div>
-            <div><span class="detail-label">Road Density</span><br><span class="detail-value" style="font-weight:600;">2.4 km/km²</span> <span style="color:#28a745;">↑0.3</span></div>
-            <div><span class="detail-label">Zoning Compliance</span><br><span class="detail-value" style="font-weight:600;">94%</span> <span style="color:#28a745;">↑2%</span></div>
-            <div><span class="detail-label">Flood Risk Index</span><br><span class="detail-value" style="font-weight:600;">Medium (4.2)</span> <span style="color:#dc3545;">↓0.5</span></div>
-            <div><span class="detail-label">Earthquake Suscept.</span><br><span class="detail-value" style="font-weight:600;">Low (2.1)</span> <span style="color:#6c757d;">→0.0</span></div>
+        <div class="layer-item">
+            <span>Boundaries</span>
+            <div style="display: flex; gap: 10px; color: #6b7280; font-size: 12px;">
+                <span>&#128065;</span>
+                <span>&#9998;</span>
+                <span>&#128465;</span>
+            </div>
         </div>
-        <div style="font-size:0.7rem; color:#6c757d; margin-top:0.5rem; border-top:1px solid #e9ecef; padding-top:0.5rem;">
-            Smart Comparable Analysis: Advanced scoring algorithms for property valuation
-        </div>
-        """
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-    else:
-        panel_html += """
-        <h4 style="margin-top:0;">Details</h4>
-        <div style="color:#6c757d; font-size:0.9rem;">Click on a marker, polygon, or draw on the map to see details here.</div>
-        <hr class="divider">
-        <div style="font-size:0.8rem; color:#6c757d;">
-            <div><span class="detail-label">Last click</span><br><span class="detail-value">-</span></div>
-            <div><span class="detail-label">Active drawings</span><br><span class="detail-value">0</span></div>
+# Floating Details & Advanced Analytics Panel (HTML Overlay)
+st.markdown("""
+<div class="details-panel">
+    <div class="details-header">
+        <div>
+            <div class="details-title">Details</div>
+            <div class="details-instruction">Click on a marker, polygon, or draw on the map to see details here.</div>
         </div>
-        <hr class="divider">
-        <h4 style="font-size:1rem; margin-top:0.8rem;">Advanced Analytics</h4>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.85rem;">
-            <div><span class="detail-label">Avg Rental Rate</span><br><span class="detail-value" style="font-weight:600;">₱ 850/m²</span> <span style="color:#28a745;">↑3.2%</span></div>
-            <div><span class="detail-label">PRIME Core Index</span><br><span class="detail-value" style="font-weight:600;">87.5</span> <span style="color:#28a745;">↑1.8%</span></div>
-            <div><span class="detail-label">Road Density</span><br><span class="detail-value" style="font-weight:600;">2.4 km/km²</span> <span style="color:#28a745;">↑0.3</span></div>
-            <div><span class="detail-label">Zoning Compliance</span><br><span class="detail-value" style="font-weight:600;">94%</span> <span style="color:#28a745;">↑2%</span></div>
-            <div><span class="detail-label">Flood Risk Index</span><br><span class="detail-value" style="font-weight:600;">Medium (4.2)</span> <span style="color:#dc3545;">↓0.5</span></div>
-            <div><span class="detail-label">Earthquake Suscept.</span><br><span class="detail-value" style="font-weight:600;">Low (2.1)</span> <span style="color:#6c757d;">→0.0</span></div>
+        <span style="cursor: pointer; color: #9ca3af; font-size: 16px;">&times;</span>
+    </div>
+    
+    <div style="margin-bottom: 16px;">
+        <div class="analytics-label">LAST CLICK</div>
+        <div class="analytics-value" style="font-weight: 400; color: #6b7280; font-size: 14px; margin-top: 4px;">-</div>
+    </div>
+    
+    <div style="margin-bottom: 16px;">
+        <div class="analytics-label">ACTIVE DRAWINGS</div>
+        <div class="analytics-value" style="font-weight: 400; color: #111827; font-size: 14px; margin-top: 4px;">0</div>
+    </div>
+    
+    <div class="metric-section-title">Advanced Analytics</div>
+    
+    <div class="analytics-grid">
+        <div class="analytics-card">
+            <div class="analytics-label">AVG RENTAL RATE</div>
+            <div class="analytics-value">P 850/m&sup2;<span class="trend-positive">&uarr;3.2%</span></div>
         </div>
-        <div style="font-size:0.7rem; color:#6c757d; margin-top:0.5rem; border-top:1px solid #e9ecef; padding-top:0.5rem;">
-            Smart Comparable Analysis: Advanced scoring algorithms for property valuation
+        <div class="analytics-card">
+            <div class="analytics-label">PRIME CORE INDEX</div>
+            <div class="analytics-value">87.5<span class="trend-positive">&uarr;1.8%</span></div>
         </div>
-        """
-
-    panel_html += "</div>"
-    st.markdown(panel_html, unsafe_allow_html=True)
+    </div>
+    
+    <div class="analytics-grid">
+        <div class="analytics-card">
+            <div class="analytics-label">ROAD DENSITY</div>
+            <div class="analytics-value">2.4 km/km&sup2;<span class="trend-positive">&uarr;0.3</span></div>
+        </div>
+        <div class="analytics-card">
+            <div class="analytics-label">ZONING COMPLIANCE</div>
+            <div class="analytics-value">94%<span class="trend-positive">&uarr;2%</span></div>
+        </div>
+    </div>
+    
+    <div class="analytics-grid">
+        <div class="analytics-card">
+            <div class="analytics-label">FLOOD RISK INDEX</div>
+            <div class="analytics-value" style="font-size: 14px;">Medium (4.2)<span class="trend-negative">&darr;0.5</span></div>
+        </div>
+        <div class="analytics-card">
+            <div class="analytics-label">EARTHQUAKE SUSCEPT.</div>
+            <div class="analytics-value" style="font-size: 14px;">Low (2.1)<span class="trend-neutral">&rarr;0.0</span></div>
+        </div>
+    </div>
+    
+    <div class="footer-note">
+        Smart Comparable Analysis: Advanced scoring algorithms for property valuation
+    </div>
+</div>
+""", unsafe_allow_html=True)
