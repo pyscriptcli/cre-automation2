@@ -48,7 +48,7 @@ APP_HTML = r"""
 * {box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI', -apple-system, Helvetica, Arial, sans-serif;}
 html, body {height:100%; overflow:hidden;}
 body {background:#2a2a2a;}
-#app {position:absolute; inset:8px; overflow:hidden; background:#fff;}
+#app {position:absolute; inset:0px; overflow:hidden; background:#fff;}
 
 svg {vertical-align:middle;}
 button {background:none; border:none; cursor:pointer; color:inherit; font:inherit;}
@@ -83,6 +83,24 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .bm-opt .dot {width:12px; height:12px; border-radius:50%; border:2px solid #999; flex-shrink:0;}
 .bm-opt.active .dot {border-color:#021a3d; background:#021a3d; box-shadow:inset 0 0 0 2px #fff;}
 
+/* ---------- Search panel (Container like Data Browser) ---------- */
+#search-panel {position:absolute; top:42px; left:46px; width:340px; background:#fff; z-index:1150;
+  box-shadow:0 1px 4px rgba(0,0,0,.3); display:none; flex-direction:column; max-height:calc(100% - 160px);}
+#search-panel.open {display:flex;}
+.search-head {display:flex; align-items:center; gap:8px; padding:12px 12px 8px 12px; font-size:14px; position:relative;}
+.search-head b {font-size:14px;}
+.search-actions {position:absolute; right:8px; top:8px; display:flex; gap:4px;}
+.search-actions button {width:22px; height:22px; border:1px solid #ccc; background:#fff; color:#555; border-radius:2px; display:flex; align-items:center; justify-content:center;}
+.search-actions button:hover {background:#eee;}
+.search-body {padding:4px 12px 12px 12px;}
+.search-input {width:100%; padding:8px; border:1px solid #ddd; border-radius:3px; font-size:13px; outline:none;}
+.search-input:focus {border-color:#555;}
+.search-results {margin-top:10px; max-height:200px; overflow-y:auto; border:1px solid #eee; border-radius:3px; display:none;}
+.search-results.open {display:block;}
+.result-item {padding:8px; border-bottom:1px solid #eee; cursor:pointer; font-size:12px; color:#222;}
+.result-item:last-child {border-bottom:none;}
+.result-item:hover {background:#f2f2f2;}
+
 /* ---------- Data browser ---------- */
 #databrowser {position:absolute; top:42px; left:46px; bottom:60px; width:300px; background:#fff;
   box-shadow:0 1px 4px rgba(0,0,0,.3); z-index:1100; display:flex; flex-direction:column;}
@@ -116,9 +134,27 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .row-icons svg:hover {color:#333;}
 .empty-note {font-size:11px; color:#999; padding:8px 4px;}
 
+/* ---------- Hazard Panel (User requested widget) ---------- */
+#hazard-panel {position:absolute; top:42px; right:10px; width:340px; background:#fff; 
+  box-shadow:0 1px 4px rgba(0,0,0,.3); z-index:1100; padding:16px; max-height:calc(100% - 80px); overflow:auto; display:none;}
+#hazard-panel.open {display:block;}
+.hazard-title {font-weight:600; font-size:18px; color:#222; margin-bottom:12px;}
+.hazard-card {display:flex; align-items:center; justify-content:space-between; background:#fff; border-radius:4px; 
+  margin-bottom:8px; padding:10px; box-shadow:0 1px 3px rgba(0,0,0,0.15); border-left:4px solid #021a3d; position:relative;}
+.hazard-card-left {display:flex; align-items:center; gap:12px;}
+.hazard-icon {display:flex; align-items:center; justify-content:center; width:40px; height:40px; flex-shrink:0; color:#0066cc;}
+.hazard-text-wrap {display:flex; flex-direction:column;}
+.hazard-label {font-size:13px; font-weight:500; color:#444;}
+.hazard-level {font-size:13px; font-weight:700; color:#222; text-transform:uppercase;}
+.hazard-info {display:flex; align-items:center; justify-content:center; width:20px; height:20px; border:1px solid #555; border-radius:50%; color:#444; font-size:12px; font-weight:bold; cursor:pointer; margin-left:8px;}
+.hazard-notes {margin-top:12px; font-size:11px; color:#444; line-height:1.6;}
+.hazard-notes ul {padding-left:16px; margin:4px 0; list-style-type:disc;}
+.hazard-notes ul li {margin-bottom:2px;}
+.hazard-db-list {margin-top:8px; font-size:11px; font-weight:600; color:#555; line-height:1.5;}
+
 /* ---------- Details panel ---------- */
 #details {position:absolute; top:42px; right:10px; width:292px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.3);
-  z-index:1100; padding:16px; max-height:calc(100% - 160px); overflow:auto;}
+  z-index:1090; padding:16px; max-height:calc(100% - 160px); overflow:auto; display:block;}
 #details-close {position:absolute; right:10px; top:10px; color:#999;}
 #details-close:hover {color:#333;}
 #details h1 {font-size:22px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:8px; margin-bottom:12px;}
@@ -186,6 +222,72 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
     <div class="bm-opt active" data-bm="osm"><span class="dot"></span>OpenStreetMap</div>
     <div class="bm-opt" data-bm="satellite"><span class="dot"></span>Satellite</div>
     <div class="bm-opt" data-bm="carto"><span class="dot"></span>CartoDB</div>
+  </div>
+
+  <!-- Search Panel (Container like Data Browser) -->
+  <div id="search-panel">
+    <div class="search-head">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#333" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+      <b>Search places</b>
+      <div class="search-actions">
+        <button id="search-close" title="Close"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+      </div>
+    </div>
+    <div class="search-body">
+      <input type="text" class="search-input" id="search-input" placeholder="Enter city, barangay, or landmark...">
+      <div class="search-results" id="search-results"></div>
+    </div>
+  </div>
+
+  <!-- Hazard Levels Panel (Matching the User's Image) -->
+  <div id="hazard-panel">
+    <div class="hazard-title">Hazard Levels In Your Area</div>
+    
+    <div class="hazard-card">
+      <div class="hazard-card-left">
+        <div class="hazard-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/><path d="M8 16h8"/></svg></div>
+        <div class="hazard-text-wrap">
+          <div class="hazard-label">Flood Hazard Level</div>
+          <div class="hazard-level">LITTLE TO NONE</div>
+        </div>
+      </div>
+      <div class="hazard-info">i</div>
+    </div>
+
+    <div class="hazard-card">
+      <div class="hazard-card-left">
+        <div class="hazard-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+        <div class="hazard-text-wrap">
+          <div class="hazard-label">Earthquake Hazard Level</div>
+          <div class="hazard-level">LITTLE TO NONE</div>
+        </div>
+      </div>
+      <div class="hazard-info">i</div>
+    </div>
+
+    <div class="hazard-card">
+      <div class="hazard-card-left">
+        <div class="hazard-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20"/><path d="M12 2v20"/><path d="M4 4l16 16"/><path d="M20 4L4 20"/></svg></div>
+        <div class="hazard-text-wrap">
+          <div class="hazard-label">Storm Surge Hazard Level</div>
+          <div class="hazard-level">LITTLE TO NONE</div>
+        </div>
+      </div>
+      <div class="hazard-info">i</div>
+    </div>
+
+    <div class="hazard-notes">
+      <div style="font-weight:600; margin-bottom:4px;">Note:</div>
+      <ul>
+        <li>If you want an independent assessment of flood, landslide, or storm surge, then click on the tabs above.</li>
+        <li>Assessment is for a point location. Please refer to map for visual evaluation.</li>
+      </ul>
+      <div class="hazard-db-list">Hazards included in map database are:<br>
+        1) 100-year rain return for floods;<br>
+        2) Shallow and structurally-controlled landslides;<br>
+        3) 5-meters for storm surges.
+      </div>
+    </div>
   </div>
 
   <!-- Data browser -->
@@ -388,13 +490,33 @@ try {
     h.onclick = function () { h.parentElement.classList.toggle('collapsed'); };
   });
 
-  // ----- Thematic sublayer toggling -----
+  // ----- Thematic sublayer toggling & Hazard Widget Logic -----
+  var hazardPanel = document.getElementById('hazard-panel');
+  
+  function checkHazardPanel() {
+    var eqRow = document.querySelector('.layer-row[data-key="earthquake"]');
+    var floodRow = document.querySelector('.layer-row[data-key="floods"]');
+    var eqActive = eqRow && eqRow.classList.contains('selected');
+    var floodActive = floodRow && floodRow.classList.contains('selected');
+    
+    if (eqActive || floodActive) {
+      hazardPanel.classList.add('open');
+    } else {
+      hazardPanel.classList.remove('open');
+    }
+  }
+
   document.querySelectorAll('.layer-row[data-key]').forEach(function (row) {
     row.onclick = function () {
       var key = row.dataset.key;
       var on = row.classList.contains('disabled');
       if (on) { overlays[key].addTo(map); row.classList.remove('disabled'); row.classList.add('selected'); }
       else { map.removeLayer(overlays[key]); row.classList.add('disabled'); row.classList.remove('selected'); }
+      
+      // Trigger Hazard panel update if earthquake or floods
+      if (key === 'earthquake' || key === 'floods') {
+        checkHazardPanel();
+      }
     };
   });
 
@@ -507,6 +629,50 @@ try {
     } catch (err) { console.warn('Edit mode unavailable:', err); }
   };
 
+  // ----- Search Panel Logic (Container like Data Browser) -----
+  var searchPanel = document.getElementById('search-panel');
+  var searchInput = document.getElementById('search-input');
+  var searchResults = document.getElementById('search-results');
+
+  document.getElementById('searchbtn').onclick = function (e) {
+    e.stopPropagation();
+    var isOpen = searchPanel.classList.contains('open');
+    searchPanel.classList.toggle('open', !isOpen);
+    if (!isOpen) { searchInput.focus(); }
+  };
+
+  document.getElementById('search-close').onclick = function () {
+    searchPanel.classList.remove('open');
+    searchResults.classList.remove('open');
+    searchResults.innerHTML = '';
+    searchInput.value = '';
+  };
+
+  searchInput.addEventListener('input', function() {
+    var q = this.value.trim();
+    if(q.length < 3) { searchResults.classList.remove('open'); searchResults.innerHTML = ''; return; }
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=5`)
+    .then(res => res.json())
+    .then(data => {
+      if(data.length === 0) { searchResults.classList.remove('open'); return; }
+      var html = '';
+      data.forEach(item => {
+        html += `<div class="result-item" data-lat="${item.lat}" data-lon="${item.lon}">${item.display_name}</div>`;
+      });
+      searchResults.innerHTML = html;
+      searchResults.classList.add('open');
+      document.querySelectorAll('.result-item').forEach(el => {
+        el.onclick = function() {
+          map.setView([parseFloat(this.dataset.lat), parseFloat(this.dataset.lon)], 14);
+          searchPanel.classList.remove('open');
+          searchResults.classList.remove('open');
+          searchResults.innerHTML = '';
+          searchInput.value = '';
+        };
+      });
+    }).catch(() => { searchResults.classList.remove('open'); });
+  });
+
   // ----- Panel controls -----
   document.getElementById('db-close').onclick = function () { document.getElementById('databrowser').style.display = 'none'; };
   document.getElementById('db-collapse').onclick = function () {
@@ -516,6 +682,7 @@ try {
   document.getElementById('details-close').onclick = function () { document.getElementById('details').style.display = 'none'; };
 
   refreshDrawnUI();
+  checkHazardPanel(); // Initial check for hazard widget
 } catch (err) {
   console.error('Map init failed:', err);
 }
