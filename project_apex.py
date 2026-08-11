@@ -55,16 +55,16 @@ svg {vertical-align:middle;}
 button {background:none; border:none; cursor:pointer; color:inherit; font:inherit;}
 
 /* ---------- Top bar ---------- */
-#topbar {position:absolute; top:0; left:0; right:0; height:34px; background:#021a3d; color:#e0e0e0;
+#topbar {position:absolute; top:0; left:0; right:0; height:34px; background:#021a3d; color:#ddd;
   display:flex; align-items:center; justify-content:space-between; padding:0 10px; z-index:1200; font-size:12px;}
 .tb-left, .tb-right {display:flex; align-items:center; gap:8px;}
 .logo {width:20px; height:20px; background:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center;}
-.app-title {font-weight:700; color:#ffffff; font-size:12px;}
-.tb-icon {color:#aaaaaa; padding:2px;}
-.tb-icon:hover {color:#ffffff;}
-.user {display:flex; align-items:center; gap:5px; color:#cccccc; font-size:11px;}
-.vsep {width:1px; height:14px; background:#555;}
-.help {display:flex; align-items:center; gap:5px; color:#cccccc; font-size:11px;}
+.app-title {font-weight:700; color:#fff; font-size:12px;}
+.tb-icon {color:#9fb2cc; padding:2px;}
+.tb-icon:hover {color:#fff;}
+.user {display:flex; align-items:center; gap:5px; color:#cdd7e6; font-size:11px;}
+.vsep {width:1px; height:14px; background:#33466b;}
+.help {display:flex; align-items:center; gap:5px; color:#cdd7e6; font-size:11px;}
 
 /* ---------- Left toolbar ---------- */
 #toolbar {position:absolute; top:34px; left:0; bottom:0; width:38px; background:#fff; border-right:1px solid #bbb;
@@ -75,7 +75,7 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .tsep {width:22px; height:1px; background:#ddd; margin:4px 0;}
 
 /* ---------- Data browser ---------- */
-#databrowser {position:absolute; top:42px; left:46px; bottom:120px; width:300px; background:#fff;
+#databrowser {position:absolute; top:42px; left:46px; bottom:60px; width:300px; background:#fff;
   box-shadow:0 1px 4px rgba(0,0,0,.3); z-index:1100; display:flex; flex-direction:column;}
 .db-head {display:flex; align-items:center; gap:8px; padding:12px 12px 8px 12px; font-size:14px; position:relative;}
 .db-head b {font-size:14px;}
@@ -87,26 +87,24 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .filters-btn {display:flex; align-items:center; gap:6px; border:1px solid #ccc; background:#fff; color:#333;
   padding:5px 12px; border-radius:3px; font-size:12px; margin:6px 0 12px 0;}
 .filters-btn:hover {background:#f2f2f2;}
-.layers-head {display:flex; justify-content:space-between; align-items:center; border-top:1px solid #ddd; padding-top:10px; margin-bottom:6px;}
+.layers-head {display:flex; justify-content:space-between; align-items:center; border-top:1px solid #ddd; padding-top:10px;}
 .layers-head span:first-child {font-weight:700; font-size:13px;}
 .lh-icons {display:flex; gap:8px; color:#777;}
 
-/* Accordion Dropdown style */
-details {margin: 2px 0;}
-summary {cursor: pointer; font-weight:600; font-size:12px; padding:8px 4px; list-style:none; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; color:#222;}
-summary::-webkit-details-marker {display:none;}
-summary::after {content:'\25BC'; font-size:10px; color:#888; margin-right:4px;}
-details[open] summary::after {content:'\25B2';}
+/* layer groups (dropdowns) */
+.group-head {display:flex; align-items:center; gap:6px; font-weight:700; font-size:12px; color:#222;
+  padding:8px 4px 4px 4px; margin-top:6px; border-top:1px solid #eee; cursor:pointer; user-select:none;}
+.group-head .chev {transition:transform .15s; color:#555;}
+.layer-group.collapsed .chev {transform:rotate(-90deg);}
+.layer-group.collapsed .group-body {display:none;}
+.group-body {padding-left:10px;}
 
-/* Sublayer Row style */
-.sub-layer-row {display:flex; align-items:center; gap:8px; padding:6px 4px 6px 12px; margin:2px 0; font-size:12px; color:#333; cursor:pointer; border-radius:2px; background:#ffffff;}
-.sub-layer-row:hover {background:#f2f2f2;}
-.sub-layer-row.selected {font-weight:500;}
-.sub-layer-row.disabled {color:#a5a5a5; background:#ececec;}
-.sub-layer-row .sl-icon {width:14px; height:14px; display:inline-block; border:1px solid #999; border-radius:2px; background:#fff;}
-.sub-layer-row.selected .sl-icon {background:#666; border-color:#666;}
-.sub-layer-row.disabled .sl-icon {background:#ddd; border-color:#ddd;}
-.sub-layer-row .lname {flex:1;}
+.layer-row {display:flex; align-items:center; gap:8px; background:#ededed; border:2px solid transparent;
+  border-radius:2px; padding:6px 8px; margin:6px 0; font-size:12px; color:#333; cursor:pointer;}
+.layer-row.selected {border-color:#222;}
+.layer-row.disabled {color:#a5a5a5; background:#ececec;}
+.lname {flex:1; line-height:1.3;}
+.row-icons {display:flex; gap:6px; color:#b5b5b5; flex-shrink:0;}
 
 /* ---------- Details panel ---------- */
 #details {position:absolute; top:42px; right:10px; width:292px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.3);
@@ -183,7 +181,6 @@ details[open] summary::after {content:'\25B2';}
     </div>
     <div class="db-body" id="db-body">
       <button class="filters-btn"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9v7l4 2v-9z"/></svg>Filters</button>
-      
       <div class="layers-head">
         <span>Layers</span>
         <span class="lh-icons">
@@ -193,29 +190,71 @@ details[open] summary::after {content:'\25B2';}
         </span>
       </div>
 
-      <!-- Hazards Group -->
-      <details>
-        <summary>Hazards</summary>
-        <div class="sub-layer-row disabled" id="layer-earthquake"><span class="sl-icon"></span><span class="lname">Earthquake</span></div>
-        <div class="sub-layer-row disabled" id="layer-floods"><span class="sl-icon"></span><span class="lname">Floods</span></div>
-      </details>
-      
-      <!-- Infrastructure Group -->
-      <details open>
-        <summary>Infrastructure</summary>
-        <div class="sub-layer-row selected" id="layer-roads"><span class="sl-icon"></span><span class="lname">Roads</span></div>
-        <div class="sub-layer-row disabled" id="layer-boundaries"><span class="sl-icon"></span><span class="lname">Boundaries (Cities, Province, Region)</span></div>
-        <div class="sub-layer-row disabled" id="layer-zoning"><span class="sl-icon"></span><span class="lname">Zoning (LGU Restrictions, CLUP)</span></div>
-      </details>
+      <!-- Hazards group -->
+      <div class="layer-group" id="grp-hazards">
+        <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Hazards</div>
+        <div class="group-body">
+          <div class="layer-row disabled" data-key="earthquake">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+            <span class="lname">Earthquake</span>
+            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
+          </div>
+          <div class="layer-row disabled" data-key="floods">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+            <span class="lname">Floods</span>
+            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
+          </div>
+        </div>
+      </div>
 
-      <!-- Valuation Group -->
-      <details>
-        <summary>Valuation</summary>
-        <div class="sub-layer-row disabled" id="layer-rental"><span class="sl-icon"></span><span class="lname">Rental Rate</span></div>
-        <div class="sub-layer-row disabled" id="layer-prime"><span class="sl-icon"></span><span class="lname">PRIME Core</span></div>
-        <div class="sub-layer-row disabled" id="layer-lamudi"><span class="sl-icon"></span><span class="lname">Lamudi and other property platforms (Scraper)</span></div>
-        <div class="sub-layer-row disabled" id="layer-tiering"><span class="sl-icon"></span><span class="lname">Tiering of data from Primary, secondary sources</span></div>
-      </details>
+      <!-- Infrastructure group -->
+      <div class="layer-group" id="grp-infrastructure">
+        <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Infrastructure</div>
+        <div class="group-body">
+          <div class="layer-row selected" data-key="roads">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+            <span class="lname">Roads</span>
+            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
+          </div>
+          <div class="layer-row selected" data-key="boundaries">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+            <span class="lname">Boundaries (Cities, Province, Region)</span>
+            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
+          </div>
+          <div class="layer-row disabled" data-key="zoning">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+            <span class="lname">Zoning (LGU Restrictions, CLUP)</span>
+            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Valuation group -->
+      <div class="layer-group" id="grp-valuation">
+        <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Valuation</div>
+        <div class="group-body">
+          <div class="layer-row disabled" data-key="rental">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+            <span class="lname">Rental Rate</span>
+            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
+          </div>
+          <div class="layer-row disabled" data-key="prime">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+            <span class="lname">PRIME Core</span>
+            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
+          </div>
+          <div class="layer-row disabled" data-key="lamudi">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+            <span class="lname">Lamudi and other property platforms (Scraper)</span>
+            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
+          </div>
+          <div class="layer-row disabled" data-key="tiering">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
+            <span class="lname">Tiering of data from Primary, secondary sources</span>
+            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
+          </div>
+        </div>
+      </div>
 
     </div>
   </div>
@@ -249,7 +288,6 @@ details[open] summary::after {content:'\25B2';}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script>
 try {
-  // Map centered on Metro Manila to mirror the screenshot view
   var map = L.map('map', {zoomControl: false}).setView([14.63, 121.00], 11);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -257,58 +295,97 @@ try {
   }).addTo(map);
   L.control.scale({position: 'bottomleft'}).addTo(map);
 
-  // Green boundary polygons (east metro / eco parks), visible like the photo
+  // ----- Overlay definitions per sublayer key -----
   var boundaries = L.layerGroup([
     L.polygon([[14.72,121.02],[14.76,121.03],[14.78,121.06],[14.74,121.07],[14.71,121.05]], {color:'#2f9e44', weight:2, fillColor:'#66bb6a', fillOpacity:0.6}),
     L.polygon([[14.75,121.10],[14.80,121.12],[14.85,121.15],[14.80,121.18],[14.70,121.16],[14.68,121.12]], {color:'#2f9e44', weight:2, fillColor:'#66bb6a', fillOpacity:0.6}),
     L.polygon([[14.60,121.10],[14.64,121.11],[14.66,121.14],[14.62,121.16],[14.58,121.13],[14.57,121.11]], {color:'#2f9e44', weight:2, fillColor:'#66bb6a', fillOpacity:0.5}),
     L.polygon([[14.52,121.11],[14.55,121.12],[14.56,121.15],[14.52,121.16],[14.50,121.13]], {color:'#2f9e44', weight:2, fillColor:'#66bb6a', fillOpacity:0.5})
-  ]).addTo(map);
+  ]);
 
-  // Hatched blue shipping lane across Manila Bay
-  L.polyline([[14.30,120.82],[14.40,120.87],[14.50,120.93],[14.585,120.985]],
-    {color:'#7ea6e0', weight:8, opacity:0.7, dashArray:'2 6', lineCap:'butt'}).addTo(map);
-
-  // Roads highlight overlay
   var roads = L.layerGroup([
     L.polyline([[14.67,121.03],[14.63,121.01],[14.58,120.99],[14.53,120.98],[14.50,120.96]], {color:'#e07b39', weight:3, opacity:0.7}),
     L.polyline([[14.55,121.00],[14.60,121.05],[14.65,121.10]], {color:'#e07b39', weight:3, opacity:0.7})
   ]);
 
-  // Placeholder empty layer groups for the new menu items
-  var earthquake = L.layerGroup();
-  var floods = L.layerGroup();
-  var zoning = L.layerGroup();
-  var rental = L.layerGroup();
-  var prime = L.layerGroup();
-  var lamudi = L.layerGroup();
-  var tiering = L.layerGroup();
+  // West Valley Fault Line approximation
+  var earthquake = L.layerGroup([
+    L.polyline([[14.75,121.08],[14.70,121.06],[14.65,121.05],[14.60,121.06],[14.55,121.05],[14.50,121.04]], {color:'#d93025', weight:3, dashArray:'6 4'}),
+    L.circle([14.65,121.05], {radius:1500, color:'#d93025', weight:1, fillColor:'#d93025', fillOpacity:0.15})
+  ]);
 
-  // Drawn shapes storage
-  var drawnItems = L.featureGroup().addTo(map);
-  function updateCount() {
-    document.getElementById('drawcount').textContent = drawnItems.getLayers().length;
+  // Flood-prone zones (river corridors + coastal fringe)
+  var floods = L.layerGroup([
+    L.polygon([[14.55,121.08],[14.60,121.09],[14.62,121.08],[14.58,121.07]], {color:'#1a73e8', weight:1, fillColor:'#4285f4', fillOpacity:0.35}),
+    L.polygon([[14.48,120.96],[14.52,120.97],[14.55,120.96],[14.50,120.95]], {color:'#1a73e8', weight:1, fillColor:'#4285f4', fillOpacity:0.35}),
+    L.polygon([[14.35,121.00],[14.40,121.02],[14.42,121.00],[14.38,120.98]], {color:'#1a73e8', weight:1, fillColor:'#4285f4', fillOpacity:0.35})
+  ]);
+
+  // Zoning overlay (LGU / CLUP style hatched districts)
+  var zoning = L.layerGroup([
+    L.polygon([[14.62,120.98],[14.66,120.99],[14.67,121.02],[14.63,121.02],[14.61,121.00]], {color:'#8e24aa', weight:2, dashArray:'4 4', fillColor:'#ba68c8', fillOpacity:0.25}),
+    L.polygon([[14.52,121.00],[14.56,121.01],[14.57,121.04],[14.53,121.04]], {color:'#8e24aa', weight:2, dashArray:'4 4', fillColor:'#ba68c8', fillOpacity:0.25})
+  ]);
+
+  // Valuation point data
+  function dots(coords, fill) {
+    return L.layerGroup(coords.map(function (c) {
+      return L.circleMarker(c, {radius:6, color:'#021a3d', weight:2, fillColor:fill, fillOpacity:0.9});
+    }));
   }
+  var rental = dots([[14.58,120.98],[14.62,121.01],[14.67,121.03],[14.52,121.00]], '#fbbc04');
+  var prime  = dots([[14.55,121.02],[14.60,120.99],[14.65,121.05]], '#34a853');
+  var lamudi  = L.layerGroup(); // placeholder: scraper feed layer
+  var tiering = L.layerGroup(); // placeholder: primary/secondary tiering layer
+
+  var overlays = {
+    earthquake: earthquake, floods: floods,
+    roads: roads, boundaries: boundaries, zoning: zoning,
+    rental: rental, prime: prime, lamudi: lamudi, tiering: tiering
+  };
+
+  // Initial visibility must match the row classes in the HTML
+  var initialOn = {roads: true, boundaries: true};
+  Object.keys(overlays).forEach(function (k) { if (initialOn[k]) overlays[k].addTo(map); });
+
+  // Hatched blue shipping lane across Manila Bay (always-on basemap decor)
+  L.polyline([[14.30,120.82],[14.40,120.87],[14.50,120.93],[14.585,120.985]],
+    {color:'#7ea6e0', weight:8, opacity:0.7, dashArray:'2 6', lineCap:'butt'}).addTo(map);
+
+  // ----- Dropdown group heads -----
+  document.querySelectorAll('.group-head').forEach(function (h) {
+    h.onclick = function () { h.parentElement.classList.toggle('collapsed'); };
+  });
+
+  // ----- Sublayer row toggling -----
+  document.querySelectorAll('.layer-row').forEach(function (row) {
+    row.onclick = function () {
+      var key = row.dataset.key;
+      var on = row.classList.contains('disabled'); // disabled => currently off
+      if (on) { overlays[key].addTo(map); row.classList.remove('disabled'); row.classList.add('selected'); }
+      else { map.removeLayer(overlays[key]); row.classList.add('disabled'); row.classList.remove('selected'); }
+    };
+  });
+
+  // ----- Drawings -----
+  var drawnItems = L.featureGroup().addTo(map);
+  function updateCount() { document.getElementById('drawcount').textContent = drawnItems.getLayers().length; }
   map.on(L.Draw.Event.CREATED, function (e) { drawnItems.addLayer(e.layer); updateCount(); });
 
-  // Last click readout
   map.on('click', function (e) {
     document.getElementById('lastclick').textContent = e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4);
   });
 
-  // Toolbar wiring
+  // ----- Toolbar -----
   document.getElementById('zoomin').onclick = function () { map.zoomIn(); };
   document.getElementById('zoomout').onclick = function () { map.zoomOut(); };
   document.getElementById('clearbtn').onclick = function () { drawnItems.clearLayers(); updateCount(); };
-
-  // Data browser toggle from left toolbar
   document.getElementById('db-toggle').onclick = function () {
     var db = document.getElementById('databrowser');
     db.style.display = (db.style.display === 'none') ? 'flex' : 'none';
     this.classList.toggle('active', db.style.display !== 'none');
   };
 
-  // Drawing tools via Leaflet.draw handlers
   var drawOpts = {shapeOptions: {color: '#d33', weight: 3}};
   var handlers = {
     polyline:  new L.Draw.Polyline(map, drawOpts),
@@ -328,7 +405,6 @@ try {
     };
   });
 
-  // Vertex editing toggle for drawn shapes
   var editMode = null, editing = false;
   document.getElementById('editbtn').onclick = function () {
     try {
@@ -339,48 +415,7 @@ try {
     } catch (err) { console.warn('Edit mode unavailable:', err); }
   };
 
-  // Layer rows Toggle Logic
-  function bindLayer(id, layer, initialOn) {
-    var row = document.getElementById(id);
-    if(!row) return;
-    
-    // Set initial state
-    if(initialOn) {
-      map.addLayer(layer);
-      row.classList.remove('disabled');
-      row.classList.add('selected');
-    } else {
-      row.classList.add('disabled');
-      row.classList.remove('selected');
-    }
-    
-    // Click handler
-    row.onclick = function () {
-      var isOn = row.classList.contains('selected');
-      if(isOn) {
-        map.removeLayer(layer);
-        row.classList.remove('selected');
-        row.classList.add('disabled');
-      } else {
-        map.addLayer(layer);
-        row.classList.remove('disabled');
-        row.classList.add('selected');
-      }
-    };
-  }
-  
-  // Bind New Menu Items
-  bindLayer('layer-roads', roads, true);
-  bindLayer('layer-boundaries', boundaries, true);
-  bindLayer('layer-earthquake', earthquake, false);
-  bindLayer('layer-floods', floods, false);
-  bindLayer('layer-zoning', zoning, false);
-  bindLayer('layer-rental', rental, false);
-  bindLayer('layer-prime', prime, false);
-  bindLayer('layer-lamudi', lamudi, false);
-  bindLayer('layer-tiering', tiering, false);
-
-  // Panel controls
+  // ----- Panel controls -----
   document.getElementById('db-close').onclick = function () { document.getElementById('databrowser').style.display = 'none'; };
   document.getElementById('db-collapse').onclick = function () {
     var b = document.getElementById('db-body');
@@ -395,5 +430,4 @@ try {
 </html>
 """
 
-# scrolling=False + fixed iframe CSS = exact 1920x1080 fit, zero scrollbars
 components.html(APP_HTML, height=1080, scrolling=False)
