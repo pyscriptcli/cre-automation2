@@ -2,16 +2,16 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import Draw, MousePosition
-import pandas as pd
 import json
 from datetime import datetime
+import re
 
 # ============================================================================
 # PAGE CONFIG
 # ============================================================================
 st.set_page_config(
     page_title="Project APEX - GIS Analysis",
-    page_icon=":globe_with_meridians:",  # fallback, but we'll hide it
+    page_icon=":globe_with_meridians:",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -175,11 +175,6 @@ st.markdown("""
         border-bottom: 2px solid #4a90d9;
         display: inline-block;
     }
-    .app-subtitle {
-        font-size: 0.8rem;
-        color: #6c757d;
-        margin-bottom: 0.75rem;
-    }
 
     /* Badge for metrics */
     .badge {
@@ -214,7 +209,23 @@ st.markdown("""
         margin-top: 0.5rem;
     }
 
-    /* Responsive adjustments for floating panel */
+    /* Layer list - single column */
+    .layer-item {
+        display: flex;
+        align-items: center;
+        padding: 0.2rem 0;
+        font-size: 0.85rem;
+    }
+    .layer-item .color-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 0.5rem;
+        display: inline-block;
+        border: 1px solid #dee2e6;
+    }
+
+    /* Responsive */
     @media (max-width: 768px) {
         .floating-panel {
             width: 300px;
@@ -239,25 +250,16 @@ st.markdown("""
 # ============================================================================
 if "selected_feature" not in st.session_state:
     st.session_state.selected_feature = None
-
 if "selected_feature_type" not in st.session_state:
     st.session_state.selected_feature_type = None
-
 if "drawings" not in st.session_state:
     st.session_state.drawings = []
-
 if "map_center" not in st.session_state:
     st.session_state.map_center = [14.8500, 120.9500]
-
 if "map_zoom" not in st.session_state:
     st.session_state.map_zoom = 11
-
 if "details_expanded" not in st.session_state:
     st.session_state.details_expanded = True
-
-if "location_input_mode" not in st.session_state:
-    st.session_state.location_input_mode = "Polygon"
-
 if "layers_visible" not in st.session_state:
     st.session_state.layers_visible = {
         "hazards": True,
@@ -266,175 +268,103 @@ if "layers_visible" not in st.session_state:
         "zoning": False,
         "valuation": False
     }
+if "basemap" not in st.session_state:
+    st.session_state.basemap = "CartoDB Positron"
+if "panel_visible" not in st.session_state:
+    st.session_state.panel_visible = True
 
 # ============================================================================
 # SAMPLE DATA
 # ============================================================================
 sample_locations = [
-    {
-        "id": 1,
-        "name": "Plaridel",
-        "lat": 14.8875,
-        "lng": 120.8567,
-        "type": "Municipality",
-        "description": "Municipal hall and town center",
-        "population": "41,000",
-        "area_km2": "32.44",
-        "hazard_risk": "Moderate",
-        "infrastructure": "Good road network"
-    },
-    {
-        "id": 2,
-        "name": "Tabang Spur Road",
-        "lat": 14.8950,
-        "lng": 120.8700,
-        "type": "Road Junction",
-        "description": "Major intersection connecting to MacArthur Highway",
-        "population": "N/A",
-        "area_km2": "N/A",
-        "hazard_risk": "Low",
-        "infrastructure": "Highway junction"
-    },
-    {
-        "id": 3,
-        "name": "MacArthur Highway",
-        "lat": 14.8980,
-        "lng": 120.8780,
-        "type": "Highway",
-        "description": "Primary north-south thoroughfare",
-        "population": "N/A",
-        "area_km2": "N/A",
-        "hazard_risk": "Low",
-        "infrastructure": "Major highway"
-    },
-    {
-        "id": 4,
-        "name": "Santa Maria",
-        "lat": 14.8183,
-        "lng": 120.9567,
-        "type": "Municipality",
-        "description": "Town center with commercial district",
-        "population": "289,000",
-        "area_km2": "90.92",
-        "hazard_risk": "Moderate",
-        "infrastructure": "Developing urban center"
-    },
-    {
-        "id": 5,
-        "name": "San Jose del Monte",
-        "lat": 14.8139,
-        "lng": 121.0450,
-        "type": "City",
-        "description": "Component city, major residential area",
-        "population": "651,000",
-        "area_km2": "105.53",
-        "hazard_risk": "High (flooding)",
-        "infrastructure": "Expanding infrastructure"
-    },
-    {
-        "id": 6,
-        "name": "Meycauayan",
-        "lat": 14.7333,
-        "lng": 120.9500,
-        "type": "City",
-        "description": "Industrial and commercial hub",
-        "population": "225,000",
-        "area_km2": "32.10",
-        "hazard_risk": "Moderate",
-        "infrastructure": "Well-developed"
-    },
-    {
-        "id": 7,
-        "name": "Montalban (Rodriguez)",
-        "lat": 14.7000,
-        "lng": 121.1167,
-        "type": "Municipality",
-        "description": "Growing suburban area",
-        "population": "370,000",
-        "area_km2": "172.53",
-        "hazard_risk": "Moderate",
-        "infrastructure": "Developing"
-    }
+    {"id": 1, "name": "Plaridel", "lat": 14.8875, "lng": 120.8567, "type": "Municipality",
+     "description": "Municipal hall and town center", "population": "41,000", "area_km2": "32.44",
+     "hazard_risk": "Moderate", "infrastructure": "Good road network"},
+    {"id": 2, "name": "Tabang Spur Road", "lat": 14.8950, "lng": 120.8700, "type": "Road Junction",
+     "description": "Major intersection connecting to MacArthur Highway", "population": "N/A",
+     "area_km2": "N/A", "hazard_risk": "Low", "infrastructure": "Highway junction"},
+    {"id": 3, "name": "MacArthur Highway", "lat": 14.8980, "lng": 120.8780, "type": "Highway",
+     "description": "Primary north-south thoroughfare", "population": "N/A", "area_km2": "N/A",
+     "hazard_risk": "Low", "infrastructure": "Major highway"},
+    {"id": 4, "name": "Santa Maria", "lat": 14.8183, "lng": 120.9567, "type": "Municipality",
+     "description": "Town center with commercial district", "population": "289,000", "area_km2": "90.92",
+     "hazard_risk": "Moderate", "infrastructure": "Developing urban center"},
+    {"id": 5, "name": "San Jose del Monte", "lat": 14.8139, "lng": 121.0450, "type": "City",
+     "description": "Component city, major residential area", "population": "651,000", "area_km2": "105.53",
+     "hazard_risk": "High (flooding)", "infrastructure": "Expanding infrastructure"},
+    {"id": 6, "name": "Meycauayan", "lat": 14.7333, "lng": 120.9500, "type": "City",
+     "description": "Industrial and commercial hub", "population": "225,000", "area_km2": "32.10",
+     "hazard_risk": "Moderate", "infrastructure": "Well-developed"},
+    {"id": 7, "name": "Montalban (Rodriguez)", "lat": 14.7000, "lng": 121.1167, "type": "Municipality",
+     "description": "Growing suburban area", "population": "370,000", "area_km2": "172.53",
+     "hazard_risk": "Moderate", "infrastructure": "Developing"}
 ]
 
 sample_polygons = [
-    {
-        "id": 101,
-        "name": "Flood Zone A - Santa Maria",
-        "type": "Hazard Zone",
-        "description": "High risk flood area along river basin",
-        "coordinates": [
-            [14.8350, 120.9400],
-            [14.8300, 120.9600],
-            [14.8100, 120.9650],
-            [14.8000, 120.9450],
-            [14.8150, 120.9300]
-        ],
-        "risk_level": "High",
-        "area_km2": "8.5"
-    },
-    {
-        "id": 102,
-        "name": "Commercial Zone - Meycauayan",
-        "type": "Zoning",
-        "description": "Designated commercial and industrial zone",
-        "coordinates": [
-            [14.7450, 120.9450],
-            [14.7400, 120.9600],
-            [14.7250, 120.9550],
-            [14.7280, 120.9400]
-        ],
-        "risk_level": "Low",
-        "area_km2": "3.2"
-    }
+    {"id": 101, "name": "Flood Zone A - Santa Maria", "type": "Hazard Zone",
+     "description": "High risk flood area along river basin",
+     "coordinates": [[14.8350, 120.9400], [14.8300, 120.9600], [14.8100, 120.9650],
+                     [14.8000, 120.9450], [14.8150, 120.9300]],
+     "risk_level": "High", "area_km2": "8.5"},
+    {"id": 102, "name": "Commercial Zone - Meycauayan", "type": "Zoning",
+     "description": "Designated commercial and industrial zone",
+     "coordinates": [[14.7450, 120.9450], [14.7400, 120.9600], [14.7250, 120.9550],
+                     [14.7280, 120.9400]],
+     "risk_level": "Low", "area_km2": "3.2"}
 ]
+
+# ============================================================================
+# FUNCTIONS
+# ============================================================================
+def parse_location_input(text):
+    """Try to parse as coordinates or match a location name."""
+    text = text.strip()
+    # Check for coordinate pattern: lat, lng
+    coord_pattern = re.compile(r'^\s*([-+]?\d*\.?\d+)\s*[,;]\s*([-+]?\d*\.?\d+)\s*$')
+    match = coord_pattern.match(text)
+    if match:
+        lat = float(match.group(1))
+        lng = float(match.group(2))
+        return {"lat": lat, "lng": lng, "type": "coordinates"}
+    # Try to match location name
+    for loc in sample_locations:
+        if text.lower() in loc["name"].lower():
+            return {"lat": loc["lat"], "lng": loc["lng"], "type": "location", "name": loc["name"]}
+    # If not found, return None
+    return None
 
 # ============================================================================
 # SIDEBAR
 # ============================================================================
 with st.sidebar:
-    # Title
     st.markdown('<div class="app-title">Project APEX</div>', unsafe_allow_html=True)
-    st.markdown('<div class="app-subtitle">Location Intelligence &amp; Mapping Platform</div>', unsafe_allow_html=True)
 
     # ========================================================================
-    # LOCATION INPUT OPTIONS - Dropdown
+    # LOCATION INPUT - Text field + search button
     # ========================================================================
-    st.markdown('<div class="sidebar-section">Location Input</div>', unsafe_allow_html=True)
-
-    loc_mode = st.selectbox(
-        "Coordinates for Pin Location",
-        ["Radius", "Polygon", "Street (Point A to Point B)"],
-        index=1,
-        key="loc_mode_select"
-    )
-    st.session_state.location_input_mode = loc_mode
-
-    # Quick helper text
-    if loc_mode == "Radius":
-        st.caption("Draw a circle on the map to define a radius.")
-        radius_val = st.slider("Radius (meters)", min_value=100, max_value=5000, value=1000, step=100, key="radius_val")
-        st.caption(f"Radius: {radius_val}m")
-    elif loc_mode == "Polygon":
-        st.caption("Draw a polygon on the map to define an area.")
-        st.caption("Click the polygon tool in the map toolbar")
-    else:  # Street
-        st.caption("Click two points on the map to define a street segment.")
-        st.caption("Use the polyline tool to draw a street")
+    st.markdown('<div class="sidebar-section">Location</div>', unsafe_allow_html=True)
+    loc_input = st.text_input("Enter coordinates (lat, lng) or place name", key="loc_input",
+                              placeholder="e.g. 14.8875, 120.8567 or Plaridel")
+    if st.button("Search Location", use_container_width=True):
+        result = parse_location_input(loc_input)
+        if result:
+            st.session_state.map_center = [result["lat"], result["lng"]]
+            st.session_state.map_zoom = 13
+            st.rerun()
+        else:
+            st.warning("Location not found. Try coordinates like '14.8875, 120.8567'")
 
     # ========================================================================
-    # LAYERS
+    # LAYERS - Single column list
     # ========================================================================
     st.markdown('<div class="sidebar-section">Layers</div>', unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        layers_hazards = st.checkbox("Hazards", value=True, key="layer_hazards")
-        layers_roads = st.checkbox("Roads", value=True, key="layer_roads")
-        layers_boundaries = st.checkbox("Boundaries", value=True, key="layer_boundaries")
-    with col2:
-        layers_zoning = st.checkbox("Zoning", value=False, key="layer_zoning")
-        layers_valuation = st.checkbox("Valuation", value=False, key="layer_valuation")
+    # Single column checkboxes
+    layers_hazards = st.checkbox("Hazards", value=st.session_state.layers_visible["hazards"], key="layer_hazards")
+    layers_roads = st.checkbox("Roads", value=st.session_state.layers_visible["roads"], key="layer_roads")
+    layers_boundaries = st.checkbox("Boundaries", value=st.session_state.layers_visible["boundaries"], key="layer_boundaries")
+    layers_zoning = st.checkbox("Zoning", value=st.session_state.layers_visible["zoning"], key="layer_zoning")
+    layers_valuation = st.checkbox("Valuation", value=st.session_state.layers_visible["valuation"], key="layer_valuation")
 
     st.session_state.layers_visible["hazards"] = layers_hazards
     st.session_state.layers_visible["roads"] = layers_roads
@@ -442,14 +372,27 @@ with st.sidebar:
     st.session_state.layers_visible["zoning"] = layers_zoning
     st.session_state.layers_visible["valuation"] = layers_valuation
 
+    # Manage layer button
     st.button("Manage layer", use_container_width=True, key="manage_layer")
+
+    # Base map selector
+    basemap_options = {
+        "CartoDB Positron": "CartoDB Positron",
+        "CartoDB Dark_Matter": "CartoDB Dark_Matter",
+        "OpenStreetMap": "OpenStreetMap",
+        "Stamen Terrain": "Stamen Terrain",
+        "Stamen Toner": "Stamen Toner"
+    }
+    selected_basemap = st.selectbox("Base Map", list(basemap_options.keys()), index=0)
+    if selected_basemap != st.session_state.basemap:
+        st.session_state.basemap = basemap_options[selected_basemap]
+        st.rerun()
 
     # ========================================================================
     # DROPDOWNS - Hazards, Infrastructure, Valuation
     # ========================================================================
     st.markdown('<div class="sidebar-section">Data Layers</div>', unsafe_allow_html=True)
 
-    # Hazards
     with st.expander("Hazards", expanded=False):
         hazard_sel = st.multiselect(
             "Select hazard types",
@@ -462,18 +405,17 @@ with st.sidebar:
         else:
             st.caption("No hazards selected")
 
-    # Infrastructure
     with st.expander("Infrastructure", expanded=False):
         infra_sel = st.multiselect(
             "Select infrastructure layers",
-            ["Roads", "Boundaries (Cities)", "Boundaries (Province)", "Boundaries (Region)", "Zoning (LGU Restrictions)", "CLUP"],
+            ["Roads", "Boundaries (Cities)", "Boundaries (Province)", "Boundaries (Region)",
+             "Zoning (LGU Restrictions)", "CLUP"],
             default=["Roads", "Boundaries (Cities)"],
             key="infra_sel"
         )
         if infra_sel:
             st.caption(f"Showing: {', '.join(infra_sel)}")
 
-    # Valuation
     with st.expander("Valuation", expanded=False):
         val_sel = st.multiselect(
             "Select valuation sources",
@@ -490,45 +432,25 @@ with st.sidebar:
     st.markdown('<div class="footer">Map tiles by CartoDB under CC BY-SA 3.0<br>Data © OpenStreetMap contributors</div>', unsafe_allow_html=True)
 
 # ============================================================================
-# MAIN CONTENT - FULL MAP
+# MAIN MAP (full screen)
 # ============================================================================
-# Create an empty container for the map (full screen)
 map_container = st.container()
-
 with map_container:
-    # We'll render the map in a div with full screen via CSS
     st.markdown('<div class="map-container" id="map-container">', unsafe_allow_html=True)
 
-    # Create map
+    # Create map with selected basemap
     m = folium.Map(
         location=st.session_state.map_center,
         zoom_start=st.session_state.map_zoom,
-        tiles="CartoDB Positron",
+        tiles=st.session_state.basemap,
         attr='Map tiles by CartoDB under CC BY-SA 3.0. Data © OpenStreetMap contributors'
     )
 
-    # Add Mouse Position
     MousePosition().add_to(m)
 
-    # ========================================================================
-    # ADD SAMPLE MARKERS
-    # ========================================================================
+    # Add sample markers
     if st.session_state.layers_visible.get("hazards", True) or st.session_state.layers_visible.get("boundaries", True):
         for loc in sample_locations:
-            # Determine color based on type
-            if "City" in loc["type"]:
-                color = "#dc3545"
-                icon_type = "star"
-            elif "Municipality" in loc["type"]:
-                color = "#4a90d9"
-                icon_type = "circle"
-            elif "Road" in loc["type"] or "Highway" in loc["type"]:
-                color = "#28a745"
-                icon_type = "road"
-            else:
-                color = "#ffc107"
-                icon_type = "info-sign"
-
             if "Highway" in loc["type"] or "Road" in loc["type"]:
                 if not st.session_state.layers_visible.get("roads", True):
                     continue
@@ -536,28 +458,29 @@ with map_container:
                 if not st.session_state.layers_visible.get("boundaries", True):
                     continue
 
+            color = "#dc3545" if "City" in loc["type"] else "#4a90d9" if "Municipality" in loc["type"] else "#28a745"
+            icon_type = "star" if "City" in loc["type"] else "circle" if "Municipality" in loc["type"] else "road"
             popup_html = f"""
-            <div style="min-width:200px; font-family:sans-serif;">
-                <h4 style="margin:0 0 4px 0; color:#1a1a2e;">{loc['name']}</h4>
-                <div style="font-size:0.8rem; color:#6c757d; margin-bottom:6px;">{loc['type']}</div>
-                <hr style="margin:4px 0; border-top:1px solid #e9ecef;">
+            <div style="min-width:200px;">
+                <h4 style="margin:0 0 4px 0;">{loc['name']}</h4>
+                <div style="font-size:0.8rem; color:#6c757d;">{loc['type']}</div>
+                <hr style="margin:4px 0;">
                 <div style="font-size:0.85rem;">
                     <strong>Population:</strong> {loc['population']}<br>
                     <strong>Area:</strong> {loc['area_km2']} km²<br>
                     <strong>Hazard Risk:</strong> {loc['hazard_risk']}<br>
                     <strong>Infrastructure:</strong> {loc['infrastructure']}
                 </div>
-                <div style="margin-top:6px; font-size:0.75rem; color:#adb5bd;">
-                    Click for full details
-                </div>
+                <div style="margin-top:6px; font-size:0.75rem; color:#adb5bd;">Click for full details</div>
             </div>
             """
-
             folium.Marker(
                 location=[loc["lat"], loc["lng"]],
                 popup=folium.Popup(popup_html, max_width=300),
                 tooltip=f"{loc['name']} ({loc['type']})",
-                icon=folium.Icon(color="red" if "City" in loc["type"] else "blue" if "Municipality" in loc["type"] else "green", icon="info-sign" if "Municipality" in loc["type"] else "star" if "City" in loc["type"] else "road", prefix="fa"),
+                icon=folium.Icon(color="red" if "City" in loc["type"] else "blue" if "Municipality" in loc["type"] else "green",
+                                 icon="info-sign" if "Municipality" in loc["type"] else "star" if "City" in loc["type"] else "road",
+                                 prefix="fa")
             ).add_to(m)
 
             folium.CircleMarker(
@@ -567,17 +490,14 @@ with map_container:
                 fill=True,
                 fill_color=color,
                 fill_opacity=0.3,
-                popup=loc["name"],
                 tooltip=loc["name"]
             ).add_to(m)
 
-    # ========================================================================
-    # ADD SAMPLE POLYGONS
-    # ========================================================================
+    # Add polygons
     if st.session_state.layers_visible.get("hazards", True):
         for poly in sample_polygons:
             color = "#dc3545" if "Flood" in poly["name"] else "#4a90d9"
-            fill_color = "#dc3545" if "Flood" in poly["name"] else "#4a90d9"
+            fill_color = color
             folium.Polygon(
                 locations=poly["coordinates"],
                 color=color,
@@ -589,9 +509,7 @@ with map_container:
                 tooltip=poly["name"]
             ).add_to(m)
 
-    # ========================================================================
-    # ADD DRAW PLUGIN
-    # ========================================================================
+    # Draw plugin
     draw = Draw(
         export=False,
         position='topleft',
@@ -607,28 +525,20 @@ with map_container:
     )
     draw.add_to(m)
 
-    # ========================================================================
-    # RENDER MAP
-    # ========================================================================
     map_data = st_folium(
         m,
         width="100%",
-        height=800,  # Will be overridden by CSS to fill viewport
-        returned_objects=[
-            "last_clicked",
-            "last_object_clicked",
-            "all_drawings",
-            "bounds"
-        ],
+        height=800,
+        returned_objects=["last_clicked", "last_object_clicked", "all_drawings", "bounds"],
         key="gis_map"
     )
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================================
-# FLOATING DETAILS PANEL (Right side overlay)
+# FLOATING DETAILS PANEL (right side overlay)
 # ============================================================================
-# Prepare selected feature info from map interaction
+# Determine selected feature from map interactions
 selected_info = None
 
 if map_data and map_data.get("last_object_clicked"):
@@ -639,96 +549,54 @@ if map_data and map_data.get("last_object_clicked"):
         for loc in sample_locations:
             dist = ((loc["lat"] - lat) ** 2 + (loc["lng"] - lng) ** 2) ** 0.5
             if dist < 0.005:
-                selected_info = {
-                    "type": "Location",
-                    "data": loc,
-                    "name": loc["name"]
-                }
+                selected_info = {"type": "Location", "data": loc, "name": loc["name"]}
                 break
 
-# Check drawings
-if map_data and map_data.get("all_drawings"):
+if not selected_info and map_data and map_data.get("all_drawings"):
     drawings = map_data["all_drawings"]
     if drawings and len(drawings) > 0:
         last_drawing = drawings[-1]
         geom_type = last_drawing.get("geometry", {}).get("type", "Unknown")
         coords = last_drawing.get("geometry", {}).get("coordinates", [])
         if geom_type == "Point":
-            selected_info = {
-                "type": "Point",
-                "data": {
-                    "name": "Drawn Point",
-                    "coordinates": coords,
-                    "description": "Point drawn on map",
-                    "created": datetime.now().strftime("%Y-%m-%d %H:%M")
-                },
-                "name": "Drawn Point"
-            }
+            selected_info = {"type": "Point", "name": "Drawn Point",
+                             "data": {"name": "Drawn Point", "coordinates": coords,
+                                      "description": "Point drawn on map",
+                                      "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
         elif geom_type == "Polygon":
-            selected_info = {
-                "type": "Polygon",
-                "data": {
-                    "name": "Drawn Polygon",
-                    "coordinates": coords,
-                    "description": "Polygon drawn on map",
-                    "area": "Calculated on server",
-                    "created": datetime.now().strftime("%Y-%m-%d %H:%M")
-                },
-                "name": "Drawn Polygon"
-            }
+            selected_info = {"type": "Polygon", "name": "Drawn Polygon",
+                             "data": {"name": "Drawn Polygon", "coordinates": coords,
+                                      "description": "Polygon drawn on map", "area": "Calculated on server",
+                                      "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
         elif geom_type == "LineString":
-            selected_info = {
-                "type": "Street",
-                "data": {
-                    "name": "Drawn Street",
-                    "coordinates": coords,
-                    "description": "Street segment drawn on map",
-                    "length": "Calculated on server",
-                    "created": datetime.now().strftime("%Y-%m-%d %H:%M")
-                },
-                "name": "Drawn Street"
-            }
+            selected_info = {"type": "Street", "name": "Drawn Street",
+                             "data": {"name": "Drawn Street", "coordinates": coords,
+                                      "description": "Street segment drawn on map", "length": "Calculated on server",
+                                      "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
         elif geom_type == "Circle":
-            selected_info = {
-                "type": "Radius",
-                "data": {
-                    "name": "Drawn Radius",
-                    "coordinates": coords,
-                    "description": "Radius drawn on map",
-                    "radius": "Calculated on server",
-                    "created": datetime.now().strftime("%Y-%m-%d %H:%M")
-                },
-                "name": "Drawn Radius"
-            }
+            selected_info = {"type": "Radius", "name": "Drawn Radius",
+                             "data": {"name": "Drawn Radius", "coordinates": coords,
+                                      "description": "Radius drawn on map", "radius": "Calculated on server",
+                                      "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
 
 if not selected_info and map_data and map_data.get("last_clicked"):
     click_loc = map_data["last_clicked"]
     if click_loc and "lat" in click_loc and "lng" in click_loc:
-        selected_info = {
-            "type": "Map Click",
-            "data": {
-                "name": "Selected Location",
-                "coordinates": [click_loc["lat"], click_loc["lng"]],
-                "description": "Point clicked on map",
-                "created": datetime.now().strftime("%Y-%m-%d %H:%M")
-            },
-            "name": f"{click_loc['lat']:.5f}, {click_loc['lng']:.5f}"
-        }
+        selected_info = {"type": "Map Click", "name": f"{click_loc['lat']:.5f}, {click_loc['lng']:.5f}",
+                         "data": {"name": "Selected Location",
+                                  "coordinates": [click_loc["lat"], click_loc["lng"]],
+                                  "description": "Point clicked on map",
+                                  "created": datetime.now().strftime("%Y-%m-%d %H:%M")}}
 
-# ============================================================================
-# RENDER FLOATING PANEL
-# ============================================================================
-# We'll use a container with custom CSS to position it over the map
-floating_html = """
-<div class="floating-panel" id="floating-panel">
-"""
+# Build the HTML for the floating panel
+panel_html = '<div class="floating-panel" id="floating-panel">'
 
 if selected_info:
     info_type = selected_info.get("type", "Unknown")
     data = selected_info.get("data", {})
     name = selected_info.get("name", "Unnamed")
 
-    floating_html += f"""
+    panel_html += f"""
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h4 style="margin:0;">{name}</h4>
         <button class="close-btn" onclick="document.getElementById('floating-panel').style.display='none';">&times;</button>
@@ -748,10 +616,7 @@ if selected_info:
             ("Coordinates", f"{data.get('lat', 'N/A')}, {data.get('lng', 'N/A')}")
         ]
         for label, value in fields:
-            floating_html += f"""
-            <div class="detail-label">{label}</div>
-            <div class="detail-value">{value}</div>
-            """
+            panel_html += f'<div class="detail-label">{label}</div><div class="detail-value">{value}</div>'
 
     elif info_type in ["Point", "Map Click"] and data:
         coords = data.get("coordinates", [])
@@ -759,43 +624,41 @@ if selected_info:
             if isinstance(coords[0], list):
                 lat_str = f"{coords[0][0]:.5f}" if len(coords[0]) > 0 else "N/A"
                 lng_str = f"{coords[0][1]:.5f}" if len(coords[0]) > 1 else "N/A"
-                floating_html += f"<div class='detail-label'>Coordinates</div><div class='detail-value'>{lat_str}, {lng_str}</div>"
+                panel_html += f'<div class="detail-label">Coordinates</div><div class="detail-value">{lat_str}, {lng_str}</div>'
             else:
-                floating_html += f"<div class='detail-label'>Coordinates</div><div class='detail-value'>{coords[0]:.5f}, {coords[1]:.5f}</div>"
-        floating_html += f"<div class='detail-label'>Description</div><div class='detail-value'>{data.get('description', 'No description')}</div>"
-        floating_html += f"<div class='detail-label'>Created</div><div class='detail-value'>{data.get('created', 'N/A')}</div>"
+                panel_html += f'<div class="detail-label">Coordinates</div><div class="detail-value">{coords[0]:.5f}, {coords[1]:.5f}</div>'
+        panel_html += f'<div class="detail-label">Description</div><div class="detail-value">{data.get("description", "No description")}</div>'
+        panel_html += f'<div class="detail-label">Created</div><div class="detail-value">{data.get("created", "N/A")}</div>'
 
     elif info_type == "Polygon" and data:
         coords = data.get("coordinates", [])
         if coords and isinstance(coords[0], list):
-            floating_html += f"<div class='detail-label'>Number of vertices</div><div class='detail-value'>{len(coords[0])}</div>"
-            floating_html += f"<div class='detail-label'>Area</div><div class='detail-value'>{data.get('area', 'Calculating...')}</div>"
-        floating_html += f"<div class='detail-label'>Description</div><div class='detail-value'>{data.get('description', 'No description')}</div>"
-        floating_html += f"<div class='detail-label'>Created</div><div class='detail-value'>{data.get('created', 'N/A')}</div>"
+            panel_html += f'<div class="detail-label">Number of vertices</div><div class="detail-value">{len(coords[0])}</div>'
+            panel_html += f'<div class="detail-label">Area</div><div class="detail-value">{data.get("area", "Calculating...")}</div>'
+        panel_html += f'<div class="detail-label">Description</div><div class="detail-value">{data.get("description", "No description")}</div>'
+        panel_html += f'<div class="detail-label">Created</div><div class="detail-value">{data.get("created", "N/A")}</div>'
 
     elif info_type == "Street" and data:
         coords = data.get("coordinates", [])
         if coords and isinstance(coords[0], list):
-            floating_html += f"<div class='detail-label'>Number of points</div><div class='detail-value'>{len(coords[0])}</div>"
-            floating_html += f"<div class='detail-label'>Length</div><div class='detail-value'>{data.get('length', 'Calculating...')}</div>"
-        floating_html += f"<div class='detail-label'>Description</div><div class='detail-value'>{data.get('description', 'No description')}</div>"
-        floating_html += f"<div class='detail-label'>Created</div><div class='detail-value'>{data.get('created', 'N/A')}</div>"
+            panel_html += f'<div class="detail-label">Number of points</div><div class="detail-value">{len(coords[0])}</div>'
+            panel_html += f'<div class="detail-label">Length</div><div class="detail-value">{data.get("length", "Calculating...")}</div>'
+        panel_html += f'<div class="detail-label">Description</div><div class="detail-value">{data.get("description", "No description")}</div>'
+        panel_html += f'<div class="detail-label">Created</div><div class="detail-value">{data.get("created", "N/A")}</div>'
 
     elif info_type == "Radius" and data:
         coords = data.get("coordinates", [])
         if coords and isinstance(coords[0], list):
-            floating_html += f"<div class='detail-label'>Center</div><div class='detail-value'>{coords[0][0]:.5f}, {coords[0][1]:.5f}</div>"
-            floating_html += f"<div class='detail-label'>Radius</div><div class='detail-value'>{data.get('radius', 'Calculating...')}</div>"
-        floating_html += f"<div class='detail-label'>Description</div><div class='detail-value'>{data.get('description', 'No description')}</div>"
-        floating_html += f"<div class='detail-label'>Created</div><div class='detail-value'>{data.get('created', 'N/A')}</div>"
+            panel_html += f'<div class="detail-label">Center</div><div class="detail-value">{coords[0][0]:.5f}, {coords[0][1]:.5f}</div>'
+            panel_html += f'<div class="detail-label">Radius</div><div class="detail-value">{data.get("radius", "Calculating...")}</div>'
+        panel_html += f'<div class="detail-label">Description</div><div class="detail-value">{data.get("description", "No description")}</div>'
+        panel_html += f'<div class="detail-label">Created</div><div class="detail-value">{data.get("created", "N/A")}</div>'
 
     else:
-        floating_html += "<div>No details available for this selection.</div>"
+        panel_html += "<div>No details available for this selection.</div>"
 
-    # ========================================================================
-    # ADVANCED ANALYTICS & DATA INTERPRETATION (moved here)
-    # ========================================================================
-    floating_html += """
+    # Advanced Analytics section
+    panel_html += """
     <hr class="divider">
     <h4 style="font-size:1rem; margin-top:0.8rem;">Advanced Analytics</h4>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.85rem;">
@@ -812,8 +675,8 @@ if selected_info:
     """
 
 else:
-    # No selection - show a default message and analytics preview
-    floating_html += """
+    # Default panel
+    panel_html += """
     <h4 style="margin-top:0;">Details</h4>
     <div style="color:#6c757d; font-size:0.9rem;">Click on a marker, polygon, or draw on the map to see details here.</div>
     <hr class="divider">
@@ -836,12 +699,7 @@ else:
     </div>
     """
 
-floating_html += "</div>"
+panel_html += "</div>"
 
 # Render the floating panel using st.markdown with unsafe_allow_html
-st.markdown(floating_html, unsafe_allow_html=True)
-
-# ============================================================================
-# BOTTOM NOTE (optional, but we removed the expandable section)
-# ============================================================================
-# We no longer have the expandable section; it's all in the floating panel.
+st.markdown(panel_html, unsafe_allow_html=True)
