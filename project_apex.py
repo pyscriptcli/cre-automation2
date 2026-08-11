@@ -1,13 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Requires: pip install streamlit
-# Run: streamlit run app.py
-# Internet needed at runtime for Leaflet CDN, OSM tiles and Nominatim geocoding.
-
 st.set_page_config(page_title="Project Apex", layout="wide", initial_sidebar_state="collapsed")
 
-# Full-screen chrome stripping: no scrollbars, iframe pinned to viewport (1920x1080 safe).
 st.markdown("""
 <style>
 html, body, #root, .stApp {
@@ -48,7 +43,7 @@ APP_HTML = r"""
 * {box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI', -apple-system, Helvetica, Arial, sans-serif;}
 html, body {height:100%; overflow:hidden;}
 body {background:#2a2a2a;}
-#app {position:absolute; inset:8px; overflow:hidden; background:#fff;}
+#app {position:absolute; inset:0px; overflow:hidden; background:#fff;}
 
 svg {vertical-align:middle;}
 button {background:none; border:none; cursor:pointer; color:inherit; font:inherit;}
@@ -65,7 +60,7 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .vsep {width:1px; height:14px; background:#33466b;}
 .help {display:flex; align-items:center; gap:5px; color:#cdd7e6; font-size:11px;}
 
-/* ---------- Left toolbar ---------- */
+/* ---------- Left toolbar (REORDERED) ---------- */
 #toolbar {position:absolute; top:34px; left:0; bottom:0; width:38px; background:#fff; border-right:1px solid #bbb;
   display:flex; flex-direction:column; align-items:center; padding-top:6px; gap:2px; z-index:1100;}
 #toolbar button {width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:#444; border-radius:3px;}
@@ -83,7 +78,7 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .bm-opt .dot {width:12px; height:12px; border-radius:50%; border:2px solid #999; flex-shrink:0;}
 .bm-opt.active .dot {border-color:#021a3d; background:#021a3d; box-shadow:inset 0 0 0 2px #fff;}
 
-/* ---------- Floating panels (data browser / search) ---------- */
+/* ---------- Floating panels ---------- */
 .panel {position:absolute; top:42px; left:46px; width:300px; background:#fff;
   box-shadow:0 1px 4px rgba(0,0,0,.3); display:none; flex-direction:column;}
 .panel.open, #databrowser {display:flex;}
@@ -148,20 +143,15 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .gb-btn {border:1px solid #ccc; background:#fff; border-radius:3px; padding:3px 8px; font-size:11px;}
 #group-create {background:#021a3d; color:#fff; border-color:#021a3d;}
 
-/* draw confirm popup */
-#draw-confirm {position:absolute; top:70px; left:50%; transform:translateX(-50%); background:#fff; z-index:1300;
-  box-shadow:0 2px 8px rgba(0,0,0,.4); border-radius:4px; padding:10px 14px; display:none; align-items:center; gap:10px; font-size:12px;}
-#draw-confirm.open {display:flex;}
-.dc-btn {padding:4px 14px; border-radius:3px; font-size:12px; border:1px solid #ccc; background:#fff;}
-#dc-save {background:#021a3d; color:#fff; border-color:#021a3d;}
-
-/* ---------- Details panel ---------- */
+/* ---------- Details Panel (Dual Mode) ---------- */
 #details {position:absolute; top:42px; right:10px; width:292px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.3);
   z-index:1100; padding:16px; max-height:calc(100% - 160px); overflow:auto;}
 #details-close {position:absolute; right:10px; top:10px; color:#999;}
 #details-close:hover {color:#333;}
-#details h1 {font-size:22px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:8px; margin-bottom:12px;}
-#details h2 {font-size:15px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:6px; margin-top:14px;}
+
+/* Standard Panel content */
+#standard-panel h1 {font-size:22px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:8px; margin-bottom:12px;}
+#standard-panel h2 {font-size:15px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:6px; margin-top:14px;}
 .hint {font-size:13px; color:#6b7c93; line-height:1.5; margin-bottom:10px;}
 .lbl {font-size:10px; letter-spacing:.5px; color:#8a8a8a; text-transform:uppercase; margin-top:10px;}
 .val {font-size:13px; color:#333; margin-top:2px; word-break:break-word;}
@@ -172,6 +162,21 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .delta {font-size:11px; font-weight:600; margin-left:4px;}
 .up {color:#188038;} .down {color:#d93025;} .flat {color:#80868b;}
 .foot {font-size:11px; color:#8a8a8a; line-height:1.5; margin-top:10px;}
+
+/* Hazard Panel content */
+#hazard-panel .hazard-title {font-weight:600; font-size:18px; color:#333; margin-bottom:12px;}
+.hazard-card {display:flex; align-items:center; justify-content:space-between; background:#fff; border-radius:4px; 
+  margin-bottom:8px; padding:10px; box-shadow:0 1px 3px rgba(0,0,0,0.15); position:relative;}
+.hazard-card-left {display:flex; align-items:center; gap:12px;}
+.hazard-icon {display:flex; align-items:center; justify-content:center; width:44px; height:44px; background:#fff; border:2px solid #0056b3; border-radius:6px; flex-shrink:0; color:#0056b3;}
+.hazard-text-wrap {display:flex; flex-direction:column;}
+.hazard-label {font-size:13px; font-weight:500; color:#444;}
+.hazard-level {font-size:13px; font-weight:700; color:#222; text-transform:uppercase;}
+.hazard-info {display:flex; align-items:center; justify-content:center; width:20px; height:20px; border:1px solid #555; border-radius:50%; color:#444; font-size:12px; font-weight:bold; cursor:pointer; margin-left:8px;}
+.hazard-notes {margin-top:12px; font-size:11px; color:#444; line-height:1.6;}
+.hazard-notes ul {padding-left:16px; margin:4px 0; list-style-type:disc;}
+.hazard-notes ul li {margin-bottom:2px;}
+.hazard-db-list {margin-top:8px; font-size:11px; font-weight:600; color:#555; line-height:1.5;}
 
 /* price tooltips */
 .leaflet-tooltip.price-tip {background:#021a3d; color:#fff; border:1px solid #021a3d; font-size:10px;
@@ -244,13 +249,6 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
       </div>
       <div id="search-results"></div>
     </div>
-  </div>
-
-  <!-- Draw save/cancel popup -->
-  <div id="draw-confirm">
-    <span>Save this shape?</span>
-    <button id="dc-save" class="dc-btn">Save</button>
-    <button id="dc-cancel" class="dc-btn">Cancel</button>
   </div>
 
   <!-- Data browser -->
@@ -351,38 +349,92 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
     </div>
   </div>
 
-  <!-- Details panel -->
+  <!-- Details panel (Dual Mode) -->
   <div id="details">
     <button id="details-close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
-    <h1>Details</h1>
-    <p class="hint">Click on a marker, polygon, or draw on the map to see details here.</p>
-    <div id="feature-block" style="display:none">
-      <div class="lbl">Selected feature</div>
-      <div class="val" id="f-name">-</div>
-      <div class="lbl">Type</div>
-      <div class="val" id="f-type">-</div>
-      <div class="lbl">Area</div>
-      <div class="val" id="f-area">-</div>
-      <div class="lbl">Centroid</div>
-      <div class="val" id="f-centroid">-</div>
+    
+    <div id="standard-panel">
+      <h1>Details</h1>
+      <p class="hint">Click on a marker, polygon, or draw on the map to see details here.</p>
+      <div id="feature-block" style="display:none">
+        <div class="lbl">Selected feature</div>
+        <div class="val" id="f-name">-</div>
+        <div class="lbl">Type</div>
+        <div class="val" id="f-type">-</div>
+        <div class="lbl">Area</div>
+        <div class="val" id="f-area">-</div>
+        <div class="lbl">Centroid</div>
+        <div class="val" id="f-centroid">-</div>
+        <hr>
+      </div>
+      <div class="lbl">Last click</div>
+      <div class="val" id="lastclick">-</div>
+      <div class="lbl">Active drawings</div>
+      <div class="val" id="drawcount">0</div>
       <hr>
+      <h2>Advanced Analytics</h2>
+      <div class="metrics">
+        <div class="metric"><div class="lbl">Avg rental rate</div><div class="mval"><span id="m-rental">&#8369; 850/m&#178;</span><span class="delta up" id="d-rental">+3.2%</span></div></div>
+        <div class="metric"><div class="lbl">Prime core index</div><div class="mval"><span id="m-prime">87.5</span><span class="delta up" id="d-prime">+1.8%</span></div></div>
+        <div class="metric"><div class="lbl">Road density</div><div class="mval"><span id="m-road">2.4 km/km&#178;</span><span class="delta up" id="d-road">+0.3</span></div></div>
+        <div class="metric"><div class="lbl">Zoning compliance</div><div class="mval"><span id="m-zoning">94%</span><span class="delta up" id="d-zoning">+2%</span></div></div>
+        <div class="metric"><div class="lbl">Flood risk index</div><div class="mval"><span id="m-flood">Medium (4.2)</span><span class="delta down" id="d-flood">+0.5</span></div></div>
+        <div class="metric"><div class="lbl">Earthquake suscept.</div><div class="mval"><span id="m-quake">Low (2.1)</span><span class="delta flat" id="d-quake">+0.0</span></div></div>
+      </div>
+      <hr>
+      <p class="foot">Smart Comparable Analysis: Advanced scoring algorithms for property valuation</p>
     </div>
-    <div class="lbl">Last click</div>
-    <div class="val" id="lastclick">-</div>
-    <div class="lbl">Active drawings</div>
-    <div class="val" id="drawcount">0</div>
-    <hr>
-    <h2>Advanced Analytics</h2>
-    <div class="metrics">
-      <div class="metric"><div class="lbl">Avg rental rate</div><div class="mval"><span id="m-rental">&#8369; 850/m&#178;</span><span class="delta up" id="d-rental">+3.2%</span></div></div>
-      <div class="metric"><div class="lbl">Prime core index</div><div class="mval"><span id="m-prime">87.5</span><span class="delta up" id="d-prime">+1.8%</span></div></div>
-      <div class="metric"><div class="lbl">Road density</div><div class="mval"><span id="m-road">2.4 km/km&#178;</span><span class="delta up" id="d-road">+0.3</span></div></div>
-      <div class="metric"><div class="lbl">Zoning compliance</div><div class="mval"><span id="m-zoning">94%</span><span class="delta up" id="d-zoning">+2%</span></div></div>
-      <div class="metric"><div class="lbl">Flood risk index</div><div class="mval"><span id="m-flood">Medium (4.2)</span><span class="delta down" id="d-flood">+0.5</span></div></div>
-      <div class="metric"><div class="lbl">Earthquake suscept.</div><div class="mval"><span id="m-quake">Low (2.1)</span><span class="delta flat" id="d-quake">+0.0</span></div></div>
+
+    <div id="hazard-panel" style="display:none;">
+      <div class="hazard-title">Hazard Levels In Your Area</div>
+      
+      <div class="hazard-card">
+        <div class="hazard-card-left">
+          <div class="hazard-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/><path d="M8 16h8"/></svg></div>
+          <div class="hazard-text-wrap">
+            <div class="hazard-label">Flood Hazard Level</div>
+            <div class="hazard-level">LITTLE TO NONE</div>
+          </div>
+        </div>
+        <div class="hazard-info">i</div>
+      </div>
+
+      <div class="hazard-card">
+        <div class="hazard-card-left">
+          <div class="hazard-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+          <div class="hazard-text-wrap">
+            <div class="hazard-label">Landslide Hazard Level</div>
+            <div class="hazard-level">LITTLE TO NONE</div>
+          </div>
+        </div>
+        <div class="hazard-info">i</div>
+      </div>
+
+      <div class="hazard-card">
+        <div class="hazard-card-left">
+          <div class="hazard-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20"/><path d="M12 2v20"/><path d="M4 4l16 16"/><path d="M20 4L4 20"/></svg></div>
+          <div class="hazard-text-wrap">
+            <div class="hazard-label">Storm Surge Hazard Level</div>
+            <div class="hazard-level">LITTLE TO NONE</div>
+          </div>
+        </div>
+        <div class="hazard-info">i</div>
+      </div>
+
+      <div class="hazard-notes">
+        <div style="font-weight:600; margin-bottom:4px;">Note:</div>
+        <ul>
+          <li>If you want an independent assessment of flood, landslide, or storm surge, then click on the tabs above.</li>
+          <li>Assessment is for a point location. Please refer to map for visual evaluation.</li>
+        </ul>
+        <div class="hazard-db-list">Hazards included in map database are:<br>
+          1) 100-year rain return for floods;<br>
+          2) Shallow and structurally-controlled landslides;<br>
+          3) 5-meters for storm surges.
+        </div>
+      </div>
     </div>
-    <hr>
-    <p class="foot">Smart Comparable Analysis: Advanced scoring algorithms for property valuation</p>
+
   </div>
 
 </div>
@@ -427,7 +479,7 @@ try {
     }
   });
 
-  // ---------- dynamic details ----------
+  // ---------- dynamic details & hazard panel logic ----------
   function setM(key, valText, delta, unit, goodPositive) {
     document.getElementById('m-' + key).textContent = valText;
     var el = document.getElementById('d-' + key);
@@ -519,7 +571,6 @@ try {
   namedPoly([[14.52,121.00],[14.56,121.01],[14.57,121.04],[14.53,121.04]], {color:'#8e24aa', weight:2, dashArray:'4 4', fillColor:'#ba68c8', fillOpacity:0.25}, 'Zoning district 2', 'Zoning', zLayers);
   var zoning = L.layerGroup(zLayers);
 
-  // valuation dots with prices
   function pricedDots(data, fill, label) {
     var out = [];
     data.forEach(function (d, i) {
@@ -563,23 +614,42 @@ try {
     h.onclick = function () { h.parentElement.classList.toggle('collapsed'); };
   });
 
-  // ---------- thematic row toggling ----------
+  // ---------- thematic row toggling & Hazard Details Swap ----------
+  function updateHazardVisibility() {
+    var eqRow = document.querySelector('.layer-row[data-key="earthquake"]');
+    var floodRow = document.querySelector('.layer-row[data-key="floods"]');
+    var eqActive = eqRow && eqRow.classList.contains('selected');
+    var floodActive = floodRow && floodRow.classList.contains('selected');
+    var showHazard = eqActive || floodActive;
+
+    var standardPanel = document.getElementById('standard-panel');
+    var hazardPanel = document.getElementById('hazard-panel');
+
+    if (showHazard) {
+      standardPanel.style.display = 'none';
+      hazardPanel.style.display = '';
+    } else {
+      standardPanel.style.display = '';
+      hazardPanel.style.display = 'none';
+    }
+  }
+
   document.querySelectorAll('.layer-row[data-key]').forEach(function (row) {
     row.onclick = function () {
       var key = row.dataset.key, on = row.classList.contains('disabled');
       if (on) { overlays[key].addTo(map); row.classList.remove('disabled'); row.classList.add('selected'); }
       else { map.removeLayer(overlays[key]); row.classList.add('disabled'); row.classList.remove('selected'); }
+      updateHazardVisibility();
     };
   });
+  updateHazardVisibility(); // initial state check
 
-  // ---------- drawings: save/cancel + Layers list ----------
+  // ---------- drawings: automatically add to Layers list ----------
   var drawnItems = L.featureGroup().addTo(map);
   var drawnList = document.getElementById('drawn-list');
   var drawnGroups = document.getElementById('drawn-groups');
   var emptyNote = document.getElementById('drawn-empty');
-  var confirmBox = document.getElementById('draw-confirm');
   var counters = {};
-  var pendingLayer = null;
 
   var typeMeta = {
     polyline:  {name:'Line',      svg:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg>'},
@@ -633,29 +703,16 @@ try {
     return row;
   }
 
+  // No more save/cancel popups! Instant drawing.
   map.on(L.Draw.Event.CREATED, function (e) {
-    // hold shape on map, ask user to save or cancel
-    pendingLayer = e.layer;
-    pendingLayer._type = e.layerType;
-    map.addLayer(pendingLayer);
-    confirmBox.classList.add('open');
-  });
-  document.getElementById('dc-save').onclick = function () {
-    if (!pendingLayer) return;
-    var t = pendingLayer._type;
+    var layer = e.layer;
+    var t = e.layerType;
+    drawnItems.addLayer(layer);
     counters[t] = (counters[t] || 0) + 1;
     var name = (typeMeta[t] ? typeMeta[t].name : t) + ' ' + counters[t];
-    drawnItems.addLayer(pendingLayer);
-    bindFeature(pendingLayer, name, typeMeta[t] ? typeMeta[t].name : t);
-    addDrawnRow(pendingLayer, t, name);
-    pendingLayer = null;
-    confirmBox.classList.remove('open');
-  };
-  document.getElementById('dc-cancel').onclick = function () {
-    if (pendingLayer) map.removeLayer(pendingLayer);
-    pendingLayer = null;
-    confirmBox.classList.remove('open');
-  };
+    bindFeature(layer, name, typeMeta[t] ? typeMeta[t].name : t);
+    addDrawnRow(layer, t, name);
+  });
 
   map.on('click', function (e) {
     document.getElementById('lastclick').textContent = e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4);
@@ -706,7 +763,7 @@ try {
     setGrouping(false);
   };
 
-  // ---------- toolbar (ZOOM BUTTONS REMOVED) ----------
+  // ---------- toolbar (Toggle Drawing Tools) ----------
   document.getElementById('clearbtn').onclick = function () {
     drawnItems.clearLayers();
     drawnList.querySelectorAll('.layer-row').forEach(function (r) { r.remove(); });
@@ -733,10 +790,20 @@ try {
   var activeHandler = null;
   document.querySelectorAll('.tool').forEach(function (btn) {
     btn.onclick = function () {
+      var toolName = btn.dataset.tool;
+      var isActive = btn.classList.contains('active');
+
+      if (isActive) {
+        btn.classList.remove('active');
+        if (activeHandler) { activeHandler.disable(); activeHandler = null; }
+        return;
+      }
+
       document.querySelectorAll('.tool').forEach(function (b) { b.classList.remove('active'); });
       if (activeHandler) { activeHandler.disable(); activeHandler = null; }
-      activeHandler = handlers[btn.dataset.tool];
-      activeHandler.enable();
+
+      activeHandler = handlers[toolName];
+      if (activeHandler) { activeHandler.enable(); }
       btn.classList.add('active');
     };
   });
