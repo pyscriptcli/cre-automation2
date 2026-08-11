@@ -17,12 +17,12 @@ st.set_page_config(
 )
 
 # ============================================================================
-# CUSTOM CSS - Hide toolbar, full map, floating panels
+# CUSTOM CSS - Hide toolbar, header, footer, and Streamlit branding
 # ============================================================================
 st.markdown("""
     <style>
-    /* Hide Streamlit toolbar */
-    .stAppToolbar, .stMainMenu, #MainMenu, footer {
+    /* Hide Streamlit toolbar, header, and menu */
+    .stAppToolbar, .stMainMenu, #MainMenu, footer, .stAppHeader {
         display: none !important;
     }
     /* Remove default padding */
@@ -289,28 +289,14 @@ with st.sidebar:
 
         st.markdown("**Valuation**")
         st.session_state.sub_layers["valuation"] = st.checkbox("Valuation (general)", value=st.session_state.sub_layers["valuation"])
-        # Sub‑options for valuation (optional)
         if st.session_state.sub_layers["valuation"]:
             st.session_state.sub_layers["rental_rate"] = st.checkbox("Rental Rate", value=st.session_state.sub_layers["rental_rate"])
             st.session_state.sub_layers["prime_core"] = st.checkbox("PRIME Core", value=st.session_state.sub_layers["prime_core"])
             st.session_state.sub_layers["lamudi"] = st.checkbox("Lamudi", value=st.session_state.sub_layers["lamudi"])
             st.session_state.sub_layers["other_platforms"] = st.checkbox("Other Platforms", value=st.session_state.sub_layers["other_platforms"])
 
-    # Manage layer button (keep for compatibility, but can be removed)
+    # Manage layer button (kept for compatibility)
     st.button("Manage layer", use_container_width=True, key="manage_layer")
-
-    # Basemap selector (still in sidebar for convenience)
-    basemap_options = {
-        "CartoDB Positron": "CartoDB Positron",
-        "CartoDB Dark_Matter": "CartoDB Dark_Matter",
-        "OpenStreetMap": "OpenStreetMap",
-        "Stamen Terrain": "Stamen Terrain",
-        "Stamen Toner": "Stamen Toner"
-    }
-    selected_basemap = st.selectbox("Base Map", list(basemap_options.keys()), index=0)
-    if selected_basemap != st.session_state.basemap:
-        st.session_state.basemap = basemap_options[selected_basemap]
-        st.rerun()
 
     st.markdown('<div class="footer">Map tiles by CartoDB under CC BY-SA 3.0<br>Data © OpenStreetMap contributors</div>', unsafe_allow_html=True)
 
@@ -321,7 +307,7 @@ map_container = st.container()
 with map_container:
     st.markdown('<div class="map-container" id="map-container">', unsafe_allow_html=True)
 
-    # Create map with selected basemap
+    # Create map with selected basemap (default)
     m = folium.Map(
         location=st.session_state.map_center,
         zoom_start=st.session_state.map_zoom,
@@ -332,41 +318,53 @@ with map_container:
     MousePosition().add_to(m)
 
     # ========================================================================
-    # ADD BASEMAP SWITCHER (LayerControl) - appears in top-right corner
+    # ADD BASEMAP SWITCHER (LayerControl) – appears in top‑right corner
     # ========================================================================
-    # Define additional tile layers for switching
-    folium.TileLayer('CartoDB Dark_Matter', name='Dark').add_to(m)
-    folium.TileLayer('OpenStreetMap', name='OSM').add_to(m)
-    folium.TileLayer('Stamen Terrain', name='Terrain').add_to(m)
-    folium.TileLayer('Stamen Toner', name='Toner').add_to(m)
-    # Add LayerControl after tiles
+    # Add alternative base tile layers with proper attribution
+    # CartoDB Dark
+    folium.TileLayer(
+        'CartoDB Dark_Matter',
+        name='Dark',
+        attr='Map tiles by CartoDB, under CC BY-SA 3.0. Data © OpenStreetMap contributors'
+    ).add_to(m)
+
+    # OpenStreetMap
+    folium.TileLayer(
+        'OpenStreetMap',
+        name='OSM',
+        attr='Map data © OpenStreetMap contributors, under ODbL'
+    ).add_to(m)
+
+    # Stamen Terrain – using URL and explicit attribution
+    folium.TileLayer(
+        'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
+        name='Terrain',
+        attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.'
+    ).add_to(m)
+
+    # Stamen Toner
+    folium.TileLayer(
+        'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
+        name='Toner',
+        attr='Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL.'
+    ).add_to(m)
+
+    # Add LayerControl to switch between base layers
     folium.LayerControl(collapsed=False).add_to(m)
 
     # ========================================================================
     # ADD SAMPLE MARKERS WITH SUB‑LAYER FILTERING
     # ========================================================================
-    # We'll show markers based on sub‑layer toggles:
-    # - If "roads" is on, show road/highway markers
-    # - If "boundaries" is on, show municipality/city markers
-    # - "hazards" are shown via polygons; we also show hazard markers if any
-
-    # Filter markers based on sub‑layer visibility
     show_roads = st.session_state.sub_layers.get("roads", True)
     show_boundaries = st.session_state.sub_layers.get("boundaries", True)
-    show_hazards = st.session_state.sub_layers.get("floods", True) or st.session_state.sub_layers.get("earthquake", True)  # etc.
 
     for loc in sample_locations:
-        # Determine if this marker should be shown
         is_road = "Road" in loc["type"] or "Highway" in loc["type"]
         is_boundary = "Municipality" in loc["type"] or "City" in loc["type"]
         if is_road and not show_roads:
             continue
         if is_boundary and not show_boundaries:
             continue
-        # For hazards, we might have specific markers, but we'll show all if any hazard sub‑layer is on
-        # Actually we don't have hazard-specific markers, so we'll show all if hazards are on
-        # But we already filtered by roads/boundaries, so we show everything else
-        # if not show_hazards and not is_road and not is_boundary: continue  # but we have no others
 
         color = "#dc3545" if "City" in loc["type"] else "#4a90d9" if "Municipality" in loc["type"] else "#28a745"
         popup_html = f"""
@@ -402,7 +400,7 @@ with map_container:
         ).add_to(m)
 
     # ========================================================================
-    # ADD POLYGONS - filtered by hazard sub‑layers
+    # ADD POLYGONS - filtered by hazard and zoning sub‑layers
     # ========================================================================
     show_floods = st.session_state.sub_layers.get("floods", True)
     show_zoning = st.session_state.sub_layers.get("zoning", True)
@@ -426,7 +424,7 @@ with map_container:
         ).add_to(m)
 
     # ========================================================================
-    # DRAW PLUGIN (still active for defining assessment areas)
+    # DRAW PLUGIN (for defining assessment areas)
     # ========================================================================
     draw = Draw(
         export=False,
