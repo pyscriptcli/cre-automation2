@@ -39,6 +39,9 @@ APP_HTML = r"""
 <meta charset="utf-8">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+<!-- Libraries for KML & KMZ support -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-kml@1.0.0/dist/leaflet-kml.min.js"></script>
 <style>
 * {box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI', -apple-system, Helvetica, Arial, sans-serif;}
 html, body {height:100%; overflow:hidden;}
@@ -185,7 +188,7 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 #map {position:absolute; top:34px; left:0; right:0; bottom:0; z-index:1; background:#cfe9e4;}
 .leaflet-container {font:inherit;}
 
-/* ---------- Style Editor Modal (New) ---------- */
+/* ---------- Style Editor Modal ---------- */
 #style-modal {position:absolute; top:60px; left:310px; width:220px; background:#fff; z-index:1200;
   box-shadow:0 2px 10px rgba(0,0,0,0.25); border-radius:4px; padding:14px; display:none; border:1px solid #ddd;}
 #style-modal.open {display:flex; flex-direction:column; gap:8px;}
@@ -292,7 +295,7 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
     </div>
     <div class="db-body" id="db-body">
 
-      <!-- Hazards -> stripped of row-icons -->
+      <!-- Hazards -->
       <div class="layer-group" id="grp-hazards">
         <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Hazards</div>
         <div class="group-body">
@@ -307,7 +310,7 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
         </div>
       </div>
 
-      <!-- Infrastructure -> stripped of row-icons -->
+      <!-- Infrastructure -->
       <div class="layer-group" id="grp-infrastructure">
         <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Infrastructure</div>
         <div class="group-body">
@@ -326,32 +329,61 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
         </div>
       </div>
 
-      <!-- Valuation -> stripped of row-icons -->
+      <!-- Valuation (Rates tool + Map Overlays) -->
       <div class="layer-group" id="grp-valuation">
         <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Valuation
           <span class="gh-actions"><button id="price-popups" title="Show price popups"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></button></span>
         </div>
         <div class="group-body">
-          <div class="layer-row disabled" data-key="rental">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
-            <span class="lname">Rental Rate</span>
+          
+          <!-- Nested Rates Dropdown -->
+          <div class="layer-group" id="grp-rates">
+            <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Rates</div>
+            <div class="group-body">
+              <div style="font-size:12px; padding:4px 0;">
+                <span style="font-weight:600;">Purpose</span><br>
+                <label style="margin-right:10px;"><input type="radio" name="rate-purpose" value="lease" checked> For Lease</label>
+                <label><input type="radio" name="rate-purpose" value="sale"> For Sale</label>
+              </div>
+              <div style="font-size:12px; padding:4px 0;">
+                <span style="font-weight:600;">Property Type</span><br>
+                <select id="prop-type" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:3px;">
+                  <option>Commercial Lot</option>
+                  <option>Retail Space</option>
+                  <option>Industrial Warehouse</option>
+                  <option>Industrial Lot</option>
+                  <option>Office Space</option>
+                </select>
+              </div>
+              <div style="font-size:12px; padding:4px 0;">
+                <span style="font-weight:600;">Sources</span><br>
+                <label style="display:block;"><input type="checkbox" id="src-prime"> PRIME Core</label>
+                <label style="display:block;"><input type="checkbox" id="src-lamudi"> Lamudi</label>
+              </div>
+              <div style="font-size:12px; padding:4px 0; background:#f0f2f5; border-radius:3px; text-align:center;">
+                <span style="font-weight:600;">Average Rate</span><br>
+                <span id="display-rate" style="font-size:16px; font-weight:700; color:#222;">₱ 500 /sqm</span>
+              </div>
+            </div>
           </div>
-          <div class="layer-row disabled" data-key="prime">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
-            <span class="lname">PRIME Core</span>
-          </div>
-          <div class="layer-row disabled" data-key="lamudi">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
-            <span class="lname">Lamudi and other property platforms (Scraper)</span>
-          </div>
-          <div class="layer-row disabled" data-key="tiering">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
-            <span class="lname">Tiering of data from Primary, secondary sources</span>
-          </div>
+          
+          <!-- Map Overlays for Pricing Data -->
+          <div class="layer-row disabled" data-key="rental"><span class="lname">Rental Map Overlay</span></div>
+          <div class="layer-row disabled" data-key="prime"><span class="lname">PRIME Map Overlay</span></div>
         </div>
       </div>
 
-      <!-- Layers section: user drawings + grouping -->
+      <!-- Community Layers / Add Data Layer -->
+      <div class="layer-group" id="grp-community">
+        <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Add Data Layer (Community)</div>
+        <div class="group-body">
+          <input type="file" id="community-file" accept=".geojson,.kml,.kmz" style="width:100%; padding:4px; border:1px solid #ccc; border-radius:3px; font-size:12px; background:#fff;">
+          <div id="community-status" style="font-size:11px; color:#666; margin-top:4px;">Supports GeoJSON, KML, KMZ</div>
+          <div id="community-list" style="margin-top:6px; border-top:1px solid #eee; padding-top:6px; min-height:20px;"></div>
+        </div>
+      </div>
+
+      <!-- User drawn layers -->
       <div class="layers-head">
         <span>Layers</span>
         <span class="lh-right">
@@ -632,7 +664,8 @@ try {
   };
 
   // ---------- group heads (thematic) ----------
-  document.querySelectorAll('#grp-hazards .group-head, #grp-infrastructure .group-head, #grp-valuation .group-head').forEach(function (h) {
+  // Adding #grp-rates and #grp-community to the click handler
+  document.querySelectorAll('#grp-hazards .group-head, #grp-infrastructure .group-head, #grp-valuation .group-head, #grp-rates .group-head, #grp-community .group-head').forEach(function (h) {
     h.onclick = function () { h.parentElement.classList.toggle('collapsed'); };
   });
 
@@ -666,7 +699,136 @@ try {
   });
   updateHazardVisibility();
 
-  // ---------- drawings (NOW WITH RENAME AND STYLE ICONS) ----------
+  // ---------- Rate Estimator ----------
+  function updateRate() {
+    var purpose = document.querySelector('input[name="rate-purpose"]:checked').value;
+    var type = document.getElementById('prop-type').value;
+    var srcPrime = document.getElementById('src-prime').checked;
+    var srcLamudi = document.getElementById('src-lamudi').checked;
+    
+    var base = 0;
+    var rates = {
+      'Commercial Lot': {lease: 500, sale: 15000},
+      'Retail Space': {lease: 800, sale: 20000},
+      'Industrial Warehouse': {lease: 350, sale: 9000},
+      'Industrial Lot': {lease: 400, sale: 11000},
+      'Office Space': {lease: 1200, sale: 30000}
+    };
+    if(rates[type]) base = rates[type][purpose];
+    
+    var multiplier = 1.0;
+    if(srcPrime) multiplier += 0.2;
+    if(srcLamudi) multiplier += 0.1;
+    
+    var finalRate = Math.round(base * multiplier);
+    document.getElementById('display-rate').textContent = '₱ ' + finalRate.toLocaleString() + ' /sqm';
+  }
+  document.querySelectorAll('input[name="rate-purpose"]').forEach(function(el){ el.onchange = updateRate; });
+  document.getElementById('prop-type').onchange = updateRate;
+  document.getElementById('src-prime').onchange = updateRate;
+  document.getElementById('src-lamudi').onchange = updateRate;
+  updateRate(); // initial calculation
+
+  // ---------- Community Layers ----------
+  var communityLayerGroup = L.layerGroup().addTo(map);
+  var communityList = document.getElementById('community-list');
+  var communityStatus = document.getElementById('community-status');
+
+  // Reuse icons for community layers
+  var eyeSvgComm = '<svg class="ic-eye" title="Show/hide" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var trashSvgComm = '<svg class="ic-trash" title="Delete" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
+
+  function addCommunityLayer(name, layer) {
+    communityLayerGroup.addLayer(layer);
+    
+    var row = document.createElement('div');
+    row.className = 'layer-row selected';
+    row._layer = layer;
+    row.style.marginTop = '4px';
+    row.innerHTML = '<span class="lname">' + esc(name) + '</span>' +
+      '<span class="row-icons">' + eyeSvgComm + trashSvgComm + '</span>';
+    
+    // Toggle visibility
+    row.querySelector('.ic-eye').onclick = function (ev) {
+      ev.stopPropagation();
+      var vis = map.hasLayer(layer);
+      if(vis) map.removeLayer(layer); else map.addLayer(layer);
+      row.classList.toggle('disabled', vis);
+      row.classList.toggle('selected', !vis);
+    };
+    
+    // Remove layer
+    row.querySelector('.ic-trash').onclick = function (ev) {
+      ev.stopPropagation();
+      communityLayerGroup.removeLayer(layer);
+      row.remove();
+    };
+    
+    communityList.appendChild(row);
+    communityStatus.textContent = 'Loaded: ' + esc(name);
+  }
+
+  document.getElementById('community-file').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if(!file) return;
+    var ext = file.name.split('.').pop().toLowerCase();
+    var reader = new FileReader();
+    
+    reader.onload = function(ev) {
+      try {
+        var layer;
+        if (ext === 'geojson' || ext === 'json') {
+          var data = JSON.parse(ev.target.result);
+          layer = L.geoJSON(data);
+          addCommunityLayer(file.name, layer);
+        } else if (ext === 'kml') {
+          if(typeof L.KML === 'undefined') {
+             communityStatus.textContent = 'Error: KML library failed to load.';
+             return;
+          }
+          var parser = new DOMParser();
+          var kmlDoc = parser.parseFromString(ev.target.result, 'text/xml');
+          layer = new L.KML(kmlDoc);
+          addCommunityLayer(file.name, layer);
+        } else if (ext === 'kmz') {
+          if(typeof JSZip === 'undefined' || typeof L.KML === 'undefined') {
+             communityStatus.textContent = 'Error: KMZ libraries (JSZip/KML) failed to load.';
+             return;
+          }
+          JSZip.loadAsync(ev.target.result).then(function(zipFile) {
+            var kmlFile = zipFile.file(/\.kml$/i)[0];
+            if(kmlFile) {
+              kmlFile.async('text').then(function(kmlString) {
+                var parser = new DOMParser();
+                var kmlDoc = parser.parseFromString(kmlString, 'text/xml');
+                var layer = new L.KML(kmlDoc);
+                addCommunityLayer(file.name, layer);
+              });
+            } else {
+              communityStatus.textContent = 'Error: No KML file found inside the KMZ archive.';
+            }
+          }).catch(function(err) {
+             communityStatus.textContent = 'Error reading KMZ: ' + err.message;
+          });
+          return; // async, don't proceed past here
+        } else {
+          communityStatus.textContent = 'Unsupported file type.';
+          return;
+        }
+        communityStatus.textContent = 'Successfully added ' + esc(file.name);
+      } catch(err) {
+        communityStatus.textContent = 'Error parsing file: ' + err.message;
+      }
+    };
+    
+    if (ext === 'kmz') {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsText(file);
+    }
+  });
+
+  // ---------- drawings (RENAME AND STYLE ICONS) ----------
   var drawnItems = L.featureGroup().addTo(map);
   var drawnList = document.getElementById('drawn-list');
   var drawnGroups = document.getElementById('drawn-groups');
@@ -748,7 +910,6 @@ try {
   function openStyleModal(layer, row) {
     activeStyleLayer = layer;
     activeStyleRow = row;
-    // Sync inputs with current style
     var currentColor = layer.options.color || '#d33';
     customColorInput.value = currentColor;
     styleThickness.value = layer.options.weight || 3;
@@ -780,7 +941,6 @@ try {
     var row = document.createElement('div');
     row.className = 'layer-row selected';
     row._layer = layer;
-    // New icons: Rename, Style, Show/Hide, Delete
     row.innerHTML = '<input type="checkbox" class="gcheck">' + meta.svg +
       '<span class="lname">' + esc(name) + '</span>' +
       '<span class="row-icons">' + renameSvg + styleSvg + eyeSvg + trashSvg + '</span>';
@@ -817,7 +977,7 @@ try {
     document.getElementById('lastclick').textContent = e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4);
   });
 
-  // ---------- layer grouping (Groups get rename too) ----------
+  // ---------- layer grouping ----------
   var addGroupBtn = document.getElementById('add-group-btn');
   var groupBar = document.getElementById('group-bar');
   var groupCount = 0;
@@ -930,6 +1090,7 @@ try {
   var searchPanel = document.getElementById('search-panel');
   var searchMarker = null;
   document.getElementById('searchbtn').onclick = function () {
+    // Auto-close databrowser
     var db = document.getElementById('databrowser');
     var dbToggle = document.getElementById('db-toggle');
     if(db.style.display === 'flex') {
