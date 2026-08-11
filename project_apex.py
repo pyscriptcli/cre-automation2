@@ -60,7 +60,7 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .vsep {width:1px; height:14px; background:#33466b;}
 .help {display:flex; align-items:center; gap:5px; color:#cdd7e6; font-size:11px;}
 
-/* ---------- Left toolbar (REORDERED) ---------- */
+/* ---------- Left toolbar ---------- */
 #toolbar {position:absolute; top:34px; left:0; bottom:0; width:38px; background:#fff; border-right:1px solid #bbb;
   display:flex; flex-direction:column; align-items:center; padding-top:6px; gap:2px; z-index:1100;}
 #toolbar button {width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:#444; border-radius:3px;}
@@ -149,7 +149,6 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 #details-close {position:absolute; right:10px; top:10px; color:#999;}
 #details-close:hover {color:#333;}
 
-/* Standard Panel content */
 #standard-panel h1 {font-size:22px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:8px; margin-bottom:12px;}
 #standard-panel h2 {font-size:15px; font-weight:600; color:#1a1a1a; border-bottom:2px solid #3f8fd2; padding-bottom:6px; margin-top:14px;}
 .hint {font-size:13px; color:#6b7c93; line-height:1.5; margin-bottom:10px;}
@@ -163,7 +162,6 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 .up {color:#188038;} .down {color:#d93025;} .flat {color:#80868b;}
 .foot {font-size:11px; color:#8a8a8a; line-height:1.5; margin-top:10px;}
 
-/* Hazard Panel content */
 #hazard-panel .hazard-title {font-weight:600; font-size:18px; color:#333; margin-bottom:12px;}
 .hazard-card {display:flex; align-items:center; justify-content:space-between; background:#fff; border-radius:4px; 
   margin-bottom:8px; padding:10px; box-shadow:0 1px 3px rgba(0,0,0,0.15); position:relative;}
@@ -186,6 +184,18 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
 /* ---------- Map ---------- */
 #map {position:absolute; top:34px; left:0; right:0; bottom:0; z-index:1; background:#cfe9e4;}
 .leaflet-container {font:inherit;}
+
+/* ---------- Style Editor Modal (New) ---------- */
+#style-modal {position:absolute; top:60px; left:310px; width:220px; background:#fff; z-index:1200;
+  box-shadow:0 2px 10px rgba(0,0,0,0.25); border-radius:4px; padding:14px; display:none; border:1px solid #ddd;}
+#style-modal.open {display:flex; flex-direction:column; gap:8px;}
+.style-title {font-size:12px; font-weight:700; color:#333; margin-bottom:4px;}
+.style-row {display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#555;}
+.style-row input[type="range"] {width:80px; accent-color:#021a3d;}
+.style-row input[type="color"] {width:24px; height:24px; padding:0; border:none; cursor:pointer;}
+.style-presets {display:flex; gap:6px; margin:4px 0 6px 0;}
+.style-presets div {width:22px; height:22px; border-radius:50%; border:2px solid #eee; cursor:pointer;}
+.style-presets div.active, .style-presets div:hover {border-color:#333;}
 </style>
 </head>
 <body>
@@ -209,7 +219,7 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
   <!-- Map -->
   <div id="map"></div>
 
-  <!-- Left toolbar (REORDERED & ZOOM BUTTONS REMOVED) -->
+  <!-- Left toolbar -->
   <div id="toolbar">
     <button id="db-toggle" class="active" title="Toggle data browser"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/><path d="M2 12l10 6 10-6"/><path d="M2 16l10 6 10-6"/></svg></button>
     <div class="tsep"></div>
@@ -251,6 +261,25 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
     </div>
   </div>
 
+  <!-- Style Editor Modal -->
+  <div id="style-modal">
+    <div class="style-title">Layer Style</div>
+    <div class="style-presets">
+      <div style="background:#d33;" data-color="#d33"></div>
+      <div style="background:#333;" data-color="#333"></div>
+      <div style="background:#2f9e44;" data-color="#2f9e44"></div>
+      <div style="background:#1a73e8;" data-color="#1a73e8"></div>
+      <div style="background:#fbbc04;" data-color="#fbbc04"></div>
+      <div style="background:#8e24aa;" data-color="#8e24aa"></div>
+    </div>
+    <div class="style-row"><span>Custom Hex</span><input type="color" id="style-custom-color" value="#d33"></div>
+    <div class="style-row"><span>Fill</span><input type="checkbox" id="style-fill" checked></div>
+    <div class="style-row"><span>Outline</span><input type="checkbox" id="style-outline" checked></div>
+    <div class="style-row"><span>Thickness</span><input type="range" id="style-thickness" min="0.5" max="15" step="0.5" value="3"></div>
+    <div class="style-row"><span>Opacity</span><input type="range" id="style-opacity" min="0" max="1" step="0.05" value="1"></div>
+    <div style="display:flex; justify-content:flex-end; margin-top:6px;"><button id="style-close-btn" style="background:#ddd; padding:2px 8px; border-radius:3px; font-size:11px;">Close</button></div>
+  </div>
+
   <!-- Data browser -->
   <div id="databrowser" class="panel">
     <div class="db-head">
@@ -263,43 +292,41 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
     </div>
     <div class="db-body" id="db-body">
 
+      <!-- Hazards -> stripped of row-icons -->
       <div class="layer-group" id="grp-hazards">
         <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Hazards</div>
         <div class="group-body">
           <div class="layer-row disabled" data-key="earthquake">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
             <span class="lname">Earthquake</span>
-            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
           </div>
           <div class="layer-row disabled" data-key="floods">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
             <span class="lname">Floods</span>
-            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
           </div>
         </div>
       </div>
 
+      <!-- Infrastructure -> stripped of row-icons -->
       <div class="layer-group" id="grp-infrastructure">
         <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Infrastructure</div>
         <div class="group-body">
           <div class="layer-row selected" data-key="roads">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
             <span class="lname">Roads</span>
-            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
           </div>
           <div class="layer-row selected" data-key="boundaries">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
             <span class="lname">Boundaries (Cities, Province, Region)</span>
-            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
           </div>
           <div class="layer-row disabled" data-key="zoning">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
             <span class="lname">Zoning (LGU Restrictions, CLUP)</span>
-            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
           </div>
         </div>
       </div>
 
+      <!-- Valuation -> stripped of row-icons -->
       <div class="layer-group" id="grp-valuation">
         <div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>Valuation
           <span class="gh-actions"><button id="price-popups" title="Show price popups"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></button></span>
@@ -308,22 +335,18 @@ button {background:none; border:none; cursor:pointer; color:inherit; font:inheri
           <div class="layer-row disabled" data-key="rental">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
             <span class="lname">Rental Rate</span>
-            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
           </div>
           <div class="layer-row disabled" data-key="prime">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
             <span class="lname">PRIME Core</span>
-            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
           </div>
           <div class="layer-row disabled" data-key="lamudi">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
             <span class="lname">Lamudi and other property platforms (Scraper)</span>
-            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
           </div>
           <div class="layer-row disabled" data-key="tiering">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22 19V7H12l-2-2H2v14z"/></svg>
             <span class="lname">Tiering of data from Primary, secondary sources</span>
-            <span class="row-icons"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"/></svg><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></span>
           </div>
         </div>
       </div>
@@ -515,7 +538,6 @@ try {
     document.getElementById('f-area').textContent = areaTxt;
     document.getElementById('f-centroid').textContent = c ? c.lat.toFixed(4) + ', ' + c.lng.toFixed(4) : '-';
 
-    // deterministic per-feature analytics from centroid seed
     var seed = Math.abs(Math.round((c ? c.lat : 14.6) * 7919 + (c ? c.lng : 121) * 104729));
     var rnd = prng(seed);
     setM('rental', '\u20B1 ' + Math.round(600 + rnd() * 600) + '/m\u00B2', rnd() * 6 - 3, '%', true);
@@ -642,9 +664,9 @@ try {
       updateHazardVisibility();
     };
   });
-  updateHazardVisibility(); // initial state check
+  updateHazardVisibility();
 
-  // ---------- drawings: automatically add to Layers list ----------
+  // ---------- drawings (NOW WITH RENAME AND STYLE ICONS) ----------
   var drawnItems = L.featureGroup().addTo(map);
   var drawnList = document.getElementById('drawn-list');
   var drawnGroups = document.getElementById('drawn-groups');
@@ -658,6 +680,8 @@ try {
     circle:    {name:'Circle',    svg:'<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg>'},
     marker:    {name:'Marker',    svg:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>'}
   };
+  var renameSvg = '<svg class="ic-rename" title="Rename" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"/><path d="M18 2l4 4-10 10H8v-4z"/></svg>';
+  var styleSvg = '<svg class="ic-style" title="Style" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>';
   var eyeSvg = '<svg class="ic-eye" title="Show/hide" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
   var trashSvg = '<svg class="ic-trash" title="Delete" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
   var ungroupSvg = '<svg class="ic-ungroup" title="Ungroup" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>';
@@ -679,13 +703,88 @@ try {
     row.remove();
     refreshDrawnUI();
   }
+  function renameRow(row) {
+    var currentName = row.querySelector('.lname').textContent;
+    var newName = prompt('Enter new name:', currentName);
+    if (newName && newName.trim() !== '') {
+      row.querySelector('.lname').textContent = newName.trim();
+    }
+  }
+
+  // Style Modal logic
+  var styleModal = document.getElementById('style-modal');
+  var activeStyleLayer = null;
+  var activeStyleRow = null;
+  var colorPresets = document.querySelectorAll('.style-presets div');
+  var customColorInput = document.getElementById('style-custom-color');
+  var styleFill = document.getElementById('style-fill');
+  var styleOutline = document.getElementById('style-outline');
+  var styleThickness = document.getElementById('style-thickness');
+  var styleOpacity = document.getElementById('style-opacity');
+  
+  function applyStyle() {
+    if (!activeStyleLayer) return;
+    var hex = customColorInput.value;
+    var fill = styleFill.checked;
+    var outline = styleOutline.checked;
+    var thickness = parseFloat(styleThickness.value);
+    var opacity = parseFloat(styleOpacity.value);
+    
+    var isPoly = activeStyleLayer instanceof L.Polygon || activeStyleLayer instanceof L.Polyline || activeStyleLayer instanceof L.Circle;
+    if (isPoly) {
+      var newStyle = {
+        color: outline ? hex : 'transparent',
+        weight: thickness,
+        opacity: outline ? opacity : 0,
+        fillColor: fill ? hex : 'transparent',
+        fillOpacity: fill ? opacity : 0
+      };
+      activeStyleLayer.setStyle(newStyle);
+    } else if (activeStyleLayer instanceof L.CircleMarker) {
+      activeStyleLayer.setStyle({color: hex, fillColor: hex, radius: Math.max(2, thickness)});
+    }
+  }
+
+  function openStyleModal(layer, row) {
+    activeStyleLayer = layer;
+    activeStyleRow = row;
+    // Sync inputs with current style
+    var currentColor = layer.options.color || '#d33';
+    customColorInput.value = currentColor;
+    styleThickness.value = layer.options.weight || 3;
+    styleOpacity.value = layer.options.opacity || 1;
+    styleFill.checked = (layer.options.fillOpacity || 0) > 0;
+    styleOutline.checked = (layer.options.opacity || 0) > 0;
+    
+    colorPresets.forEach(function(p){ p.classList.remove('active'); });
+    styleModal.classList.add('open');
+  }
+  
+  colorPresets.forEach(function(p) {
+    p.onclick = function() {
+      colorPresets.forEach(function(c){ c.classList.remove('active'); });
+      this.classList.add('active');
+      customColorInput.value = this.dataset.color;
+      applyStyle();
+    };
+  });
+  customColorInput.oninput = applyStyle;
+  styleFill.onchange = applyStyle;
+  styleOutline.onchange = applyStyle;
+  styleThickness.oninput = applyStyle;
+  styleOpacity.oninput = applyStyle;
+  document.getElementById('style-close-btn').onclick = function() { styleModal.classList.remove('open'); };
+
   function addDrawnRow(layer, t, name) {
     var meta = typeMeta[t] || {name:t, svg:''};
     var row = document.createElement('div');
     row.className = 'layer-row selected';
     row._layer = layer;
+    // New icons: Rename, Style, Show/Hide, Delete
     row.innerHTML = '<input type="checkbox" class="gcheck">' + meta.svg +
-      '<span class="lname">' + esc(name) + '</span><span class="row-icons">' + eyeSvg + trashSvg + '</span>';
+      '<span class="lname">' + esc(name) + '</span>' +
+      '<span class="row-icons">' + renameSvg + styleSvg + eyeSvg + trashSvg + '</span>';
+    
     row.querySelector('.gcheck').onclick = function (ev) { ev.stopPropagation(); };
     row.onclick = function () {
       try {
@@ -693,9 +792,10 @@ try {
         else map.setView(layer.getLatLng(), 15);
       } catch (err) {}
     };
+    row.querySelector('.ic-rename').onclick = function (ev) { ev.stopPropagation(); renameRow(row); };
+    row.querySelector('.ic-style').onclick = function (ev) { ev.stopPropagation(); openStyleModal(layer, row); };
     row.querySelector('.ic-eye').onclick = function (ev) {
-      ev.stopPropagation();
-      setRowVisible(row, !map.hasLayer(layer));
+      ev.stopPropagation(); setRowVisible(row, !map.hasLayer(layer));
     };
     row.querySelector('.ic-trash').onclick = function (ev) { ev.stopPropagation(); deleteRow(row); };
     drawnList.appendChild(row);
@@ -703,7 +803,6 @@ try {
     return row;
   }
 
-  // No more save/cancel popups! Instant drawing.
   map.on(L.Draw.Event.CREATED, function (e) {
     var layer = e.layer;
     var t = e.layerType;
@@ -718,7 +817,7 @@ try {
     document.getElementById('lastclick').textContent = e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4);
   });
 
-  // ---------- layer grouping ----------
+  // ---------- layer grouping (Groups get rename too) ----------
   var addGroupBtn = document.getElementById('add-group-btn');
   var groupBar = document.getElementById('group-bar');
   var groupCount = 0;
@@ -743,12 +842,21 @@ try {
     var grp = document.createElement('div');
     grp.className = 'layer-group drawn-group';
     grp.innerHTML = '<div class="group-head"><span class="chev"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>' +
-      '<span>' + esc(name) + '</span><span class="row-icons">' + eyeSvg + ungroupSvg + '</span></div><div class="group-body"></div>';
+      '<span>' + esc(name) + '</span>' +
+      '<span class="row-icons">' + renameSvg + eyeSvg + ungroupSvg + '</span></div><div class="group-body"></div>';
     var body = grp.querySelector('.group-body');
     sel.forEach(function (cb) { var r = cb.closest('.layer-row'); cb.checked = false; body.appendChild(r); });
 
     var gVisible = true;
     grp.querySelector('.group-head').onclick = function () { grp.classList.toggle('collapsed'); };
+    grp.querySelector('.ic-rename').onclick = function (ev) {
+      ev.stopPropagation();
+      var currentName = grp.querySelector('.group-head span').textContent;
+      var newName = prompt('Enter new group name:', currentName);
+      if (newName && newName.trim() !== '') {
+        grp.querySelector('.group-head span').textContent = newName.trim();
+      }
+    };
     grp.querySelector('.ic-eye').onclick = function (ev) {
       ev.stopPropagation();
       gVisible = !gVisible;
@@ -763,7 +871,7 @@ try {
     setGrouping(false);
   };
 
-  // ---------- toolbar (Toggle Drawing Tools) ----------
+  // ---------- toolbar ----------
   document.getElementById('clearbtn').onclick = function () {
     drawnItems.clearLayers();
     drawnList.querySelectorAll('.layer-row').forEach(function (r) { r.remove(); });
@@ -818,10 +926,17 @@ try {
     } catch (err) { console.warn('Edit mode unavailable:', err); }
   };
 
-  // ---------- search panel (Nominatim geocoding) ----------
+  // ---------- search panel (Nominatim geocoding) + AUTO CLOSE DATA BROWSER ----------
   var searchPanel = document.getElementById('search-panel');
   var searchMarker = null;
   document.getElementById('searchbtn').onclick = function () {
+    var db = document.getElementById('databrowser');
+    var dbToggle = document.getElementById('db-toggle');
+    if(db.style.display === 'flex') {
+        db.style.display = 'none';
+        dbToggle.classList.remove('active');
+    }
+
     searchPanel.classList.toggle('open');
     this.classList.toggle('active', searchPanel.classList.contains('open'));
     if (searchPanel.classList.contains('open')) document.getElementById('search-input').focus();
