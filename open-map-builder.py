@@ -24,7 +24,7 @@ st.set_page_config(page_title="Terraink", layout="wide", page_icon="🔥",
                    initial_sidebar_state="collapsed")
 ss = st.session_state
 
-# ================================================================ IN-APP THEME (no config.toml)
+# ================================================================ IN-APP THEME (no config.toml, no deprecated APIs)
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
@@ -35,34 +35,24 @@ html, body, .stApp, [data-testid="stAppViewContainer"] { background:#0a0f16 !imp
 * { font-family:'JetBrains Mono', monospace !important; }
 p, span, label, h1, h2, h3, h4, [data-testid="stMarkdownContainer"] { color:#cfe3ff !important; }
 [data-testid="stCaptionContainer"], .stCaption { color:#5f7396 !important; }
-
-/* inputs */
 .stTextInput input, .stNumberInput input, textarea {
   background:#0d1626 !important; color:#cfe3ff !important; border:1px solid #24344f !important; }
-/* selects */
 .stSelectbox [data-baseweb="select"] > div { background:#0d1626 !important; border:1px solid #24344f !important; }
 .stSelectbox [data-baseweb="select"] span, .stSelectbox svg { color:#cfe3ff !important; fill:#cfe3ff !important; }
 [data-baseweb="menu"] > li { background:#0d1626 !important; color:#cfe3ff !important; }
-/* checkbox / radio / slider */
 input[type="checkbox"], input[type="radio"] { accent-color:#E8B44A; }
 .stSlider [role="slider"] { background:#E8B44A !important; border-color:#E8B44A !important; }
-.stSlider [data-baseweb="slider"] > div > div { background:#24344f !important; }
-/* expander / cards */
 [data-testid="stExpander"] { background:#0d1626 !important; border:1px solid #1e2c44 !important; }
 [data-testid="stExpander"] summary { color:#cfe3ff !important; }
-
-/* buttons */
 div[data-testid="stButton"]>button {
   background:#0d1626 !important; border:1px solid #24344f !important; color:#bcd3f7 !important;
   border-radius:10px; font-size:9px !important; letter-spacing:1px; text-transform:uppercase;
   padding:8px 6px; white-space:pre-line; line-height:1.6; }
 div[data-testid="stButton"]>button:hover { border-color:#E8B44A !important; color:#E8B44A !important; }
-div[data-testid="stButton"]>button[kind="primary"],
 div[data-testid="stButton"]>button[type="primary"] { border-color:#5b8dd9 !important; color:#fff !important; background:#12203a !important; }
 div[data-testid="stDownloadButton"]>button {
   background:#e9edf2 !important; color:#0a0f16 !important; border:none !important;
   border-radius:10px; font-weight:700; letter-spacing:1px; padding:12px 22px; }
-
 .tk-card { background:#0d1626; border:1px solid #1e2c44; border-radius:12px; padding:14px; margin-bottom:12px; }
 .tk-ads { text-align:center; color:#5f7396; font-size:10px; letter-spacing:2px; padding:18px; }
 .tk-head { display:flex; align-items:center; justify-content:space-between; padding:10px 6px; }
@@ -127,6 +117,9 @@ FONT_FILES = {"Sans": "DejaVuSans-Bold.ttf", "Serif": "DejaVuSerif-Bold.ttf", "M
 
 def _idx(options, val, default=0):
     return options.index(val) if val in options else default
+
+def _ftype(f):
+    return (f.get("geometry") or {}).get("type", "")
 
 # ================================================================ GEO / RENDER ENGINE
 @st.cache_data(ttl=3600)
@@ -258,7 +251,7 @@ def compose_poster(map_img, W, H, colors, title, subtitle, font_key):
     d.text((W - margin - 260, H - margin + 4), "© OpenStreetMap contributors", font=fc, fill=colors["text"])
     return img
 
-# ================================================================ STATE DEFAULTS (non-widget keys only)
+# ================================================================ STATE (non-widget keys only — prevents c_overlay class errors)
 ss.setdefault("panel", "LOCATION")
 ss.setdefault("drawings", [])
 ss.setdefault("edit_mode", False)
@@ -281,7 +274,7 @@ for lyr in ["Water", "Parks", "Buildings", "Roads", "Landcover"]:
 
 loc = geocode_location(ss["query"]) or {"lat": 15.0141, "lon": 120.7059}
 
-# ================================================================ LAYOUT: RAIL / CANVAS / PANEL
+# ================================================================ LAYOUT
 RAIL = ["LOCATION", "THEME", "LAYOUT", "STYLE", "LAYERS", "MARKERS", "ROUTES", "SETTINGS"]
 ICONS = {"LOCATION": "📍", "THEME": "🎨", "LAYOUT": "📐", "STYLE": "🔤",
          "LAYERS": "🗂️", "MARKERS": "📌", "ROUTES": "🛣️", "SETTINGS": "⚙️"}
@@ -298,8 +291,7 @@ with right:
     st.markdown('<div class="tk-card">', unsafe_allow_html=True)
 
     if ss.panel == "LOCATION":
-        # keyless widget -> manual persistence (no session-state conflict)
-        q = st.text_input("Location", ss["query"])
+        q = st.text_input("Location", ss["query"])          # keyless -> no state conflict
         if q != ss["query"]:
             ss["query"] = q; ss["recenter"] += 1
 
@@ -312,11 +304,11 @@ with right:
                 for k, v in THEME_PRESETS[preset].items(): ss[f"c_{k}"] = v
             st.rerun()
         with st.expander("Color Editor"):
-            grid = st.columns(2); cols = {}
+            grid = st.columns(2)
             for i, k in enumerate(THEME_PRESETS["Carrara"]):
-                v = grid[i % 2].color_picker(k.replace("_", " ").title(),
-                                             ss.get(f"c_{k}", THEME_PRESETS[DEF_THEME][k]))
-                ss[f"c_{k}"] = v; cols[k] = v
+                # keyless color pickers: value in, value saved out (fixes "c_overlay" error)
+                ss[f"c_{k}"] = grid[i % 2].color_picker(
+                    k.replace("_", " ").title(), ss.get(f"c_{k}", THEME_PRESETS[DEF_THEME][k]))
             if st.button("Reset All Colors"):
                 src = THEME_PRESETS.get(ss["preset"], THEME_PRESETS[DEF_THEME])
                 for k, v in src.items(): ss[f"c_{k}"] = v
@@ -342,13 +334,13 @@ with right:
             ss[f"lyr_{lyr}"] = st.checkbox(lyr, ss[f"lyr_{lyr}"])
 
     elif ss.panel == "MARKERS":
-        st.caption(f"{sum(1 for f in ss.drawings if f['geometry']['type'] == 'Point')} marker(s)")
+        st.caption(f"{sum(1 for f in ss.drawings if _ftype(f) == 'Point')} marker(s)")
         ss["mk_stroke"] = st.color_picker("Marker border", ss["mk_stroke"])
         ss["mk_fill"] = st.color_picker("Marker fill", ss["mk_fill"])
         ss["mk_size"] = st.slider("Marker size", 4, 20, ss["mk_size"])
 
     elif ss.panel == "ROUTES":
-        st.caption(f"{sum(1 for f in ss.drawings if f['geometry']['type'] != 'Point')} route/shape(s)")
+        st.caption(f"{sum(1 for f in ss.drawings if _ftype(f) not in ('', 'Point'))} route/shape(s)")
         ss["shp_stroke"] = st.color_picker("Border", ss["shp_stroke"])
         ss["shp_fill"] = st.color_picker("Fill", ss["shp_fill"])
         ss["shp_weight"] = st.slider("Border width", 1, 10, ss["shp_weight"])
@@ -393,9 +385,14 @@ if ss.drawings:
                        fill=True, fill_color=mk["fill"], fill_opacity=1.0)).add_to(m)
 
 with main:
-    out = st_folium(m, height=map_h,
-                    returned_objects=["all_drawings"] if ss.edit_mode else [],
-                    key=f"map_{ss['recenter']}")
+    try:
+        out = st_folium(m, height=map_h,
+                        returned_objects=["all_drawings"] if ss.edit_mode else [],
+                        key=f"map_{ss['recenter']}")
+    except Exception as e:
+        logger.error("Map render failed: %s", e)
+        out = None
+        st.error("Map preview failed to load.")
     new_draws = (out or {}).get("all_drawings") or []
     if new_draws:
         known = {json.dumps(f, sort_keys=True) for f in ss.drawings}
@@ -438,4 +435,4 @@ st.markdown("""
   <span>hello@terraink.app | Imprint | Data Privacy | Cookie Settings</span>
   <span>Terraink™ v0.4.2 | © 2026 | Made with ♥ in Hannover, Germany</span>
   <span>Map data ©OpenStreetMap contributors</span>
-</div>""", unsafe_allow_html=True)s
+</div>""", unsafe_allow_html=True)
