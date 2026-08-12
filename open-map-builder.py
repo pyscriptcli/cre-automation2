@@ -20,47 +20,65 @@ except Exception:
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-st.set_page_config(page_title="Terraink", layout="wide", page_icon="🔥")
+st.set_page_config(page_title="Terraink", layout="wide", page_icon="🔥",
+                   initial_sidebar_state="collapsed")
+ss = st.session_state
 
-# ================================================================ CSS / CHROME
+# ================================================================ IN-APP THEME (no config.toml)
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
 #MainMenu, header, footer, [data-testid="stToolbar"], [data-testid="stSidebar"],
 [data-testid="stStatusWidget"], [data-testid="stDecoration"] { display:none !important; }
-html, body, .stApp { background:#0a0f16 !important; }
+html, body, .stApp, [data-testid="stAppViewContainer"] { background:#0a0f16 !important; }
 .main .block-container { padding:0.5rem 1rem !important; max-width:100%; }
 * { font-family:'JetBrains Mono', monospace !important; }
+p, span, label, h1, h2, h3, h4, [data-testid="stMarkdownContainer"] { color:#cfe3ff !important; }
+[data-testid="stCaptionContainer"], .stCaption { color:#5f7396 !important; }
 
-/* generic bordered button (rail + header actions) */
+/* inputs */
+.stTextInput input, .stNumberInput input, textarea {
+  background:#0d1626 !important; color:#cfe3ff !important; border:1px solid #24344f !important; }
+/* selects */
+.stSelectbox [data-baseweb="select"] > div { background:#0d1626 !important; border:1px solid #24344f !important; }
+.stSelectbox [data-baseweb="select"] span, .stSelectbox svg { color:#cfe3ff !important; fill:#cfe3ff !important; }
+[data-baseweb="menu"] > li { background:#0d1626 !important; color:#cfe3ff !important; }
+/* checkbox / radio / slider */
+input[type="checkbox"], input[type="radio"] { accent-color:#E8B44A; }
+.stSlider [role="slider"] { background:#E8B44A !important; border-color:#E8B44A !important; }
+.stSlider [data-baseweb="slider"] > div > div { background:#24344f !important; }
+/* expander / cards */
+[data-testid="stExpander"] { background:#0d1626 !important; border:1px solid #1e2c44 !important; }
+[data-testid="stExpander"] summary { color:#cfe3ff !important; }
+
+/* buttons */
 div[data-testid="stButton"]>button {
-  background:#0d1626; border:1px solid #24344f; color:#bcd3f7; border-radius:10px;
-  font-size:9px; letter-spacing:1px; text-transform:uppercase; padding:8px 6px;
-  white-space:pre-line; line-height:1.6; }
-div[data-testid="stButton"]>button:hover { border-color:#E8B44A; color:#E8B44A; }
-div[data-testid="stButton"]>button[kind="primary"] { border-color:#5b8dd9; color:#fff; background:#12203a; }
-/* bright DOWNLOAD button */
+  background:#0d1626 !important; border:1px solid #24344f !important; color:#bcd3f7 !important;
+  border-radius:10px; font-size:9px !important; letter-spacing:1px; text-transform:uppercase;
+  padding:8px 6px; white-space:pre-line; line-height:1.6; }
+div[data-testid="stButton"]>button:hover { border-color:#E8B44A !important; color:#E8B44A !important; }
+div[data-testid="stButton"]>button[kind="primary"],
+div[data-testid="stButton"]>button[type="primary"] { border-color:#5b8dd9 !important; color:#fff !important; background:#12203a !important; }
 div[data-testid="stDownloadButton"]>button {
   background:#e9edf2 !important; color:#0a0f16 !important; border:none !important;
   border-radius:10px; font-weight:700; letter-spacing:1px; padding:12px 22px; }
 
-.tk-card { background:#0d1626; border:1px solid #1e2c44; border-radius:12px;
-  padding:14px; margin-bottom:12px; }
+.tk-card { background:#0d1626; border:1px solid #1e2c44; border-radius:12px; padding:14px; margin-bottom:12px; }
 .tk-ads { text-align:center; color:#5f7396; font-size:10px; letter-spacing:2px; padding:18px; }
 .tk-head { display:flex; align-items:center; justify-content:space-between; padding:10px 6px; }
 .tk-logo { display:flex; align-items:baseline; gap:12px; }
-.tk-logo b { font-size:22px; color:#fff; letter-spacing:1px; }
-.tk-logo span { color:#5f7396; font-size:11px; letter-spacing:2px; }
+.tk-logo b { font-size:22px; color:#fff !important; letter-spacing:1px; }
+.tk-logo span { color:#5f7396 !important; font-size:11px; letter-spacing:2px; }
 .tk-actions a { display:inline-block; margin-left:8px; padding:8px 14px; border:1px solid #24344f;
-  border-radius:10px; color:#bcd3f7; text-decoration:none; font-size:10px; letter-spacing:1px; }
-.tk-foot { display:flex; justify-content:space-between; color:#5f7396; font-size:10px;
+  border-radius:10px; color:#bcd3f7 !important; text-decoration:none; font-size:10px; letter-spacing:1px; }
+.tk-foot { display:flex; justify-content:space-between; color:#5f7396 !important; font-size:10px;
   padding:10px 6px; border-top:1px solid #14203a; margin-top:8px; }
+.tk-foot span { color:#5f7396 !important; }
 div[data-testid="stIFrame"] iframe { border:1px solid #24344f; border-radius:4px; }
 </style>""", unsafe_allow_html=True)
 
 LOGO_SVG = ('<svg width="26" height="26" viewBox="0 0 24 24"><path fill="#E8B44A" '
             'd="M12 2C9 8 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 15 8 12 2z"/></svg>')
-
 st.markdown(f"""
 <div class="tk-head">
   <div class="tk-logo">{LOGO_SVG}<b>TERRAINK</b><span>FREE MAP POSTER &amp; WALLPAPER CREATOR</span></div>
@@ -70,7 +88,7 @@ st.markdown(f"""
   </div>
 </div>""", unsafe_allow_html=True)
 
-# ================================================================ DATA / STATE
+# ================================================================ CONSTANTS
 THEME_PRESETS = {
     "Carrara": dict(overlay="#f5f2ec", text="#1c1c1c", land="#f7f5f1", landcover="#e6e2d6",
                     water="#cfd4d6", waterways="#c3c9cc", parks="#e3e0d2", buildings="#e0ddd2",
@@ -93,6 +111,7 @@ THEME_PRESETS = {
                           roads_minor_high="#a8862d", roads_minor_mid="#8a7a3a", roads_minor_low="#6f6242",
                           roads_path="#3c4658", road_outline="#050a14"),
 }
+DEF_THEME = "Midnight Blue"
 PREVIEW_FILTERS = {"Carrara": "grayscale(0.85) brightness(1.05)",
                    "Blush": "sepia(0.25) hue-rotate(-20deg) saturate(1.4)",
                    "Sandstone": "sepia(0.5) saturate(1.1)",
@@ -106,6 +125,10 @@ LAYOUTS = {"Instagram Square": (1080, 1080), "Landscape 16:10": (1600, 1000),
            "Portrait 3:4": (1080, 1440), "Custom": None}
 FONT_FILES = {"Sans": "DejaVuSans-Bold.ttf", "Serif": "DejaVuSerif-Bold.ttf", "Mono": "DejaVuSansMono-Bold.ttf"}
 
+def _idx(options, val, default=0):
+    return options.index(val) if val in options else default
+
+# ================================================================ GEO / RENDER ENGINE
 @st.cache_data(ttl=3600)
 def geocode_location(query: str):
     if not query: return None
@@ -113,7 +136,7 @@ def geocode_location(query: str):
         res = requests.get("https://nominatim.openstreetmap.org/search",
                            params={"format": "json", "q": query, "limit": 1},
                            headers={"User-Agent": "TerrainkClone/1.0"}, timeout=10).json()
-        if res: return {"lat": float(res[0]["lat"]), "lon": float(res[0]["lon"]), "name": res[0]["display_name"]}
+        if res: return {"lat": float(res[0]["lat"]), "lon": float(res[0]["lon"])}
     except Exception as e:
         logger.error("Geocode failed: %s", e)
     return None
@@ -198,19 +221,19 @@ def render_vector_map(lat, lon, zoom, w_px, h_px, colors, layers, mk, shp, drawi
     if layers["Buildings"]:
         plot(_subset(gdf, "building", True), colors["buildings"], 0.3)
 
-    for f in drawings:  # user annotations
+    for f in drawings:
         try:
             geom = shape(f["geometry"])
             r = (f.get("properties") or {}).get("radius")
             if geom.geom_type == "Point" and r: geom = geom.buffer(r / 111320)
             if geom.geom_type == "Point":
                 ax.plot(geom.x, geom.y, "o", color=mk["stroke"], markersize=mk["size"],
-                        markerfacecolor=mk["fill"], markeredgecolor=mk["stroke"])
+                        markerfacecolor=mk["fill"])
             else:
-                xs, ys = (geom.exterior.xy, None) if geom.geom_type == "Polygon" else (geom.xy, None)
                 if geom.geom_type == "Polygon":
                     ax.fill(*geom.exterior.xy, color=shp["fill"], alpha=shp["fill_op"])
-                ax.plot(xs, ys, color=shp["stroke"], linewidth=shp["weight"], alpha=shp["opacity"])
+                ax.plot(*geom.exterior.xy if geom.geom_type == "Polygon" else geom.xy,
+                        color=shp["stroke"], linewidth=shp["weight"], alpha=shp["opacity"])
         except Exception as ex:
             logger.warning("Skip annotation: %s", ex)
     buf = io.BytesIO(); fig.savefig(buf, format="png", dpi=100); plt.close(fig); buf.seek(0)
@@ -235,120 +258,143 @@ def compose_poster(map_img, W, H, colors, title, subtitle, font_key):
     d.text((W - margin - 260, H - margin + 4), "© OpenStreetMap contributors", font=fc, fill=colors["text"])
     return img
 
-# ================================================================ RAIL + PANELS
+# ================================================================ STATE DEFAULTS (non-widget keys only)
+ss.setdefault("panel", "LOCATION")
+ss.setdefault("drawings", [])
+ss.setdefault("edit_mode", False)
+ss.setdefault("recenter", 0)
+ss.setdefault("query", "Santo Tomas, Philippines")
+ss.setdefault("preset", DEF_THEME)
+ss.setdefault("layout", "Instagram Square")
+ss.setdefault("basemap", "CartoDB Dark Matter")
+ss.setdefault("zoom", 13)
+ss.setdefault("fmt", "PNG")
+ss.setdefault("font", "Mono")
+ss.setdefault("title", "")
+ss.setdefault("subtitle", "")
+ss.setdefault("W", 1080); ss.setdefault("H", 1080)
+ss.setdefault("mk_stroke", "#5b8dd9"); ss.setdefault("mk_fill", "#E8B44A"); ss.setdefault("mk_size", 9)
+ss.setdefault("shp_stroke", "#E8B44A"); ss.setdefault("shp_fill", "#0d1626")
+ss.setdefault("shp_weight", 3); ss.setdefault("shp_opacity", 1.0); ss.setdefault("shp_fill_op", 0.3)
+for lyr in ["Water", "Parks", "Buildings", "Roads", "Landcover"]:
+    ss.setdefault(f"lyr_{lyr}", True)
+
+loc = geocode_location(ss["query"]) or {"lat": 15.0141, "lon": 120.7059}
+
+# ================================================================ LAYOUT: RAIL / CANVAS / PANEL
 RAIL = ["LOCATION", "THEME", "LAYOUT", "STYLE", "LAYERS", "MARKERS", "ROUTES", "SETTINGS"]
 ICONS = {"LOCATION": "📍", "THEME": "🎨", "LAYOUT": "📐", "STYLE": "🔤",
          "LAYERS": "🗂️", "MARKERS": "📌", "ROUTES": "🛣️", "SETTINGS": "⚙️"}
-st.session_state.setdefault("panel", "LOCATION")
-st.session_state.setdefault("drawings", [])
-st.session_state.setdefault("edit_mode", False)
-st.session_state.setdefault("recenter", 0)
 
 rail, main, right = st.columns([0.55, 3.6, 1.15], gap="small")
 
 with rail:
     for p in RAIL:
-        if st.button(f"{ICONS[p]}\n{p}", key=f"rail_{p}", kind="primary" if st.session_state.panel == p else "secondary"):
-            st.session_state.panel = p
-            st.rerun()
-
-# ---- gather shared inputs with defaults (persisted) ----
-ss = st.session_state
-loc = geocode_location(ss.get("query", "Santo Tomas, Philippines")) or {"lat": 15.0141, "lon": 120.7059, "name": "Santo Tomas"}
-ss.setdefault("query", "Santo Tomas, Philippines")
+        if st.button(f"{ICONS[p]}\n{p}", key=f"rail_{p}",
+                     type="primary" if ss.panel == p else "secondary"):
+            ss.panel = p; st.rerun()
 
 with right:
     st.markdown('<div class="tk-card">', unsafe_allow_html=True)
+
     if ss.panel == "LOCATION":
+        # keyless widget -> manual persistence (no session-state conflict)
         q = st.text_input("Location", ss["query"])
         if q != ss["query"]:
-            ss["query"] = q; ss["recenter"] += 1; st.rerun()
-        st.caption(f"{loc['lat']:.4f}, {loc['lon']:.4f}")
+            ss["query"] = q; ss["recenter"] += 1
+
     elif ss.panel == "THEME":
-        preset = st.selectbox("Theme", list(THEME_PRESETS.keys()) + ["Custom"],
-                              index=list(THEME_PRESETS.keys()).index(ss.get("preset", "Midnight Blue")) if ss.get("preset") != "Custom" else 4)
-        if preset != ss.get("preset"):
+        opts = list(THEME_PRESETS.keys()) + ["Custom"]
+        preset = st.selectbox("Theme", opts, index=_idx(opts, ss["preset"], 3))
+        if preset != ss["preset"]:
             ss["preset"] = preset
             if preset != "Custom":
                 for k, v in THEME_PRESETS[preset].items(): ss[f"c_{k}"] = v
             st.rerun()
-        with st.expander("Color Editor", expanded=False):
-            cols = st.columns(2); colors = {}
+        with st.expander("Color Editor"):
+            grid = st.columns(2); cols = {}
             for i, k in enumerate(THEME_PRESETS["Carrara"]):
-                colors[k] = cols[i % 2].color_picker(k, ss.get(f"c_{k}", THEME_PRESETS["Midnight Blue"][k]), key=f"c_{k}")
+                v = grid[i % 2].color_picker(k.replace("_", " ").title(),
+                                             ss.get(f"c_{k}", THEME_PRESETS[DEF_THEME][k]))
+                ss[f"c_{k}"] = v; cols[k] = v
             if st.button("Reset All Colors"):
-                src = THEME_PRESETS.get(ss.get("preset", "Midnight Blue"), THEME_PRESETS["Midnight Blue"])
+                src = THEME_PRESETS.get(ss["preset"], THEME_PRESETS[DEF_THEME])
                 for k, v in src.items(): ss[f"c_{k}"] = v
                 st.rerun()
+
     elif ss.panel == "LAYOUT":
-        layout = st.selectbox("Layout", list(LAYOUTS.keys()), index=list(LAYOUTS.keys()).index(ss.get("layout", "Instagram Square")))
+        layout = st.selectbox("Layout", list(LAYOUTS.keys()), _idx(list(LAYOUTS.keys()), ss["layout"]))
         ss["layout"] = layout
         if layout == "Custom":
-            ss["W"] = st.number_input("Width px", 400, 4000, ss.get("W", 1080), 20)
-            ss["H"] = st.number_input("Height px", 400, 4000, ss.get("H", 1080), 20)
-        W, H = (ss.get("W", 1080), ss.get("H", 1080)) if layout == "Custom" else LAYOUTS[layout]
+            ss["W"] = st.number_input("Width px", 400, 4000, ss["W"], 20)
+            ss["H"] = st.number_input("Height px", 400, 4000, ss["H"], 20)
+        W, H = (ss["W"], ss["H"]) if layout == "Custom" else LAYOUTS[layout]
         st.caption(f"Poster size: {W} x {H} px")
+
     elif ss.panel == "STYLE":
-        ss["title"] = st.text_input("Title", ss.get("title", ""))
-        ss["subtitle"] = st.text_input("Subtitle", ss.get("subtitle", ""))
-        ss["font"] = st.selectbox("Font", list(FONT_FILES.keys()), index=list(FONT_FILES.keys()).index(ss.get("font", "Mono")))
+        ss["title"] = st.text_input("Title", ss["title"])
+        ss["subtitle"] = st.text_input("Subtitle", ss["subtitle"])
+        ss["font"] = st.selectbox("Font", list(FONT_FILES.keys()), _idx(list(FONT_FILES.keys()), ss["font"], 2))
+
     elif ss.panel == "LAYERS":
-        ss["basemap"] = st.selectbox("Basemap", list(BASEMAPS.keys()), index=list(BASEMAPS.keys()).index(ss.get("basemap", "CartoDB Dark Matter")))
+        ss["basemap"] = st.selectbox("Basemap", list(BASEMAPS.keys()), _idx(list(BASEMAPS.keys()), ss["basemap"], 2))
         for lyr in ["Water", "Parks", "Buildings", "Roads", "Landcover"]:
-            ss.setdefault(f"lyr_{lyr}", True)
             ss[f"lyr_{lyr}"] = st.checkbox(lyr, ss[f"lyr_{lyr}"])
+
     elif ss.panel == "MARKERS":
-        n_mk = sum(1 for f in ss.drawings if f["geometry"]["type"] == "Point")
-        st.caption(f"{n_mk} marker(s)")
-        ss["mk_stroke"] = st.color_picker("Marker border", ss.get("mk_stroke", "#5b8dd9"))
-        ss["mk_fill"] = st.color_picker("Marker fill", ss.get("mk_fill", "#E8B44A"))
-        ss["mk_size"] = st.slider("Marker size", 4, 20, ss.get("mk_size", 9))
+        st.caption(f"{sum(1 for f in ss.drawings if f['geometry']['type'] == 'Point')} marker(s)")
+        ss["mk_stroke"] = st.color_picker("Marker border", ss["mk_stroke"])
+        ss["mk_fill"] = st.color_picker("Marker fill", ss["mk_fill"])
+        ss["mk_size"] = st.slider("Marker size", 4, 20, ss["mk_size"])
+
     elif ss.panel == "ROUTES":
-        n_rt = sum(1 for f in ss.drawings if f["geometry"]["type"] != "Point")
-        st.caption(f"{n_rt} route/polygon/circle(s)")
-        ss["shp_stroke"] = st.color_picker("Border", ss.get("shp_stroke", "#E8B44A"))
-        ss["shp_fill"] = st.color_picker("Fill", ss.get("shp_fill", "#0d1626"))
-        ss["shp_weight"] = st.slider("Border width", 1, 10, ss.get("shp_weight", 3))
-        ss["shp_opacity"] = st.slider("Border opacity", 0.0, 1.0, ss.get("shp_opacity", 1.0))
-        ss["shp_fill_op"] = st.slider("Fill opacity", 0.0, 1.0, ss.get("shp_fill_op", 0.3))
+        st.caption(f"{sum(1 for f in ss.drawings if f['geometry']['type'] != 'Point')} route/shape(s)")
+        ss["shp_stroke"] = st.color_picker("Border", ss["shp_stroke"])
+        ss["shp_fill"] = st.color_picker("Fill", ss["shp_fill"])
+        ss["shp_weight"] = st.slider("Border width", 1, 10, ss["shp_weight"])
+        ss["shp_opacity"] = st.slider("Border opacity", 0.0, 1.0, ss["shp_opacity"])
+        ss["shp_fill_op"] = st.slider("Fill opacity", 0.0, 1.0, ss["shp_fill_op"])
+
     elif ss.panel == "SETTINGS":
-        ss["zoom"] = st.slider("Zoom", 10, 18, ss.get("zoom", 13))
-        ss["fmt"] = st.radio("Export format", ["PNG", "JPG"], horizontal=True, index=["PNG", "JPG"].index(ss.get("fmt", "PNG")))
+        ss["zoom"] = st.slider("Zoom", 10, 18, ss["zoom"])
+        ss["fmt"] = st.radio("Export format", ["PNG", "JPG"], horizontal=True,
+                             index=0 if ss["fmt"] == "PNG" else 1)
+
     if ss.panel in ("MARKERS", "ROUTES") and st.button("Clear All Drawings"):
         ss["drawings"] = []; st.rerun()
     st.markdown('</div><div class="tk-card tk-ads">ADS KEEP TERRAINK FREE</div>', unsafe_allow_html=True)
 
 # ================================================================ CANVAS
-colors = {k: ss.get(f"c_{k}", THEME_PRESETS["Midnight Blue"][k]) for k in THEME_PRESETS["Carrara"]}
-layers = {l: ss.get(f"lyr_{l}", True) for l in ["Water", "Parks", "Buildings", "Roads", "Landcover"]}
-mk = dict(stroke=ss.get("mk_stroke", "#5b8dd9"), fill=ss.get("mk_fill", "#E8B44A"), size=ss.get("mk_size", 9))
-shp = dict(stroke=ss.get("shp_stroke", "#E8B44A"), fill=ss.get("shp_fill", "#0d1626"),
-           weight=ss.get("shp_weight", 3), opacity=ss.get("shp_opacity", 1.0), fill_op=ss.get("shp_fill_op", 0.3))
-layout = ss.get("layout", "Instagram Square")
-W, H = (ss.get("W", 1080), ss.get("H", 1080)) if layout == "Custom" else LAYOUTS[layout]
-map_h = {"Instagram Square": 640, "Landscape 16:10": 470, "Portrait 3:4": 720, "Custom": 600}[layout]
+colors = {k: ss.get(f"c_{k}", THEME_PRESETS[DEF_THEME][k]) for k in THEME_PRESETS["Carrara"]}
+layers = {l: ss[f"lyr_{l}"] for l in ["Water", "Parks", "Buildings", "Roads", "Landcover"]}
+mk = dict(stroke=ss["mk_stroke"], fill=ss["mk_fill"], size=ss["mk_size"])
+shp = dict(stroke=ss["shp_stroke"], fill=ss["shp_fill"], weight=ss["shp_weight"],
+           opacity=ss["shp_opacity"], fill_op=ss["shp_fill_op"])
+W, H = (ss["W"], ss["H"]) if ss["layout"] == "Custom" else LAYOUTS[ss["layout"]]
+map_h = {"Instagram Square": 640, "Landscape 16:10": 470, "Portrait 3:4": 720, "Custom": 600}[ss["layout"]]
 
-m = folium.Map(location=[loc["lat"], loc["lon"]], zoom_start=ss.get("zoom", 13),
-               tiles=BASEMAPS[ss.get("basemap", "CartoDB Dark Matter")][0], attr="© OpenStreetMap contributors")
+m = folium.Map(location=[loc["lat"], loc["lon"]], zoom_start=ss["zoom"],
+               tiles=BASEMAPS[ss["basemap"]][0], attr="© OpenStreetMap contributors")
 m.get_root().html.add_child(folium.Element(
-    f"<style>.leaflet-tile-pane{{filter:{PREVIEW_FILTERS.get(ss.get('preset','Midnight Blue'),'none')};}}"
+    f"<style>.leaflet-tile-pane{{filter:{PREVIEW_FILTERS.get(ss['preset'], 'none')};}}"
     "body{background:#0d1626;}"
-    ".wm{position:absolute;bottom:6px;font:9px monospace;color:#5f7396;z-index:999;}"
-    "</style>"
+    ".wm{position:absolute;bottom:6px;font:9px monospace;color:#5f7396;z-index:999;}</style>"
     '<div class="wm" style="left:8px;">© terraink.app</div>'
     '<div class="wm" style="right:8px;">© OpenStreetMap contributors</div>'))
 if ss.edit_mode:
     Draw(export=False, position="topleft").add_to(m)
 if ss.drawings:
     folium.GeoJson({"type": "FeatureCollection", "features": ss.drawings},
-                   style_function=lambda f: dict(color=shp["stroke"], weight=shp["weight"], opacity=shp["opacity"],
-                                                 fillColor=shp["fill"], fillOpacity=shp["fill_op"]),
+                   style_function=lambda f: dict(color=shp["stroke"], weight=shp["weight"],
+                                                 opacity=shp["opacity"], fillColor=shp["fill"],
+                                                 fillOpacity=shp["fill_op"]),
                    point_to_layer=lambda f, ll: folium.CircleMarker(
-                       ll, radius=mk["size"], color=mk["stroke"], weight=2, fill=True,
-                       fill_color=mk["fill"], fill_opacity=1.0)).add_to(m)
+                       ll, radius=mk["size"], color=mk["stroke"], weight=2,
+                       fill=True, fill_color=mk["fill"], fill_opacity=1.0)).add_to(m)
 
 with main:
-    out = st_folium(m, height=map_h, returned_objects=["all_drawings"] if ss.edit_mode else [],
+    out = st_folium(m, height=map_h,
+                    returned_objects=["all_drawings"] if ss.edit_mode else [],
                     key=f"map_{ss['recenter']}")
     new_draws = (out or {}).get("all_drawings") or []
     if new_draws:
@@ -359,24 +405,23 @@ with main:
 
     c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
     with c2:
-        if st.button("⛶ Recenter"):
-            ss["recenter"] += 1; st.rerun()
+        if st.button("⛶ Recenter"): ss["recenter"] += 1; st.rerun()
     with c3:
-        if st.button("✏️ Edit Map"):
-            ss["edit_mode"] = not ss["edit_mode"]; st.rerun()
+        if st.button("✏️ Edit Map"): ss["edit_mode"] = not ss["edit_mode"]; st.rerun()
     with c4:
         if st.button("⬇ Download", type="primary"):
             with st.spinner("Rendering poster…"):
                 try:
                     if not OSMNX_OK: raise RuntimeError("osmnx missing")
-                    img = render_vector_map(loc["lat"], loc["lon"], ss.get("zoom", 13), W, H - 260, colors, layers, mk, shp, ss.drawings)
+                    img = render_vector_map(loc["lat"], loc["lon"], ss["zoom"], W, H - 260,
+                                            colors, layers, mk, shp, ss.drawings)
                 except Exception as e:
                     logger.warning("Vector render failed (%s), raster fallback", e)
-                    img = stitch_tiles(loc["lat"], loc["lon"], ss.get("zoom", 13), W, H - 260,
-                                       BASEMAPS[ss.get("basemap", "CartoDB Dark Matter")][1])
-                poster = compose_poster(img, W, H, colors, ss.get("title", ""), ss.get("subtitle", ""), ss.get("font", "Mono"))
+                    img = stitch_tiles(loc["lat"], loc["lon"], ss["zoom"], W, H - 260,
+                                       BASEMAPS[ss["basemap"]][1])
+                poster = compose_poster(img, W, H, colors, ss["title"], ss["subtitle"], ss["font"])
                 buf = io.BytesIO()
-                if ss.get("fmt", "PNG") == "PNG":
+                if ss["fmt"] == "PNG":
                     poster.save(buf, "PNG"); mime, ext = "image/png", "png"
                 else:
                     poster.convert("RGB").save(buf, "JPEG", quality=92); mime, ext = "image/jpeg", "jpg"
@@ -384,7 +429,8 @@ with main:
                 st.rerun()
 
 if ss.get("export_bytes"):
-    st.download_button("⬇ DOWNLOAD", ss["export_bytes"], file_name=f"terraink_poster.{ss['export_ext']}",
+    st.download_button(" DOWNLOAD", ss["export_bytes"],
+                       file_name=f"terraink_poster.{ss['export_ext']}",
                        mime=ss["export_mime"], key="dl")
 
 st.markdown("""
@@ -392,4 +438,4 @@ st.markdown("""
   <span>hello@terraink.app | Imprint | Data Privacy | Cookie Settings</span>
   <span>Terraink™ v0.4.2 | © 2026 | Made with ♥ in Hannover, Germany</span>
   <span>Map data ©OpenStreetMap contributors</span>
-</div>""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)s
