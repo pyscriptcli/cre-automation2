@@ -1,5 +1,6 @@
 import streamlit as st
-import streamlit.components.v1 as components
+from streamlit_folium import st_folium
+import folium
 import requests
 import logging
 
@@ -17,7 +18,6 @@ st.markdown("""
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         border-radius: 4px;
         margin-bottom: 20px;
-        position: relative;
     }
     .poster-title {
         font-family: 'Inter', sans-serif;
@@ -35,7 +35,6 @@ st.markdown("""
         letter-spacing: 1px;
         margin-bottom: 15px;
     }
-    .stHtml { margin-bottom: -20px; } /* Pull map up into the poster frame */
 </style>
 """, unsafe_allow_html=True)
 
@@ -48,7 +47,7 @@ def geocode_location(query: str) -> dict:
     try:
         res = requests.get(url, headers=headers, timeout=10).json()
         if res and len(res) > 0:
-            return {"lat": float(res[0]["lat"]), "lon": float(res[0]["lon"]), "name": res[0]["display_name"]}
+            return {"lat": float(res[0]["lat"]), "lon": float(res[0]["lon"])}
     except Exception as e:
         logger.error(f"Geocoding failed for '{query}': {e}")
     return None
@@ -64,15 +63,13 @@ if not location_data:
 
 st.sidebar.markdown(f"**Coordinates:** {location_data['lat']:.4f}, {location_data['lon']:.4f}")
 
-theme_options = {
-    "Liberty (Color)": "https://tiles.openfreemap.org/styles/liberty",
-    "Bright (Light)": "https://tiles.openfreemap.org/styles/bright",
-    "Positron (Minimal)": "https://tiles.openfreemap.org/styles/positron",
-    "Dark Matter": "https://tiles.openfreemap.org/styles/dark",
-    "Fiord (Dark Blue)": "https://tiles.openfreemap.org/styles/fiord"
+basemap_options = {
+    "OpenStreetMap": "OpenStreetMap",
+    "CartoDB Positron": "CartoDB positron",
+    "CartoDB Dark Matter": "CartoDB dark_matter",
+    "Esri Satellite": "Esri WorldImagery"
 }
-selected_theme = st.sidebar.selectbox("Map Theme", list(theme_options.keys()))
-theme_url = theme_options[selected_theme]
+selected_basemap = st.sidebar.selectbox("Basemap", list(basemap_options.keys()))
 
 st.sidebar.subheader("Typography")
 poster_title = st.sidebar.text_input("Title", value=search_query.split(",")[0].upper())
@@ -80,49 +77,24 @@ poster_subtitle = st.sidebar.text_input("Subtitle", value="City Map Poster")
 font_family = st.sidebar.selectbox("Font Family", ["Inter", "Playfair Display", "Roboto", "Georgia"], index=0)
 
 st.sidebar.subheader("Map View")
-zoom = st.sidebar.slider("Zoom Level", 10.0, 16.0, 13.5, 0.1)
-pitch = st.sidebar.slider("Pitch (3D Angle)", 0, 60, 0)
+zoom = st.sidebar.slider("Zoom Level", 10, 18, 13, 1)
+
+# --- FOLIUM MAP CREATION ---
+m = folium.Map(
+    location=[location_data['lat'], location_data['lon']],
+    zoom_start=zoom,
+    tiles=basemap_options[selected_basemap],
+    attr='&copy; OpenStreetMap &copy; CARTO &copy; Esri'
+)
 
 # --- POSTER LAYOUT ---
 st.markdown('<div class="poster-frame">', unsafe_allow_html=True)
 
-# Typography Overlay
 st.markdown(f"""
     <div class="poster-title" style="font-family: '{font_family}', sans-serif;">{poster_title}</div>
     <div class="poster-subtitle" style="font-family: '{font_family}', sans-serif;">{poster_subtitle}</div>
 """, unsafe_allow_html=True)
 
-# --- MAPLIBRE GL JS RENDERING (NATIVE HTML COMPONENT) ---
-map_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Terraink Map</title>
-    <script src="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@4.5.0/dist/maplibre-gl.css" rel="stylesheet" />
-    <style>
-        body {{ margin: 0; padding: 0; }}
-        #map {{ position: absolute; top: 0; bottom: 0; width: 100%; }}
-    </style>
-</head>
-<body>
-    <div id="map"></div>
-    <script>
-        var map = new maplibregl.Map({{
-            container: 'map',
-            style: '{theme_url}',
-            center: [{location_data['lon']}, {location_data['lat']}],
-            zoom: {zoom},
-            pitch: {pitch},
-            bearing: 0,
-            antialias: true
-        }});
-        map.addControl(new maplibregl.NavigationControl(), 'top-right');
-    </script>
-</body>
-</html>
-"""
+st_folium(m, width=None, height=650, returned_objects=[])
 
-components.html(map_html, height=650)
 st.markdown('</div>', unsafe_allow_html=True)
