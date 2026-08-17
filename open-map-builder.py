@@ -1,9 +1,10 @@
 import json
+import re
 import streamlit as st
 import streamlit.components.v1 as components
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & STATE INIT
+# 1. PAGE CONFIGURATION & ROOT CSS OVERRIDES
 # ------------------------------------------------------------------------
 st.set_page_config(
     page_title="Open Map Builder",
@@ -58,10 +59,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ------------------------------------------------------------------------
+# 2. SESSION STATE & DATA CONFIGURATIONS
+# ------------------------------------------------------------------------
 DEFAULT_COORDS = [14.5995, 120.9842]
 DEFAULT_RADIUS = 1000
 
-if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
+if 'geo_coords' not in st.session_state: st.session_state.geo_coords = "14.5995, 120.9842"
 if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
 if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
 if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
@@ -91,6 +95,10 @@ POI_CONFIG = {
         ['Pharmacy', '"amenity"="pharmacy"'], 
         ['Hardware', '"shop"~"hardware|doityourself",i'], 
         ['General Shops', '"shop"~"boutique|clothes|shoes",i'], 
+        ['Beauty', '"shop"="beauty"'], 
+        ['Bicycle', '"shop"="bicycle"'], 
+        ['Books/Stationary', '"shop"~"books|stationary",i'], 
+        ['Car', '"shop"="car"'], 
         ['Marketplace', '"amenity"="marketplace"']
     ],
     "FOOD, BEVERAGE & HOSPITALITY": [
@@ -119,6 +127,7 @@ POI_CONFIG = {
     "HEALTH & EMERGENCY SERVICES": [
         ['Hospital', '"amenity"~"hospital|clinic",i'], 
         ['Clinic', '"amenity"="clinic"'], 
+        ['Pharmacy', '"amenity"="pharmacy"'], 
         ['Police Station', '"amenity"="police"'], 
         ['Fire Station', '"amenity"="fire_station"']
     ],
@@ -141,7 +150,58 @@ POI_CONFIG = {
 }
 
 # ------------------------------------------------------------------------
-# 2. THEMES & VECTOR STYLING ENGINE (Railways & Roads Granularity)
+# 3. BACKEND OSMNX GEOQUERY PIPELINE
+# ------------------------------------------------------------------------
+def extract_osmnx_pois(lat, lon, radius, category=None):
+    try:
+        import osmnx as ox
+        import shapely.geometry
+        
+        tags_dict = {}
+        target_tags = []
+        if category and category in POI_CONFIG:
+            target_tags = POI_CONFIG[category]
+        else:
+            for c in POI_CONFIG.values(): target_tags.extend(c)
+            
+        for t in target_tags:
+            clean = t[1].replace('"', '')
+            if '=' in clean:
+                k, v = clean.split('=', 1)
+                if '|' in v: v = [x.strip() for x in v.split('|')]
+                tags_dict[k] = v
+            elif '~' in clean:
+                k, v = clean.split('~', 1)
+                v = v.replace(',i', '')
+                if '|' in v: v = [x.strip() for x in v.split('|')]
+                tags_dict[k] = v
+            else:
+                tags_dict[clean] = True
+                
+        gdf = ox.geometries_from_point((lat, lon), tags_dict, dist=radius)
+        records = []
+        if not gdf.empty:
+            for idx, row in gdf.iterrows():
+                if hasattr(row.geometry, 'centroid'):
+                    c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
+                else: continue
+                name = row.get('name', 'Unknown')
+                if isinstance(name, float): name = 'Unknown'
+                matched_type = category or 'POI'
+                for k in tags_dict.keys():
+                    if k in row and row[k]:
+                        matched_type = str(row[k])
+                        break
+                records.append({
+                    "lat": float(c_lat), "lon": float(c_lon), "name": str(name),
+                    "type": matched_type, "visible": True
+                })
+        return records
+    except Exception:
+        return []
+
+# ------------------------------------------------------------------------
+# 4. VECTOR STYLING ENGINE
 # ------------------------------------------------------------------------
 CENTER = [120.9842, 14.5995]
 ZOOM = 14
@@ -192,8 +252,7 @@ def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=
         "layout": {"line-cap": "round", "line-join": "round"},
         "paint": {"line-color": color, "line-width": w(*widths), "line-opacity": opacity},
     }
-    if minzoom:
-        lyr["minzoom"] = minzoom
+    if minzoom: lyr["minzoom"] = minzoom
     if casing:
         lyr["paint"]["line-color"] = p["rd_case"]
         lyr["paint"]["line-width"] = w(*[(z, val + 1.8) for z, val in widths])
@@ -238,7 +297,6 @@ def vector_style(p):
             road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 3.8), (20, 18)]),
             road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 5.5), (20, 24)]),
             
-            # Rail Layer
             {"id": "rd_rail", "type": "line", "source": "omt", "source-layer": "transportation", "filter": ["match", ["get", "class"], ["rail", "transit"], True, False], "minzoom": 10, "paint": {"line-color": p["rail"], "line-width": w((10, 1.2), (15, 2.5), (20, 4)), "line-dasharray": [3, 2]}},
 
             # Labels
@@ -271,7 +329,7 @@ ALL_STYLES = {
 INITIAL_BASEMAP = "Midnight Blue"
 
 # ------------------------------------------------------------------------
-# 3. OPEN MAP BUILDER FRONTEND & COMPONENT
+# 5. OPEN MAP BUILDER FRONTEND & COMPONENT
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -293,7 +351,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   }
   #map { position: absolute; inset: 0; width: 100vw; height: 100vh; }
 
-  /* Perfectly Centered Floating Vertical Toolbar */
+  /* Vertical Toolbar Rail */
   #side-rail {
     position: absolute; 
     top: 50%; 
@@ -324,7 +382,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   /* Flyout Left Side Panels */
   .left-panel {
-    position: absolute; top: 16px; left: 74px; bottom: 16px; width: 350px; z-index: 9;
+    position: absolute; top: 16px; left: 74px; bottom: 16px; width: 360px; z-index: 9;
     background: #181d24f7; backdrop-filter: blur(14px); border: 1px solid #2d333b;
     border-radius: 16px; box-shadow: 0 12px 36px rgba(0,0,0,0.6);
     display: none; flex-direction: column; overflow: hidden; color: #adbac7;
@@ -341,27 +399,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   .panel-content { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
 
-  /* Accordions */
+  /* Collapsed by default Accordions */
   .acc-item { border-bottom: 1px solid #22272e; padding-bottom: 8px; }
   .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 6px 0; }
   .acc-body { padding: 6px 0 2px 0; display: flex; flex-direction: column; gap: 8px; }
-  .acc-body.hidden { display: none; }
+  .acc-body.hidden { display: none !important; }
 
   .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
   .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
 
-  /* Boundaries Selective Controls */
   .bound-select-row { display: flex; gap: 6px; margin-top: 4px; }
   .bound-select-row input[type=text] { flex: 1; background: #1c2128; border: 1px solid #2d333b; color: #f0f6fc; padding: 5px 8px; border-radius: 6px; font-size: 11px; font-family: inherit; }
   .bound-select-row button { background: #ff1e1e; color: #fff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
 
-  /* My Layers Cards */
+  /* My Layers & Grouping Container */
   .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
   .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
 
+  .group-container { background: #1c2128; border: 1px solid #2d333b; border-radius: 8px; margin-top: 6px; overflow: hidden; }
+  .group-header { background: #22272e; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; }
+  .group-title-input { background: transparent; border: none; font-weight: 700; color: #f0f6fc; font-size: 12px; width: 140px; font-family: inherit; }
+  .group-title-input:focus { background: #181d24; outline: none; border-radius: 4px; padding: 2px 4px; }
+  .group-items { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
+
   .layer-card {
-    background: #22272e; border: 1px solid #2d333b; border-radius: 8px; padding: 8px 10px;
-    display: flex; flex-direction: column; gap: 6px; margin-top: 6px;
+    background: #22272e; border: 1px solid #2d333b; border-radius: 6px; padding: 6px 8px;
+    display: flex; flex-direction: column; gap: 4px; margin-top: 4px;
   }
   .layer-card-top { display: flex; align-items: center; gap: 6px; }
   .layer-name-input {
@@ -380,7 +443,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
   .poi-badge { display: flex; justify-content: space-between; background: #22272e; padding: 4px 6px; border-radius: 4px; }
 
-  /* Floating Popups on Left Side */
+  /* Floating Popups */
   .float-card {
     position: absolute; left: 74px; z-index: 12; background: #181d24f7; backdrop-filter: blur(14px);
     border: 1px solid #2d333b; border-radius: 14px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
@@ -397,11 +460,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   #popup-text-settings { top: 30%; width: 260px; }
   #popup-shape-editor { top: 8%; width: 320px; max-height: 84vh; overflow-y: auto; }
   #popup-custom-map { top: 16px; bottom: 16px; width: 310px; overflow-y: auto; }
+  #popup-export { top: 50%; transform: translateY(-50%); width: 320px; }
 
   .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #2d333b; border-radius: 8px; background: #22272e; color: #adbac7; cursor: pointer; }
   .icon-grid button:hover { background: #2d333b; }
   .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
+
+  /* Export Layout Selector */
+  .layout-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0; }
+  .layout-btn { padding: 6px; background: #22272e; border: 1px solid #2d333b; border-radius: 6px; color: #f0f6fc; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
+  .layout-btn.active { background: #316dca; border-color: #316dca; }
+  #exportPreviewCanvas { width: 100%; height: 110px; object-fit: contain; background: #0d1117; border-radius: 6px; border: 1px solid #2d333b; }
 
   #hint-toast {
     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 15;
@@ -413,7 +483,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
 <div id="map"></div>
 
-<!-- Vertical Toolbar Rail (Cleaned up: No Clear All button) -->
+<!-- Vertical Toolbar Rail -->
 <div id="side-rail">
   <button class="rail-btn" id="btn-browser-toggle" title="Data Browser / Layers">
     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
@@ -447,7 +517,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button class="rail-btn" id="btn-custom-map" title="Basemap & Vector Styling">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
   </button>
-  <button class="rail-btn" id="btn-export-direct" title="Export Map PNG (Instant Download)">
+  <button class="rail-btn" id="btn-export-dialog" title="Export Map Layout">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
   </button>
   <button class="rail-btn" id="btn-edit-mode" title="Select & Drag Mode">
@@ -468,41 +538,41 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <div class="panel-content">
-    <!-- Trade Area Dropdown -->
+    <!-- Trade Area Dropdown (Collapsed by default) -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-trade-area">
-        <span>Trade Area Analysis</span><span>▾</span>
+        <span>Trade Area Analysis</span><span>▸</span>
       </div>
-      <div class="acc-body" id="body-trade-area">
+      <div class="acc-body hidden" id="body-trade-area">
         <div class="trade-controls">
           <label style="font-size:11px; font-weight:600; color:#f0f6fc;">Target Polygon:</label>
           <select id="tradePolygonSelect"><option value="">-- Choose a polygon --</option></select>
           <label style="font-size:11px; font-weight:600; color:#f0f6fc; margin-top:2px;">POI Category:</label>
           <select id="tradeCategorySelect"></select>
-          <button class="trade-btn" id="btnScanTradeArea">Scan POIs Inside Polygon</button>
+          <button class="trade-btn" id="btnScanTradeArea">Scan POIs (OSM Geometries)</button>
         </div>
         <div id="tradeResults" class="poi-summary"></div>
       </div>
     </div>
 
-    <!-- Labels -->
+    <!-- Labels (Collapsed by default) -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-labels">
-        <span>Labels</span><span>▾</span>
+        <span>Labels</span><span>▸</span>
       </div>
-      <div class="acc-body" id="body-labels">
+      <div class="acc-body hidden" id="body-labels">
         <label class="layer-row"><span>City</span><input type="checkbox" data-g="label_city" checked></label>
         <label class="layer-row"><span>Brgy</span><input type="checkbox" data-g="label_brgy" checked></label>
         <label class="layer-row"><span>Street</span><input type="checkbox" data-g="label_street" checked></label>
       </div>
     </div>
 
-    <!-- Roads & Railways -->
+    <!-- Roads & Railways (Collapsed by default) -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-roads">
-        <span>Roads & Transit</span><span>▾</span>
+        <span>Roads & Transit</span><span>▸</span>
       </div>
-      <div class="acc-body" id="body-roads">
+      <div class="acc-body hidden" id="body-roads">
         <label class="layer-row"><span>Express Way</span><input type="checkbox" data-g="road_exp" checked></label>
         <label class="layer-row"><span>Main Road</span><input type="checkbox" data-g="road_main" checked></label>
         <label class="layer-row"><span>Secondary Road</span><input type="checkbox" data-g="road_sec" checked></label>
@@ -511,12 +581,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Boundaries (Red Dashed + Selective City Boundary Fetcher) -->
+    <!-- Boundaries (Collapsed by default) -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-boundaries">
-        <span>Boundaries (Red Dashed)</span><span>▾</span>
+        <span>Boundaries (Red Dashed)</span><span>▸</span>
       </div>
-      <div class="acc-body" id="body-boundaries">
+      <div class="acc-body hidden" id="body-boundaries">
         <label class="layer-row"><span>All Provinces</span><input type="checkbox" data-g="bound_prov"></label>
         <label class="layer-row"><span>All Cities</span><input type="checkbox" data-g="bound_city"></label>
         <label class="layer-row"><span>All Brgys</span><input type="checkbox" data-g="bound_brgy"></label>
@@ -529,14 +599,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Custom Drawings -->
+    <!-- Custom Drawings & Grouping -->
     <div class="layers-heading">
       <span>My Layers</span>
-      <span class="badge-count" id="layer-badge-count">0</span>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button id="btnAddCustomGroup" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">+ GROUP</button>
+        <span class="badge-count" id="layer-badge-count">0</span>
+      </div>
     </div>
-    <div id="my-layers-list">
-      <div style="font-size:12px; color:#768390; padding: 6px 0;">No drawings yet. Use the tools to create shapes.</div>
-    </div>
+    <div id="my-layers-list"></div>
   </div>
 </div>
 
@@ -578,7 +649,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
   <div class="f-row"><span>Name</span><input type="text" id="eName" style="width:140px;"></div>
   
-  <!-- Direct Colors & Opacity Controls -->
   <div class="f-row" id="eBorderColorRow"><span>Border Color</span><input type="color" id="eBorderColor"></div>
   <div class="f-row" id="eBorderOpRow"><span>Border Opacity</span><input type="range" id="eBorderOp" min="0" max="1" step="0.05"></div>
   <div class="f-row" id="eWidthRow"><span>Border Width</span><input type="range" id="eWidth" min="1" max="16" step="1"></div>
@@ -659,6 +729,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Opacity</span><input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"></div>
 </div>
 
+<!-- Left Side Export Preview & Layout Panel -->
+<div id="popup-export" class="float-card">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <span style="font-weight:700; color:#f0f6fc;">Export Layout</span>
+    <button class="card-btn" id="closeExportBtn">✕</button>
+  </div>
+  
+  <div style="font-size:10px; font-weight:700; color:#768390; text-transform:uppercase;">Live Export Preview</div>
+  <img id="exportPreviewImg" style="width:100%; height:110px; object-fit:cover; background:#0d1117; border-radius:6px; border:1px solid #2d333b;" />
+  
+  <div style="font-weight:600; font-size:11px; color:#768390;">LAYOUT RATIO</div>
+  <div class="layout-grid">
+    <button class="layout-btn active" data-ratio="screen">Screen</button>
+    <button class="layout-btn" data-ratio="1:1">1:1</button>
+    <button class="layout-btn" data-ratio="16:9">16:9</button>
+    <button class="layout-btn" data-ratio="4:3">4:3</button>
+    <button class="layout-btn" data-ratio="9:16">9:16</button>
+    <button class="layout-btn" data-ratio="a4">A4</button>
+  </div>
+  
+  <button id="triggerExportBtn" style="background:#316dca; color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:4px;">Download Rendered Image</button>
+</div>
+
 <div id="hint-toast"></div>
 
 <script>
@@ -680,9 +773,13 @@ map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 
 // ----------------- State Machine -----------------
 let features = [], fid = 0;
+let customGroups = {
+  "Trade Area Scan": []
+};
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
 let markerShape = 'pin', markerColor = '#e8b84a', markerIconSize = 0.9;
+let currentExportRatio = 'screen';
 
 const textSettings = {
   content: 'Custom Label',
@@ -692,10 +789,8 @@ const textSettings = {
   opacity: 1.0
 };
 
-// Dragging feature state
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
 
-// Granular Road, Rail & Label Visibility (Boundaries OFF by default)
 const vis = {
   label_city: true, label_brgy: true, label_street: true,
   road_exp: true, road_main: true, road_sec: true, road_ter: true, rd_rail: true,
@@ -720,7 +815,7 @@ const $ = id => document.getElementById(id);
 const hint = t => { $('hint-toast').style.display = t ? 'block' : 'none'; $('hint-toast').textContent = t || ''; };
 
 const closeFloatingCards = () => {
-  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','browser-panel'].forEach(id => $(id).classList.remove('open'));
+  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-export','browser-panel'].forEach(id => $(id).classList.remove('open'));
 };
 
 const resetActiveTools = () => {
@@ -808,7 +903,6 @@ $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
 $('mColor').oninput = e => { markerColor = e.target.value; };
 $('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); };
 
-// ----------------- Populate Trade Area Category Dropdown -----------------
 $('tradeCategorySelect').innerHTML = Object.keys(POI_CONFIG).map(cat => `<option value="${cat}">${cat}</option>`).join('');
 
 // ----------------- Vector Layers Pipeline -----------------
@@ -890,7 +984,7 @@ function addDrawStack() {
       }
     });
 
-    // Specific Polygon Labels Layer with Anchor Alignment
+    // Specific Polygon Labels Layer
     map.addLayer({
       id: 'draw-poly-labels', type: 'symbol', source: 'draw',
       filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'showLabel'], true]],
@@ -1006,6 +1100,18 @@ function circleCoords(c, edge) {
   return { coords: [coords], r };
 }
 
+function pointInPolygon(point, vs) {
+  const x = point[0], y = point[1];
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    const xi = vs[i][0], yi = vs[i][1];
+    const xj = vs[j][0], yj = vs[j][1];
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 function fetchMultiPointRoute(pts) {
   hint('Calculating route…');
   const coordStr = pts.map(p => `${p[0]},${p[1]}`).join(';');
@@ -1022,7 +1128,7 @@ function fetchMultiPointRoute(pts) {
     });
 }
 
-function addFeatureRecord(kind, geometry, customProps = {}) {
+function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null) {
   const newId = ++fid;
   const isRoute = kind === 'route';
   const defaultBorder = isRoute ? '#38bdf8' : '#e8b84a';
@@ -1048,6 +1154,11 @@ function addFeatureRecord(kind, geometry, customProps = {}) {
     }
   };
   features.push(feat);
+  
+  if (targetGroup && customGroups[targetGroup]) {
+    customGroups[targetGroup].push(newId);
+  }
+  
   syncDraw();
   renderMyLayers();
   return feat;
@@ -1062,16 +1173,19 @@ $('btnScanTradeArea').onclick = () => {
     return;
   }
   const category = $('tradeCategorySelect').value;
-  const tags = POI_CONFIG[category];
-  if (!tags) return;
-
-  hint(`Querying Overpass for ${category} inside polygon…`);
-  $('tradeResults').innerHTML = '<div style="color:#d9b451;">Scanning OpenStreetMap POIs…</div>';
-
-  // Compute bbox for overpass
   const bnd = calcBounds(targetPoly);
-  const bbox = `${bnd[0][1]},${bnd[0][0]},${bnd[1][1]},${bnd[1][0]}`; // minLat, minLon, maxLat, maxLon
+  const centerLat = (bnd[0][1] + bnd[1][1]) / 2;
+  const centerLon = (bnd[0][0] + bnd[1][0]) / 2;
+  const radius = haversineDist([centerLon, centerLat], [bnd[1][0], bnd[1][1]]);
 
+  hint(`Querying POIs for ${category} inside polygon…`);
+  $('tradeResults').innerHTML = '<div style="color:#d9b451;">Extracting local POIs…</div>';
+
+  if (!customGroups["Trade Area Scan"]) customGroups["Trade Area Scan"] = [];
+
+  // Robust Geoprocessing Query (Overpass / OSMnx Tag Parser)
+  const tags = POI_CONFIG[category] || [];
+  const bbox = `${bnd[0][1]},${bnd[0][0]},${bnd[1][1]},${bnd[1][0]}`;
   let queryParts = '';
   tags.forEach(t => {
     const rawTag = t[1];
@@ -1095,41 +1209,44 @@ $('btnScanTradeArea').onclick = () => {
     .then(r => r.json())
     .then(data => {
       const results = data.elements || [];
-      if (!results.length) {
-        $('tradeResults').innerHTML = '<div style="color:#8b949e;">No matching POIs found in this trade area.</div>';
-        hint('Scan complete: 0 POIs found.');
+      const polyCoords = targetPoly.geometry.coordinates[0];
+      const filtered = results.filter(el => {
+        const lat = el.lat || (el.center && el.center.lat);
+        const lon = el.lon || (el.center && el.center.lon);
+        return lat && lon && pointInPolygon([lon, lat], polyCoords);
+      });
+
+      if (!filtered.length) {
+        $('tradeResults').innerHTML = '<div style="color:#8b949e;">No matching POIs inside this exact polygon.</div>';
+        hint('Scan complete: 0 POIs inside area.');
         return;
       }
 
-      // Aggregate breakdown
       const counts = {};
-      results.forEach(el => {
-        const name = (el.tags && (el.tags.name || el.tags.amenity || el.tags.shop || el.tags.building)) || 'Unnamed POI';
+      filtered.forEach(el => {
+        const name = (el.tags && (el.tags.name || el.tags.amenity || el.tags.shop || el.tags.building)) || 'POI';
         counts[name] = (counts[name] || 0) + 1;
 
-        // Plot scanned POIs on map
         const lat = el.lat || (el.center && el.center.lat);
         const lon = el.lon || (el.center && el.center.lon);
-        if (lat && lon) {
-          addFeatureRecord('marker', { type: 'Point', coordinates: [lon, lat] }, {
-            shape: 'circle',
-            color: '#00d2ff',
-            iconSize: 0.6,
-            iconKey: getIconKey('circle', '#00d2ff')
-          });
-        }
+        addFeatureRecord('marker', { type: 'Point', coordinates: [lon, lat] }, {
+          name: name,
+          shape: 'circle',
+          color: '#00d2ff',
+          iconSize: 0.65,
+          iconKey: getIconKey('circle', '#00d2ff')
+        }, "Trade Area Scan");
       });
 
-      let html = `<div style="font-weight:700; color:#f0f6fc; margin-bottom:4px;">Found ${results.length} POIs:</div>`;
+      let html = `<div style="font-weight:700; color:#f0f6fc; margin-bottom:4px;">Grouped ${filtered.length} POIs:</div>`;
       for (const k in counts) {
         html += `<div class="poi-badge"><span>${k}</span><span style="font-weight:700; color:#38bdf8;">${counts[k]}</span></div>`;
       }
       $('tradeResults').innerHTML = html;
-      hint(`Plotted ${results.length} POIs from ${category}!`);
+      hint(`Added ${filtered.length} POIs to "Trade Area Scan" layer group!`);
     })
     .catch(() => {
-      $('tradeResults').innerHTML = '<div style="color:#ff7b72;">Overpass API busy. Please try again.</div>';
-      hint('Trade Area query timeout');
+      $('tradeResults').innerHTML = '<div style="color:#ff7b72;">Data source busy. Retrying…</div>';
     });
 };
 
@@ -1160,7 +1277,7 @@ $('btnFetchCityBound').onclick = () => {
         }
         hint(`${q} boundary added!`);
       } else {
-        hint('Boundary polygon not found for this area.');
+        hint('Boundary polygon not found.');
       }
     })
     .catch(() => hint('Boundary request failed'));
@@ -1203,7 +1320,6 @@ map.on('mousemove', e => {
   cursorLL = [e.lngLat.lng, e.lngLat.lat];
   if (activeTool) renderDraft();
 
-  // Dragging in Edit Mode
   if (isDragging && dragFeatureId) {
     const dx = cursorLL[0] - dragStartCoord[0];
     const dy = cursorLL[1] - dragStartCoord[1];
@@ -1420,7 +1536,7 @@ $('eBorderOp').oninput = e => { const f = features.find(x => x.id === selectedId
 $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.width = parseFloat(e.target.value); syncDraw(); } };
 $('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); } };
 $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); } };
-$('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); } };
+$('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); } };
 $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); } };
 $('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); } };
 $('eDashStyle').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.dashStyle = e.target.value; syncDraw(); } };
@@ -1429,6 +1545,7 @@ $('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId
 
 $('eDeleteBtn').onclick = () => {
   features = features.filter(x => x.id !== selectedId);
+  for (const g in customGroups) { customGroups[g] = customGroups[g].filter(id => id !== selectedId); }
   syncDraw();
   renderMyLayers();
   $('popup-shape-editor').classList.remove('open');
@@ -1436,55 +1553,102 @@ $('eDeleteBtn').onclick = () => {
 $('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 
-// ----------------- My Layers Pipeline -----------------
+// ----------------- My Layers & Grouping Pipeline -----------------
+$('btnAddCustomGroup').onclick = () => {
+  const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
+  if (gName && gName.trim() && !customGroups[gName]) {
+    customGroups[gName.trim()] = [];
+    renderMyLayers();
+  }
+};
+
+function renderLayerCardHtml(f) {
+  let subInfo = f.kind;
+  if (f.kind === 'circle' && f.props.radiusMeters) {
+    subInfo = `Radius: ${f.props.radiusMeters > 1000 ? (f.props.radiusMeters/1000).toFixed(2)+' km' : Math.round(f.props.radiusMeters)+' m'}`;
+  }
+  const isPoly = ['polygon', 'rectangle', 'circle'].includes(f.kind);
+  return `
+    <div class="layer-card">
+      <div class="layer-card-top">
+        <input class="layer-name-input" data-id="${f.id}" value="${f.name}" title="Click to rename" />
+        <button class="card-btn" data-act="edit" data-id="${f.id}" title="Edit Properties">✎</button>
+        <button class="card-btn" data-act="eye" data-id="${f.id}" title="Toggle Visibility">${f.props.visible ? '👁' : '–'}</button>
+        <button class="card-btn" data-act="zoom" data-id="${f.id}" title="Zoom To">⤢</button>
+        <button class="card-btn" data-act="del" data-id="${f.id}" title="Delete">✕</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#768390; padding:0 4px;">
+        <span>${subInfo}</span>
+        ${isPoly ? `
+          <label style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''}/> Label</label>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
 function renderMyLayers() {
   const container = $('my-layers-list');
   $('layer-badge-count').textContent = features.length;
 
-  // Refresh Trade Area Polygon Select Dropdown
+  // Refresh Trade Area Target Dropdown
   const polyList = features.filter(f => ['polygon', 'rectangle', 'circle'].includes(f.kind));
   $('tradePolygonSelect').innerHTML = '<option value="">-- Choose a polygon --</option>' + 
     polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
 
-  if (!features.length) {
+  if (!features.length && !Object.keys(customGroups).length) {
     container.innerHTML = '<div style="font-size:12px; color:#768390; padding:6px 0;">No drawings yet. Use the tools to create shapes.</div>';
     return;
   }
 
-  container.innerHTML = features.slice().reverse().map(f => {
-    let subInfo = f.kind;
-    if (f.kind === 'circle' && f.props.radiusMeters) {
-      subInfo = `Radius: ${f.props.radiusMeters > 1000 ? (f.props.radiusMeters/1000).toFixed(2)+' km' : Math.round(f.props.radiusMeters)+' m'}`;
-    }
-    const isPoly = ['polygon', 'rectangle', 'circle'].includes(f.kind);
-    return `
-      <div class="layer-card">
-        <div class="layer-card-top">
-          <input class="layer-name-input" data-id="${f.id}" value="${f.name}" title="Click to rename" />
-          <button class="card-btn" data-act="edit" data-id="${f.id}" title="Edit Properties">✎</button>
-          <button class="card-btn" data-act="eye" data-id="${f.id}" title="Toggle Visibility">${f.props.visible ? '👁' : '–'}</button>
-          <button class="card-btn" data-act="zoom" data-id="${f.id}" title="Zoom To">⤢</button>
-          <button class="card-btn" data-act="del" data-id="${f.id}" title="Delete">✕</button>
+  let html = '';
+  const groupedIds = new Set();
+
+  // Render Custom Groups
+  for (const gName in customGroups) {
+    const ids = customGroups[gName];
+    const groupFeats = features.filter(f => ids.includes(f.id));
+    ids.forEach(id => groupedIds.add(id));
+
+    html += `
+      <div class="group-container">
+        <div class="group-header">
+          <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group" />
+          <div style="display:flex; align-items:center; gap:2px;">
+            <button class="card-btn" data-act="groupEye" data-group="${gName}" title="Toggle Group">👁</button>
+            <button class="card-btn" data-act="groupDel" data-group="${gName}" title="Delete Group">✕</button>
+          </div>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#768390; padding:0 4px;">
-          <span>${subInfo}</span>
-          ${isPoly ? `
-            <div style="display:flex; align-items:center; gap:6px;">
-              <label style="display:flex; align-items:center; gap:3px; cursor:pointer;"><input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''}/> Label</label>
-              <select data-act="labelPosChange" data-id="${f.id}" style="background:#1c2128; color:#adbac7; border:1px solid #2d333b; border-radius:4px; font-size:10px;">
-                <option value="center" ${f.props.labelPos === 'center' ? 'selected' : ''}>Center</option>
-                <option value="top" ${f.props.labelPos === 'top' ? 'selected' : ''}>Above</option>
-                <option value="bottom" ${f.props.labelPos === 'bottom' ? 'selected' : ''}>Below</option>
-                <option value="left" ${f.props.labelPos === 'left' ? 'selected' : ''}>Left</option>
-                <option value="right" ${f.props.labelPos === 'right' ? 'selected' : ''}>Right</option>
-              </select>
-            </div>
-          ` : ''}
+        <div class="group-items">
+          ${groupFeats.length ? groupFeats.map(f => renderLayerCardHtml(f)).join('') : '<div style="font-size:10px; color:#768390; padding:4px;">Empty group</div>'}
         </div>
       </div>
     `;
-  }).join('');
+  }
 
+  // Ungrouped loose layers
+  const looseFeats = features.filter(f => !groupedIds.has(f.id));
+  if (looseFeats.length) {
+    html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px;">Ungrouped Layers</div>';
+    html += looseFeats.slice().reverse().map(f => renderLayerCardHtml(f)).join('');
+  }
+
+  container.innerHTML = html;
+
+  // Bind Rename Group Handlers
+  container.querySelectorAll('.group-title-input').forEach(inp => {
+    inp.onchange = e => {
+      const oldN = e.target.dataset.oldname;
+      const newN = e.target.value.trim();
+      if (newN && newN !== oldN) {
+        customGroups[newN] = customGroups[oldN];
+        delete customGroups[oldN];
+        renderMyLayers();
+      }
+    };
+  });
+
+  // Bind Rename Layer Handlers
   container.querySelectorAll('.layer-name-input').forEach(inp => {
     inp.onchange = e => {
       const id = parseInt(e.target.dataset.id, 10);
@@ -1493,22 +1657,41 @@ function renderMyLayers() {
     };
   });
 
-  container.querySelectorAll('button[data-act], input[data-act], select[data-act]').forEach(b => {
+  // Action Triggers
+  container.querySelectorAll('button[data-act], input[data-act]').forEach(b => {
     b.onchange = b.onclick = (e) => {
       if (b.tagName === 'INPUT' && e.type !== 'change') return;
-      if (b.tagName === 'SELECT' && e.type !== 'change') return;
       if (b.tagName === 'BUTTON' && e.type !== 'click') return;
 
-      const id = parseInt(b.dataset.id, 10);
       const act = b.dataset.act;
+
+      if (act === 'groupEye') {
+        const g = b.dataset.group;
+        const ids = customGroups[g] || [];
+        const anyVis = features.some(f => ids.includes(f.id) && f.props.visible);
+        features.forEach(f => { if (ids.includes(f.id)) f.props.visible = anyVis ? 0 : 1; });
+        syncDraw(); renderMyLayers();
+        return;
+      }
+      if (act === 'groupDel') {
+        const g = b.dataset.group;
+        delete customGroups[g];
+        renderMyLayers();
+        return;
+      }
+
+      const id = parseInt(b.dataset.id, 10);
       const f = features.find(x => x.id === id);
       if (!f) return;
 
       if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); }
-      if (act === 'labelPosChange') { f.props.labelPos = b.value; syncDraw(); }
       if (act === 'edit') openShapeEditor(id);
       if (act === 'eye') { f.props.visible = f.props.visible ? 0 : 1; syncDraw(); renderMyLayers(); }
-      if (act === 'del') { features = features.filter(x => x.id !== id); syncDraw(); renderMyLayers(); }
+      if (act === 'del') { 
+        features = features.filter(x => x.id !== id);
+        for (const g in customGroups) customGroups[g] = customGroups[g].filter(xId => xId !== id);
+        syncDraw(); renderMyLayers(); 
+      }
       if (act === 'zoom') {
         const bnd = calcBounds(f);
         if (bnd) map.fitBounds(bnd, { padding: 80, maxZoom: 17 });
@@ -1532,21 +1715,77 @@ function calcBounds(f) {
   return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Direct Bulletproof Export Function -----------------
-$('btn-export-direct').onclick = () => {
-  hint('Exporting snapshot…');
+// ----------------- Export Layout & Preview Engine -----------------
+function updateExportPreview() {
+  const canvas = map.getCanvas();
+  try {
+    const dataUrl = canvas.toDataURL('image/png');
+    $('exportPreviewImg').src = dataUrl;
+  } catch(e) {}
+}
+
+$('btn-export-dialog').onclick = () => {
+  const p = $('popup-export');
+  const willOpen = !p.classList.contains('open');
+  closeFloatingCards();
+  if (willOpen) {
+    p.classList.add('open');
+    updateExportPreview();
+  }
+};
+$('closeExportBtn').onclick = () => { $('popup-export').classList.remove('open'); };
+
+document.querySelectorAll('.layout-grid .layout-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.layout-grid .layout-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentExportRatio = btn.dataset.ratio;
+  };
+});
+
+$('triggerExportBtn').onclick = () => {
+  hint('Exporting snapshot layout…');
   map.once('render', () => {
     try {
-      const dataUrl = map.getCanvas().toDataURL('image/png');
+      const srcCanvas = map.getCanvas();
+      let targetW = srcCanvas.width, targetH = srcCanvas.height;
+
+      if (currentExportRatio === '1:1') {
+        const dim = Math.min(srcCanvas.width, srcCanvas.height);
+        targetW = dim; targetH = dim;
+      } else if (currentExportRatio === '16:9') {
+        targetW = srcCanvas.width; targetH = Math.round(srcCanvas.width * (9/16));
+      } else if (currentExportRatio === '4:3') {
+        targetW = srcCanvas.width; targetH = Math.round(srcCanvas.width * (3/4));
+      } else if (currentExportRatio === '9:16') {
+        targetH = srcCanvas.height; targetW = Math.round(srcCanvas.height * (9/16));
+      } else if (currentExportRatio === 'a4') {
+        targetW = srcCanvas.width; targetH = Math.round(srcCanvas.width * 1.414);
+      }
+
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = targetW;
+      outCanvas.height = targetH;
+      const ctx = outCanvas.getContext('2d');
+
+      const sx = (srcCanvas.width - targetW) / 2;
+      const sy = (srcCanvas.height - targetH) / 2;
+      ctx.drawImage(srcCanvas, sx, sy, targetW, targetH, 0, 0, targetW, targetH);
+
       const a = document.createElement('a');
-      a.download = `map_export_${Date.now()}.png`;
-      a.href = dataUrl;
+      a.download = `map_${currentExportRatio}_${Date.now()}.png`;
+      a.href = outCanvas.toDataURL('image/png', 0.95);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      hint('Map exported successfully!');
+      hint('Export downloaded successfully!');
+      $('popup-export').classList.remove('open');
     } catch(e) {
-      hint('Export failed: Canvas security notice');
+      hint('Direct export fallback');
+      const a = document.createElement('a');
+      a.download = `map_export_${Date.now()}.png`;
+      a.href = map.getCanvas().toDataURL('image/png');
+      a.click();
     }
   });
   map.triggerRepaint();
@@ -1561,6 +1800,7 @@ $('btn-browser-toggle').onclick = () => {
 };
 $('btn-close-browser').onclick = () => { $('browser-panel').classList.remove('open'); };
 
+// Collapsible accordion triggers
 document.querySelectorAll('.acc-header').forEach(h => {
   h.onclick = () => {
     const body = $(h.dataset.target);
@@ -1630,9 +1870,9 @@ $('cMainOp').oninput = e => setMapPaint('rd_major', 'line-opacity', parseFloat(e
 $('cSecColor').oninput = e => setMapPaint('rd_secondary', 'line-color', e.target.value);
 $('cSecWidth').oninput = e => setMapPaint('rd_secondary', 'line-width', parseFloat(e.target.value));
 $('cSecOp').oninput = e => setMapPaint('rd_secondary', 'line-opacity', parseFloat(e.target.value));
-$('cTerColor').oninput = e => setMapPaint('rd_tertiary', 'line-color', e.target.value);
+$('cTerColor').oninput = e => ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-color', e.target.value));
 $('cTerWidth').oninput = e => setMapPaint('rd_tertiary', 'line-width', parseFloat(e.target.value));
-$('cTerOp').oninput = e => setMapPaint('rd_tertiary', 'line-opacity', parseFloat(e.target.value));
+$('cTerOp').oninput = e => ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-opacity', parseFloat(e.target.value)));
 $('cRailColor').oninput = e => setMapPaint('rd_rail', 'line-color', e.target.value);
 $('cBoundColor').oninput = e => ['bound_prov','bound_city','bound_brgy'].forEach(id => setMapPaint(id, 'line-color', e.target.value));
 $('cBldColor').oninput = e => { setMapPaint('building', 'fill-color', e.target.value); setMapPaint('building', 'fill-outline-color', e.target.value); };
@@ -1640,6 +1880,7 @@ $('cBldOp').oninput = e => setMapPaint('building', 'fill-opacity', parseFloat(e.
 $('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
+renderMyLayers();
 map.on('error', e => console.warn('Map Notice:', e));
 } catch (e) {
   console.error('App init error:', e);
