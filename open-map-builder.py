@@ -12,21 +12,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Streamlit full-bleed layout and dark Felt-like sidebar
+# Custom CSS for full-bleed layout and dark Felt-like sidebar
 st.markdown("""
     <style>
-    /* Full-screen bleed layout */
     .block-container {
         padding: 0rem !important;
         max-width: 100% !important;
     }
-    
-    /* Clean app mode: hide standard Streamlit headers */
     header { visibility: hidden; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
     
-    /* Felt Dark Sidebar Styling */
     [data-testid="stSidebar"] {
         background-color: #0d1117;
         border-right: 1px solid #21262d;
@@ -34,8 +30,6 @@ st.markdown("""
     [data-testid="stSidebar"] * {
         color: #f0f6fc;
     }
-    
-    /* Radio Option Cards */
     div.row-widget.stRadio > div {
         background: #161b22;
         padding: 12px;
@@ -51,7 +45,7 @@ st.markdown("""
 st.sidebar.markdown("### 🗺️ **Basemap Layer**")
 
 basemap_options = [
-    "Midnight Blue",
+    "Midnight Blue",    # custom duotone
     "Carto DB Light",
     "Carto DB Dark",
     "Satellite",
@@ -80,10 +74,8 @@ else:
     st.sidebar.caption(f"Active basemap: **{selected_basemap}**")
 
 # ------------------------------------------------------------------------
-# 3. MAP BUILDER & ZERO-API COLOR MATRIX TRANSFORMATION
+# 3. MAP BUILDER & DUOTONE COLOR MATRIX
 # ------------------------------------------------------------------------
-
-# Coordinates for Mandaluyong / Metro Manila
 CENTER_COORDS = [14.5794, 121.0359]
 
 m = folium.Map(
@@ -94,8 +86,7 @@ m = folium.Map(
     zoom_control=False
 )
 
-# Common CSS fix for subpixel tile seams/grid line artifacts across all modes
-# We use a box-shadow trick to bleed the exact background color into the grid seams
+# Universal tile seam fix – removes gridlines for all basemaps
 tile_seam_fix = """
     .leaflet-tile {
         margin: -1px !important;
@@ -104,11 +95,15 @@ tile_seam_fix = """
         border: none !important;
         -webkit-backface-visibility: hidden !important;
         backface-visibility: hidden !important;
+        box-shadow: 0 0 1px #0a1628 !important;  /* bleed color into seams */
+    }
+    .leaflet-container {
+        background: #0a1628 !important;
     }
 """
 
 if selected_basemap == "Midnight Blue":
-    # Base: CartoDB Dark Matter
+    # Base tile layer: CartoDB Dark Matter (dark background, light roads)
     folium.TileLayer(
         tiles='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         attr='&copy; OpenStreetMap contributors &copy; CARTO',
@@ -117,41 +112,41 @@ if selected_basemap == "Midnight Blue":
         subdomains='abcd'
     ).add_to(m)
 
-    # SVG feColorMatrix Transformation (Mathematically tuned for #0a1628 and #c99c37)
-    # The box-shadow in the leaflet-tile CSS completely eliminates the gridlines
-    midnight_svg_matrix = f"""
+    # Duotone feColorMatrix that maps luminance to gradient between #0a1628 and #c99c37
+    # Derived from: L = 0.2126*R + 0.7152*G + 0.0722*B
+    # Output = (1-L)*C1 + L*C2, where C1=#0a1628, C2=#c99c37
+    duotone_matrix = f"""
     <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
-        <filter id="navy-gold-matrix" color-interpolation-filters="sRGB">
+        <filter id="duotone-matrix" color-interpolation-filters="sRGB">
             <feColorMatrix type="matrix" values="
-                3.00 0 0 0 -0.26
-                2.10 0 0 0 -0.12
-                0.24 0 0 0  0.13
-                0    0 0 1  0" />
+                0.1593 0.5358 0.0541 0 0.0392
+                0.1117 0.3758 0.0379 0 0.0863
+                0.0125 0.0421 0.00425 0 0.1569
+                0     0     0     1 0
+            " />
         </filter>
     </svg>
     <style>
     {tile_seam_fix}
-    .leaflet-tile {{
-        box-shadow: 0 0 1px #0a1628 !important; 
-    }}
     .leaflet-tile-pane {{
-        filter: url(#navy-gold-matrix) !important;
-        -webkit-filter: url(#navy-gold-matrix) !important;
-    }}
-    .leaflet-container {{
-        background: #0a1628 !important;
+        filter: url(#duotone-matrix) !important;
+        -webkit-filter: url(#duotone-matrix) !important;
     }}
     </style>
     """
-    m.get_root().header.add_child(folium.Element(midnight_svg_matrix))
+    m.get_root().header.add_child(folium.Element(duotone_matrix))
 
 elif selected_basemap == "Carto DB Light":
     folium.TileLayer('CartoDB positron', name="Carto DB Light").add_to(m)
-    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #f8f9fa !important; }}</style>"))
+    m.get_root().header.add_child(
+        folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #f8f9fa !important; }}</style>")
+    )
 
 elif selected_basemap == "Carto DB Dark":
     folium.TileLayer('CartoDB dark_matter', name="Carto DB Dark").add_to(m)
-    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-tile {{ box-shadow: 0 0 1px #000 !important; }} .leaflet-container {{ background: #000 !important; }}</style>"))
+    m.get_root().header.add_child(
+        folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>")
+    )
 
 elif selected_basemap == "OSM":
     folium.TileLayer('OpenStreetMap', name="OSM").add_to(m)
@@ -164,7 +159,9 @@ elif selected_basemap == "Satellite":
         name='Satellite',
         max_zoom=19
     ).add_to(m)
-    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-tile {{ box-shadow: 0 0 1px #000 !important; }} .leaflet-container {{ background: #000 !important; }}</style>"))
+    m.get_root().header.add_child(
+        folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>")
+    )
 
 # ------------------------------------------------------------------------
 # 4. RENDER FULL-SCREEN MAP
