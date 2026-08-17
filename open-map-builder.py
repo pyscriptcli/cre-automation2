@@ -935,6 +935,19 @@ const map = new maplibregl.Map({
 });
 map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 
+// ----------------- Debounce Utility -----------------
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 // ----------------- State Machine -----------------
 let features = __INITIAL_FEATURES__;
 let fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
