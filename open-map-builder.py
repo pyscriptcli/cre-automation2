@@ -298,24 +298,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   }
   * { box-sizing: border-box; user-select: none; font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
   html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0a1628; }
-  #map-wrapper { position: absolute; inset: 0; width: 100vw; height: 100vh; transition: filter 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-  #map-wrapper.blurred { filter: blur(28px) brightness(0.65) saturate(1.2); transform: scale(0.985); }
-  #map { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #map { position: absolute; inset: 0; width: 100vw; height: 100vh; z-index: 1; }
 
   /* Top Centered Unified Toolbar Island */
   #top-toolbar-bar {
     position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
-    background: rgba(22, 27, 34, 0.75); backdrop-filter: blur(20px) saturate(190%);
+    background-color: rgba(9, 16, 24, 0.97);
     border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 36px; padding: 4px 10px;
-    display: flex; align-items: center; gap: 4px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+    display: flex; align-items: center; gap: 4px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
     color: #f0f6fc;
   }
   .tb-btn {
     width: 32px; height: 32px; display: grid; place-items: center;
     background: transparent; border: none; color: #adbac7; border-radius: 50%;
-    cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer; transition: all 0.15s ease;
   }
-  .tb-btn:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; transform: scale(1.05); }
+  .tb-btn:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; }
   .tb-btn.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
   .tb-btn.primary-active { background: #316dca; color: #ffffff; }
   .tb-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.12); margin: 0 4px; }
@@ -329,13 +327,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   /* Left Floating Panels */
   .left-panel {
     position: absolute; top: 68px; left: 16px; bottom: 16px; width: 360px; z-index: 9;
-    background: rgba(22, 27, 34, 0.82); backdrop-filter: blur(24px) saturate(190%);
+    background-color: rgba(9, 16, 24, 0.97);
     border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); display: none; flex-direction: column;
-    overflow: hidden; color: #adbac7; animation: panelIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7); display: none; flex-direction: column;
+    overflow: hidden; color: #adbac7;
   }
   .left-panel.open { display: flex; }
-  @keyframes panelIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
   .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
   .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #f0f6fc; }
@@ -353,33 +350,33 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
 
   /* Dimension Toggle */
-  .dimension-mode-bar { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.25); padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .dimension-mode-bar { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.35); padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); }
   .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 6px; cursor: pointer; }
   .dimension-mode-btn.active { background: #316dca; color: #ffffff; }
 
   .bound-select-row { display: flex; gap: 6px; margin-top: 4px; }
-  .bound-select-row input[type=text] { flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.12); color: #f0f6fc; padding: 6px 8px; border-radius: 8px; font-size: 11px; }
+  .bound-select-row input[type=text] { flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.12); color: #f0f6fc; padding: 6px 8px; border-radius: 8px; font-size: 11px; }
   .bound-select-row button { background: #ff1e1e; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
 
   /* My Layers & Grouping Container */
   .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
   .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
-  .group-container { background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; }
+  .group-container { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; }
   .group-header { background: rgba(255, 255, 255, 0.05); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
   .group-title-input { background: transparent; border: none; font-weight: 700; color: #f0f6fc; font-size: 12px; width: 140px; }
-  .group-title-input:focus { background: rgba(0, 0, 0, 0.4); outline: none; border-radius: 4px; padding: 2px 4px; }
+  .group-title-input:focus { background: rgba(0, 0, 0, 0.5); outline: none; border-radius: 4px; padding: 2px 4px; }
   .group-items { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
   .group-items.hidden { display: none !important; }
 
   .layer-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
   .layer-card-top { display: flex; align-items: center; gap: 6px; }
   .layer-name-input { flex: 1; border: 1px solid transparent; background: transparent; font-weight: 600; font-size: 12px; color: #f0f6fc; padding: 2px 4px; border-radius: 4px; }
-  .layer-name-input:focus { border-color: #316dca; background: rgba(0,0,0,0.3); outline: none; }
+  .layer-name-input:focus { border-color: #316dca; background: rgba(0,0,0,0.4); outline: none; }
   .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
   .card-btn:hover { color: #f0f6fc; background: rgba(255,255,255,0.1); }
 
   /* Trade Area Controls */
-  .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
   .trade-controls select { background: rgba(255,255,255,0.06); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
   .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; }
   .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
@@ -388,16 +385,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   /* Floating Tool Options Popups */
   .float-card {
     position: absolute; top: 68px; left: 50%; transform: translateX(-50%); z-index: 12;
-    background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(24px) saturate(190%);
+    background-color: rgba(9, 16, 24, 0.97);
     border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 14px;
-    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6); display: none; flex-direction: column;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75); display: none; flex-direction: column;
     gap: 10px; font-size: 12px; color: #adbac7;
   }
   .float-card.open { display: flex; }
   .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
   .float-card input[type=color] { border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; background: transparent; }
-  .float-card input[type=text], .float-card select { background: rgba(0,0,0,0.3); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; }
+  .float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; }
 
   #popup-search { width: 280px; }
   #popup-marker-settings { width: 240px; }
@@ -416,12 +413,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   /* Tag Inspector Table */
   .maplibregl-popup-content {
-    background: rgba(22, 27, 34, 0.88) !important; color: #f0f6fc !important;
+    background: rgba(9, 16, 24, 0.97) !important; color: #f0f6fc !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important;
-    backdrop-filter: blur(20px) !important; padding: 10px !important; box-shadow: 0 12px 32px rgba(0,0,0,0.6) !important;
+    padding: 10px !important; box-shadow: 0 12px 32px rgba(0,0,0,0.7) !important;
     font-size: 11px !important; max-width: 280px !important;
   }
-  .maplibregl-popup-tip { border-top-color: rgba(22, 27, 34, 0.88) !important; }
+  .maplibregl-popup-tip { border-top-color: rgba(9, 16, 24, 0.97) !important; }
   .tag-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
   .tag-table th, .tag-table td { text-align: left; padding: 4px 6px; border: 1px solid rgba(255,255,255,0.08); font-size: 10px; }
   .tag-table th { background: rgba(255,255,255,0.06); color: #38bdf8; }
@@ -429,62 +426,58 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   #hint-toast {
     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 15;
-    background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(16px); color: #f0f6fc;
+    background-color: rgba(9, 16, 24, 0.97); color: #f0f6fc;
     border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 7px 18px;
-    font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: none;
+    font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none;
   }
 
-  /* iOS 26 Glassmorphic Launcher Overlay */
+  /* Solid Glass Minimalist Launcher Overlay */
   #launcher-modal-scrim {
     position: fixed; inset: 0; z-index: 9999;
     display: flex; align-items: center; justify-content: center;
-    background: rgba(5, 10, 20, 0.4); backdrop-filter: blur(24px) saturate(180%);
-    opacity: 0; pointer-events: none; transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    background-color: rgba(5, 10, 18, 0.85);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
   #launcher-modal-scrim.visible { opacity: 1; pointer-events: auto; }
 
   .ios26-card {
     width: 90%; max-width: 440px; max-height: 82vh;
-    background: rgba(25, 32, 45, 0.72); backdrop-filter: blur(40px) saturate(210%);
+    background-color: rgba(9, 16, 24, 0.97);
     border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 24px;
-    box-shadow: 0 32px 80px -12px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+    box-shadow: 0 32px 80px -12px rgba(0, 0, 0, 0.85);
     display: flex; flex-direction: column; overflow: hidden; color: #ffffff;
-    transform: scale(0.95) translateY(8px); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  #launcher-modal-scrim.visible .ios26-card { transform: scale(1) translateY(0); }
 
   .ios26-header { padding: 22px 24px 14px 24px; display: flex; flex-direction: column; gap: 4px; }
   .ios26-title { font-size: 20px; font-weight: 800; letter-spacing: -0.4px; color: #ffffff; }
   .ios26-subtitle { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
 
   .ios26-seg {
-    margin: 0 24px 14px 24px; display: flex; background: rgba(0, 0, 0, 0.32);
+    margin: 0 24px 14px 24px; display: flex; background: rgba(0, 0, 0, 0.4);
     padding: 3px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.08);
   }
   .ios26-seg-btn {
     flex: 1; border: none; background: transparent; color: rgba(255, 255, 255, 0.65);
     font-size: 12px; font-weight: 600; padding: 7px 0; border-radius: 11px; cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.15s ease;
   }
   .ios26-seg-btn.active {
     background: rgba(255, 255, 255, 0.18); color: #ffffff;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.2);
   }
 
   .ios26-body { padding: 0 24px 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
   .ios26-input-group { display: flex; flex-direction: column; gap: 6px; }
   .ios26-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.5); }
   .ios26-input {
-    background: rgba(0, 0, 0, 0.28); border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 14px; padding: 10px 14px; color: #ffffff; font-size: 13px; outline: none;
-    transition: border-color 0.2s;
   }
   .ios26-input:focus { border-color: #38bdf8; }
 
   .ios26-proj-item {
     background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 14px; padding: 10px 14px; display: flex; justify-content: space-between;
-    align-items: center; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    align-items: center; transition: all 0.15s ease;
   }
   .ios26-proj-item:hover {
     background: rgba(255, 255, 255, 0.1); border-color: rgba(56, 189, 248, 0.3);
@@ -492,17 +485,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .ios26-action-btn {
     background: #316dca; color: #ffffff; border: none; border-radius: 14px;
     padding: 11px; font-weight: 700; font-size: 13px; cursor: pointer;
-    box-shadow: 0 8px 24px rgba(49, 109, 202, 0.4), inset 0 1px 1px rgba(255,255,255,0.3);
-    transition: transform 0.15s, background 0.15s;
+    box-shadow: 0 8px 24px rgba(49, 109, 202, 0.4);
   }
-  .ios26-action-btn:hover { background: #255bb0; transform: scale(1.01); }
+  .ios26-action-btn:hover { background: #255bb0; }
 </style>
 </head>
 <body>
 
-<div id="map-wrapper">
-  <div id="map"></div>
-</div>
+<div id="map"></div>
 
 <!-- Unified Top Island Toolbar -->
 <div id="top-toolbar-bar">
@@ -814,7 +804,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="triggerExportBtn" style="background:#316dca; color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:4px;">Download Rendered Image</button>
 </div>
 
-<!-- iOS 26 Glassmorphic Minimalist Launcher Modal Dialog -->
+<!-- Solid Glass Minimalist Launcher Modal Dialog -->
 <div id="launcher-modal-scrim" class="visible">
   <div class="ios26-card">
     <div class="ios26-header">
@@ -866,9 +856,6 @@ const map = new maplibregl.Map({
   preserveDrawingBuffer: true
 });
 map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
-
-// Ensure clean blur effect on modal mount
-$('map-wrapper').classList.add('blurred');
 
 // ----------------- State Machine -----------------
 let features = __INITIAL_FEATURES__;
@@ -942,7 +929,7 @@ const resetActiveTools = () => {
   hint('');
 };
 
-// ----------------- Project Auto-Naming Increment Calculation -----------------
+// ----------------- Project Auto-Naming Calculation -----------------
 function getNextUntitledProjectName() {
   const untitledRegex = /^Untitled Project (\d+)$/i;
   let maxN = 0;
@@ -956,10 +943,9 @@ function getNextUntitledProjectName() {
   return `Untitled Project ${maxN + 1}`;
 }
 
-// ----------------- iOS 26 Home Launcher Modal UI -----------------
+// ----------------- Launcher Modal UI -----------------
 function openHomeDialog() {
   closeFloatingCards();
-  $('map-wrapper').classList.add('blurred');
   $('launcher-modal-scrim').classList.add('visible');
   $('new-proj-name').value = getNextUntitledProjectName();
   renderProjectsList();
@@ -967,7 +953,6 @@ function openHomeDialog() {
 
 function closeHomeDialog() {
   $('launcher-modal-scrim').classList.remove('visible');
-  $('map-wrapper').classList.remove('blurred');
 }
 
 $('btn-home-dialog').onclick = openHomeDialog;
