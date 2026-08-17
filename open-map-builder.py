@@ -37,7 +37,7 @@ st.markdown(
         padding: 0rem !important; 
         margin: 0rem !important; 
         max-width: 100vw !important; 
-        width: 100vw !important;
+        width: 100vw !important; 
         height: 100vh !important; 
         max-height: 100vh !important;
         overflow: hidden !important; 
@@ -66,7 +66,7 @@ st.markdown(
 )
 
 # ------------------------------------------------------------------------
-# 2. SUPABASE REST INTEGRATION (Direct & Resilient)
+# 2. SUPABASE REST INTEGRATION
 # ------------------------------------------------------------------------
 SUPABASE_URL = st.secrets.get("supabase", {}).get("url", "https://cyczyaswxkpdcremqnkn.supabase.co")
 SUPABASE_KEY = st.secrets.get("supabase", {}).get("key", "sb_publishable_pUppHGjwmT1mLlhWGZH6Og_4GcCLCPR")
@@ -504,9 +504,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 <div id="map"></div>
 
-<!-- Unified Top Island Toolbar Organized by Optimal UX Hierarchy -->
 <div id="top-toolbar-bar">
-  <!-- 1. System / Project Navigation -->
   <button class="tb-btn" id="btn-home-dialog" title="Project Selection (Home)">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
   </button>
@@ -525,7 +523,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <div class="tb-sep"></div>
 
-  <!-- 2. Inspection & Layer Browsers -->
   <button class="tb-btn" id="btn-browser-toggle" title="Data Browser">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
   </button>
@@ -538,7 +535,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <div class="tb-sep"></div>
 
-  <!-- 3. Primary Creation Geometry Tools -->
   <button class="tb-btn tool" data-tool="polygon" title="Draw Polygon">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path></svg>
   </button>
@@ -563,7 +559,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <div class="tb-sep"></div>
 
-  <!-- 4. Direct Manipulation & Vertex Edit Mode -->
   <button class="tb-btn" id="btn-edit-mode" title="Select & Drag Features">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
   </button>
@@ -573,7 +568,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <div class="tb-sep"></div>
 
-  <!-- 5. Styling & Layout Export -->
   <button class="tb-btn" id="btn-custom-map" title="Basemap Styling">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
   </button>
@@ -582,7 +576,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </button>
 </div>
 
-<!-- Panel 1: Data Browser Panel -->
 <div id="browser-panel" class="left-panel">
   <div class="panel-header">
     <div class="panel-title">
@@ -659,7 +652,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 
-<!-- Panel 2: My Layers & Groups Panel -->
 <div id="mylayers-panel" class="left-panel">
   <div class="panel-header">
     <div class="panel-title">
@@ -683,12 +675,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 
-<!-- Left Side Search Card -->
 <div id="popup-search" class="float-card">
   <input type="text" id="searchInput" placeholder="Search location (Press Enter)…" />
 </div>
 
-<!-- Left Side Marker Settings Card -->
 <div id="popup-marker-settings" class="float-card">
   <div style="font-weight:600; font-size:11px; color:#768390;">CHOOSE MARKER ICON</div>
   <div class="icon-grid" id="markerIconGrid"></div>
@@ -696,7 +686,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Icon Size</span><input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"></div>
 </div>
 
-<!-- Left Side Text Tool Settings Card -->
 <div id="popup-text-settings" class="float-card">
   <div style="font-weight:600; font-size:11px; color:#768390;">TEXT CONFIGURATION</div>
   <input type="text" id="tContent" value="Custom Label" placeholder="Text content…"/>
@@ -713,7 +702,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Opacity</span><input type="range" id="tOp" min="0.1" max="1" step="0.05" value="1"></div>
 </div>
 
-<!-- Left Side Shape Customizer Editor -->
 <div id="popup-shape-editor" class="float-card">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;" id="editShapeTitle">Edit Layer</span>
@@ -755,7 +743,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 
-<!-- Left Side Basemap & Vector Customizer Panel -->
 <div id="popup-custom-map" class="float-card">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;">Vector & Basemap Style</span>
@@ -800,7 +787,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Opacity</span><input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"></div>
 </div>
 
-<!-- Left Side Export Preview & Layout Panel -->
 <div id="popup-export" class="float-card">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;">Export Layout</span>
@@ -823,12 +809,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="triggerExportBtn" style="background:#316dca; color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:4px;">Download Rendered Image</button>
 </div>
 
-<!-- Solid Glass Minimalist Launcher Modal Dialog -->
 <div id="launcher-modal-scrim" class="visible">
   <div class="ios26-card">
     <div class="ios26-header">
       <div class="ios26-title">Project Atlas</div>
-      <div class="ios26-subtitle">Select or initialize a spatial workspace.</div>
+      <div class="ios26-subtitle">Select workspace.</div>
     </div>
 
     <div class="ios26-seg">
@@ -1008,8 +993,12 @@ function renderProjectsList() {
         <span style="font-size:11px; color:rgba(255,255,255,0.5);">${p.basemap || 'Midnight Blue'} · ${p.features ? p.features.length : 0} layers</span>
       </div>
       <div style="display:flex; align-items:center; gap:6px;">
-        <button class="card-btn" onclick="renameProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Rename">✎</button>
-        <button class="card-btn" onclick="deleteProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Delete" style="color:#ff7b72;">✕</button>
+        <button class="card-btn" onclick="renameProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Rename">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+        </button>
+        <button class="card-btn" onclick="deleteProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Delete" style="color:#ff7b72;">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
       </div>
     </div>
   `).join('');
@@ -1791,7 +1780,6 @@ map.on('mousemove', e => {
   cursorLL = [e.lngLat.lng, e.lngLat.lat];
   if (activeTool) renderDraft();
 
-  // Move entire feature in Edit Mode
   if (isDragging && dragFeatureId) {
     const dx = cursorLL[0] - dragStartCoord[0];
     const dy = cursorLL[1] - dragStartCoord[1];
@@ -2102,10 +2090,18 @@ function renderLayerCardHtml(f) {
     <div class="layer-card">
       <div class="layer-card-top">
         <input class="layer-name-input" data-id="${f.id}" value="${f.name}" title="Click to rename" />
-        <button class="card-btn" data-act="edit" data-id="${f.id}" title="Edit Properties">✎</button>
-        <button class="card-btn" data-act="eye" data-id="${f.id}" title="Toggle Visibility">${f.props.visible ? '👁' : '–'}</button>
-        <button class="card-btn" data-act="zoom" data-id="${f.id}" title="Zoom To">⤢</button>
-        <button class="card-btn" data-act="del" data-id="${f.id}" title="Delete">✕</button>
+        <button class="card-btn" data-act="edit" data-id="${f.id}" title="Edit Properties">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+        </button>
+        <button class="card-btn" data-act="eye" data-id="${f.id}" title="Toggle Visibility">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+        <button class="card-btn" data-act="zoom" data-id="${f.id}" title="Zoom To">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
+        <button class="card-btn" data-act="del" data-id="${f.id}" title="Delete" style="color:#ff7b72;">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#768390; padding:0 4px;">
         <span>${subInfo}</span>
@@ -2142,12 +2138,18 @@ function renderMyLayers() {
       <div class="group-container">
         <div class="group-header" data-group="${gName}">
           <div style="display:flex; align-items:center; gap:6px;">
-            <span class="card-btn" data-act="groupToggleCollapse" data-group="${gName}">${grp.collapsed ? '▸' : '▾'}</span>
+            <span class="card-btn" data-act="groupToggleCollapse" data-group="${gName}">
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="${grp.collapsed ? '9 18 15 12 9 6' : '6 9 12 15 18 9'}"></polyline></svg>
+            </span>
             <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group" />
           </div>
           <div style="display:flex; align-items:center; gap:2px;">
-            <button class="card-btn" data-act="groupEye" data-group="${gName}" title="Toggle Group">👁</button>
-            <button class="card-btn" data-act="groupDel" data-group="${gName}" title="Delete Group">✕</button>
+            <button class="card-btn" data-act="groupEye" data-group="${gName}" title="Toggle Group">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+            <button class="card-btn" data-act="groupDel" data-group="${gName}" title="Delete Group" style="color:#ff7b72;">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
           </div>
         </div>
         <div class="group-items ${grp.collapsed ? 'hidden' : ''}">
@@ -2349,7 +2351,8 @@ document.querySelectorAll('.acc-header').forEach(h => {
   h.onclick = () => {
     const body = $(h.dataset.target);
     body.classList.toggle('hidden');
-    h.querySelector('span:last-child').textContent = body.classList.contains('hidden') ? '▸' : '▾';
+    const chev = h.querySelector('span:last-child');
+    if (chev) chev.textContent = body.classList.contains('hidden') ? '▸' : '▾';
   };
 });
 
@@ -2421,8 +2424,8 @@ $('cRailColor').oninput = e => { setMapPaint('rd_rail', 'line-color', e.target.v
 $('cBoundColor').oninput = e => { ['bound_prov','bound_city','bound_brgy'].forEach(id => setMapPaint(id, 'line-color', e.target.value)); markDirty(); };
 $('cBldColor').oninput = e => { setMapPaint('building-2d', 'fill-color', e.target.value); setMapPaint('building-2d', 'fill-outline-color', e.target.value); setMapPaint('building-3d', 'fill-extrusion-color', e.target.value); markDirty(); };
 $('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('building-3d', 'fill-extrusion-opacity', parseFloat(e.target.value)); markDirty(); };
-$('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); markDirty(); };
-$('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); markDirty(); };
+$('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); };
+$('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
 map.on('moveend', () => markDirty());
 map.on('error', e => console.warn('Map Notice:', e));
