@@ -70,7 +70,7 @@ C = {
     "water":     "#0a1424",  # Water
     "waterway":  "#081120",  # Waterways
     "parks":     "#142440",  # Parks
-    "buildings": "#8e7258",  # Buildings
+    "buildings": "#8e7258",  # Buildings (blended via BUILDING_OPACITY)
     "aeroway":   "#152640",  # Aeroway
     "rail":      "#d9b451",  # Rail
     "rd_major":  "#c99c37",  # Roads Major
@@ -80,6 +80,10 @@ C = {
     "rd_path":   "#4a4333",  # Roads Path
     "rd_case":   "#685c37",  # Road Outline (casing)
 }
+
+# Tan at 15% over the navy land tone -> subtle warm-navy footprint (~#202636).
+# Raise toward 1.0 to make buildings pop, lower to hide them completely.
+BUILDING_OPACITY = 0.15
 
 def w(*stops):
     """Zoom-interpolated line width helper (exponential 1.2)."""
@@ -128,10 +132,13 @@ def midnight_style():
              "paint": {"line-color": C["waterway"], "line-width": w((9, 1), (20, 6))}},
             {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway",
              "paint": {"line-color": C["aeroway"], "line-width": w((11, 1), (20, 12))}},
+            # Buildings: palette tan blended INTO the navy basemap instead of
+            # sitting on top of it as solid blocks
             {"id": "building", "type": "fill", "source": "omt", "source-layer": "building",
              "minzoom": 14,
-             "paint": {"fill-color": C["buildings"], "fill-opacity": 0.85,
-                        "fill-outline-color": "#6f5844"}},
+             "paint": {"fill-color": C["buildings"],
+                        "fill-opacity": BUILDING_OPACITY,
+                        "fill-outline-color": C["buildings"]}},
             # Casings first (Road Outline), then fills low->high so majors sit on top
             road_layer("case_major", ["motorway", "trunk", "primary"], None,
                        [(6, 1.0), (14, 4.0), (20, 22)], casing=True),
