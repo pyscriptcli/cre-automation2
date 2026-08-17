@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 # ------------------------------------------------------------------------
 # 1. PAGE CONFIGURATION (no sidebar — all controls live in the map toolbar)
 # ------------------------------------------------------------------------
-st.set_page_config(page_title="Open Map Builder", page_icon="🗺️",
+st.set_page_config(page_title="Felt Map Studio", page_icon="🗺️",
                    layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
@@ -243,14 +243,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="err"></div>
 
 <script>
-try {
-const ALL_STYLES = __ALL_STYLES__;
-const map = new maplibregl.Map({
-  container: 'map', style: __STYLE__, center: __CENTER__, zoom: __ZOOM__,
-  attributionControl: false, fadeDuration: 0
-});
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+// Each block is isolated so one runtime failure can never kill the whole app.
+const $ = id => document.getElementById(id);
+const fail = msg => { const b = $('err'); b.style.display = 'block'; b.textContent = msg; };
 
+let map = null;
+try {
+  const ALL_STYLES = __ALL_STYLES__;
+  map = new maplibregl.Map({
+    container: 'map', style: __STYLE__, center: __CENTER__, zoom: __ZOOM__,
+    attributionControl: false, fadeDuration: 0
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  window.__ALL_STYLES__ = ALL_STYLES;
+} catch (e) { fail('Map init failed: ' + e.message); }
+
+if (map) (function () {
+try {
 // ---------------- state ----------------
 const DEF = { color: '#c99c37', width: 3, opacity: 0.9 };
 let features = [], fid = 0, activeTool = null, editMode = false;
@@ -267,7 +276,6 @@ const HINTS = {
   polygon: 'Click vertices · Enter/double-click closes · Backspace undo', rectangle: 'Click two corners',
   circle: 'Click center, then edge', route: 'Click point A, then point B'
 };
-const $ = id => document.getElementById(id);
 const hint = t => { $('hint').style.display = t ? 'block' : 'none'; $('hint').textContent = t || ''; };
 const SHAPES = ['pin','dot','square','star','triangle','diamond'];
 const SHAPE_SVG = {
@@ -279,7 +287,7 @@ const SHAPE_SVG = {
   diamond: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2l9 10-9 10-9-10z" fill="currentColor"/></svg>'
 };
 
-// ---------------- runtime icon factory (canvas -> sprite, no external assets) ----
+// ---------------- runtime icon factory ----------------
 const iconCache = {};
 function makeIcon(shape, color) {
   const key = shape + '|' + color;
@@ -383,7 +391,7 @@ function circleFrom(c, edge) {
   return { kind: 'circle', props: { ...DEF }, geometry: { type: 'Polygon', coordinates: [coords] } };
 }
 function bboxOf(g) {
-  let b = [1e9, 1e9, -1e9, -1e9];
+  const b = [1e9, 1e9, -1e9, -1e9];
   const scan = c => { if (typeof c[0] === 'number') { b[0]=Math.min(b[0],c[0]); b[1]=Math.min(b[1],c[1]); b[2]=Math.max(b[2],c[0]); b[3]=Math.max(b[3],c[1]); } else c.forEach(scan); };
   scan(g.coordinates);
   return b;
@@ -416,12 +424,11 @@ document.querySelectorAll('.tool').forEach(btn => btn.addEventListener('click', 
   resetDraft(); closeEditor();
   document.querySelectorAll('.tool').forEach(b => b.classList.toggle('active', b.dataset.tool === activeTool));
   map.getCanvas().style.cursor = activeTool ? 'crosshair' : '';
-  activeTool ? map.doubleClickZoom.disable() : map.doubleClickZoom.enable();
+  if (activeTool) map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
   $('markerOpts').classList.toggle('open', activeTool === 'marker');
   hint(activeTool ? HINTS[activeTool] : '');
 }));
 
-// Cursor-following preview while drafting
 map.on('mousemove', e => {
   if (editMode) {
     const ids = ['draw-fill','draw-line','draw-outline','draw-marker'].filter(l => map.getLayer(l));
@@ -474,11 +481,13 @@ document.addEventListener('keydown', e => {
 // ---------------- marker icon options ----------------
 $('mkShapes').innerHTML = SHAPES.map(s =>
   `<button class="shp ${s === mkIcon ? 'active' : ''}" data-s="${s}" title="${s}">${SHAPE_SVG[s]}</button>`).join('');
-$('mkShapes').querySelectorAll('button').forEach(b => b.onclick = () => {
-  mkIcon = b.dataset.s;
-  $('mkShapes').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
-};
-$('mkColor').oninput = e => mkColor = e.target.value;
+$('mkShapes').querySelectorAll('button').forEach(b => {
+  b.onclick = () => {
+    mkIcon = b.dataset.s;
+    $('mkShapes').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+  };
+});
+$('mkColor').oninput = e => { mkColor = e.target.value; };
 
 // ---------------- edit mode + editor ----------------
 $('editbtn').onclick = () => {
@@ -507,10 +516,13 @@ function openEditor(id) {
   if (isMk) {
     $('eIcons').innerHTML = SHAPES.map(s =>
       `<button class="shp ${s === f.props.icon ? 'active' : ''}" data-s="${s}">${SHAPE_SVG[s]}</button>`).join('');
-    $('eIcons').querySelectorAll('button').forEach(b => b.onclick = () => {
-      f.props.icon = b.dataset.s; f.props.iconkey = makeIcon(f.props.icon, f.props.color);
-      $('eIcons').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
-      syncDraw();
+    $('eIcons').querySelectorAll('button').forEach(b => {
+      b.onclick = () => {
+        f.props.icon = b.dataset.s;
+        f.props.iconkey = makeIcon(f.props.icon, f.props.color);
+        $('eIcons').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+        syncDraw();
+      };
     });
   }
   $('editor').classList.add('open');
@@ -535,7 +547,9 @@ $('bmGroups').innerHTML = Object.keys(VIS_MAP).map(g => {
   const names = { roads: 'Roads', rail: 'Rail', buildings: 'Buildings', water: 'Water', parks: 'Parks', labels: 'Labels' };
   return `<label class="row"><span>${names[g]}</span><input type="checkbox" data-g="${g}" ${vis[g] ? 'checked' : ''}></label>`;
 }).join('');
-$('bmGroups').querySelectorAll('input').forEach(cb => cb.onchange = () => { vis[cb.dataset.g] = cb.checked; applyVis(); });
+$('bmGroups').querySelectorAll('input').forEach(cb => {
+  cb.onchange = () => { vis[cb.dataset.g] = cb.checked; applyVis(); };
+});
 
 function refreshShapes() {
   $('shapeCount').textContent = features.length;
@@ -558,7 +572,7 @@ $('shapesList').onclick = e => {
 };
 $('db-toggle').onclick = () => { refreshShapes(); $('layersPanel').classList.toggle('open'); };
 
-// ---------------- search (Nominatim, keyless) ----------------
+// ---------------- search ----------------
 $('searchbtn').onclick = () => { $('searchBox').classList.toggle('open'); $('searchInput').focus(); };
 $('searchInput').addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
@@ -574,22 +588,21 @@ $('searchInput').addEventListener('keydown', e => {
 $('basemap-btn').onclick = () => {
   const m = $('bmMenu');
   if (!m.innerHTML) {
-    m.innerHTML = Object.keys(ALL_STYLES).map(n => `<button data-n="${n}">${n}</button>`).join('');
-    m.querySelectorAll('button').forEach(b => b.onclick = () => {
-      map.setStyle(ALL_STYLES[b.dataset.n]);
-      map.once('idle', () => { addDrawStack(); applyVis(); syncDraw(); });
-      m.classList.remove('open');
+    m.innerHTML = Object.keys(window.__ALL_STYLES__).map(n => `<button data-n="${n}">${n}</button>`).join('');
+    m.querySelectorAll('button').forEach(b => {
+      b.onclick = () => {
+        map.setStyle(window.__ALL_STYLES__[b.dataset.n]);
+        map.once('idle', () => { addDrawStack(); applyVis(); syncDraw(); });
+        m.classList.remove('open');
+      };
     });
   }
   m.classList.toggle('open');
 };
 
 map.on('error', e => console.warn('map error:', e));
-} catch (e) {
-  const box = document.getElementById('err');
-  box.style.display = 'block';
-  box.textContent = 'Map init failed: ' + e.message;
-}
+} catch (e) { fail('UI wiring failed: ' + e.message); }
+})();
 </script>
 </body>
 </html>"""
