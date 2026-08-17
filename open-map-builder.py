@@ -146,7 +146,7 @@ ALL_STYLES = {
 INITIAL_BASEMAP = "Midnight Blue"
 
 # ------------------------------------------------------------------------
-# 3. MAP RENDERER + TOOLBAR + LAYER MANAGER + DRAWING ENGINE
+# 3. MAP + LEFT RAIL + DATA BROWSER PANEL
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -157,51 +157,64 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <style>
   html, body { margin: 0; padding: 0; background: __BG__; }
   #map { position: absolute; width: 100%; height: 100%; }
-  #attr { position: absolute; bottom: 4px; left: 6px; z-index: 2;
+  #attr { position: absolute; bottom: 4px; right: 6px; z-index: 2;
           font: 10px sans-serif; color: __MUTED__; pointer-events: none; }
-  #toolbar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-             z-index: 3; display: flex; align-items: center; gap: 2px;
-             background: #161b22ee; border: 1px solid #30363d; border-radius: 10px; padding: 4px; }
-  #toolbar button { width: 28px; height: 28px; display: grid; place-items: center;
-                    background: transparent; border: none; color: #c9d1d9;
+  /* Left icon rail (orientation copied from reference) */
+  #rail { position: absolute; left: 8px; top: 8px; bottom: 8px; width: 44px; z-index: 4;
+          background: #161b22ee; border: 1px solid #30363d; border-radius: 10px;
+          display: flex; flex-direction: column; align-items: center;
+          padding: 6px 0; gap: 2px; overflow-y: auto; }
+  #rail button { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center;
+                 background: transparent; border: none; color: #c9d1d9;
+                 border-radius: 8px; cursor: pointer; }
+  #rail button:hover { background: #21262d; color: #f0f6fc; }
+  #rail button.active { background: #c99c37; color: #0a1628; }
+  #rail .tsep { width: 20px; height: 1px; background: #30363d; margin: 4px 0; flex: 0 0 auto; }
+  /* Data browser panel */
+  #panel { position: absolute; left: 60px; top: 8px; bottom: 8px; width: 300px; z-index: 3;
+           background: #161b22f5; border: 1px solid #30363d; border-radius: 10px;
+           padding: 12px; overflow-y: auto; display: none; flex-direction: column; gap: 8px;
+           font: 12px sans-serif; color: #f0f6fc; }
+  #panel.open { display: flex; }
+  .phead { display: flex; justify-content: space-between; align-items: center; }
+  .phead button { background: #21262d; color: #f0f6fc; border: 1px solid #30363d;
+                  border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+  .sec { font-size: 10px; letter-spacing: 1px; color: #8b949e; margin-top: 6px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  #panel input[type=range] { width: 110px; accent-color: #c99c37; }
+  #panel input[type=text] { width: 100%; box-sizing: border-box; background: #0d1117;
+                            color: #f0f6fc; border: 1px solid #30363d; border-radius: 6px; padding: 6px; }
+  #panel button.small { background: #21262d; color: #f0f6fc; border: 1px solid #30363d;
+                        border-radius: 6px; padding: 3px 7px; cursor: pointer; font: 11px sans-serif; }
+  .bmgrid { display: flex; flex-wrap: wrap; gap: 4px; }
+  .bmgrid button { background: #21262d; color: #f0f6fc; border: 1px solid #30363d;
+                   border-radius: 6px; padding: 4px 8px; cursor: pointer; font: 11px sans-serif; }
+  .bmgrid button.active { background: #c99c37; color: #0a1628; }
+  #iconRow { display: flex; gap: 4px; }
+  #iconRow button { width: 30px; height: 30px; display: grid; place-items: center;
+                    background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
                     border-radius: 6px; cursor: pointer; }
-  #toolbar button:hover { background: #21262d; color: #f0f6fc; }
-  #toolbar button.active { background: #c99c37; color: #0a1628; }
-  .tsep { width: 1px; height: 18px; background: #30363d; margin: 0 3px; }
-  .panelbox { position: absolute; top: 52px; left: 50%; transform: translateX(-50%);
-              z-index: 3; background: #161b22f2; border: 1px solid #30363d;
-              border-radius: 10px; padding: 10px; display: none; flex-direction: column;
-              gap: 6px; font: 12px sans-serif; color: #f0f6fc; min-width: 190px;
-              max-height: 70vh; overflow-y: auto; }
-  .panelbox.open { display: flex; }
-  .panelbox .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  .panelbox .sec { font-size: 10px; letter-spacing: 1px; color: #8b949e; margin-top: 4px; }
-  .panelbox input[type=range] { width: 100px; accent-color: #c99c37; }
-  .panelbox button { background: #21262d; color: #f0f6fc; border: 1px solid #30363d;
-                     border-radius: 6px; padding: 4px 8px; cursor: pointer; font: 11px sans-serif; }
-  #editor, #layersPanel { left: auto; transform: none; right: 10px; }
-  #searchBox input { width: 100%; box-sizing: border-box; background: #0d1117;
-                     color: #f0f6fc; border: 1px solid #30363d; border-radius: 6px; padding: 6px; }
-  #iconPanel { top: 52px; }
-  #iconPanel button { width: 28px; height: 28px; display: grid; place-items: center; }
-  #iconPanel button.active { background: #c99c37; color: #0a1628; }
-  .listitem { display: flex; align-items: center; gap: 6px; }
+  #iconRow button.active { background: #c99c37; color: #0a1628; }
+  .listitem { display: flex; align-items: center; gap: 4px; }
   .listitem .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .listitem button { padding: 2px 6px; }
+  .badge { background: #c99c37; color: #0a1628; border-radius: 10px; padding: 0 7px; font-weight: 700; }
   #hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
           z-index: 2; background: #161b22cc; color: #d9b451; border: 1px solid #30363d;
           border-radius: 6px; padding: 4px 10px; font: 11px sans-serif; display: none; }
-  #err { display: none; position: absolute; top: 10px; left: 10px; z-index: 4;
+  #measure { position: absolute; z-index: 5; display: none; pointer-events: none;
+             background: #c99c37; color: #0a1628; border-radius: 6px; padding: 2px 8px;
+             font: 11px sans-serif; font-weight: 700; }
+  #err { display: none; position: absolute; top: 10px; right: 10px; z-index: 6;
          background: #3d1111; color: #ffb4b4; padding: 8px 12px; border-radius: 6px;
          font: 12px monospace; }
 </style>
 </head>
 <body>
 <div id="map"></div>
-<div id="attr">© OpenStreetMap contributors · OpenFreeMap · OSRM · Nominatim</div>
+<div id="attr">© OpenStreetMap · OpenFreeMap · OSRM · Nominatim</div>
 
-<div id="toolbar">
-  <button id="db-toggle" title="Manage layers"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg></button>
+<div id="rail">
+  <button id="db-toggle" class="active" title="Data browser"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg></button>
   <div class="tsep"></div>
   <button id="searchbtn" title="Search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg></button>
   <button class="tool" data-tool="marker" title="Place marker"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></button>
@@ -210,27 +223,42 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button class="tool" data-tool="rectangle" title="Draw rectangle"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"></rect></svg></button>
   <button class="tool" data-tool="circle" title="Draw circle"><svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="8" fill="currentColor"></circle></svg></button>
   <button class="tool" data-tool="route" title="Route A to B"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="19" r="2.5"></circle><circle cx="19" cy="5" r="2.5"></circle><path d="M7 17c4-1 3-8 8-9"></path></svg></button>
-  <button id="basemap-btn" title="Basemap"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4z"></path><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg></button>
   <div class="tsep"></div>
-  <button id="editbtn" title="Edit drawings"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg></button>
+  <button id="basemap-btn" title="Basemap"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4z"></path><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg></button>
+  <button id="editbtn" title="Pick shape to edit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg></button>
   <button id="clearbtn" title="Clear drawings"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg></button>
 </div>
 
-<div id="layersPanel" class="panelbox"></div>
-<div id="searchBox" class="panelbox"><input id="searchInput" placeholder="Search place… (Enter)"/></div>
-<div id="bmMenu" class="panelbox"></div>
-<div id="iconPanel" class="panelbox">
+<div id="panel" class="open">
+  <div class="phead"><strong>🗂️ Data browser</strong><button id="panelClose">✕</button></div>
+
+  <div class="sec">SEARCH</div>
+  <input id="searchInput" type="text" placeholder="Search place… (Enter)"/>
+
+  <div class="sec">BASEMAP</div>
+  <div id="bmGrid" class="bmgrid"></div>
+
   <div class="sec">MARKER ICON</div>
-  <div class="row" id="iconRow"></div>
+  <div id="iconRow"></div>
+
+  <div class="sec">DATA LAYERS</div>
+  <div id="dataLayers"></div>
+
+  <div class="sec">MY LAYERS <span id="lyrCount" class="badge">0</span></div>
+  <div id="myLayers"><div style="color:#8b949e">No drawings yet. Use the draw tools to add shapes.</div></div>
+
+  <div id="editSec" style="display:none">
+    <div class="sec">EDIT SHAPE · <span id="editName"></span></div>
+    <div class="row"><span>Color</span><input type="color" id="eColor"></div>
+    <div class="row"><span>Width</span><input type="range" id="eWidth" min="1" max="12" step="1"></div>
+    <div class="row"><span>Opacity</span><input type="range" id="eOp" min="0.05" max="1" step="0.05"></div>
+    <div class="row"><button class="small" id="eDone">Done</button>
+    <span style="color:#8b949e;font-size:10px">drag shape · drag points · right-click point = delete</span></div>
+  </div>
 </div>
-<div id="editor" class="panelbox">
-  <div class="sec">EDIT SHAPE</div>
-  <div class="row"><span>Color</span><input type="color" id="eColor"></div>
-  <div class="row"><span>Width</span><input type="range" id="eWidth" min="1" max="12" step="1"></div>
-  <div class="row"><span>Opacity</span><input type="range" id="eOp" min="0.05" max="1" step="0.05"></div>
-  <div class="row"><button id="eDelete">Delete</button><button id="eClose">Close</button></div>
-</div>
+
 <div id="hint"></div>
+<div id="measure"></div>
 <div id="err"></div>
 
 <script>
@@ -245,18 +273,18 @@ map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 
 // ---------------- state ----------------
 const DEF = { color: '#c99c37', width: 3, opacity: 0.9 };
-let features = [], fid = 0, activeTool = null, editMode = false;
-let draft = [], routeA = null, selectedId = null, cursorLL = null;
+let features = [], fid = 0, activeTool = null, pickMode = false;
+let draft = [], routeA = null, cursorLL = null;
+let editingId = null, drag = null;
 let markerShape = 'pin';
 const usedIcons = new Map();
 const vis = { main: true, secondary: true, buildings: true, water: true, labels: true };
 const VIS_MAP = {
   main: ['case_major_casing', 'rd_major'],
   secondary: ['case_minhi_casing', 'rd_min_hi', 'rd_min_md', 'rd_min_lo', 'rd_path'],
-  buildings: ['building'],
-  water: ['water', 'waterway'],
-  labels: ['label_place']
+  buildings: ['building'], water: ['water', 'waterway'], labels: ['label_place']
 };
+const DATA_NAMES = { main: 'Main Roads', secondary: 'Secondary Roads', buildings: 'Buildings', water: 'Water', labels: 'Labels' };
 const HINTS = {
   marker: 'Click to place markers',
   polyline: 'Click vertices · right-click undo · double-click/Enter finish',
@@ -267,8 +295,11 @@ const HINTS = {
 };
 const $ = id => document.getElementById(id);
 const hint = t => { $('hint').style.display = t ? 'block' : 'none'; $('hint').textContent = t || ''; };
+const byId = id => features.find(x => x.props.id === id);
+const drawLayers = () => ['draw-fill','draw-line','draw-outline','draw-marker'].filter(l => map.getLayer(l));
+const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(2) + ' km';
 
-// ---------------- marker icons (canvas-generated) ----------------
+// ---------------- marker icons (canvas -> ImageData, sanitized ids) ----------------
 function drawIcon(shape, color) {
   const c = document.createElement('canvas'); c.width = c.height = 48;
   const x = c.getContext('2d');
@@ -284,8 +315,11 @@ function drawIcon(shape, color) {
   return c;
 }
 function ensureIcon(shape, color) {
-  const key = shape + '|' + color;
-  if (!map.hasImage(key)) { try { map.addImage(key, drawIcon(shape, color)); } catch (e) {} }
+  const key = 'mk_' + shape + '_' + color.replace('#', '');
+  if (!map.hasImage(key)) {
+    // ImageData is the most reliably supported addImage input across builds
+    map.addImage(key, drawIcon(shape, color).getContext('2d').getImageData(0, 0, 48, 48));
+  }
   usedIcons.set(key, { shape, color });
   return key;
 }
@@ -343,18 +377,23 @@ function addDrawStack() {
       paint: { 'circle-color': '#d9b451', 'circle-radius': 4,
                'circle-stroke-color': '#0a1628', 'circle-stroke-width': 1 } });
   } else renderDraft();
+
+  if (!map.getSource('handles')) {
+    map.addSource('handles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'handles', type: 'circle', source: 'handles',
+      paint: { 'circle-color': '#ffffff', 'circle-radius': 5,
+               'circle-stroke-color': '#c99c37', 'circle-stroke-width': 2 } });
+  } else renderHandles();
 }
 const syncDraw = () => { if (map.getSource('draw')) map.getSource('draw').setData(fc(features)); };
 
-// Live preview: dashed draft follows the cursor
 function renderDraft() {
   if (!map.getSource('draft')) return;
   const f = [];
   const pt = c => ({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: {} });
   const ln = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
   draft.forEach(p => f.push(pt(p)));
-  if (activeTool === 'polyline' && draft.length)
-    f.push(ln(cursorLL ? [...draft, cursorLL] : draft));
+  if (activeTool === 'polyline' && draft.length) f.push(ln(cursorLL ? [...draft, cursorLL] : draft));
   if (activeTool === 'polygon' && draft.length) {
     const pts = cursorLL ? [...draft, cursorLL] : draft;
     if (pts.length > 1) f.push(ln([...pts, pts[0]]));
@@ -366,7 +405,7 @@ function renderDraft() {
   if (activeTool === 'route' && routeA && cursorLL) f.push(ln([routeA, cursorLL]));
   map.getSource('draft').setData({ type: 'FeatureCollection', features: f });
 }
-const resetDraft = () => { draft = []; routeA = null; renderDraft(); };
+const resetDraft = () => { draft = []; routeA = null; hideMeasure(); renderDraft(); };
 function applyVis() {
   for (const g in VIS_MAP) VIS_MAP[g].forEach(id => {
     if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis[g] ? 'visible' : 'none');
@@ -411,25 +450,114 @@ function fetchRoute(a, b) {
     });
 }
 
+// ---------------- vertex handles / move editing ----------------
+function handlesFor(f) {
+  const pts = [];
+  if (f.geometry.type === 'Point') pts.push({ idx: 0, c: f.geometry.coordinates });
+  else {
+    const isPoly = f.geometry.type === 'Polygon';
+    const ring = isPoly ? f.geometry.coordinates[0] : f.geometry.coordinates;
+    const n = isPoly ? ring.length - 1 : ring.length;
+    for (let i = 0; i < n; i++) pts.push({ idx: i, c: ring[i] });
+  }
+  return pts;
+}
+function renderHandles() {
+  if (!map.getSource('handles')) return;
+  const f = byId(editingId);
+  const feats = f ? handlesFor(f).map(h => ({ type: 'Feature',
+    geometry: { type: 'Point', coordinates: h.c }, properties: { idx: h.idx } })) : [];
+  map.getSource('handles').setData({ type: 'FeatureCollection', features: feats });
+}
+function setCoord(f, idx, ll) {
+  if (f.geometry.type === 'Point') { f.geometry.coordinates = ll; return; }
+  const isPoly = f.geometry.type === 'Polygon';
+  const ring = isPoly ? f.geometry.coordinates[0] : f.geometry.coordinates;
+  ring[idx] = ll;
+  if (isPoly && idx === 0) ring[ring.length - 1] = [...ll];
+}
+function translate(f, dLng, dLat) {
+  const walk = c => { if (typeof c[0] === 'number') { c[0] += dLng; c[1] += dLat; } else c.forEach(walk); };
+  walk(f.geometry.coordinates);
+}
+function startEditing(id) {
+  editingId = id;
+  const f = byId(id);
+  if (!f) return;
+  $('panel').classList.add('open'); $('db-toggle').classList.add('active');
+  $('editSec').style.display = 'block';
+  $('editName').textContent = f.kind + ' ' + id;
+  $('eColor').value = f.props.color; $('eWidth').value = f.props.width; $('eOp').value = f.props.opacity;
+  renderHandles();
+  map.getCanvas().style.cursor = 'pointer';
+  hint('Drag shape to move · drag white points · right-click point deletes');
+}
+function stopEditing() {
+  editingId = null; drag = null;
+  $('editSec').style.display = 'none';
+  renderHandles();
+  map.getCanvas().style.cursor = activeTool ? 'crosshair' : '';
+  hint(activeTool ? HINTS[activeTool] : '');
+}
+map.on('mousedown', e => {
+  if (editingId == null || activeTool) return;
+  const hf = map.getLayer('handles') ? map.queryRenderedFeatures(e.point, { layers: ['handles'] }) : [];
+  if (hf.length) drag = { mode: 'vertex', idx: hf[0].properties.idx, last: [e.lngLat.lng, e.lngLat.lat] };
+  else {
+    const sf = map.queryRenderedFeatures(e.point, { layers: drawLayers() }).filter(x => x.properties.id === editingId);
+    if (sf.length) drag = { mode: 'move', last: [e.lngLat.lng, e.lngLat.lat] };
+  }
+  if (drag) { map.dragPan.disable(); map.getCanvas().style.cursor = 'grabbing'; }
+});
+map.on('mouseup', () => {
+  if (drag) { drag = null; map.dragPan.enable();
+    map.getCanvas().style.cursor = editingId != null ? 'pointer' : (activeTool ? 'crosshair' : ''); }
+});
+
+// ---------------- circle radius indicator ----------------
+function showMeasure(e) {
+  const el = $('measure');
+  el.style.display = 'block';
+  el.style.left = (e.point.x + 14) + 'px';
+  el.style.top = (e.point.y + 14) + 'px';
+  el.textContent = 'R = ' + fmtDist(haversine(draft[0], cursorLL));
+}
+const hideMeasure = () => { $('measure').style.display = 'none'; };
+
 // ---------------- tools ----------------
 document.querySelectorAll('.tool').forEach(btn => btn.addEventListener('click', () => {
   const t = btn.dataset.tool;
   activeTool = (activeTool === t) ? null : t;
-  editMode = false; $('editbtn').classList.remove('active');
-  resetDraft(); closeEditor();
+  pickMode = false; $('editbtn').classList.remove('active');
+  if (!activeTool) stopEditing();
+  resetDraft();
   document.querySelectorAll('.tool').forEach(b => b.classList.toggle('active', b.dataset.tool === activeTool));
   map.getCanvas().style.cursor = activeTool ? 'crosshair' : '';
   activeTool ? map.doubleClickZoom.disable() : map.doubleClickZoom.enable();
-  $('iconPanel').classList.toggle('open', activeTool === 'marker');
   hint(activeTool ? HINTS[activeTool] : '');
 }));
 
 map.on('mousemove', e => {
   cursorLL = [e.lngLat.lng, e.lngLat.lat];
-  if (activeTool) renderDraft();
+  if (activeTool) {
+    renderDraft();
+    (activeTool === 'circle' && draft.length === 1) ? showMeasure(e) : hideMeasure();
+  }
+  if (drag && editingId != null) {
+    const f = byId(editingId); if (!f) return;
+    const ll = [e.lngLat.lng, e.lngLat.lat];
+    if (drag.mode === 'vertex') setCoord(f, drag.idx, ll);
+    else translate(f, ll[0] - drag.last[0], ll[1] - drag.last[1]);
+    drag.last = ll;
+    syncDraw(); renderHandles();
+  }
 });
 map.on('click', e => {
-  if (editMode) { pickFeature(e); return; }
+  if (pickMode && !activeTool) {
+    const fs = map.queryRenderedFeatures(e.point, { layers: drawLayers() });
+    if (fs.length && fs[0].properties.id != null) startEditing(fs[0].properties.id);
+    return;
+  }
   if (!activeTool) return;
   const ll = [e.lngLat.lng, e.lngLat.lat];
   if (activeTool === 'marker') {
@@ -456,9 +584,25 @@ map.on('dblclick', () => {
     resetDraft();
   }
 });
-// Right-click = undo last vertex while drafting
-map.on('contextmenu', () => {
-  if (!activeTool) return;
+map.on('contextmenu', e => {
+  // While editing: right-click a handle to delete the vertex
+  if (editingId != null && !activeTool) {
+    const hf = map.getLayer('handles') ? map.queryRenderedFeatures(e.point, { layers: ['handles'] }) : [];
+    if (hf.length) {
+      const f = byId(editingId), idx = hf[0].properties.idx;
+      if (f.geometry.type === 'Polygon' && f.geometry.coordinates[0].length > 4) {
+        const r = f.geometry.coordinates[0];
+        r.splice(idx, 1);
+        r[r.length - 1] = [...r[0]];
+        syncDraw(); renderHandles();
+      } else if (f.geometry.type === 'LineString' && f.geometry.coordinates.length > 2) {
+        f.geometry.coordinates.splice(idx, 1);
+        syncDraw(); renderHandles();
+      }
+    }
+    return;
+  }
+  if (!activeTool) return;  // drafting: right-click = undo vertex
   if (activeTool === 'route' && routeA) { routeA = null; draft = []; hint(HINTS.route); }
   else if (draft.length) draft.pop();
   renderDraft();
@@ -466,128 +610,99 @@ map.on('contextmenu', () => {
 document.addEventListener('keydown', e => {
   if (/INPUT|TEXTAREA/.test(e.target.tagName)) return;
   if (e.key === 'Enter') map.fire('dblclick');
-  if (e.key === 'Escape') { resetDraft(); closeEditor(); }
+  if (e.key === 'Escape') { resetDraft(); stopEditing(); pickMode = false; $('editbtn').classList.remove('active'); }
   if (e.key === 'Backspace' && draft.length) { draft.pop(); renderDraft(); }
 });
 
-// ---------------- edit mode ----------------
-$('editbtn').onclick = () => {
-  editMode = !editMode; activeTool = null;
-  document.querySelectorAll('.tool').forEach(b => b.classList.remove('active'));
-  $('iconPanel').classList.remove('open');
-  $('editbtn').classList.toggle('active', editMode);
-  map.getCanvas().style.cursor = editMode ? 'pointer' : '';
-  hint(editMode ? 'Click a shape to edit · Esc to exit' : '');
-};
-function pickFeature(e) {
-  const ids = ['draw-fill','draw-line','draw-outline','draw-marker'].filter(l => map.getLayer(l));
-  const fs = map.queryRenderedFeatures(e.point, { layers: ids });
-  if (fs.length && fs[0].properties.id != null) openEditor(fs[0].properties.id);
-  else closeEditor();
-}
-function openEditor(id) {
-  const f = features.find(x => x.props.id === id);
-  if (!f) return;
-  selectedId = id;
-  $('eColor').value = f.props.color;
-  $('eWidth').value = f.props.width;
-  $('eOp').value = f.props.opacity;
-  $('editor').classList.add('open');
-}
-function closeEditor() { selectedId = null; $('editor').classList.remove('open'); }
+// ---------------- editor bindings ----------------
 const editProp = (k, v) => {
-  const f = features.find(x => x.props.id === selectedId);
-  if (!f) return;
+  const f = byId(editingId); if (!f) return;
   f.props[k] = v;
-  // Markers regenerate their icon in the new color
   if (k === 'color' && f.kind === 'marker') f.props.icon = ensureIcon(f.props.shape, v);
   syncDraw();
 };
 $('eColor').oninput = e => editProp('color', e.target.value);
 $('eWidth').oninput = e => editProp('width', parseFloat(e.target.value));
 $('eOp').oninput   = e => editProp('opacity', parseFloat(e.target.value));
-$('eDelete').onclick = () => { features = features.filter(x => x.props.id !== selectedId); syncDraw(); closeEditor(); refreshManager(); };
-$('eClose').onclick = closeEditor;
-$('clearbtn').onclick = () => { features = []; resetDraft(); syncDraw(); closeEditor(); refreshManager(); };
+$('eDone').onclick = stopEditing;
+$('editbtn').onclick = () => {
+  pickMode = !pickMode;
+  $('editbtn').classList.toggle('active', pickMode);
+  if (pickMode) { activeTool = null; document.querySelectorAll('.tool').forEach(b => b.classList.remove('active')); }
+  hint(pickMode ? 'Click a shape to edit' : '');
+};
+$('clearbtn').onclick = () => { features = []; resetDraft(); stopEditing(); syncDraw(); refreshManager(); };
 
-// ---------------- layer manager (data layers + user drawings) ----------------
-const DATA_NAMES = { main: 'Main Roads', secondary: 'Secondary Roads', buildings: 'Buildings', water: 'Water', labels: 'Labels' };
+// ---------------- data browser panel ----------------
+$('db-toggle').onclick = () => {
+  const open = $('panel').classList.toggle('open');
+  $('db-toggle').classList.toggle('active', open);
+  refreshManager();
+};
+$('panelClose').onclick = () => { $('panel').classList.remove('open'); $('db-toggle').classList.remove('active'); };
+
+$('dataLayers').innerHTML = Object.keys(VIS_MAP).map(g =>
+  `<label class="row"><span>${DATA_NAMES[g]}</span><input type="checkbox" data-g="${g}" ${vis[g] ? 'checked' : ''}></label>`).join('');
+$('dataLayers').querySelectorAll('input').forEach(cb => cb.onchange = () => { vis[cb.dataset.g] = cb.checked; applyVis(); });
+
 function refreshManager() {
-  const p = $('layersPanel');
-  if (!p.classList.contains('open')) return;
-  let html = '<div class="sec">DATA LAYERS</div>';
-  for (const g in VIS_MAP) {
-    html += `<label class="row"><span>${DATA_NAMES[g]}</span><input type="checkbox" data-g="${g}" ${vis[g] ? 'checked' : ''}></label>`;
-  }
-  html += `<div class="sec">MY LAYERS (${features.length})</div>`;
-  if (!features.length) html += '<div style="color:#8b949e">Nothing drawn yet</div>';
-  features.slice().reverse().forEach(f => {
-    html += `<div class="listitem">
-      <button data-act="eye" data-id="${f.props.id}" title="Show/hide">${f.props.visible ? '👁' : '–'}</button>
-      <span class="nm">${f.kind} ${f.props.id}</span>
-      <button data-act="zoom" data-id="${f.props.id}" title="Zoom to">⤢</button>
-      <button data-act="del" data-id="${f.props.id}" title="Delete">✕</button>
-    </div>`;
-  });
-  p.innerHTML = html;
-  p.querySelectorAll('input[data-g]').forEach(cb => cb.onchange = () => { vis[cb.dataset.g] = cb.checked; applyVis(); });
-  p.querySelectorAll('button[data-act]').forEach(b => b.onclick = () => {
+  $('lyrCount').textContent = features.length;
+  const box = $('myLayers');
+  if (!features.length) { box.innerHTML = '<div style="color:#8b949e">No drawings yet. Use the draw tools to add shapes.</div>'; return; }
+  box.innerHTML = features.slice().reverse().map(f =>
+    `<div class="listitem">
+       <button class="small" data-act="eye" data-id="${f.props.id}" title="Show/hide">${f.props.visible ? '👁' : '–'}</button>
+       <span class="nm">${f.kind} ${f.props.id}</span>
+       <button class="small" data-act="edit" data-id="${f.props.id}" title="Edit">✎</button>
+       <button class="small" data-act="zoom" data-id="${f.props.id}" title="Zoom to">⤢</button>
+       <button class="small" data-act="del" data-id="${f.props.id}" title="Delete">✕</button>
+     </div>`).join('');
+  box.querySelectorAll('button[data-act]').forEach(b => b.onclick = () => {
     const id = parseInt(b.dataset.id, 10);
-    const f = features.find(x => x.props.id === id);
-    if (!f) return;
-    if (b.dataset.act === 'eye') { f.props.visible = f.props.visible ? 0 : 1; syncDraw(); refreshManager(); }
-    if (b.dataset.act === 'del') { features = features.filter(x => x.props.id !== id); syncDraw(); refreshManager(); }
+    const f = byId(id); if (!f) return;
+    if (b.dataset.act === 'eye')  { f.props.visible = f.props.visible ? 0 : 1; syncDraw(); refreshManager(); }
+    if (b.dataset.act === 'edit') startEditing(id);
+    if (b.dataset.act === 'del')  { features = features.filter(x => x.props.id !== id); if (editingId === id) stopEditing(); syncDraw(); refreshManager(); }
     if (b.dataset.act === 'zoom') { const bnd = boundsOf(f); if (bnd) map.fitBounds(bnd, { padding: 60, maxZoom: 17 }); }
   });
 }
 function boundsOf(f) {
   let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, ok = false;
-  const walk = c => {
-    if (typeof c[0] === 'number') { ok = true;
-      minX = Math.min(minX, c[0]); maxX = Math.max(maxX, c[0]);
-      minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]);
-    } else c.forEach(walk);
-  };
+  const walk = c => { if (typeof c[0] === 'number') { ok = true;
+    minX = Math.min(minX, c[0]); maxX = Math.max(maxX, c[0]);
+    minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]); } else c.forEach(walk); };
   walk(f.geometry.coordinates);
   if (!ok) return null;
-  if (minX === maxX && minY === maxY) { return [[minX - 0.005, minY - 0.005], [maxX + 0.005, maxY + 0.005]]; }
+  if (minX === maxX && minY === maxY) return [[minX - 0.005, minY - 0.005], [maxX + 0.005, maxY + 0.005]];
   return [[minX, minY], [maxX, maxY]];
 }
-$('db-toggle').onclick = () => { const p = $('layersPanel'); p.classList.toggle('open'); refreshManager(); };
 
-// ---------------- search (Nominatim, keyless) ----------------
-$('searchbtn').onclick = () => { $('searchBox').classList.toggle('open'); $('searchInput').focus(); };
+// ---------------- search ----------------
+$('searchbtn').onclick = () => { $('panel').classList.add('open'); $('db-toggle').classList.add('active'); $('searchInput').focus(); };
 $('searchInput').addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
-  const q = e.target.value.trim();
-  if (!q) return;
+  const q = e.target.value.trim(); if (!q) return;
   hint('Searching…');
   fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`)
     .then(r => r.json())
-    .then(j => {
-      if (j.length) { map.flyTo({ center: [parseFloat(j[0].lon), parseFloat(j[0].lat)], zoom: 15 }); hint(''); }
-      else hint('No results');
-    })
+    .then(j => { if (j.length) { map.flyTo({ center: [parseFloat(j[0].lon), parseFloat(j[0].lat)], zoom: 15 }); hint(''); } else hint('No results'); })
     .catch(() => hint('Search failed'));
 });
 
-// ---------------- live basemap switcher ----------------
-$('basemap-btn').onclick = () => {
-  const m = $('bmMenu');
-  if (!m.innerHTML) {
-    m.innerHTML = Object.keys(ALL_STYLES).map(n => `<button data-n="${n}">${n}</button>`).join('');
-    m.querySelectorAll('button').forEach(b => b.onclick = () => {
-      map.setStyle(ALL_STYLES[b.dataset.n]);
-      // setStyle wipes layers + images -> rebuild everything on idle
-      map.once('idle', () => {
-        usedIcons.forEach((v, key) => { if (!map.hasImage(key)) { try { map.addImage(key, drawIcon(v.shape, v.color)); } catch (e) {} } });
-        addDrawStack(); applyVis();
-      });
-      m.classList.remove('open');
-    });
-  }
-  m.classList.toggle('open');
-};
+// ---------------- basemap switcher ----------------
+$('basemap-btn').onclick = () => { $('panel').classList.add('open'); $('db-toggle').classList.add('active'); };
+$('bmGrid').innerHTML = Object.keys(ALL_STYLES).map(n =>
+  `<button data-n="${n}" class="${n === __INIT_NAME__ ? 'active' : ''}">${n}</button>`).join('');
+$('bmGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
+  $('bmGrid').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+  map.setStyle(ALL_STYLES[b.dataset.n]);
+  map.once('idle', () => {
+    // setStyle wipes layers + images -> rebuild icons, draw stack, visibility
+    usedIcons.forEach((v, key) => { if (!map.hasImage(key)) {
+      try { map.addImage(key, drawIcon(v.shape, v.color).getContext('2d').getImageData(0, 0, 48, 48)); } catch (e) {} } });
+    addDrawStack(); applyVis(); renderHandles();
+  });
+});
 
 map.on('error', e => console.warn('map error:', e));
 } catch (e) {
@@ -605,6 +720,7 @@ try:
     html = (HTML_TEMPLATE
             .replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
             .replace("__STYLE__", json.dumps(ALL_STYLES[INITIAL_BASEMAP]))
+            .replace("__INIT_NAME__", json.dumps(INITIAL_BASEMAP))
             .replace("__CENTER__", json.dumps(CENTER))
             .replace("__ZOOM__", str(ZOOM))
             .replace("__BG__", body_bg)
