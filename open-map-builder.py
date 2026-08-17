@@ -1,4 +1,3 @@
-```python
 import json
 import re
 import streamlit as st
@@ -2782,4 +2781,3 @@ try:
     components.html(html, height=1000, scrolling=False)
 except Exception as e:
     st.error(f"Failed to load application: {e}")
-```
