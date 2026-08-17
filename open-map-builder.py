@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 import requests
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & STREAMLIT CHROMIUM OVERRIDES
+# 1. PAGE CONFIGURATION & ROOT OVERRIDES
 # ------------------------------------------------------------------------
 st.set_page_config(
     page_title="Project Atlas Studio",
@@ -291,7 +291,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
 <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet"/>
-<!-- GIS Importer Parsers -->
 <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
 <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
 <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -315,7 +314,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     color: #ffffff !important;
   }
 
-  /* Island Toolbar Top */
+  /* Top Toolbar Island */
   #top-toolbar-bar {
     position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 20;
     background: rgba(10, 18, 32, 0.94); backdrop-filter: blur(20px);
@@ -449,7 +448,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     box-shadow: 0 32px 80px rgba(0, 0, 0, 0.85);
     display: flex; flex-direction: column; overflow: hidden; color: #ffffff;
   }
-  .ios-modal-header { padding: 20px 24px 12px 24px; display: flex; flex-direction: column; gap: 4px; }
+  .ios-modal-header { padding: 20px 24px 12px 24px; display: flex; align-items: flex-start; justify-content: space-between; }
   .ios-modal-title { font-size: 20px; font-weight: 800; color: #ffffff; }
   .ios-modal-subtitle { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
 
@@ -470,7 +469,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 <div id="map"></div>
 
-<!-- Top Unified Toolbar Island -->
 <div id="top-toolbar-bar">
   <button class="tb-btn" id="btn-home-dialog" title="Workspaces (Home)">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -490,8 +488,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <div class="tb-sep"></div>
 
-  <!-- Merged Pointer / Select & Point Edit Mode -->
-  <button class="tb-btn" id="btn-pointer-mode" title="Select, Drag & Edit Points">
+  <button class="tb-btn primary-active" id="btn-pointer-mode" title="Select, Drag & Edit Points">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7 18 3-7 7-3L3 3z"></path></svg>
   </button>
 
@@ -532,7 +529,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </button>
 </div>
 
-<!-- Unified Right Floating Dock -->
 <div class="right-dock" id="unified-right-dock">
   <div class="dock-header">
     <div class="dock-tabs">
@@ -544,7 +540,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <div class="dock-body">
-    <!-- TAB 1: LAYERS (Draggable, Chronological, Multi-Select Inline) -->
     <div id="tab-layers" class="dock-section">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
         <span style="font-weight:700; color:#f0f6fc; font-size:12px;">Workspace Hierarchy</span>
@@ -553,7 +548,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <div id="layers-tree-container" class="layer-drop-zone"></div>
     </div>
 
-    <!-- TAB 2: DATA BROWSER & NOMINATIM SEARCH -->
     <div id="tab-browser" class="dock-section" style="display:none;">
       <div style="font-weight:700; color:#f0f6fc; font-size:12px;">Administrative Boundaries</div>
       <div class="search-suggest-box">
@@ -561,7 +555,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div id="boundarySuggestResults" class="suggest-results"></div>
       </div>
 
-      <div style="display:flex; gap:4px; margin-top:4px;">
+      <div style="display:flex; gap:8px; margin-top:4px;">
         <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#94a3b8;"><input type="checkbox" data-g="bound_prov"> Provinces</label>
         <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#94a3b8;"><input type="checkbox" data-g="bound_city"> Cities</label>
         <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#94a3b8;"><input type="checkbox" data-g="bound_brgy"> Barangays</label>
@@ -578,7 +572,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <div id="tradeResults" style="font-size:11px; color:#94a3b8; max-height:140px; overflow-y:auto;"></div>
     </div>
 
-    <!-- TAB 3: CUSTOM OVERPASS QUERY BUILDER -->
     <div id="tab-query" class="dock-section" style="display:none;">
       <div style="font-weight:700; color:#f0f6fc; font-size:12px;">Overpass QL Console</div>
       <textarea id="overpassQueryText" class="overpass-console" placeholder="node['amenity'='cafe']({{bbox}});out center;"></textarea>
@@ -591,7 +584,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 
-<!-- Contextual Popovers -->
 <div id="popup-marker-settings" class="float-popover">
   <div style="font-weight:700; font-size:12px; color:#f0f6fc;">Marker & Custom Image Icon</div>
   <div class="f-row">
@@ -626,7 +618,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Color</span><input type="color" id="tColor" value="#d9b451"></div>
 </div>
 
-<!-- Universal GIS File Importer Modal -->
 <div id="popup-import-dialog" class="float-popover" style="width:340px;">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;">Native GIS Importer</span>
@@ -637,7 +628,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="btnProcessImport" style="background:#2563eb; color:#fff; border:none; border-radius:8px; padding:8px; font-weight:700; cursor:pointer;">Parse & Load onto Map</button>
 </div>
 
-<!-- Map Basemap Popover -->
 <div id="popup-custom-map" class="float-popover" style="width:320px;">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;">Basemap Presets</span>
@@ -650,7 +640,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Buildings</span><input type="color" id="cBldColor" value="#8e7258"></div>
 </div>
 
-<!-- Export Popover -->
 <div id="popup-export" class="float-popover" style="width:320px;">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;">Export Canvas</span>
@@ -669,19 +658,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="triggerExportBtn" style="background:#2563eb; color:#fff; border:none; padding:8px; border-radius:8px; font-weight:700; cursor:pointer;">Download PNG</button>
 </div>
 
-<!-- Multi-select Ribbon -->
 <div id="multiselect-group-ribbon">
   <span id="multiselect-count-text">0 selected</span>
   <button id="btnGroupSelected" style="background:#2563eb; color:#fff; border:none; padding:5px 12px; border-radius:12px; font-weight:700; font-size:11px; cursor:pointer;">Create Group</button>
   <button id="btnDeleteSelected" style="background:rgba(239,68,68,0.2); color:#ef4444; border:1px solid rgba(239,68,68,0.4); padding:5px 12px; border-radius:12px; font-weight:700; font-size:11px; cursor:pointer;">Delete</button>
 </div>
 
-<!-- Launcher Scrim Modal -->
 <div id="launcher-modal-scrim" class="visible">
   <div class="ios-modal-card">
     <div class="ios-modal-header">
-      <div class="ios-modal-title">Project Atlas</div>
-      <div class="ios-modal-subtitle">Select workspace.</div>
+      <div>
+        <div class="ios-modal-title">Project Atlas</div>
+        <div class="ios-modal-subtitle">Select workspace.</div>
+      </div>
+      <button class="card-btn" id="btn-close-launcher" title="Close">✕</button>
     </div>
 
     <div class="ios-seg">
@@ -732,7 +722,7 @@ let fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
 let customGroups = __INITIAL_CUSTOM_GROUPS__ || { "Trade Area Scan": { collapsed: false, ids: [] } };
 
 let activeTool = null;
-let pointerMode = true; // Unified select, drag & edit points mode
+let pointerMode = true;
 let selectedId = null;
 let selectedIdsSet = new Set();
 let draft = [], cursorLL = null;
@@ -1567,7 +1557,142 @@ function calcBounds(f) {
   return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Workspaces Engine -----------------
+// ----------------- Workspaces Engine (Complete Fix) -----------------
+function getNextUntitledProjectName() {
+  const untitledRegex = /^Untitled Project (\d+)$/i;
+  let maxN = 0;
+  ALL_PROJECTS.forEach(p => {
+    const match = (p.name || '').match(untitledRegex);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxN) maxN = num;
+    }
+  });
+  return `Untitled Project ${maxN + 1}`;
+}
+
+function openHomeDialog() {
+  closeFloatingCards();
+  $('launcher-modal-scrim').classList.add('visible');
+  $('new-proj-name').value = getNextUntitledProjectName();
+  renderProjectsList();
+}
+
+function closeHomeDialog() {
+  $('launcher-modal-scrim').classList.remove('visible');
+}
+
+window.loadProjectDirectly = function(projectId) {
+  const p = ALL_PROJECTS.find(x => String(x.id) === String(projectId));
+  if (!p) return;
+  currentProjectId = p.id;
+  currentProjectName = p.name || 'Untitled Project';
+  $('project-name-display').textContent = currentProjectName;
+  
+  features = p.features || [];
+  fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
+  customGroups = p.custom_groups || { "Trade Area Scan": { collapsed: false, ids: [] } };
+
+  if (p.center) map.setCenter(p.center);
+  if (p.zoom) map.setZoom(p.zoom);
+  if (p.basemap && ALL_STYLES[p.basemap]) {
+    currentStyleName = p.basemap;
+    map.setStyle(ALL_STYLES[p.basemap]);
+  }
+
+  map.once('idle', () => {
+    addDrawStack();
+    renderLayersTree();
+  });
+
+  closeHomeDialog();
+  hint(`Loaded "${currentProjectName}"`);
+};
+
+$('btn-home-dialog').onclick = openHomeDialog;
+$('btn-close-launcher').onclick = closeHomeDialog;
+$('launcher-modal-scrim').onclick = e => {
+  if (e.target === $('launcher-modal-scrim')) closeHomeDialog();
+};
+
+$('seg-btn-existing').onclick = () => {
+  $('seg-btn-existing').classList.add('active');
+  $('seg-btn-new').classList.remove('active');
+  $('seg-content-existing').style.display = 'flex';
+  $('seg-content-new').style.display = 'none';
+};
+
+$('seg-btn-new').onclick = () => {
+  $('seg-btn-new').classList.add('active');
+  $('seg-btn-existing').classList.remove('active');
+  $('seg-content-new').style.display = 'flex';
+  $('seg-content-existing').style.display = 'none';
+  $('new-proj-name').value = getNextUntitledProjectName();
+  $('new-proj-name').focus();
+};
+
+$('btn-create-project-submit').onclick = async () => {
+  const pName = $('new-proj-name').value.trim() || getNextUntitledProjectName();
+  const centerLL = [120.9842, 14.5995];
+
+  const payload = {
+    name: pName,
+    basemap: "Midnight Blue",
+    center: centerLL,
+    zoom: 14,
+    pitch: 0,
+    bearing: 0,
+    features: [],
+    custom_groups: { "Trade Area Scan": { collapsed: false, ids: [] } },
+    layer_visibilities: {}
+  };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const created = await res.json();
+      const proj = created[0] || created;
+      ALL_PROJECTS.unshift(proj);
+      loadProjectDirectly(proj.id);
+    } else {
+      currentProjectId = "local-temp-" + Date.now();
+      currentProjectName = pName;
+      $('project-name-display').textContent = pName;
+      features = [];
+      customGroups = { "Trade Area Scan": { collapsed: false, ids: [] } };
+      map.setCenter(centerLL);
+      closeHomeDialog();
+      renderLayersTree();
+      hint(`Created "${pName}"`);
+    }
+  } catch(e) {
+    currentProjectId = "local-temp-" + Date.now();
+    currentProjectName = pName;
+    $('project-name-display').textContent = pName;
+    features = [];
+    closeHomeDialog();
+    renderLayersTree();
+  }
+};
+
+$('project-name-display').onclick = () => {
+  const newN = prompt('Rename project name:', currentProjectName);
+  if (newN && newN.trim() && newN.trim() !== currentProjectName) {
+    currentProjectName = newN.trim();
+    $('project-name-display').textContent = currentProjectName;
+    markDirty();
+  }
+};
+
 function renderProjectsList() {
   const container = $('existing-projects-container');
   if (!ALL_PROJECTS || !ALL_PROJECTS.length) {
@@ -1590,7 +1715,7 @@ function renderProjectsList() {
 window.deleteProjectPermanently = async function(e, id) {
   e.stopPropagation();
   if (!confirm("Permanently delete this workspace?")) return;
-  ALL_PROJECTS = ALL_PROJECTS.filter(p => p.id !== id);
+  ALL_PROJECTS = ALL_PROJECTS.filter(p => String(p.id) !== String(id));
   renderProjectsList();
   try {
     await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${id}`, {
@@ -1600,19 +1725,62 @@ window.deleteProjectPermanently = async function(e, id) {
   } catch(err) {}
 };
 
-$('btn-home-dialog').onclick = () => $('launcher-modal-scrim').classList.add('visible');
-$('seg-btn-existing').onclick = () => {
-  $('seg-btn-existing').classList.add('active');
-  $('seg-btn-new').classList.remove('active');
-  $('seg-content-existing').style.display = 'flex';
-  $('seg-content-new').style.display = 'none';
-};
-$('seg-btn-new').onclick = () => {
-  $('seg-btn-new').classList.add('active');
-  $('seg-btn-existing').classList.remove('active');
-  $('seg-content-new').style.display = 'flex';
-  $('seg-content-existing').style.display = 'none';
-};
+// ----------------- Supabase Sync Engine -----------------
+async function saveProjectToSupabase(showToast = false) {
+  if (!currentProjectId || String(currentProjectId).startsWith("local-temp") || !SUPABASE_URL || !SUPABASE_KEY) {
+    if (showToast) hint('Working in local mode');
+    return;
+  }
+  setSaveBadgeStatus('saving');
+  
+  const c = map.getCenter();
+  const payload = {
+    updated_at: new Date().toISOString(),
+    name: currentProjectName,
+    center: [c.lng, c.lat],
+    zoom: map.getZoom(),
+    pitch: map.getPitch(),
+    bearing: map.getBearing(),
+    basemap: currentStyleName,
+    features: features,
+    custom_groups: customGroups,
+    layer_visibilities: vis
+  };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${currentProjectId}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      isDirty = false;
+      setSaveBadgeStatus('saved');
+      if (showToast) hint('Project Saved!');
+    } else {
+      setSaveBadgeStatus('unsaved');
+      if (showToast) hint('Failed to save project');
+    }
+  } catch(e) {
+    setSaveBadgeStatus('unsaved');
+    if (showToast) hint('Save request error');
+  }
+}
+
+setInterval(() => { if (isDirty) saveProjectToSupabase(false); }, 20000);
+$('btn-save-project').onclick = () => saveProjectToSupabase(true);
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveProjectToSupabase(true);
+  }
+});
 
 // ----------------- Export Pipeline -----------------
 $('btn-export-dialog').onclick = () => {
@@ -1684,4 +1852,3 @@ try:
     components.html(html, height=1000, scrolling=False)
 except Exception as e:
     st.error(f"Failed to mount Atlas application: {e}")
-    
