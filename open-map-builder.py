@@ -33,6 +33,7 @@ st.sidebar.markdown("### 🗺️ **Basemap Layer**")
 
 basemap_options = [
     "Midnight Blue",
+    "White Gold",
     "Carto DB Light",
     "Carto DB Dark",
     "Satellite",
@@ -40,50 +41,41 @@ basemap_options = [
 ]
 
 selected_basemap = st.sidebar.radio("Select Layer", options=basemap_options, index=0)
+
+# Initial label state; the in-map button can also flip it live without reload
+show_labels = st.sidebar.checkbox("🏷️ Show Labels", value=True)
+
 st.sidebar.markdown("---")
 
-if selected_basemap == "Midnight Blue":
-    st.sidebar.markdown(
-        """
-        <div style="background-color: #0a1628; padding: 12px; border-radius: 6px; border-left: 4px solid #c99c37;">
-            <strong style="color: #c99c37;">Midnight Blue Active</strong><br>
-            <span style="font-size: 12px; color: #8b949e;">Vector-rendered. Zero gridlines. Exact palette.</span>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-else:
-    st.sidebar.caption(f"Active basemap: **{selected_basemap}**")
-
 # ------------------------------------------------------------------------
-# 3. STYLE BUILDERS (MapLibre GL style spec v8)
+# 3. THEME PALETTES & STYLE BUILDERS (MapLibre GL style spec v8)
 # ------------------------------------------------------------------------
 CENTER = [121.0359, 14.5794]  # [lon, lat] Mandaluyong / Metro Manila
 ZOOM = 14
 
-# --- Palette sampled 1:1 from the reference swatch sheet ---
-C = {
-    "overlay":   "#0a1628",  # Overlay  -> map background
-    "text":      "#d9b451",  # Text     -> place labels
-    "land":      "#0d1830",  # Land     -> landuse fill
-    "landcover": "#0f1d33",  # Landcover
-    "water":     "#0a1424",  # Water
-    "waterway":  "#081120",  # Waterways
-    "parks":     "#142440",  # Parks
-    "buildings": "#8e7258",  # Buildings (blended via BUILDING_OPACITY)
-    "aeroway":   "#152640",  # Aeroway
-    "rail":      "#d9b451",  # Rail
-    "rd_major":  "#c99c37",  # Roads Major
-    "rd_min_hi": "#a37d1d",  # Roads Minor High
-    "rd_min_md": "#46463e",  # Roads Minor Mid
-    "rd_min_lo": "#2f2f2a",  # Roads Minor Low
-    "rd_path":   "#4a4333",  # Roads Path
-    "rd_case":   "#685c37",  # Road Outline (casing)
+# Vector themes: one palette dict per theme, one shared style builder
+THEMES = {
+    "Midnight Blue": {
+        "overlay": "#0a1628", "text": "#d9b451", "land": "#0d1830",
+        "landcover": "#0f1d33", "water": "#0a1424", "waterway": "#081120",
+        "parks": "#142440", "buildings": "#8e7258", "aeroway": "#152640",
+        "rail": "#d9b451", "rd_major": "#c99c37", "rd_min_hi": "#a37d1d",
+        "rd_min_md": "#46463e", "rd_min_lo": "#2f2f2a", "rd_path": "#4a4333",
+        "rd_case": "#685c37",
+        "building_opacity": 0.07,   # barely-there footprints, blends into navy
+        "muted": "#8b949e",
+    },
+    "White Gold": {
+        "overlay": "#ffffff", "text": "#a07d1c", "land": "#fafafa",
+        "landcover": "#f1f1ec", "water": "#d4dadc", "waterway": "#c2c9cc",
+        "parks": "#e6ebe4", "buildings": "#d8d8d4", "aeroway": "#e4e4e4",
+        "rail": "#c99c37", "rd_major": "#c99c37", "rd_min_hi": "#d3a845",
+        "rd_min_md": "#e0be74", "rd_min_lo": "#ead9b0", "rd_path": "#e6dabd",
+        "rd_case": "#b08a24",
+        "building_opacity": 0.5,
+        "muted": "#6b7280",
+    },
 }
-
-# Tan at 15% over the navy land tone -> subtle warm-navy footprint (~#202636).
-# Raise toward 1.0 to make buildings pop, lower to hide them completely.
-BUILDING_OPACITY = 0.15
 
 def w(*stops):
     """Zoom-interpolated line width helper (exponential 1.2)."""
@@ -92,7 +84,7 @@ def w(*stops):
         out += [z, val]
     return out
 
-def road_layer(lid, classes, color, widths, minzoom=0, casing=False):
+def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False):
     """One transportation line layer filtered by OMT class."""
     lyr = {
         "id": lid, "type": "line", "source": "omt", "source-layer": "transportation",
@@ -102,63 +94,61 @@ def road_layer(lid, classes, color, widths, minzoom=0, casing=False):
     }
     if minzoom:
         lyr["minzoom"] = minzoom
-    if casing:  # olive outline drawn under the road fill
-        lyr["paint"]["line-color"] = C["rd_case"]
+    if casing:  # outline drawn under the road fill
+        lyr["paint"]["line-color"] = p["rd_case"]
         lyr["paint"]["line-width"] = w(*[(z, val + 2.0) for z, val in widths])
         lyr["id"] = lid + "_casing"
     return lyr
 
-def midnight_style():
-    """Custom vector style. Vector tiles = no raster seams/gridlines, ever."""
+def vector_style(p, show_labels):
+    """Custom vector style from a palette. Vector tiles = zero gridlines."""
     return {
         "version": 8,
-        # Free hosted glyphs so symbol layers can render text (no API key)
         "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
         "sources": {
             # Free OpenMapTiles vector planet, no API key (OpenFreeMap)
             "omt": {"type": "vector", "url": "https://tiles.openfreemap.org/planet"}
         },
         "layers": [
-            {"id": "bg", "type": "background", "paint": {"background-color": C["overlay"]}},
+            {"id": "bg", "type": "background", "paint": {"background-color": p["overlay"]}},
             {"id": "landcover", "type": "fill", "source": "omt", "source-layer": "landcover",
-             "paint": {"fill-color": C["landcover"], "fill-opacity": 0.6}},
+             "paint": {"fill-color": p["landcover"], "fill-opacity": 0.6}},
             {"id": "landuse", "type": "fill", "source": "omt", "source-layer": "landuse",
-             "paint": {"fill-color": C["land"], "fill-opacity": 0.8}},
+             "paint": {"fill-color": p["land"], "fill-opacity": 0.8}},
             {"id": "park", "type": "fill", "source": "omt", "source-layer": "park",
-             "paint": {"fill-color": C["parks"]}},
+             "paint": {"fill-color": p["parks"]}},
             {"id": "water", "type": "fill", "source": "omt", "source-layer": "water",
-             "paint": {"fill-color": C["water"]}},
+             "paint": {"fill-color": p["water"]}},
             {"id": "waterway", "type": "line", "source": "omt", "source-layer": "waterway",
-             "paint": {"line-color": C["waterway"], "line-width": w((9, 1), (20, 6))}},
+             "paint": {"line-color": p["waterway"], "line-width": w((9, 1), (20, 6))}},
             {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway",
-             "paint": {"line-color": C["aeroway"], "line-width": w((11, 1), (20, 12))}},
-            # Buildings: palette tan blended INTO the navy basemap instead of
-            # sitting on top of it as solid blocks
+             "paint": {"line-color": p["aeroway"], "line-width": w((11, 1), (20, 12))}},
             {"id": "building", "type": "fill", "source": "omt", "source-layer": "building",
              "minzoom": 14,
-             "paint": {"fill-color": C["buildings"],
-                        "fill-opacity": BUILDING_OPACITY,
-                        "fill-outline-color": C["buildings"]}},
+             "paint": {"fill-color": p["buildings"],
+                        "fill-opacity": p["building_opacity"],
+                        "fill-outline-color": p["buildings"]}},
             # Casings first (Road Outline), then fills low->high so majors sit on top
-            road_layer("case_major", ["motorway", "trunk", "primary"], None,
+            road_layer(p, "case_major", ["motorway", "trunk", "primary"], None,
                        [(6, 1.0), (14, 4.0), (20, 22)], casing=True),
-            road_layer("case_minhi", ["secondary", "tertiary"], None,
+            road_layer(p, "case_minhi", ["secondary", "tertiary"], None,
                        [(8, 0.8), (14, 3.0), (20, 16)], casing=True),
-            road_layer("rd_path", ["path", "pedestrian", "footway"], C["rd_path"],
+            road_layer(p, "rd_path", ["path", "pedestrian", "footway"], p["rd_path"],
                        [(14, 0.6), (20, 6)], minzoom=14),
-            road_layer("rd_min_lo", ["service", "track"], C["rd_min_lo"],
+            road_layer(p, "rd_min_lo", ["service", "track"], p["rd_min_lo"],
                        [(14, 0.6), (20, 7)], minzoom=14),
-            road_layer("rd_min_md", ["minor"], C["rd_min_md"],
+            road_layer(p, "rd_min_md", ["minor"], p["rd_min_md"],
                        [(13, 0.8), (16, 4.0), (20, 12)], minzoom=13),
-            road_layer("rd_min_hi", ["secondary", "tertiary"], C["rd_min_hi"],
+            road_layer(p, "rd_min_hi", ["secondary", "tertiary"], p["rd_min_hi"],
                        [(8, 0.8), (14, 3.0), (20, 16)]),
-            road_layer("rd_major", ["motorway", "trunk", "primary"], C["rd_major"],
+            road_layer(p, "rd_major", ["motorway", "trunk", "primary"], p["rd_major"],
                        [(6, 1.0), (14, 4.0), (20, 22)]),
-            road_layer("rail", ["rail"], C["rail"], [(13, 0.5), (20, 2.5)], minzoom=13),
-            # Place labels in the gold "Text" swatch, haloed by the base navy
+            road_layer(p, "rail", ["rail"], p["rail"], [(13, 0.5), (20, 2.5)], minzoom=13),
+            # Place labels; visibility driven by sidebar checkbox + in-map button
             {"id": "label_place", "type": "symbol", "source": "omt", "source-layer": "place",
              "minzoom": 6,
              "layout": {
+                 "visibility": "visible" if show_labels else "none",
                  "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]],
                  "text-font": ["Noto Sans Regular"],
                  "text-size": ["interpolate", ["linear"], ["zoom"], 6, 10, 12, 14, 16, 18],
@@ -167,8 +157,8 @@ def midnight_style():
                  "text-max-width": 8,
              },
              "paint": {
-                 "text-color": C["text"],
-                 "text-halo-color": C["overlay"],
+                 "text-color": p["text"],
+                 "text-halo-color": p["overlay"],
                  "text-halo-width": 1.5,
              }},
         ],
@@ -186,19 +176,38 @@ def raster_style(tile_urls, bg, maxzoom=20):
     }
 
 STYLES = {
-    "Midnight Blue": midnight_style,
-    "Carto DB Light": lambda: raster_style(
+    "Midnight Blue": lambda lb: vector_style(THEMES["Midnight Blue"], lb),
+    "White Gold":    lambda lb: vector_style(THEMES["White Gold"], lb),
+    "Carto DB Light": lambda lb: raster_style(
         ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
          "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], "#f8f9fa"),
-    "Carto DB Dark": lambda: raster_style(
+    "Carto DB Dark": lambda lb: raster_style(
         ["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
          "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"], "#000000"),
-    "OSM": lambda: raster_style(
+    "OSM": lambda lb: raster_style(
         ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "#f2efe9", maxzoom=19),
-    "Satellite": lambda: raster_style(
+    "Satellite": lambda lb: raster_style(
         ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
         "#000000", maxzoom=19),
 }
+
+# Sidebar status card for vector themes
+if selected_basemap in THEMES:
+    p = THEMES[selected_basemap]
+    st.sidebar.markdown(
+        f"""
+        <div style="background-color: {p['overlay']}; padding: 12px; border-radius: 6px;
+                    border: 1px solid {p['muted']}33; border-left: 4px solid {p['rd_major']};">
+            <strong style="color: {p['text']};">{selected_basemap} Active</strong><br>
+            <span style="font-size: 12px; color: {p['muted']};">
+                Vector-rendered. Zero gridlines. Exact palette.
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.sidebar.caption(f"Active basemap: **{selected_basemap}**")
 
 # ------------------------------------------------------------------------
 # 4. MAPLIBRE GL RENDERER
@@ -213,7 +222,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   html, body { margin: 0; padding: 0; background: __BG__; }
   #map { position: absolute; width: 100%; height: 100%; }
   #attr { position: absolute; bottom: 4px; left: 6px; z-index: 2;
-          font: 10px sans-serif; color: #8b949e; pointer-events: none; }
+          font: 10px sans-serif; color: __MUTED__; pointer-events: none; }
+  #lblToggle { position: absolute; bottom: 10px; right: 10px; z-index: 2;
+               background: #161b22dd; color: #f0f6fc; border: 1px solid #30363d;
+               border-radius: 6px; padding: 6px 10px; font: 11px sans-serif;
+               cursor: pointer; }
   #err { display: none; position: absolute; top: 10px; left: 10px; z-index: 3;
          background: #3d1111; color: #ffb4b4; padding: 8px 12px;
          border-radius: 6px; font: 12px monospace; }
@@ -222,6 +235,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
 <div id="map"></div>
 <div id="attr">© OpenStreetMap contributors · OpenFreeMap</div>
+<button id="lblToggle"></button>
 <div id="err"></div>
 <script>
 try {
@@ -234,6 +248,19 @@ try {
     fadeDuration: 0
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+  // Instant label toggle (no Streamlit rerun / map reload)
+  let labelsOn = __LABELS_JS__;
+  const btn = document.getElementById('lblToggle');
+  const applyLabels = () => {
+    if (map.getLayer('label_place')) {
+      map.setLayoutProperty('label_place', 'visibility', labelsOn ? 'visible' : 'none');
+    }
+    btn.textContent = 'Labels: ' + (labelsOn ? 'ON' : 'OFF');
+  };
+  btn.onclick = () => { labelsOn = !labelsOn; applyLabels(); };
+  map.on('load', applyLabels);
+
   map.on('error', (e) => console.warn('map error:', e));
 } catch (e) {
   const box = document.getElementById('err');
@@ -245,13 +272,21 @@ try {
 </html>"""
 
 try:
-    style_json = json.dumps(STYLES[selected_basemap]())
-    bg = C["overlay"] if selected_basemap == "Midnight Blue" else "#000000"
+    style_json = json.dumps(STYLES[selected_basemap](show_labels))
+    if selected_basemap in THEMES:
+        body_bg, muted = THEMES[selected_basemap]["overlay"], THEMES[selected_basemap]["muted"]
+    elif selected_basemap in ("Carto DB Dark", "Satellite"):
+        body_bg, muted = "#000000", "#8b949e"
+    else:
+        body_bg, muted = "#f8f9fa", "#6b7280"
+
     html = (HTML_TEMPLATE
             .replace("__STYLE__", style_json)
             .replace("__CENTER__", json.dumps(CENTER))
             .replace("__ZOOM__", str(ZOOM))
-            .replace("__BG__", bg))
+            .replace("__BG__", body_bg)
+            .replace("__MUTED__", muted)
+            .replace("__LABELS_JS__", "true" if show_labels else "false"))
     components.html(html, height=950, scrolling=False)
 except Exception as e:
     st.error(f"Map render failed: {e}")
