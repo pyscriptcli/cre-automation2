@@ -3,7 +3,7 @@ import os
 import re
 import streamlit as st
 import streamlit.components.v1 as components
-from supabase import create_client, Client
+import requests
 
 # ------------------------------------------------------------------------
 # 1. PAGE CONFIGURATION & ROOT CSS OVERRIDES
@@ -22,7 +22,7 @@ st.markdown(
         font-family: 'Century Gothic Custom';
         src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic'), sans-serif;
     }
-    * { font-family: 'Century Gothic Custom', system-ui, -apple-system, sans-serif !important; }
+    * { font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif !important; }
     [data-testid="stSidebar"], section[data-testid="stSidebar"],
     header, #MainMenu, footer, [data-testid="stHeader"] { 
         display: none !important; 
@@ -62,168 +62,42 @@ st.markdown(
         height: 100vh !important;
         background: #0a1628 !important;
     }
-
-    /* Modal / Dialog Backdrop & Panels */
-    .stDialog > div {
-        background: #181d24f9 !important;
-        backdrop-filter: blur(16px) !important;
-        border: 1px solid #2d333b !important;
-        border-radius: 16px !important;
-        color: #f0f6fc !important;
-    }
-    div[data-baseweb="input"], div[data-baseweb="select"] {
-        background-color: #0d1117 !important;
-        border: 1px solid #2d333b !important;
-        border-radius: 8px !important;
-    }
-    input, select, textarea {
-        color: #f0f6fc !important;
-    }
-    .stButton > button {
-        background: #316dca !important;
-        color: #ffffff !important;
-        border: 1px solid #316dca !important;
-        border-radius: 8px !important;
-        font-weight: 700 !important;
-        padding: 6px 16px !important;
-        transition: all 0.2s ease !important;
-    }
-    .stButton > button:hover {
-        background: #2557a7 !important;
-        border-color: #2557a7 !important;
-    }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
 # ------------------------------------------------------------------------
-# 2. SUPABASE CONNECTION & DATABASE PIPELINE
+# 2. SUPABASE CONNECTION & REST API PIPELINE
 # ------------------------------------------------------------------------
 SUPABASE_URL = st.secrets.get("supabase", {}).get("url", "https://cyczyaswxkpdcremqnkn.supabase.co")
 SUPABASE_KEY = st.secrets.get("supabase", {}).get("key", "sb_publishable_pUppHGjwmT1mLlhWGZH6Og_4GcCLCPR")
 
-@st.cache_resource
-def get_supabase_client() -> Client:
-    clean_url = SUPABASE_URL.replace("/rest/v1/", "").rstrip("/")
-    return create_client(clean_url, SUPABASE_KEY)
+BASE_API_URL = SUPABASE_URL.replace("/rest/v1/", "").rstrip("/") + "/rest/v1"
 
-try:
-    supabase = get_supabase_client()
-except Exception as e:
-    supabase = None
+def get_headers():
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
 
 def fetch_projects():
-    if not supabase: return []
     try:
-        res = supabase.table("map_projects").select("id, name, updated_at, basemap, zoom, center").order("updated_at", desc=True).execute()
-        return res.data or []
+        url = f"{BASE_API_URL}/map_projects?select=id,name,updated_at,basemap,zoom,center,features,custom_groups,layer_visibilities&order=updated_at.desc"
+        res = requests.get(url, headers=get_headers(), timeout=8)
+        if res.status_code == 200:
+            return res.json()
+        return []
     except Exception:
         return []
 
-def create_new_project_db(name, basemap, center, zoom):
-    if not supabase: return None
-    payload = {
-        "name": name or "Untitled Workspace",
-        "basemap": basemap,
-        "center": center,
-        "zoom": zoom,
-        "pitch": 0,
-        "bearing": 0,
-        "features": [],
-        "custom_groups": {"Trade Area Scan": {"collapsed": False, "ids": []}},
-        "layer_visibilities": {}
-    }
-    res = supabase.table("map_projects").insert(payload).execute()
-    return res.data[0] if res.data else None
-
-def get_project_db(project_id):
-    if not supabase: return None
-    res = supabase.table("map_projects").select("*").eq("id", project_id).single().execute()
-    return res.data
-
-def delete_project_db(project_id):
-    if not supabase: return
-    supabase.table("map_projects").delete().eq("id", project_id).execute()
+ALL_PROJECTS_LIST = fetch_projects()
 
 # ------------------------------------------------------------------------
-# 3. INITIAL PROJECT SELECTION DIALOG (LAUNCHER)
+# 3. POI & VECTOR STYLES CONFIGURATION
 # ------------------------------------------------------------------------
-if "active_project" not in st.session_state:
-    st.session_state.active_project = None
-
-if not st.session_state.active_project:
-    @st.dialog("Open Map Builder Studio", width="large")
-    def project_launcher_dialog():
-        st.markdown("<div style='font-size: 13px; color: #adbac7; margin-bottom: 12px;'>Select an existing spatial workspace from Supabase or start a new studio project.</div>", unsafe_allow_html=True)
-        tab_new, tab_open = st.tabs(["✨ Create New Project", "📂 Open Existing Project"])
-
-        with tab_new:
-            p_name = st.text_input("Project Name", value="Manila Metro Spatial Analysis", placeholder="e.g. BGC Expansion Study")
-            col_b, col_z = st.columns(2)
-            with col_b:
-                p_basemap = st.selectbox("Default Basemap", ["Midnight Blue", "Monochrome", "White Gold", "Satellite", "Carto DB Dark", "Carto DB Light", "OSM"])
-            with col_z:
-                p_zoom = st.slider("Initial Zoom Level", min_value=6, max_value=18, value=14)
-            p_coords = st.text_input("Center Coordinates (Lat, Lon)", value="14.5995, 120.9842")
-
-            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-            if st.button("Initialize Workspace", use_container_width=True):
-                match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", p_coords)
-                if match:
-                    lat, lon = float(match.group(1)), float(match.group(2))
-                    center_payload = [lon, lat]
-                else:
-                    center_payload = [120.9842, 14.5995]
-
-                created = create_new_project_db(p_name, p_basemap, center_payload, p_zoom)
-                if created:
-                    st.session_state.active_project = created
-                    st.rerun()
-                else:
-                    st.session_state.active_project = {
-                        "id": "local-fallback",
-                        "name": p_name,
-                        "basemap": p_basemap,
-                        "center": center_payload,
-                        "zoom": p_zoom,
-                        "features": [],
-                        "custom_groups": {"Trade Area Scan": {"collapsed": False, "ids": []}},
-                        "layer_visibilities": {}
-                    }
-                    st.rerun()
-
-        with tab_open:
-            existing = fetch_projects()
-            if not existing:
-                st.info("No saved projects found in Supabase. Create your first project above.")
-            else:
-                for proj in existing:
-                    with st.container():
-                        col_info, col_act = st.columns([3, 1])
-                        with col_info:
-                            st.markdown(f"**{proj['name']}**")
-                            st.markdown(f"<span style='font-size:11px; color:#768390;'>Theme: {proj.get('basemap','Default')} · Zoom: {proj.get('zoom',14)} · Last saved: {str(proj.get('updated_at',''))[:19]}</span>", unsafe_allow_html=True)
-                        with col_act:
-                            if st.button("Open", key=f"open_{proj['id']}", use_container_width=True):
-                                loaded = get_project_db(proj['id'])
-                                st.session_state.active_project = loaded or proj
-                                st.rerun()
-                        st.markdown("<hr style='border:0; border-top:1px solid #22272e; margin:6px 0;'>", unsafe_allow_html=True)
-
-    project_launcher_dialog()
-    st.stop()
-
-# ------------------------------------------------------------------------
-# 4. ACTIVE PROJECT CONTEXT & POI TAXONOMY
-# ------------------------------------------------------------------------
-CURRENT_PROJECT = st.session_state.active_project
-CENTER = CURRENT_PROJECT.get("center", [120.9842, 14.5995])
-ZOOM = CURRENT_PROJECT.get("zoom", 14)
-INITIAL_BASEMAP = CURRENT_PROJECT.get("basemap", "Midnight Blue")
-PROJECT_ID = str(CURRENT_PROJECT.get("id", "temp-id"))
-PROJECT_NAME = CURRENT_PROJECT.get("name", "Untitled Workspace")
-
 POI_CONFIG = {
     "COMMERCIAL & OFFICES": [
         ['Corporate Office', '"building"~"office|commercial",i'], 
@@ -290,9 +164,6 @@ POI_CONFIG = {
     ]
 }
 
-# ------------------------------------------------------------------------
-# 5. VECTOR MAP STYLES & LAYERS
-# ------------------------------------------------------------------------
 THEMES = {
     "Midnight Blue": {
         "overlay": "#0a1628", "text": "#d9b451", "land": "#0d1830",
@@ -413,7 +284,7 @@ ALL_STYLES = {
 }
 
 # ------------------------------------------------------------------------
-# 6. HTML MAP ENGINE WITH SUPABASE AUTOSAVE & DIRECT SYNC
+# 4. EMBEDDED MAPBOX/MAPLIBRE APP WITH UNIFIED TOP TOOLBAR & IOS 26 DIALOG
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -427,58 +298,55 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     font-family: 'Century Gothic Custom';
     src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic'), sans-serif;
   }
-  * { box-sizing: border-box; user-select: none; font-family: 'Century Gothic Custom', system-ui, sans-serif; }
-  html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: __BG__; }
-  #map { position: absolute; inset: 0; width: 100vw; height: 100vh; }
+  * { box-sizing: border-box; user-select: none; font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
+  html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0a1628; }
+  #map-wrapper { position: absolute; inset: 0; width: 100vw; height: 100vh; transition: filter 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+  #map-wrapper.blurred { filter: blur(28px) brightness(0.65) saturate(1.2); transform: scale(0.985); pointer-events: none; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-  /* Top Workspace Header Bar */
-  #project-bar {
-    position: absolute; top: 16px; left: 74px; z-index: 8;
-    background: #181d24ee; backdrop-filter: blur(12px); border: 1px solid #2d333b;
-    border-radius: 12px; padding: 6px 14px; display: flex; align-items: center; gap: 10px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5); color: #f0f6fc; font-size: 12px;
+  /* Unified Top Island Toolbar */
+  #top-toolbar-bar {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+    background: rgba(22, 27, 34, 0.72); backdrop-filter: blur(20px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 36px; padding: 4px 10px;
+    display: flex; align-items: center; gap: 4px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+    color: #f0f6fc;
   }
-  #project-name-display { font-weight: 700; color: #38bdf8; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .save-badge { font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 600; background: #22272e; color: #8b949e; border: 1px solid #30363d; display: flex; align-items: center; gap: 4px; }
-  .save-badge.saving { color: #d9b451; border-color: #d9b451; }
-  .save-badge.saved { color: #3fb950; border-color: #3fb950; }
-
-  /* Vertical Toolbar Rail */
-  #side-rail {
-    position: absolute; top: 50%; left: 16px; transform: translateY(-50%);
-    width: 48px; z-index: 10; background: #181d24ee; backdrop-filter: blur(14px);
-    border: 1px solid #2d333b; border-radius: 28px; display: flex; flex-direction: column;
-    align-items: center; padding: 10px 0; gap: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-  }
-  .rail-btn {
-    width: 36px; height: 36px; display: grid; place-items: center;
+  .tb-btn {
+    width: 32px; height: 32px; display: grid; place-items: center;
     background: transparent; border: none; color: #adbac7; border-radius: 50%;
-    cursor: pointer; transition: all 0.15s ease;
+    cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .rail-btn:hover { background: #22272e; color: #cdd9e5; }
-  .rail-btn.active { background: #2d333b; color: #f0f6fc; }
-  .rail-btn.primary-active { background: #316dca; color: #ffffff; }
-  .rail-btn.save-trigger-btn { color: #3fb950; }
-  .rail-btn.save-trigger-btn:hover { background: #23863626; color: #3fb950; }
-  .rail-sep { width: 24px; height: 1px; background: #2d333b; margin: 2px 0; }
+  .tb-btn:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; transform: scale(1.05); }
+  .tb-btn.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
+  .tb-btn.primary-active { background: #316dca; color: #ffffff; }
+  .tb-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.12); margin: 0 4px; }
 
-  /* Flyout Left Panels */
+  #project-meta-cluster { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+  #project-name-display { font-weight: 700; color: #38bdf8; font-size: 12px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .save-badge { font-size: 9px; padding: 2px 7px; border-radius: 12px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: #8b949e; border: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 4px; }
+  .save-badge.saving { color: #d9b451; border-color: rgba(217, 180, 81, 0.4); }
+  .save-badge.saved { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); }
+
+  /* Left Floating Panels */
   .left-panel {
-    position: absolute; top: 16px; left: 74px; bottom: 16px; width: 360px; z-index: 9;
-    background: #181d24f7; backdrop-filter: blur(14px); border: 1px solid #2d333b;
-    border-radius: 16px; box-shadow: 0 12px 36px rgba(0,0,0,0.6);
-    display: none; flex-direction: column; overflow: hidden; color: #adbac7;
+    position: absolute; top: 68px; left: 16px; bottom: 16px; width: 360px; z-index: 9;
+    background: rgba(22, 27, 34, 0.82); backdrop-filter: blur(24px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); display: none; flex-direction: column;
+    overflow: hidden; color: #adbac7; animation: panelIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .left-panel.open { display: flex; }
+  @keyframes panelIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #22272e; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
   .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #f0f6fc; }
-  .icon-action-btn { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #2d333b; background: #22272e; border-radius: 6px; cursor: pointer; color: #adbac7; }
-  .icon-action-btn:hover { background: #2d333b; color: #f0f6fc; }
+  .icon-action-btn { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); border-radius: 8px; cursor: pointer; color: #adbac7; }
+  .icon-action-btn:hover { background: rgba(255, 255, 255, 0.15); color: #f0f6fc; }
   .panel-content { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
 
-  /* Collapsed Accordions */
-  .acc-item { border-bottom: 1px solid #22272e; padding-bottom: 8px; }
+  /* Accordions */
+  .acc-item { border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
   .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 6px 0; }
   .acc-body { padding: 6px 0 2px 0; display: flex; flex-direction: column; gap: 8px; }
   .acc-body.hidden { display: none !important; }
@@ -486,144 +354,226 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
   .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
 
-  /* 2D / 3D Mode Toggle */
-  .dimension-mode-bar { display: flex; gap: 4px; background: #1c2128; padding: 3px; border-radius: 6px; border: 1px solid #2d333b; }
-  .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 4px; cursor: pointer; }
+  /* Dimension 2D / 3D Mode */
+  .dimension-mode-bar { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.25); padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 6px; cursor: pointer; }
   .dimension-mode-btn.active { background: #316dca; color: #ffffff; }
 
   .bound-select-row { display: flex; gap: 6px; margin-top: 4px; }
-  .bound-select-row input[type=text] { flex: 1; background: #1c2128; border: 1px solid #2d333b; color: #f0f6fc; padding: 5px 8px; border-radius: 6px; font-size: 11px; }
-  .bound-select-row button { background: #ff1e1e; color: #fff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .bound-select-row input[type=text] { flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.12); color: #f0f6fc; padding: 6px 8px; border-radius: 8px; font-size: 11px; }
+  .bound-select-row button { background: #ff1e1e; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
 
-  /* My Layers & Collapsible Grouping Container */
+  /* My Layers & Collapsible Grouping */
   .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
   .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
-  .group-container { background: #1c2128; border: 1px solid #2d333b; border-radius: 8px; margin-top: 6px; overflow: hidden; }
-  .group-header { background: #22272e; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  .group-container { background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; }
+  .group-header { background: rgba(255, 255, 255, 0.05); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
   .group-title-input { background: transparent; border: none; font-weight: 700; color: #f0f6fc; font-size: 12px; width: 140px; }
-  .group-title-input:focus { background: #181d24; outline: none; border-radius: 4px; padding: 2px 4px; }
+  .group-title-input:focus { background: rgba(0, 0, 0, 0.4); outline: none; border-radius: 4px; padding: 2px 4px; }
   .group-items { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
   .group-items.hidden { display: none !important; }
 
-  .layer-card { background: #22272e; border: 1px solid #2d333b; border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .layer-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
   .layer-card-top { display: flex; align-items: center; gap: 6px; }
   .layer-name-input { flex: 1; border: 1px solid transparent; background: transparent; font-weight: 600; font-size: 12px; color: #f0f6fc; padding: 2px 4px; border-radius: 4px; }
-  .layer-name-input:focus { border-color: #316dca; background: #1c2128; outline: none; }
+  .layer-name-input:focus { border-color: #316dca; background: rgba(0,0,0,0.3); outline: none; }
   .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
-  .card-btn:hover { color: #f0f6fc; background: #2d333b; }
+  .card-btn:hover { color: #f0f6fc; background: rgba(255,255,255,0.1); }
 
   /* Trade Area Controls */
-  .trade-controls { display: flex; flex-direction: column; gap: 6px; background: #1c2128; padding: 8px; border-radius: 8px; border: 1px solid #2d333b; }
-  .trade-controls select { background: #22272e; color: #f0f6fc; border: 1px solid #2d333b; border-radius: 6px; padding: 5px; font-size: 11px; }
-  .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 6px; padding: 6px; font-weight: 600; cursor: pointer; font-size: 11px; }
+  .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .trade-controls select { background: rgba(255,255,255,0.06); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
+  .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; }
   .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-  .poi-badge { display: flex; justify-content: space-between; background: #22272e; padding: 4px 6px; border-radius: 4px; }
+  .poi-badge { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 5px 8px; border-radius: 6px; }
 
   /* Floating Popups */
   .float-card {
-    position: absolute; left: 74px; z-index: 12; background: #181d24f7; backdrop-filter: blur(14px);
-    border: 1px solid #2d333b; border-radius: 14px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    display: none; flex-direction: column; gap: 10px; font-size: 12px; color: #adbac7;
+    position: absolute; top: 68px; left: 50%; transform: translateX(-50%); z-index: 12;
+    background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(24px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 14px;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6); display: none; flex-direction: column;
+    gap: 10px; font-size: 12px; color: #adbac7;
   }
   .float-card.open { display: flex; }
   .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
   .float-card input[type=color] { border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; background: transparent; }
-  .float-card input[type=text], .float-card select { background: #1c2128; color: #f0f6fc; border: 1px solid #2d333b; border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+  .float-card input[type=text], .float-card select { background: rgba(0,0,0,0.3); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; }
 
-  #popup-search { top: 20%; width: 280px; }
-  #popup-marker-settings { top: 25%; width: 240px; }
-  #popup-text-settings { top: 30%; width: 260px; }
-  #popup-shape-editor { top: 8%; width: 320px; max-height: 84vh; overflow-y: auto; }
-  #popup-custom-map { top: 16px; bottom: 16px; width: 310px; overflow-y: auto; }
-  #popup-export { top: 50%; transform: translateY(-50%); width: 320px; }
+  #popup-search { width: 280px; }
+  #popup-marker-settings { width: 240px; }
+  #popup-text-settings { width: 260px; }
+  #popup-shape-editor { width: 320px; max-height: 80vh; overflow-y: auto; right: 16px; left: auto; transform: none; }
+  #popup-custom-map { width: 310px; max-height: 80vh; overflow-y: auto; }
+  #popup-export { width: 320px; }
 
   .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #2d333b; border-radius: 8px; background: #22272e; color: #adbac7; cursor: pointer; }
+  .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; }
   .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
 
   .layout-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0; }
-  .layout-btn { padding: 6px; background: #22272e; border: 1px solid #2d333b; border-radius: 6px; color: #f0f6fc; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
+  .layout-btn { padding: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #f0f6fc; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
   .layout-btn.active { background: #316dca; border-color: #316dca; }
 
+  /* Tag Inspector Table */
   .maplibregl-popup-content {
-    background: #181d24f7 !important; color: #f0f6fc !important;
-    border: 1px solid #2d333b !important; border-radius: 8px !important;
-    padding: 10px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+    background: rgba(22, 27, 34, 0.88) !important; color: #f0f6fc !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important;
+    backdrop-filter: blur(20px) !important; padding: 10px !important; box-shadow: 0 12px 32px rgba(0,0,0,0.6) !important;
     font-size: 11px !important; max-width: 280px !important;
   }
-  .maplibregl-popup-tip { border-top-color: #181d24f7 !important; }
+  .maplibregl-popup-tip { border-top-color: rgba(22, 27, 34, 0.88) !important; }
   .tag-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  .tag-table th, .tag-table td { text-align: left; padding: 3px 6px; border: 1px solid #2d333b; font-size: 10px; }
-  .tag-table th { background: #22272e; color: #38bdf8; }
+  .tag-table th, .tag-table td { text-align: left; padding: 4px 6px; border: 1px solid rgba(255,255,255,0.08); font-size: 10px; }
+  .tag-table th { background: rgba(255,255,255,0.06); color: #38bdf8; }
   .tag-table td { word-break: break-all; }
 
   #hint-toast {
     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 15;
-    background: #181d24ee; color: #f0f6fc; border: 1px solid #2d333b; border-radius: 20px; padding: 7px 18px;
-    font-size: 12px; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: none;
+    background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(16px); color: #f0f6fc;
+    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 7px 18px;
+    font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: none;
   }
+
+  /* iOS 26 Glassmorphic Minimalist Launcher Modal Overlay */
+  #launcher-modal-scrim {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(5, 10, 20, 0.45); backdrop-filter: blur(32px) saturate(200%);
+    opacity: 0; pointer-events: none; transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #launcher-modal-scrim.visible { opacity: 1; pointer-events: auto; }
+
+  .ios26-card {
+    width: 90%; max-width: 480px; max-height: 85vh;
+    background: rgba(25, 32, 45, 0.65); backdrop-filter: blur(40px) saturate(210%);
+    border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 28px;
+    box-shadow: 0 32px 80px -12px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+    display: flex; flex-direction: column; overflow: hidden; color: #ffffff;
+    transform: scale(0.94) translateY(12px); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #launcher-modal-scrim.visible .ios26-card { transform: scale(1) translateY(0); }
+
+  .ios26-header { padding: 22px 24px 14px 24px; display: flex; flex-direction: column; gap: 4px; }
+  .ios26-title { font-size: 20px; font-weight: 800; letter-spacing: -0.4px; color: #ffffff; }
+  .ios26-subtitle { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+
+  /* iOS 26 Segmented Control */
+  .ios26-seg {
+    margin: 0 24px 14px 24px; display: flex; background: rgba(0, 0, 0, 0.32);
+    padding: 3px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .ios26-seg-btn {
+    flex: 1; border: none; background: transparent; color: rgba(255, 255, 255, 0.65);
+    font-size: 12px; font-weight: 600; padding: 7px 0; border-radius: 11px; cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ios26-seg-btn.active {
+    background: rgba(255, 255, 255, 0.18); color: #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.2);
+  }
+
+  .ios26-body { padding: 0 24px 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .ios26-input-group { display: flex; flex-direction: column; gap: 6px; }
+  .ios26-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.5); }
+  .ios26-input {
+    background: rgba(0, 0, 0, 0.28); border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px; padding: 10px 14px; color: #ffffff; font-size: 13px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .ios26-input:focus { border-color: #38bdf8; }
+
+  .ios26-proj-item {
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px; padding: 12px 16px; display: flex; justify-content: space-between;
+    align-items: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ios26-proj-item:hover {
+    background: rgba(255, 255, 255, 0.12); border-color: rgba(56, 189, 248, 0.4);
+    transform: translateY(-1px);
+  }
+  .ios26-action-btn {
+    background: #316dca; color: #ffffff; border: none; border-radius: 14px;
+    padding: 12px; font-weight: 700; font-size: 13px; cursor: pointer;
+    box-shadow: 0 8px 24px rgba(49, 109, 202, 0.4), inset 0 1px 1px rgba(255,255,255,0.3);
+    transition: transform 0.15s, background 0.15s;
+  }
+  .ios26-action-btn:hover { background: #255bb0; transform: scale(1.01); }
 </style>
 </head>
 <body>
-<div id="map"></div>
 
-<!-- Top Workspace Header Bar -->
-<div id="project-bar">
-  <span style="color:#768390;">Project:</span>
-  <span id="project-name-display">__PROJECT_NAME__</span>
-  <div class="save-badge" id="save-status-badge">
-    <span id="save-dot">●</span>
-    <span id="save-text">Saved</span>
-  </div>
+<div id="map-wrapper">
+  <div id="map"></div>
 </div>
 
-<!-- Vertical Toolbar Rail -->
-<div id="side-rail">
-  <button class="rail-btn save-trigger-btn" id="btn-save-project" title="Save Workspace (Ctrl+S)">
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+<!-- Unified Top Island Toolbar -->
+<div id="top-toolbar-bar">
+  <button class="tb-btn" id="btn-home-dialog" title="Project Selection (Home)">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
   </button>
-  <div class="rail-sep"></div>
-  <button class="rail-btn" id="btn-browser-toggle" title="Data Browser (Base layers, 2D/3D, Boundaries)">
-    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
+  
+  <div class="tb-sep"></div>
+
+  <div id="project-meta-cluster">
+    <span id="project-name-display" title="Click to rename project">__PROJECT_NAME__</span>
+    <div class="save-badge" id="save-status-badge">
+      <span id="save-dot">●</span>
+      <span id="save-text">Saved</span>
+    </div>
+  </div>
+
+  <button class="tb-btn" id="btn-save-project" title="Save Workspace (Ctrl+S)" style="color:#3fb950;">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
   </button>
-  <button class="rail-btn" id="btn-mylayers-toggle" title="My Layers & Groupings">
-    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+
+  <div class="tb-sep"></div>
+
+  <button class="tb-btn" id="btn-browser-toggle" title="Data Browser">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
   </button>
-  <div class="rail-sep"></div>
-  <button class="rail-btn" id="btn-search" title="Search Location">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+  <button class="tb-btn" id="btn-mylayers-toggle" title="My Layers">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
   </button>
-  <button class="rail-btn tool" data-tool="marker" title="Place Drop-Pin Marker">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
+
+  <div class="tb-sep"></div>
+
+  <button class="tb-btn" id="btn-search" title="Search Place">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
   </button>
-  <button class="rail-btn tool" data-tool="textbox" title="Add Text Label">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+  <button class="tb-btn tool" data-tool="marker" title="Marker Pin">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
   </button>
-  <button class="rail-btn tool" data-tool="polyline" title="Draw Polyline">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"></path></svg>
+  <button class="tb-btn tool" data-tool="textbox" title="Text Label">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
   </button>
-  <button class="rail-btn tool" data-tool="polygon" title="Draw Polygon">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path></svg>
+  <button class="tb-btn tool" data-tool="polyline" title="Polyline">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"></path></svg>
   </button>
-  <button class="rail-btn tool" data-tool="rectangle" title="Draw Rectangle">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"></rect></svg>
+  <button class="tb-btn tool" data-tool="polygon" title="Polygon">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path></svg>
   </button>
-  <button class="rail-btn tool" data-tool="circle" title="Draw Circle (with Radius)">
-    <svg viewBox="0 0 24 24" width="15" height="15"><circle cx="12" cy="12" r="8" fill="currentColor"></circle></svg>
+  <button class="tb-btn tool" data-tool="rectangle" title="Rectangle">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"></rect></svg>
   </button>
-  <button class="rail-btn tool" data-tool="route" title="Multi-Point Route">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="19" r="2.5"></circle><circle cx="19" cy="5" r="2.5"></circle><path d="M7 17c4-1 3-8 8-9"></path></svg>
+  <button class="tb-btn tool" data-tool="circle" title="Circle">
+    <svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="8" fill="currentColor"></circle></svg>
   </button>
-  <div class="rail-sep"></div>
-  <button class="rail-btn" id="btn-custom-map" title="Basemap & Vector Styling">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+  <button class="tb-btn tool" data-tool="route" title="Route">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="19" r="2.5"></circle><circle cx="19" cy="5" r="2.5"></circle><path d="M7 17c4-1 3-8 8-9"></path></svg>
   </button>
-  <button class="rail-btn" id="btn-export-dialog" title="Export Map Layout">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+
+  <div class="tb-sep"></div>
+
+  <button class="tb-btn" id="btn-custom-map" title="Basemap Styling">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
   </button>
-  <button class="rail-btn" id="btn-edit-mode" title="Select & Drag Mode">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+  <button class="tb-btn" id="btn-export-dialog" title="Export Map">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+  </button>
+  <button class="tb-btn" id="btn-edit-mode" title="Select & Drag">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
   </button>
 </div>
 
@@ -694,9 +644,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <label class="layer-row"><span>All Cities</span><input type="checkbox" data-g="bound_city"></label>
         <label class="layer-row"><span>All Brgys</span><input type="checkbox" data-g="bound_brgy"></label>
         
-        <div style="font-weight:600; font-size:11px; color:#f0f6fc; margin-top:4px;">Highlight Specific City Boundary</div>
+        <div style="font-weight:600; font-size:11px; color:#f0f6fc; margin-top:4px;">Highlight City Boundary</div>
         <div class="bound-select-row">
-          <input type="text" id="targetCityInput" placeholder="e.g. Mandaluyong, Pasig…"/>
+          <input type="text" id="targetCityInput" placeholder="e.g. Pasig, Makati…"/>
           <button id="btnFetchCityBound">Highlight</button>
         </div>
       </div>
@@ -868,6 +818,52 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="triggerExportBtn" style="background:#316dca; color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:4px;">Download Rendered Image</button>
 </div>
 
+<!-- iOS 26 Glassmorphic Minimalist Launcher Modal Dialog -->
+<div id="launcher-modal-scrim" class="visible">
+  <div class="ios26-card">
+    <div class="ios26-header">
+      <div class="ios26-title">Open Map Builder</div>
+      <div class="ios26-subtitle">Select or initialize a spatial workspace.</div>
+    </div>
+
+    <div class="ios26-seg">
+      <button class="ios26-seg-btn active" id="seg-btn-existing">Existing Workspaces</button>
+      <button class="ios26-seg-btn" id="seg-btn-new">Create New</button>
+    </div>
+
+    <div class="ios26-body" id="seg-content-existing">
+      <div id="existing-projects-container" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
+    <div class="ios26-body" id="seg-content-new" style="display:none;">
+      <div class="ios26-input-group">
+        <label class="ios26-label">Workspace Name</label>
+        <input class="ios26-input" id="new-proj-name" placeholder="e.g. Metro Manila Expansion" value="Manila Spatial Study" />
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <div class="ios26-input-group" style="flex:1;">
+          <label class="ios26-label">Basemap Theme</label>
+          <select class="ios26-input" id="new-proj-theme" style="padding:9px 12px;">
+            <option value="Midnight Blue">Midnight Blue</option>
+            <option value="Monochrome">Monochrome</option>
+            <option value="White Gold">White Gold</option>
+            <option value="Satellite">Satellite</option>
+            <option value="Carto DB Dark">Carto DB Dark</option>
+            <option value="Carto DB Light">Carto DB Light</option>
+          </select>
+        </div>
+        <div class="ios26-input-group" style="flex:1;">
+          <label class="ios26-label">Center Coords</label>
+          <input class="ios26-input" id="new-proj-coords" value="14.5995, 120.9842" />
+        </div>
+      </div>
+
+      <button class="ios26-action-btn" id="btn-create-project-submit" style="margin-top:6px;">Initialize Workspace</button>
+    </div>
+  </div>
+</div>
+
 <div id="hint-toast"></div>
 
 <script>
@@ -876,8 +872,10 @@ const ALL_STYLES = __ALL_STYLES__;
 const POI_CONFIG = __POI_CONFIG__;
 const SUPABASE_URL = "__SUPABASE_URL__";
 const SUPABASE_KEY = "__SUPABASE_KEY__";
-const PROJECT_ID = "__PROJECT_ID__";
+let ALL_PROJECTS = __ALL_PROJECTS_JSON__;
 
+let currentProjectId = "__PROJECT_ID__";
+let currentProjectName = "__PROJECT_NAME__";
 let currentStyleName = "__INITIAL_BASEMAP__";
 
 const map = new maplibregl.Map({
@@ -890,6 +888,9 @@ const map = new maplibregl.Map({
   preserveDrawingBuffer: true
 });
 map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
+
+// Blur background map initially for modal overlay
+$('map-wrapper').classList.add('blurred');
 
 // ----------------- State Machine -----------------
 let features = __INITIAL_FEATURES__;
@@ -963,10 +964,149 @@ const resetActiveTools = () => {
   hint('');
 };
 
-// ----------------- Supabase Direct Sync & Autosave -----------------
+// ----------------- iOS 26 Home Launcher Modal UI -----------------
+function openHomeDialog() {
+  closeFloatingCards();
+  $('map-wrapper').classList.add('blurred');
+  $('launcher-modal-scrim').classList.add('visible');
+  renderProjectsList();
+}
+
+function closeHomeDialog() {
+  $('launcher-modal-scrim').classList.remove('visible');
+  $('map-wrapper').classList.remove('blurred');
+}
+
+$('btn-home-dialog').onclick = openHomeDialog;
+
+$('seg-btn-existing').onclick = () => {
+  $('seg-btn-existing').classList.add('active');
+  $('seg-btn-new').classList.remove('active');
+  $('seg-content-existing').style.display = 'flex';
+  $('seg-content-new').style.display = 'none';
+};
+
+$('seg-btn-new').onclick = () => {
+  $('seg-btn-new').classList.add('active');
+  $('seg-btn-existing').classList.remove('active');
+  $('seg-content-new').style.display = 'flex';
+  $('seg-content-existing').style.display = 'none';
+};
+
+function renderProjectsList() {
+  const container = $('existing-projects-container');
+  if (!ALL_PROJECTS || !ALL_PROJECTS.length) {
+    container.innerHTML = `<div style="color:rgba(255,255,255,0.5); font-size:12px; text-align:center; padding:16px;">No projects in Supabase. Create your first project above.</div>`;
+    return;
+  }
+  container.innerHTML = ALL_PROJECTS.map(p => `
+    <div class="ios26-proj-item" onclick="loadProjectDirectly('${p.id}')">
+      <div style="display:flex; flex-direction:column; gap:2px;">
+        <span style="font-weight:700; font-size:13px; color:#ffffff;">${p.name || 'Untitled Workspace'}</span>
+        <span style="font-size:11px; color:rgba(255,255,255,0.5);">${p.basemap || 'Midnight Blue'} · ${p.features ? p.features.length : 0} layers</span>
+      </div>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </div>
+  `).join('');
+}
+
+window.loadProjectDirectly = function(projectId) {
+  const p = ALL_PROJECTS.find(x => x.id === projectId);
+  if (!p) return;
+  currentProjectId = p.id;
+  currentProjectName = p.name || 'Workspace';
+  $('project-name-display').textContent = currentProjectName;
+  
+  features = p.features || [];
+  fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
+  customGroups = p.custom_groups || { "Trade Area Scan": { collapsed: false, ids: [] } };
+
+  if (p.center) map.setCenter(p.center);
+  if (p.zoom) map.setZoom(p.zoom);
+  if (p.basemap && ALL_STYLES[p.basemap]) {
+    currentStyleName = p.basemap;
+    map.setStyle(ALL_STYLES[p.basemap]);
+  }
+
+  features.forEach(f => {
+    if (f.kind === 'marker') {
+      const sh = f.props.shape || 'pin';
+      const col = f.props.color || '#003366';
+      f.props.iconKey = getIconKey(sh, col);
+    }
+  });
+
+  map.once('idle', () => {
+    addDrawStack();
+    applyVis();
+    renderMyLayers();
+  });
+
+  closeHomeDialog();
+  hint(`Loaded project "${currentProjectName}"`);
+};
+
+$('btn-create-project-submit').onclick = async () => {
+  const pName = $('new-proj-name').value.trim() || 'Untitled Workspace';
+  const pTheme = $('new-proj-theme').value;
+  const pCoords = $('new-proj-coords').value.split(',').map(s => parseFloat(s.trim()));
+  const centerLL = (pCoords.length === 2 && !isNaN(pCoords[0])) ? [pCoords[1], pCoords[0]] : [120.9842, 14.5995];
+
+  const payload = {
+    name: pName,
+    basemap: pTheme,
+    center: centerLL,
+    zoom: 14,
+    pitch: 0,
+    bearing: 0,
+    features: [],
+    custom_groups: { "Trade Area Scan": { collapsed: false, ids: [] } },
+    layer_visibilities: {}
+  };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const created = await res.json();
+      const proj = created[0] || created;
+      ALL_PROJECTS.unshift(proj);
+      loadProjectDirectly(proj.id);
+    } else {
+      currentProjectId = "local-temp";
+      currentProjectName = pName;
+      $('project-name-display').textContent = pName;
+      features = [];
+      customGroups = { "Trade Area Scan": { collapsed: false, ids: [] } };
+      map.setCenter(centerLL);
+      closeHomeDialog();
+    }
+  } catch(e) {
+    closeHomeDialog();
+  }
+};
+
+$('project-name-display').onclick = () => {
+  const newN = prompt('Rename project name:', currentProjectName);
+  if (newN && newN.trim() && newN.trim() !== currentProjectName) {
+    currentProjectName = newN.trim();
+    $('project-name-display').textContent = currentProjectName;
+    markDirty();
+  }
+};
+
+// ----------------- Supabase Sync & Autosave Engine -----------------
 async function saveProjectToSupabase(showToast = false) {
-  if (PROJECT_ID === "local-fallback" || !SUPABASE_URL || !SUPABASE_KEY) {
-    if (showToast) hint('Working in local mode (Database not configured)');
+  if (!currentProjectId || currentProjectId === "local-temp" || !SUPABASE_URL || !SUPABASE_KEY) {
+    if (showToast) hint('Working in local mode');
     return;
   }
   setSaveBadgeStatus('saving');
@@ -974,6 +1114,7 @@ async function saveProjectToSupabase(showToast = false) {
   const c = map.getCenter();
   const payload = {
     updated_at: new Date().toISOString(),
+    name: currentProjectName,
     center: [c.lng, c.lat],
     zoom: map.getZoom(),
     pitch: map.getPitch(),
@@ -985,7 +1126,7 @@ async function saveProjectToSupabase(showToast = false) {
   };
 
   try {
-    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${PROJECT_ID}`, {
+    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${currentProjectId}`, {
       method: 'PATCH',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -1009,11 +1150,7 @@ async function saveProjectToSupabase(showToast = false) {
   }
 }
 
-// Autosave every 20 seconds if changes exist
-setInterval(() => {
-  if (isDirty) saveProjectToSupabase(false);
-}, 20000);
-
+setInterval(() => { if (isDirty) saveProjectToSupabase(false); }, 20000);
 $('btn-save-project').onclick = () => saveProjectToSupabase(true);
 
 document.addEventListener('keydown', e => {
@@ -1212,7 +1349,6 @@ function addDrawStack() {
       paint: { 
         'circle-color': ['case', ['get', 'isLastPoint'], '#38bdf8', '#e8b84a'],
         'circle-radius': ['case', ['get', 'isLastPoint'], 10, ['case', ['get', 'isOrigin'], 8, 5]], 
-        'circle-stroke-color': '#ffffff', 
         'circle-stroke-width': 2.5 
       }
     });
@@ -1275,6 +1411,7 @@ map.on('load', () => {
   addDrawStack(); 
   applyVis(); 
   renderMyLayers();
+  renderProjectsList();
 });
 
 // ----------------- 2D vs 3D Dimension Switcher -----------------
@@ -1942,7 +2079,7 @@ function renderMyLayers() {
       if (act === 'del') { 
         features = features.filter(x => x.id !== id);
         for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== id);
-        syncDraw(); renderMyLayers(); markDirty();
+        syncDraw(); renderMyLayers(); markDirty(); 
       }
       if (act === 'zoom') {
         const bnd = calcBounds(f);
@@ -2109,7 +2246,7 @@ $('btn-custom-map').onclick = () => {
 $('closeCustomMapBtn').onclick = () => { $('popup-custom-map').classList.remove('open'); };
 
 $('presetBtnList').innerHTML = Object.keys(ALL_STYLES).map(n =>
-  `<button style="border:1px solid #2d333b; background:#22272e; color:#adbac7; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer;" data-n="${n}">${n}</button>`
+  `<button style="border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#adbac7; border-radius:6px; padding:5px 8px; font-size:11px; cursor:pointer;" data-n="${n}">${n}</button>`
 ).join('');
 
 $('presetBtnList').querySelectorAll('button').forEach(b => {
@@ -2150,23 +2287,31 @@ map.on('error', e => console.warn('Map Notice:', e));
 </html>"""
 
 # ------------------------------------------------------------------------
-# 7. RENDER COMPONENT INSTANCE
+# 5. RENDER COMPONENT
 # ------------------------------------------------------------------------
 try:
-    body_bg = THEMES.get(INITIAL_BASEMAP, THEMES["Midnight Blue"])["overlay"]
+    initial_theme_name = ALL_PROJECTS_LIST[0].get("basemap", "Midnight Blue") if ALL_PROJECTS_LIST else "Midnight Blue"
+    initial_center = ALL_PROJECTS_LIST[0].get("center", [120.9842, 14.5995]) if ALL_PROJECTS_LIST else [120.9842, 14.5995]
+    initial_zoom = ALL_PROJECTS_LIST[0].get("zoom", 14) if ALL_PROJECTS_LIST else 14
+    initial_name = ALL_PROJECTS_LIST[0].get("name", "Untitled Workspace") if ALL_PROJECTS_LIST else "Untitled Workspace"
+    initial_id = str(ALL_PROJECTS_LIST[0].get("id", "temp-id")) if ALL_PROJECTS_LIST else "local-temp"
+    initial_features = ALL_PROJECTS_LIST[0].get("features", []) if ALL_PROJECTS_LIST else []
+    initial_custom_groups = ALL_PROJECTS_LIST[0].get("custom_groups", {"Trade Area Scan": {"collapsed": False, "ids": []}}) if ALL_PROJECTS_LIST else {"Trade Area Scan": {"collapsed": False, "ids": []}}
+
     html = (
         HTML_TEMPLATE.replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
         .replace("__POI_CONFIG__", json.dumps(POI_CONFIG))
         .replace("__SUPABASE_URL__", SUPABASE_URL)
         .replace("__SUPABASE_KEY__", SUPABASE_KEY)
-        .replace("__PROJECT_ID__", PROJECT_ID)
-        .replace("__PROJECT_NAME__", PROJECT_NAME)
-        .replace("__INITIAL_BASEMAP__", INITIAL_BASEMAP)
-        .replace("__INITIAL_FEATURES__", json.dumps(CURRENT_PROJECT.get("features", [])))
-        .replace("__INITIAL_CUSTOM_GROUPS__", json.dumps(CURRENT_PROJECT.get("custom_groups", {"Trade Area Scan": {"collapsed": False, "ids": []}})))
-        .replace("__CENTER__", json.dumps(CENTER))
-        .replace("__ZOOM__", str(ZOOM))
-        .replace("__BG__", body_bg)
+        .replace("__ALL_PROJECTS_JSON__", json.dumps(ALL_PROJECTS_LIST))
+        .replace("__PROJECT_ID__", initial_id)
+        .replace("__PROJECT_NAME__", initial_name)
+        .replace("__INITIAL_BASEMAP__", initial_theme_name)
+        .replace("__INITIAL_FEATURES__", json.dumps(initial_features))
+        .replace("__INITIAL_CUSTOM_GROUPS__", json.dumps(initial_custom_groups))
+        .replace("__CENTER__", json.dumps(initial_center))
+        .replace("__ZOOM__", str(initial_zoom))
+        .replace("__BG__", THEMES.get(initial_theme_name, THEMES["Midnight Blue"])["overlay"])
     )
     components.html(html, height=1000, scrolling=False)
 except Exception as e:
