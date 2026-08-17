@@ -1,0 +1,34 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    # Runs every 10 hours (must be less than Streamlit's 12-hour limit)
+    - cron: '0 */10 * * *'
+  # Allows you to manually trigger it from the GitHub "Actions" tab for testing
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Gives the action permission to push to your repo
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches the entire history to avoid shallow errors
+
+      - name: Configure Git user
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Sync perfectly with remote to avoid conflicts
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Push empty commit
+        run: |
+          git commit --allow-empty -m "⏰ Keep-alive ping $(date -u)"
+          git push origin main
