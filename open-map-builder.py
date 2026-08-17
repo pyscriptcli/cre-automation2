@@ -3,137 +3,160 @@ import folium
 from streamlit_folium import st_folium
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & FELT.COM-STYLE CSS
+# 1. PAGE CONFIGURATION & FELT.COM-STYLE UI
 # ------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Felt-Style Map Viewer",
+    page_title="Felt Map Studio",
     page_icon="🗺️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS to force full-screen map, hide Streamlit chrome, and style the sidebar
+# Custom CSS for Streamlit full-bleed layout and dark Felt-like sidebar
 st.markdown("""
     <style>
-    /* Remove standard Streamlit padding and margins */
+    /* Full-screen bleed layout */
     .block-container {
-        padding-top: 0rem !important;
-        padding-bottom: 0rem !important;
-        padding-left: 0rem !important;
-        padding-right: 0rem !important;
+        padding: 0rem !important;
         max-width: 100% !important;
     }
     
-    /* Hide Header and Main Menu for a clean app-like feel */
+    /* Clean app mode: hide standard Streamlit headers */
     header { visibility: hidden; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
     
-    /* Dark theme for sidebar */
+    /* Felt Dark Sidebar Styling */
     [data-testid="stSidebar"] {
-        background-color: #111418;
-        border-right: 1px solid #2d333b;
+        background-color: #0d1117;
+        border-right: 1px solid #21262d;
     }
     [data-testid="stSidebar"] * {
-        color: #e6edf3;
+        color: #f0f6fc;
     }
     
-    /* Style radio buttons to look a bit cleaner */
+    /* Radio Option Cards */
     div.row-widget.stRadio > div {
-        background: #1d2127;
-        padding: 15px;
+        background: #161b22;
+        padding: 12px;
         border-radius: 8px;
         border: 1px solid #30363d;
     }
     </style>
 """, unsafe_allow_html=True)
 
-
 # ------------------------------------------------------------------------
-# 2. SIDEBAR UI (TOOLBAR)
+# 2. SIDEBAR TOOLBAR
 # ------------------------------------------------------------------------
-st.sidebar.title("🗺️ Map Workspace")
-st.sidebar.markdown("---")
+st.sidebar.markdown("### 🗺️ **Basemap Layer**")
 
-st.sidebar.subheader("Basemap Configuration")
-
-# Standard Basemaps including the new Custom Midnight Blue
-basemaps = [
+basemap_options = [
+    "Midnight Blue",
     "Carto DB Light",
     "Carto DB Dark",
     "Satellite",
-    "OSM",
-    "Midnight Blue"
+    "OSM"
 ]
 
-selected_layer = st.sidebar.radio(
-    "Select Basemap",
-    options=basemaps,
-    index=4 # Defaults to Midnight Blue
+selected_basemap = st.sidebar.radio(
+    "Select Layer",
+    options=basemap_options,
+    index=0
 )
 
 st.sidebar.markdown("---")
-if selected_layer == "Midnight Blue":
-    st.sidebar.success("Rendering custom Midnight Blue style.")
+
+if selected_basemap == "Midnight Blue":
+    st.sidebar.markdown(
+        """
+        <div style="background-color: #0b1320; padding: 12px; border-radius: 6px; border-left: 4px solid #e0a838;">
+            <strong style="color: #e0a838;">Midnight Blue Active</strong><br>
+            <span style="font-size: 12px; color: #8b949e;">Deep Navy Base (#0b1320) with Gold/Amber Features (#e0a838).</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 else:
-    st.sidebar.info(f"Rendering standard {selected_layer} style.")
+    st.sidebar.caption(f"Active basemap: **{selected_basemap}**")
 
 # ------------------------------------------------------------------------
-# 3. MAP GENERATION LOGIC
+# 3. MAP BUILDER & ZERO-API COLOR TRANSFORMATION
 # ------------------------------------------------------------------------
 
-# Coordinates for Mandaluyong City, Metro Manila
-MANDALUYONG_COORDS = [14.5794, 121.0359]
+# Coordinates for Mandaluyong / Metro Manila
+CENTER_COORDS = [14.5794, 121.0359]
 
-# Initialize base map without standard tiles
 m = folium.Map(
-    location=MANDALUYONG_COORDS, 
-    zoom_start=14, # Slightly zoomed in to see the road details clearly
+    location=CENTER_COORDS,
+    zoom_start=14,
     tiles=None,
     control_scale=True,
-    zoom_control=False # Hiding default controls for a cleaner Felt look
+    zoom_control=False
 )
 
-# Determine which tile set to apply
-if selected_layer == "Carto DB Light":
+# Common CSS fix for subpixel tile seams/grid line artifacts across all modes
+tile_seam_fix = """
+    .leaflet-tile {
+        margin: -0.5px !important;
+        padding: 0.5px !important;
+        outline: 1px solid transparent !important;
+        -webkit-backface-visibility: hidden !important;
+        backface-visibility: hidden !important;
+    }
+"""
+
+if selected_basemap == "Midnight Blue":
+    # Base: CartoDB Positron (Light)
+    folium.TileLayer(
+        tiles='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        attr='&copy; OpenStreetMap contributors &copy; CARTO',
+        name='Midnight Blue Base',
+        max_zoom=20,
+        subdomains='abcd'
+    ).add_to(m)
+
+    # Invert light basemap + hue shift into Navy background with Gold roads
+    midnight_css = f"""
+    <style>
+    {tile_seam_fix}
+    .leaflet-tile-pane {{
+        filter: invert(96%) hue-rotate(190deg) saturate(320%) contrast(135%) brightness(85%) !important;
+        -webkit-filter: invert(96%) hue-rotate(190deg) saturate(320%) contrast(135%) brightness(85%) !important;
+    }}
+    .leaflet-container {{
+        background: #09101d !important;
+    }}
+    </style>
+    """
+    m.get_root().header.add_child(folium.Element(midnight_css))
+
+elif selected_basemap == "Carto DB Light":
     folium.TileLayer('CartoDB positron', name="Carto DB Light").add_to(m)
+    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix}</style>"))
 
-elif selected_layer == "Carto DB Dark":
+elif selected_basemap == "Carto DB Dark":
     folium.TileLayer('CartoDB dark_matter', name="Carto DB Dark").add_to(m)
+    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>"))
 
-elif selected_layer == "OSM":
+elif selected_basemap == "OSM":
     folium.TileLayer('OpenStreetMap', name="OSM").add_to(m)
+    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix}</style>"))
 
-elif selected_layer == "Satellite":
-    # Using Esri World Imagery for a clean, high-res satellite view
+elif selected_basemap == "Satellite":
     folium.TileLayer(
         tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attr='Esri World Imagery',
-        name='Satellite'
+        name='Satellite',
+        max_zoom=19
     ).add_to(m)
-
-elif selected_layer == "Midnight Blue":
-    # -------------------------------------------------------------------------
-    # ACTION REQUIRED: INSERT YOUR CUSTOM TILE URL BELOW
-    # -------------------------------------------------------------------------
-    # Replace the 'tiles' URL with the XYZ link generated by your map provider
-    # (e.g., Mapbox, Stadia, JawgMaps) where you built the custom navy/gold style.
-    
-    custom_midnight_blue_url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' # PLACEHOLDER
-    
-    folium.TileLayer(
-        tiles=custom_midnight_blue_url,
-        attr='Custom Midnight Blue Style',
-        name='Midnight Blue',
-        max_zoom=20
-    ).add_to(m)
+    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>"))
 
 # ------------------------------------------------------------------------
-# 4. RENDER MAP 
+# 4. RENDER FULL-SCREEN MAP
 # ------------------------------------------------------------------------
 st_folium(
-    m, 
-    use_container_width=True, 
-    height=1000, 
-    returned_objects=[] # Prevents Streamlit re-renders on map pan/zoom
+    m,
+    use_container_width=True,
+    height=950,
+    returned_objects=[]
 )
