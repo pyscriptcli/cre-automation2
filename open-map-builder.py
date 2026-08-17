@@ -3,7 +3,7 @@ import folium
 from streamlit_folium import st_folium
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & FELT.COM-STYLE UI
+# 1. PAGE CONFIGURATION & FELT.COM THEME
 # ------------------------------------------------------------------------
 st.set_page_config(
     page_title="Felt Map Studio",
@@ -12,40 +12,58 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for full-bleed layout and dark Felt-like sidebar
+# Custom Felt-style UI styling
 st.markdown("""
     <style>
+    /* Full-bleed map canvas */
     .block-container {
         padding: 0rem !important;
+        margin: 0rem !important;
         max-width: 100% !important;
     }
+    
+    /* Remove default Streamlit chrome */
     header { visibility: hidden; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
     
+    /* Felt-style dark workspace toolbar */
     [data-testid="stSidebar"] {
-        background-color: #0d1117;
-        border-right: 1px solid #21262d;
+        background-color: #0b0f17 !important;
+        border-right: 1px solid #1a2233 !important;
+        padding-top: 1.5rem;
     }
     [data-testid="stSidebar"] * {
-        color: #f0f6fc;
+        color: #e2e8f0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
+    
+    /* Radio options styled as clean select cards */
     div.row-widget.stRadio > div {
-        background: #161b22;
-        padding: 12px;
+        background: #111827;
+        padding: 10px;
         border-radius: 8px;
-        border: 1px solid #30363d;
+        border: 1px solid #1f293d;
+        gap: 6px;
+    }
+    div.row-widget.stRadio label {
+        padding: 6px 10px;
+        border-radius: 6px;
+        transition: background 0.15s ease;
+    }
+    div.row-widget.stRadio label:hover {
+        background: #1a2336;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------
-# 2. SIDEBAR TOOLBAR
+# 2. SIDEBAR (FELT TOOLBAR)
 # ------------------------------------------------------------------------
 st.sidebar.markdown("### 🗺️ **Basemap Layer**")
 
 basemap_options = [
-    "Midnight Blue",    # custom duotone
+    "Midnight Blue",
     "Carto DB Light",
     "Carto DB Dark",
     "Satellite",
@@ -63,19 +81,28 @@ st.sidebar.markdown("---")
 if selected_basemap == "Midnight Blue":
     st.sidebar.markdown(
         """
-        <div style="background-color: #0a1628; padding: 12px; border-radius: 6px; border-left: 4px solid #c99c37;">
-            <strong style="color: #c99c37;">Midnight Blue Active</strong><br>
-            <span style="font-size: 12px; color: #8b949e;">Deep Navy Base (#0a1628) with Gold/Amber Features (#c99c37).</span>
+        <div style="background-color: #0a1628; padding: 12px; border-radius: 8px; border: 1px solid #1a2c4e; border-left: 4px solid #c99c37;">
+            <strong style="color: #c99c37; font-size: 13px;">Midnight Blue Active</strong><br>
+            <div style="display: flex; gap: 8px; margin-top: 8px; align-items: center;">
+                <span style="display:inline-block; width:14px; height:14px; background:#0a1628; border:1px solid #334e7a; border-radius:3px;"></span>
+                <span style="font-size: 11px; color: #94a3b8;">Base: <code>#0a1628</code></span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 4px; align-items: center;">
+                <span style="display:inline-block; width:14px; height:14px; background:#c99c37; border-radius:3px;"></span>
+                <span style="font-size: 11px; color: #94a3b8;">Roads: <code>#c99c37</code></span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True
     )
 else:
-    st.sidebar.caption(f"Active basemap: **{selected_basemap}**")
+    st.sidebar.caption(f"Active layer: **{selected_basemap}**")
 
 # ------------------------------------------------------------------------
-# 3. MAP BUILDER & DUOTONE COLOR MATRIX
+# 3. MAP BUILDER & PRECISE COLOR CALIBRATION
 # ------------------------------------------------------------------------
+
+# Center coordinates (Metro Manila)
 CENTER_COORDS = [14.5794, 121.0359]
 
 m = folium.Map(
@@ -86,67 +113,66 @@ m = folium.Map(
     zoom_control=False
 )
 
-# Universal tile seam fix – removes gridlines for all basemaps
+# Seamless tile CSS: fixes subpixel rounding gaps and removes all grid lines
 tile_seam_fix = """
     .leaflet-tile {
-        margin: -1px !important;
-        padding: 1px !important;
+        margin: -0.5px !important;
+        padding: 0.5px !important;
         outline: none !important;
         border: none !important;
         -webkit-backface-visibility: hidden !important;
         backface-visibility: hidden !important;
-        box-shadow: 0 0 1px #0a1628 !important;  /* bleed color into seams */
-    }
-    .leaflet-container {
-        background: #0a1628 !important;
+        image-rendering: -webkit-optimize-contrast !important;
     }
 """
 
 if selected_basemap == "Midnight Blue":
-    # Base tile layer: CartoDB Dark Matter (dark background, light roads)
+    # High-DPI retina tiles for crisp vector lines without label clutter
     folium.TileLayer(
-        tiles='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        tiles='https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}@2x.png',
         attr='&copy; OpenStreetMap contributors &copy; CARTO',
-        name='Midnight Blue Base',
+        name='Midnight Blue',
         max_zoom=20,
         subdomains='abcd'
     ).add_to(m)
 
-    # Duotone feColorMatrix that maps luminance to gradient between #0a1628 and #c99c37
-    # Derived from: L = 0.2126*R + 0.7152*G + 0.0722*B
-    # Output = (1-L)*C1 + L*C2, where C1=#0a1628, C2=#c99c37
-    duotone_matrix = f"""
+    # Exact RGB linear matrix mapping:
+    # Maps Dark Matter background (L~0.05) -> #0a1628 [R:10, G:22, B:40]
+    # Maps Road vectors (L~0.40)          -> #c99c37 [R:201, G:156, B:55]
+    midnight_svg_filter = f"""
     <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
-        <filter id="duotone-matrix" color-interpolation-filters="sRGB">
+        <filter id="midnight-gold-matrix" color-interpolation-filters="sRGB">
             <feColorMatrix type="matrix" values="
-                0.1593 0.5358 0.0541 0 0.0392
-                0.1117 0.3758 0.0379 0 0.0863
-                0.0125 0.0421 0.00425 0 0.1569
-                0     0     0     1 0
-            " />
+                2.15 0 0 0 -0.07
+                1.55 0 0 0  0.01
+                0.18 0 0 0  0.15
+                0    0 0 1  0" />
         </filter>
     </svg>
     <style>
     {tile_seam_fix}
     .leaflet-tile-pane {{
-        filter: url(#duotone-matrix) !important;
-        -webkit-filter: url(#duotone-matrix) !important;
+        filter: url(#midnight-gold-matrix) !important;
+        -webkit-filter: url(#midnight-gold-matrix) !important;
+    }}
+    .leaflet-tile {{
+        outline: 1px solid #0a1628 !important;
+        outline-offset: -1px;
+    }}
+    .leaflet-container {{
+        background: #0a1628 !important;
     }}
     </style>
     """
-    m.get_root().header.add_child(folium.Element(duotone_matrix))
+    m.get_root().header.add_child(folium.Element(midnight_svg_filter))
 
 elif selected_basemap == "Carto DB Light":
     folium.TileLayer('CartoDB positron', name="Carto DB Light").add_to(m)
-    m.get_root().header.add_child(
-        folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #f8f9fa !important; }}</style>")
-    )
+    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #f8f9fa !important; }}</style>"))
 
 elif selected_basemap == "Carto DB Dark":
     folium.TileLayer('CartoDB dark_matter', name="Carto DB Dark").add_to(m)
-    m.get_root().header.add_child(
-        folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>")
-    )
+    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>"))
 
 elif selected_basemap == "OSM":
     folium.TileLayer('OpenStreetMap', name="OSM").add_to(m)
@@ -159,12 +185,10 @@ elif selected_basemap == "Satellite":
         name='Satellite',
         max_zoom=19
     ).add_to(m)
-    m.get_root().header.add_child(
-        folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>")
-    )
+    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>"))
 
 # ------------------------------------------------------------------------
-# 4. RENDER FULL-SCREEN MAP
+# 4. RENDER MAP
 # ------------------------------------------------------------------------
 st_folium(
     m,
