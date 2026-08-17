@@ -6,9 +6,9 @@ import sys
 
 # 👇 REPLACE THESE WITH YOUR ACTUAL APP URLS
 APP_URLS = [
-    "https://your-first-app.streamlit.app",
-    "https://your-second-app.streamlit.app",
-    "https://your-third-app.streamlit.app",
+    "https://open-node.streamlit.app",
+    "https://project-apex.streamlit.app",
+    "https://trs-site-report.streamlit.app",
 ]
 
 async def wake_up_app(url):
