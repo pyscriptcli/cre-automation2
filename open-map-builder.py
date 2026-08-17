@@ -61,23 +61,24 @@ else:
 CENTER = [121.0359, 14.5794]  # [lon, lat] Mandaluyong / Metro Manila
 ZOOM = 14
 
-# --- Palette sampled from the reference swatch sheet ---
+# --- Palette sampled 1:1 from the reference swatch sheet ---
 C = {
-    "base":      "#0a1628",  # Land / background
-    "landcover": "#0e1a2e",
-    "landuse":   "#0d1a2f",
-    "water":     "#0a1424",
-    "waterway":  "#071019",
-    "park":      "#14243e",
-    "building":  "#8d7156",
-    "aeroway":   "#14243c",
-    "rail":      "#d9b451",
-    "rd_major":  "#c99c37",  # motorway / trunk / primary
-    "rd_min_hi": "#a8801f",  # secondary / tertiary
-    "rd_min_md": "#494941",  # minor streets
-    "rd_min_lo": "#32322d",  # service / track
-    "rd_path":   "#4c4535",
-    "rd_case":   "#6a5e39",  # road outline / casing
+    "overlay":   "#0a1628",  # Overlay  -> map background
+    "text":      "#d9b451",  # Text     -> place labels
+    "land":      "#0d1830",  # Land     -> landuse fill
+    "landcover": "#0f1d33",  # Landcover
+    "water":     "#0a1424",  # Water
+    "waterway":  "#081120",  # Waterways
+    "parks":     "#142440",  # Parks
+    "buildings": "#8e7258",  # Buildings
+    "aeroway":   "#152640",  # Aeroway
+    "rail":      "#d9b451",  # Rail
+    "rd_major":  "#c99c37",  # Roads Major
+    "rd_min_hi": "#a37d1d",  # Roads Minor High
+    "rd_min_md": "#46463e",  # Roads Minor Mid
+    "rd_min_lo": "#2f2f2a",  # Roads Minor Low
+    "rd_path":   "#4a4333",  # Roads Path
+    "rd_case":   "#685c37",  # Road Outline (casing)
 }
 
 def w(*stops):
@@ -97,7 +98,7 @@ def road_layer(lid, classes, color, widths, minzoom=0, casing=False):
     }
     if minzoom:
         lyr["minzoom"] = minzoom
-    if casing:  # draw the olive outline under the fill
+    if casing:  # olive outline drawn under the road fill
         lyr["paint"]["line-color"] = C["rd_case"]
         lyr["paint"]["line-width"] = w(*[(z, val + 2.0) for z, val in widths])
         lyr["id"] = lid + "_casing"
@@ -107,18 +108,20 @@ def midnight_style():
     """Custom vector style. Vector tiles = no raster seams/gridlines, ever."""
     return {
         "version": 8,
+        # Free hosted glyphs so symbol layers can render text (no API key)
+        "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
         "sources": {
             # Free OpenMapTiles vector planet, no API key (OpenFreeMap)
             "omt": {"type": "vector", "url": "https://tiles.openfreemap.org/planet"}
         },
         "layers": [
-            {"id": "bg", "type": "background", "paint": {"background-color": C["base"]}},
+            {"id": "bg", "type": "background", "paint": {"background-color": C["overlay"]}},
             {"id": "landcover", "type": "fill", "source": "omt", "source-layer": "landcover",
              "paint": {"fill-color": C["landcover"], "fill-opacity": 0.6}},
             {"id": "landuse", "type": "fill", "source": "omt", "source-layer": "landuse",
-             "paint": {"fill-color": C["landuse"], "fill-opacity": 0.8}},
+             "paint": {"fill-color": C["land"], "fill-opacity": 0.8}},
             {"id": "park", "type": "fill", "source": "omt", "source-layer": "park",
-             "paint": {"fill-color": C["park"]}},
+             "paint": {"fill-color": C["parks"]}},
             {"id": "water", "type": "fill", "source": "omt", "source-layer": "water",
              "paint": {"fill-color": C["water"]}},
             {"id": "waterway", "type": "line", "source": "omt", "source-layer": "waterway",
@@ -127,9 +130,9 @@ def midnight_style():
              "paint": {"line-color": C["aeroway"], "line-width": w((11, 1), (20, 12))}},
             {"id": "building", "type": "fill", "source": "omt", "source-layer": "building",
              "minzoom": 14,
-             "paint": {"fill-color": C["building"], "fill-opacity": 0.85,
+             "paint": {"fill-color": C["buildings"], "fill-opacity": 0.85,
                         "fill-outline-color": "#6f5844"}},
-            # Casings first (road outline), then fills low->high so majors sit on top
+            # Casings first (Road Outline), then fills low->high so majors sit on top
             road_layer("case_major", ["motorway", "trunk", "primary"], None,
                        [(6, 1.0), (14, 4.0), (20, 22)], casing=True),
             road_layer("case_minhi", ["secondary", "tertiary"], None,
@@ -145,11 +148,27 @@ def midnight_style():
             road_layer("rd_major", ["motorway", "trunk", "primary"], C["rd_major"],
                        [(6, 1.0), (14, 4.0), (20, 22)]),
             road_layer("rail", ["rail"], C["rail"], [(13, 0.5), (20, 2.5)], minzoom=13),
+            # Place labels in the gold "Text" swatch, haloed by the base navy
+            {"id": "label_place", "type": "symbol", "source": "omt", "source-layer": "place",
+             "minzoom": 6,
+             "layout": {
+                 "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]],
+                 "text-font": ["Noto Sans Regular"],
+                 "text-size": ["interpolate", ["linear"], ["zoom"], 6, 10, 12, 14, 16, 18],
+                 "text-transform": "uppercase",
+                 "text-letter-spacing": 0.05,
+                 "text-max-width": 8,
+             },
+             "paint": {
+                 "text-color": C["text"],
+                 "text-halo-color": C["overlay"],
+                 "text-halo-width": 1.5,
+             }},
         ],
     }
 
 def raster_style(tile_urls, bg, maxzoom=20):
-    """Plain raster basemaps (also seam-free: single canvas renderer)."""
+    """Plain raster basemaps (single canvas renderer, seam-free)."""
     return {
         "version": 8,
         "sources": {"r": {"type": "raster", "tiles": tile_urls, "tileSize": 256, "maxzoom": maxzoom}},
@@ -175,7 +194,7 @@ STYLES = {
 }
 
 # ------------------------------------------------------------------------
-# 4. MAPLIBRE GL RENDERER (replaces folium entirely)
+# 4. MAPLIBRE GL RENDERER
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -208,10 +227,7 @@ try {
     fadeDuration: 0
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-  map.on('error', (e) => {
-    // Log tile/network failures without killing the app
-    console.warn('map error:', e);
-  });
+  map.on('error', (e) => console.warn('map error:', e));
 } catch (e) {
   const box = document.getElementById('err');
   box.style.display = 'block';
@@ -223,7 +239,7 @@ try {
 
 try:
     style_json = json.dumps(STYLES[selected_basemap]())
-    bg = "#0a1628" if selected_basemap == "Midnight Blue" else "#000000"
+    bg = C["overlay"] if selected_basemap == "Midnight Blue" else "#000000"
     html = (HTML_TEMPLATE
             .replace("__STYLE__", style_json)
             .replace("__CENTER__", json.dumps(CENTER))
