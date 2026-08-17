@@ -4,7 +4,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & ROOT CSS OVERRIDES
+# 1. PAGE CONFIGURATION & FULL-CANVAS OVERRIDES
 # ------------------------------------------------------------------------
 st.set_page_config(
     page_title="Open Map Builder",
@@ -60,7 +60,7 @@ st.markdown(
 )
 
 # ------------------------------------------------------------------------
-# 2. SESSION STATE & DATA CONFIGURATIONS
+# 2. STATE PERSISTENCE & POI CONFIGURATIONS
 # ------------------------------------------------------------------------
 DEFAULT_COORDS = [14.5995, 120.9842]
 DEFAULT_RADIUS = 1000
@@ -75,8 +75,8 @@ if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
 if 'target_config' not in st.session_state: st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
 if 'radius_config' not in st.session_state: st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
-if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "dots"
-if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
+if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "pin"
+if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 14
 if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
 
 POI_CONFIG = {
@@ -150,58 +150,7 @@ POI_CONFIG = {
 }
 
 # ------------------------------------------------------------------------
-# 3. BACKEND OSMNX GEOQUERY PIPELINE
-# ------------------------------------------------------------------------
-def extract_osmnx_pois(lat, lon, radius, category=None):
-    try:
-        import osmnx as ox
-        import shapely.geometry
-        
-        tags_dict = {}
-        target_tags = []
-        if category and category in POI_CONFIG:
-            target_tags = POI_CONFIG[category]
-        else:
-            for c in POI_CONFIG.values(): target_tags.extend(c)
-            
-        for t in target_tags:
-            clean = t[1].replace('"', '')
-            if '=' in clean:
-                k, v = clean.split('=', 1)
-                if '|' in v: v = [x.strip() for x in v.split('|')]
-                tags_dict[k] = v
-            elif '~' in clean:
-                k, v = clean.split('~', 1)
-                v = v.replace(',i', '')
-                if '|' in v: v = [x.strip() for x in v.split('|')]
-                tags_dict[k] = v
-            else:
-                tags_dict[clean] = True
-                
-        gdf = ox.geometries_from_point((lat, lon), tags_dict, dist=radius)
-        records = []
-        if not gdf.empty:
-            for idx, row in gdf.iterrows():
-                if hasattr(row.geometry, 'centroid'):
-                    c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
-                else: continue
-                name = row.get('name', 'Unknown')
-                if isinstance(name, float): name = 'Unknown'
-                matched_type = category or 'POI'
-                for k in tags_dict.keys():
-                    if k in row and row[k]:
-                        matched_type = str(row[k])
-                        break
-                records.append({
-                    "lat": float(c_lat), "lon": float(c_lon), "name": str(name),
-                    "type": matched_type, "visible": True
-                })
-        return records
-    except Exception:
-        return []
-
-# ------------------------------------------------------------------------
-# 4. VECTOR STYLING ENGINE
+# 3. THEMES & VECTOR STYLING ENGINE (with 3D Buildings support)
 # ------------------------------------------------------------------------
 CENTER = [120.9842, 14.5995]
 ZOOM = 14
@@ -214,7 +163,7 @@ THEMES = {
         "rail": "#d9b451", "rd_express": "#ffaa00", "rd_major": "#e8b84a",
         "rd_secondary": "#c99c37", "rd_tertiary": "#7d5f14", "rd_min_md": "#46463e",
         "rd_min_lo": "#2f2f2a", "rd_path": "#4a4333", "rd_case": "#685c37",
-        "sec_opacity": 0.8, "ter_opacity": 0.65, "building_opacity": 0.25,
+        "sec_opacity": 0.8, "ter_opacity": 0.65, "building_opacity": 0.35,
         "boundary": "#ff1e1e", "muted": "#8b949e",
     },
     "Monochrome": {
@@ -276,9 +225,23 @@ def vector_style(p):
             {"id": "water", "type": "fill", "source": "omt", "source-layer": "water", "paint": {"fill-color": p["water"]}},
             {"id": "waterway", "type": "line", "source": "omt", "source-layer": "waterway", "paint": {"line-color": p["waterway"], "line-width": w((9, 1), (20, 6))}},
             {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway", "paint": {"line-color": p["aeroway"], "line-width": w((11, 1), (20, 12))}},
-            {"id": "building", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
             
-            # Boundaries
+            # 2D Buildings Layer
+            {"id": "building-2d", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
+            
+            # 3D Extruded Buildings Layer
+            {
+                "id": "building-3d", "type": "fill-extrusion", "source": "omt", "source-layer": "building", "minzoom": 14,
+                "layout": {"visibility": "none"},
+                "paint": {
+                    "fill-extrusion-color": p["buildings"],
+                    "fill-extrusion-height": ["coalesce", ["get", "render_height"], ["get", "height"], 12],
+                    "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+                    "fill-extrusion-opacity": 0.85
+                }
+            },
+            
+            # Boundaries (Province, City, Brgy)
             {"id": "bound_prov", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [2, 4], True, False], "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 2.2, "line-dasharray": [4, 2]}},
             {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 7, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.8, "line-dasharray": [2, 2], "line-opacity": 0.9}},
             {"id": "bound_brgy", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [9, 10], True, False], "minzoom": 11, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.2, "line-dasharray": [1, 2], "line-opacity": 0.8}},
@@ -329,7 +292,7 @@ ALL_STYLES = {
 INITIAL_BASEMAP = "Midnight Blue"
 
 # ------------------------------------------------------------------------
-# 5. OPEN MAP BUILDER FRONTEND & COMPONENT
+# 4. APP HTML & FRONTEND ARCHITECTURE
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -351,7 +314,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   }
   #map { position: absolute; inset: 0; width: 100vw; height: 100vh; }
 
-  /* Vertical Toolbar Rail */
+  /* Perfectly Centered Floating Vertical Toolbar */
   #side-rail {
     position: absolute; 
     top: 50%; 
@@ -380,7 +343,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .rail-btn.primary-active { background: #316dca; color: #ffffff; }
   .rail-sep { width: 24px; height: 1px; background: #2d333b; margin: 2px 0; }
 
-  /* Flyout Left Side Panels */
+  /* Flyout Left Panels */
   .left-panel {
     position: absolute; top: 16px; left: 74px; bottom: 16px; width: 360px; z-index: 9;
     background: #181d24f7; backdrop-filter: blur(14px); border: 1px solid #2d333b;
@@ -399,7 +362,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   .panel-content { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
 
-  /* Collapsed by default Accordions */
+  /* Accordions (Collapsed by default) */
   .acc-item { border-bottom: 1px solid #22272e; padding-bottom: 8px; }
   .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 6px 0; }
   .acc-body { padding: 6px 0 2px 0; display: flex; flex-direction: column; gap: 8px; }
@@ -407,6 +370,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
   .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
+
+  /* 2D / 3D Mode Toggle */
+  .dimension-mode-bar { display: flex; gap: 4px; background: #1c2128; padding: 3px; border-radius: 6px; border: 1px solid #2d333b; }
+  .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 4px; cursor: pointer; }
+  .dimension-mode-btn.active { background: #316dca; color: #ffffff; }
 
   .bound-select-row { display: flex; gap: 6px; margin-top: 4px; }
   .bound-select-row input[type=text] { flex: 1; background: #1c2128; border: 1px solid #2d333b; color: #f0f6fc; padding: 5px 8px; border-radius: 6px; font-size: 11px; font-family: inherit; }
@@ -417,10 +385,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
 
   .group-container { background: #1c2128; border: 1px solid #2d333b; border-radius: 8px; margin-top: 6px; overflow: hidden; }
-  .group-header { background: #22272e; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; }
+  .group-header { background: #22272e; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
   .group-title-input { background: transparent; border: none; font-weight: 700; color: #f0f6fc; font-size: 12px; width: 140px; font-family: inherit; }
   .group-title-input:focus { background: #181d24; outline: none; border-radius: 4px; padding: 2px 4px; }
   .group-items { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
+  .group-items.hidden { display: none !important; }
 
   .layer-card {
     background: #22272e; border: 1px solid #2d333b; border-radius: 6px; padding: 6px 8px;
@@ -471,7 +440,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .layout-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0; }
   .layout-btn { padding: 6px; background: #22272e; border: 1px solid #2d333b; border-radius: 6px; color: #f0f6fc; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
   .layout-btn.active { background: #316dca; border-color: #316dca; }
-  #exportPreviewCanvas { width: 100%; height: 110px; object-fit: contain; background: #0d1117; border-radius: 6px; border: 1px solid #2d333b; }
+
+  /* Native Tag Inspector Table (Overpass Turbo style) */
+  .maplibregl-popup-content {
+    background: #181d24f7 !important; color: #f0f6fc !important;
+    border: 1px solid #2d333b !important; border-radius: 8px !important;
+    padding: 10px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+    font-family: inherit !important; font-size: 11px !important; max-width: 280px !important;
+  }
+  .maplibregl-popup-tip { border-top-color: #181d24f7 !important; }
+  .tag-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  .tag-table th, .tag-table td { text-align: left; padding: 3px 6px; border: 1px solid #2d333b; font-size: 10px; }
+  .tag-table th { background: #22272e; color: #38bdf8; }
+  .tag-table td { word-break: break-all; }
 
   #hint-toast {
     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 15;
@@ -483,16 +464,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
 <div id="map"></div>
 
-<!-- Vertical Toolbar Rail -->
+<!-- Vertical Toolbar Rail (Separated Data Browser & My Layers) -->
 <div id="side-rail">
-  <button class="rail-btn" id="btn-browser-toggle" title="Data Browser / Layers">
+  <button class="rail-btn" id="btn-browser-toggle" title="Data Browser (Base layers, 2D/3D, Boundaries)">
     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
+  </button>
+  <button class="rail-btn" id="btn-mylayers-toggle" title="My Layers & Groupings">
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
   </button>
   <div class="rail-sep"></div>
   <button class="rail-btn" id="btn-search" title="Search Location">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
   </button>
-  <button class="rail-btn tool" data-tool="marker" title="Place Marker Pin">
+  <button class="rail-btn tool" data-tool="marker" title="Place Drop-Pin Marker">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
   </button>
   <button class="rail-btn tool" data-tool="textbox" title="Add Text Label">
@@ -525,7 +509,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </button>
 </div>
 
-<!-- Left Side Data Browser Panel -->
+<!-- Panel 1: Data Browser Panel -->
 <div id="browser-panel" class="left-panel">
   <div class="panel-header">
     <div class="panel-title">
@@ -538,6 +522,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <div class="panel-content">
+    <!-- 2D / 3D Mode Selector -->
+    <div class="dimension-mode-bar">
+      <button class="dimension-mode-btn active" id="btn2DMode">2D MAP</button>
+      <button class="dimension-mode-btn" id="btn3DMode">3D BUILDINGS</button>
+    </div>
+
     <!-- Trade Area Dropdown (Collapsed by default) -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-trade-area">
@@ -549,7 +539,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           <select id="tradePolygonSelect"><option value="">-- Choose a polygon --</option></select>
           <label style="font-size:11px; font-weight:600; color:#f0f6fc; margin-top:2px;">POI Category:</label>
           <select id="tradeCategorySelect"></select>
-          <button class="trade-btn" id="btnScanTradeArea">Scan POIs (OSM Geometries)</button>
+          <button class="trade-btn" id="btnScanTradeArea">Scan POIs</button>
         </div>
         <div id="tradeResults" class="poi-summary"></div>
       </div>
@@ -598,10 +588,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- Custom Drawings & Grouping -->
-    <div class="layers-heading">
+<!-- Panel 2: My Layers & Groups Panel -->
+<div id="mylayers-panel" class="left-panel">
+  <div class="panel-header">
+    <div class="panel-title">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
       <span>My Layers</span>
+    </div>
+    <div class="panel-actions">
+      <button class="icon-action-btn" id="btn-close-mylayers" title="Close">✕</button>
+    </div>
+  </div>
+
+  <div class="panel-content">
+    <div class="layers-heading">
+      <span>Layer Groups</span>
       <div style="display:flex; align-items:center; gap:6px;">
         <button id="btnAddCustomGroup" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">+ GROUP</button>
         <span class="badge-count" id="layer-badge-count">0</span>
@@ -774,11 +778,11 @@ map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 // ----------------- State Machine -----------------
 let features = [], fid = 0;
 let customGroups = {
-  "Trade Area Scan": []
+  "Trade Area Scan": { collapsed: false, ids: [] }
 };
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
-let markerShape = 'pin', markerColor = '#e8b84a', markerIconSize = 0.9;
+let markerShape = 'pin', markerColor = '#003366', markerIconSize = 0.9;
 let currentExportRatio = 'screen';
 
 const textSettings = {
@@ -815,7 +819,7 @@ const $ = id => document.getElementById(id);
 const hint = t => { $('hint-toast').style.display = t ? 'block' : 'none'; $('hint-toast').textContent = t || ''; };
 
 const closeFloatingCards = () => {
-  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-export','browser-panel'].forEach(id => $(id).classList.remove('open'));
+  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-export','browser-panel','mylayers-panel'].forEach(id => $(id).classList.remove('open'));
 };
 
 const resetActiveTools = () => {
@@ -834,7 +838,7 @@ function renderIconCanvas(shape, color) {
   c.width = 64; c.height = 64;
   const ctx = c.getContext('2d');
   ctx.clearRect(0,0,64,64);
-  ctx.strokeStyle = '#0a1628';
+  ctx.strokeStyle = '#ffffff';
   ctx.lineWidth = 3;
   ctx.fillStyle = color;
   ctx.lineJoin = 'round';
@@ -940,7 +944,7 @@ function addDrawStack() {
       }
     });
 
-    // Polylines & Light Blue Default Routes
+    // Polylines & Light Blue Routes
     map.addLayer({
       id: 'draw-line', type: 'line', source: 'draw',
       filter: ['==', ['geometry-type'], 'LineString'],
@@ -952,7 +956,7 @@ function addDrawStack() {
       }
     });
 
-    // Marker Pins
+    // Drop-Pin Marker Pins (Defaults to Pin Style)
     map.addLayer({
       id: 'draw-marker', type: 'symbol', source: 'draw',
       filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
@@ -984,7 +988,7 @@ function addDrawStack() {
       }
     });
 
-    // Specific Polygon Labels Layer
+    // Polygon Labels
     map.addLayer({
       id: 'draw-poly-labels', type: 'symbol', source: 'draw',
       filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'showLabel'], true]],
@@ -1009,7 +1013,7 @@ function addDrawStack() {
     map.getSource('draw').setData(fc(features));
   }
 
-  // Live Construction Draft Preview Source
+  // Draft preview
   if (!map.getSource('draft')) {
     map.addSource('draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
@@ -1077,6 +1081,23 @@ function applyVis() {
 
 map.on('load', () => { addDrawStack(); applyVis(); });
 
+// ----------------- 2D vs 3D Dimension Switcher -----------------
+$('btn2DMode').onclick = () => {
+  $('btn2DMode').classList.add('active');
+  $('btn3DMode').classList.remove('active');
+  map.setLayoutProperty('building-2d', 'visibility', 'visible');
+  map.setLayoutProperty('building-3d', 'visibility', 'none');
+  map.easeTo({ pitch: 0 });
+};
+
+$('btn3DMode').onclick = () => {
+  $('btn3DMode').classList.add('active');
+  $('btn2DMode').classList.remove('active');
+  map.setLayoutProperty('building-2d', 'visibility', 'none');
+  map.setLayoutProperty('building-3d', 'visibility', 'visible');
+  map.easeTo({ pitch: 55, bearing: -15 });
+};
+
 // ----------------- Geometry Utilities & Snapping -----------------
 function haversineDist(a, b) {
   const R = 6371000, dLa = (b[1]-a[1]) * Math.PI/180, dLo = (b[0]-a[0]) * Math.PI/180;
@@ -1128,14 +1149,15 @@ function fetchMultiPointRoute(pts) {
     });
 }
 
-function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null) {
+function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, explicitName = null) {
   const newId = ++fid;
   const isRoute = kind === 'route';
   const defaultBorder = isRoute ? '#38bdf8' : '#e8b84a';
+  const assignedName = explicitName || `${kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
 
   const feat = {
     id: newId,
-    name: `${kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`,
+    name: assignedName,
     kind: kind,
     geometry: geometry,
     props: {
@@ -1156,7 +1178,7 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null) 
   features.push(feat);
   
   if (targetGroup && customGroups[targetGroup]) {
-    customGroups[targetGroup].push(newId);
+    customGroups[targetGroup].ids.push(newId);
   }
   
   syncDraw();
@@ -1174,16 +1196,12 @@ $('btnScanTradeArea').onclick = () => {
   }
   const category = $('tradeCategorySelect').value;
   const bnd = calcBounds(targetPoly);
-  const centerLat = (bnd[0][1] + bnd[1][1]) / 2;
-  const centerLon = (bnd[0][0] + bnd[1][0]) / 2;
-  const radius = haversineDist([centerLon, centerLat], [bnd[1][0], bnd[1][1]]);
 
-  hint(`Querying POIs for ${category} inside polygon…`);
-  $('tradeResults').innerHTML = '<div style="color:#d9b451;">Extracting local POIs…</div>';
+  hint(`Scanning POIs for ${category} inside polygon…`);
+  $('tradeResults').innerHTML = '<div style="color:#d9b451;">Querying local spatial features…</div>';
 
-  if (!customGroups["Trade Area Scan"]) customGroups["Trade Area Scan"] = [];
+  if (!customGroups["Trade Area Scan"]) customGroups["Trade Area Scan"] = { collapsed: false, ids: [] };
 
-  // Robust Geoprocessing Query (Overpass / OSMnx Tag Parser)
   const tags = POI_CONFIG[category] || [];
   const bbox = `${bnd[0][1]},${bnd[0][0]},${bnd[1][1]},${bnd[1][0]}`;
   let queryParts = '';
@@ -1224,18 +1242,20 @@ $('btnScanTradeArea').onclick = () => {
 
       const counts = {};
       filtered.forEach(el => {
-        const name = (el.tags && (el.tags.name || el.tags.amenity || el.tags.shop || el.tags.building)) || 'POI';
-        counts[name] = (counts[name] || 0) + 1;
+        const poiName = (el.tags && (el.tags.name || el.tags.amenity || el.tags.shop || el.tags.building)) || 'POI';
+        counts[poiName] = (counts[poiName] || 0) + 1;
 
         const lat = el.lat || (el.center && el.center.lat);
         const lon = el.lon || (el.center && el.center.lon);
+        
+        // POI Name becomes Marker Name with Overpass Tag metadata saved
         addFeatureRecord('marker', { type: 'Point', coordinates: [lon, lat] }, {
-          name: name,
-          shape: 'circle',
-          color: '#00d2ff',
-          iconSize: 0.65,
-          iconKey: getIconKey('circle', '#00d2ff')
-        }, "Trade Area Scan");
+          shape: 'pin',
+          color: '#003366',
+          iconSize: 0.85,
+          iconKey: getIconKey('pin', '#003366'),
+          osmTags: el.tags || { name: poiName, type: category }
+        }, "Trade Area Scan", poiName);
       });
 
       let html = `<div style="font-weight:700; color:#f0f6fc; margin-bottom:4px;">Grouped ${filtered.length} POIs:</div>`;
@@ -1260,7 +1280,6 @@ $('btnFetchCityBound').onclick = () => {
     .then(j => {
       if (j.length && j[0].geojson && (j[0].geojson.type === 'Polygon' || j[0].geojson.type === 'MultiPolygon')) {
         addFeatureRecord('polygon', j[0].geojson, {
-          name: `${q} Boundary`,
           borderColor: '#ff1e1e',
           borderOpacity: 1.0,
           width: 3,
@@ -1268,7 +1287,7 @@ $('btnFetchCityBound').onclick = () => {
           fillColor: '#ff1e1e',
           fillOpacity: 0.15,
           showLabel: true
-        });
+        }, null, `${q} Boundary`);
         if (j[0].boundingbox) {
           map.fitBounds([
             [parseFloat(j[0].boundingbox[2]), parseFloat(j[0].boundingbox[0])],
@@ -1282,6 +1301,30 @@ $('btnFetchCityBound').onclick = () => {
     })
     .catch(() => hint('Boundary request failed'));
 };
+
+// ----------------- Overpass Tag Inspector Popup Handler -----------------
+map.on('click', 'draw-marker', e => {
+  if (editMode || activeTool) return;
+  if (!e.features.length) return;
+  const fProps = e.features[0].properties;
+  let tags = {};
+  try { tags = typeof fProps.osmTags === 'string' ? JSON.parse(fProps.osmTags) : fProps.osmTags; } catch(err) {}
+  
+  if (tags && Object.keys(tags).length) {
+    let tableRows = '';
+    for (const k in tags) {
+      tableRows += `<tr><th>${k}</th><td>${tags[k]}</td></tr>`;
+    }
+    const html = `
+      <div style="font-weight:700; color:#38bdf8; margin-bottom:4px; font-size:12px;">${fProps.name || 'POI Details'}</div>
+      <table class="tag-table">${tableRows}</table>
+    `;
+    new maplibregl.Popup()
+      .setLngLat(e.lngLat)
+      .setHTML(html)
+      .addTo(map);
+  }
+});
 
 // ----------------- Tool Handlers & Drawing Engine -----------------
 document.querySelectorAll('.tool').forEach(btn => {
@@ -1536,7 +1579,7 @@ $('eBorderOp').oninput = e => { const f = features.find(x => x.id === selectedId
 $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.width = parseFloat(e.target.value); syncDraw(); } };
 $('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); } };
 $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); } };
-$('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); } };
+$('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); } };
 $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); } };
 $('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); } };
 $('eDashStyle').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.dashStyle = e.target.value; syncDraw(); } };
@@ -1545,7 +1588,7 @@ $('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId
 
 $('eDeleteBtn').onclick = () => {
   features = features.filter(x => x.id !== selectedId);
-  for (const g in customGroups) { customGroups[g] = customGroups[g].filter(id => id !== selectedId); }
+  for (const g in customGroups) { customGroups[g].ids = customGroups[g].ids.filter(id => id !== selectedId); }
   syncDraw();
   renderMyLayers();
   $('popup-shape-editor').classList.remove('open');
@@ -1557,7 +1600,7 @@ $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('
 $('btnAddCustomGroup').onclick = () => {
   const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
   if (gName && gName.trim() && !customGroups[gName]) {
-    customGroups[gName.trim()] = [];
+    customGroups[gName.trim()] = { collapsed: false, ids: [] };
     renderMyLayers();
   }
 };
@@ -1591,7 +1634,6 @@ function renderMyLayers() {
   const container = $('my-layers-list');
   $('layer-badge-count').textContent = features.length;
 
-  // Refresh Trade Area Target Dropdown
   const polyList = features.filter(f => ['polygon', 'rectangle', 'circle'].includes(f.kind));
   $('tradePolygonSelect').innerHTML = '<option value="">-- Choose a polygon --</option>' + 
     polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
@@ -1604,29 +1646,30 @@ function renderMyLayers() {
   let html = '';
   const groupedIds = new Set();
 
-  // Render Custom Groups
   for (const gName in customGroups) {
-    const ids = customGroups[gName];
-    const groupFeats = features.filter(f => ids.includes(f.id));
-    ids.forEach(id => groupedIds.add(id));
+    const grp = customGroups[gName];
+    const groupFeats = features.filter(f => grp.ids.includes(f.id));
+    grp.ids.forEach(id => groupedIds.add(id));
 
     html += `
       <div class="group-container">
-        <div class="group-header">
-          <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group" />
+        <div class="group-header" data-group="${gName}">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="card-btn" data-act="groupToggleCollapse" data-group="${gName}">${grp.collapsed ? '▸' : '▾'}</span>
+            <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group" />
+          </div>
           <div style="display:flex; align-items:center; gap:2px;">
             <button class="card-btn" data-act="groupEye" data-group="${gName}" title="Toggle Group">👁</button>
             <button class="card-btn" data-act="groupDel" data-group="${gName}" title="Delete Group">✕</button>
           </div>
         </div>
-        <div class="group-items">
+        <div class="group-items ${grp.collapsed ? 'hidden' : ''}">
           ${groupFeats.length ? groupFeats.map(f => renderLayerCardHtml(f)).join('') : '<div style="font-size:10px; color:#768390; padding:4px;">Empty group</div>'}
         </div>
       </div>
     `;
   }
 
-  // Ungrouped loose layers
   const looseFeats = features.filter(f => !groupedIds.has(f.id));
   if (looseFeats.length) {
     html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px;">Ungrouped Layers</div>';
@@ -1635,7 +1678,6 @@ function renderMyLayers() {
 
   container.innerHTML = html;
 
-  // Bind Rename Group Handlers
   container.querySelectorAll('.group-title-input').forEach(inp => {
     inp.onchange = e => {
       const oldN = e.target.dataset.oldname;
@@ -1648,7 +1690,6 @@ function renderMyLayers() {
     };
   });
 
-  // Bind Rename Layer Handlers
   container.querySelectorAll('.layer-name-input').forEach(inp => {
     inp.onchange = e => {
       const id = parseInt(e.target.dataset.id, 10);
@@ -1657,17 +1698,23 @@ function renderMyLayers() {
     };
   });
 
-  // Action Triggers
-  container.querySelectorAll('button[data-act], input[data-act]').forEach(b => {
+  container.querySelectorAll('button[data-act], input[data-act], span[data-act]').forEach(b => {
     b.onchange = b.onclick = (e) => {
       if (b.tagName === 'INPUT' && e.type !== 'change') return;
       if (b.tagName === 'BUTTON' && e.type !== 'click') return;
+      if (b.tagName === 'SPAN' && e.type !== 'click') return;
 
       const act = b.dataset.act;
 
+      if (act === 'groupToggleCollapse') {
+        const g = b.dataset.group;
+        customGroups[g].collapsed = !customGroups[g].collapsed;
+        renderMyLayers();
+        return;
+      }
       if (act === 'groupEye') {
         const g = b.dataset.group;
-        const ids = customGroups[g] || [];
+        const ids = customGroups[g].ids || [];
         const anyVis = features.some(f => ids.includes(f.id) && f.props.visible);
         features.forEach(f => { if (ids.includes(f.id)) f.props.visible = anyVis ? 0 : 1; });
         syncDraw(); renderMyLayers();
@@ -1689,7 +1736,7 @@ function renderMyLayers() {
       if (act === 'eye') { f.props.visible = f.props.visible ? 0 : 1; syncDraw(); renderMyLayers(); }
       if (act === 'del') { 
         features = features.filter(x => x.id !== id);
-        for (const g in customGroups) customGroups[g] = customGroups[g].filter(xId => xId !== id);
+        for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== id);
         syncDraw(); renderMyLayers(); 
       }
       if (act === 'zoom') {
@@ -1715,7 +1762,7 @@ function calcBounds(f) {
   return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Export Layout & Preview Engine -----------------
+// ----------------- Live Export Preview & Layout Engine -----------------
 function updateExportPreview() {
   const canvas = map.getCanvas();
   try {
@@ -1740,6 +1787,7 @@ document.querySelectorAll('.layout-grid .layout-btn').forEach(btn => {
     document.querySelectorAll('.layout-grid .layout-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentExportRatio = btn.dataset.ratio;
+    updateExportPreview();
   };
 });
 
@@ -1791,7 +1839,7 @@ $('triggerExportBtn').onclick = () => {
   map.triggerRepaint();
 };
 
-// ----------------- UI / Rail / Accordion Controls -----------------
+// ----------------- UI Panel Toggles -----------------
 $('btn-browser-toggle').onclick = () => {
   const p = $('browser-panel');
   const willOpen = !p.classList.contains('open');
@@ -1799,6 +1847,14 @@ $('btn-browser-toggle').onclick = () => {
   if (willOpen) p.classList.add('open');
 };
 $('btn-close-browser').onclick = () => { $('browser-panel').classList.remove('open'); };
+
+$('btn-mylayers-toggle').onclick = () => {
+  const p = $('mylayers-panel');
+  const willOpen = !p.classList.contains('open');
+  closeFloatingCards();
+  if (willOpen) p.classList.add('open');
+};
+$('btn-close-mylayers').onclick = () => { $('mylayers-panel').classList.remove('open'); };
 
 // Collapsible accordion triggers
 document.querySelectorAll('.acc-header').forEach(h => {
@@ -1875,8 +1931,8 @@ $('cTerWidth').oninput = e => setMapPaint('rd_tertiary', 'line-width', parseFloa
 $('cTerOp').oninput = e => ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-opacity', parseFloat(e.target.value)));
 $('cRailColor').oninput = e => setMapPaint('rd_rail', 'line-color', e.target.value);
 $('cBoundColor').oninput = e => ['bound_prov','bound_city','bound_brgy'].forEach(id => setMapPaint(id, 'line-color', e.target.value));
-$('cBldColor').oninput = e => { setMapPaint('building', 'fill-color', e.target.value); setMapPaint('building', 'fill-outline-color', e.target.value); };
-$('cBldOp').oninput = e => setMapPaint('building', 'fill-opacity', parseFloat(e.target.value));
+$('cBldColor').oninput = e => { setMapPaint('building-2d', 'fill-color', e.target.value); setMapPaint('building-2d', 'fill-outline-color', e.target.value); setMapPaint('building-3d', 'fill-extrusion-color', e.target.value); };
+$('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('building-3d', 'fill-extrusion-opacity', parseFloat(e.target.value)); };
 $('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
