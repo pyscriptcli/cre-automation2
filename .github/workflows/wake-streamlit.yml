@@ -1,0 +1,41 @@
+# .github/workflows/wake-streamlit.yml
+
+name: Wake Up Streamlit Apps
+
+on:
+  # Run automatically every 10 hours (must be less than Streamlit's 12-hour limit)
+  schedule:
+    - cron: '0 */10 * * *'
+  
+  # Allow you to manually trigger it from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  wake-apps:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Check out your repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Set up Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 3. Install Playwright Python package
+      - name: Install Playwright
+        run: |
+          pip install playwright
+
+      # 4. Install Chromium browser (with all system dependencies)
+      - name: Install Chromium browser
+        run: |
+          playwright install --with-deps chromium
+
+      # 5. Run your wake-up script
+      - name: Run wake-up script
+        run: |
+          python scripts/wake_apps.py
