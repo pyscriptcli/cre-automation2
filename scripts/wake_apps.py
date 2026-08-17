@@ -10,6 +10,8 @@ APP_URLS = [
     "https://project-apex.streamlit.app",
     "https://trs-site-report.streamlit.app",
     "https://primephilippines2026midyearpropertymarketreport.streamlit.app",
+    "https://openflux-playground.streamlit.app",
+    "https://open-map-builder.streamlit.app",
 ]
 
 async def wake_up_app(url):
