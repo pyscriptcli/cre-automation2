@@ -80,7 +80,7 @@ else:
     st.sidebar.caption(f"Active basemap: **{selected_basemap}**")
 
 # ------------------------------------------------------------------------
-# 3. MAP BUILDER & ZERO-API COLOR TRANSFORMATION
+# 3. MAP BUILDER & ZERO-API COLOR MATRIX TRANSFORMATION
 # ------------------------------------------------------------------------
 
 # Coordinates for Mandaluyong / Metro Manila
@@ -106,29 +106,42 @@ tile_seam_fix = """
 """
 
 if selected_basemap == "Midnight Blue":
-    # Base: CartoDB Positron (Light)
+    # Base: CartoDB Dark Matter
+    # We use Dark Matter because the roads are distinctly lighter than the background, 
+    # allowing the color matrix to target them perfectly.
     folium.TileLayer(
-        tiles='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        tiles='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         attr='&copy; OpenStreetMap contributors &copy; CARTO',
         name='Midnight Blue Base',
         max_zoom=20,
         subdomains='abcd'
     ).add_to(m)
 
-    # Invert light basemap + hue shift into Navy background with Gold roads
-    midnight_css = f"""
+    # SVG feColorMatrix Transformation
+    # This precisely calculates the greyscale pixels of Carto DB Dark and maps 
+    # RGB(36,36,36) to Navy RGB(11,19,32) and RGB(100,100,100) to Gold RGB(224,168,56)
+    midnight_svg_matrix = f"""
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+        <filter id="navy-gold-matrix">
+            <feColorMatrix type="matrix" values="
+                3.34 0 0 0 -0.42
+                2.33 0 0 0 -0.25
+                0.37 0 0 0 0.07
+                0    0 0 1 0" />
+        </filter>
+    </svg>
     <style>
     {tile_seam_fix}
     .leaflet-tile-pane {{
-        filter: invert(96%) hue-rotate(190deg) saturate(320%) contrast(135%) brightness(85%) !important;
-        -webkit-filter: invert(96%) hue-rotate(190deg) saturate(320%) contrast(135%) brightness(85%) !important;
+        filter: url(#navy-gold-matrix) !important;
+        -webkit-filter: url(#navy-gold-matrix) !important;
     }}
     .leaflet-container {{
-        background: #09101d !important;
+        background: #0b1320 !important;
     }}
     </style>
     """
-    m.get_root().header.add_child(folium.Element(midnight_css))
+    m.get_root().header.add_child(folium.Element(midnight_svg_matrix))
 
 elif selected_basemap == "Carto DB Light":
     folium.TileLayer('CartoDB positron', name="Carto DB Light").add_to(m)
