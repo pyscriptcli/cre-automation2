@@ -29,7 +29,7 @@ st.markdown("""
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
     
-    /* Dark theme for sidebar to match the provided screenshots */
+    /* Dark theme for sidebar */
     [data-testid="stSidebar"] {
         background-color: #111418;
         border-right: 1px solid #2d333b;
@@ -65,10 +65,7 @@ standard_basemaps = [
     "OSM"
 ]
 
-# Color Themes referenced from provided files:
-# "Screenshot 2026-08-17 125647.png" (Carrara)
-# "Screenshot 2026-08-17 125658.png" (Sandstone, Midnight Blue)
-# "Screenshot 2026-08-17 125707.png" (Contrast)
+# Color Themes
 color_themes = [
     "Theme: Carrara",
     "Theme: Sandstone",
@@ -79,7 +76,7 @@ color_themes = [
 selected_layer = st.sidebar.radio(
     "Select Layer or Theme",
     options=standard_basemaps + color_themes,
-    index=0
+    index=6 # Defaults to Midnight Blue based on your screenshot
 )
 
 st.sidebar.markdown("---")
@@ -92,7 +89,7 @@ st.sidebar.caption("Selecting a 'Theme' injects CSS filters onto a Carto DB Ligh
 # Coordinates for Mandaluyong City, Metro Manila
 MANDALUYONG_COORDS = [14.5794, 121.0359]
 
-# Initialize base map without standard tiles (we will add them manually)
+# Initialize base map without standard tiles
 m = folium.Map(
     location=MANDALUYONG_COORDS, 
     zoom_start=13, 
@@ -100,9 +97,6 @@ m = folium.Map(
     control_scale=True,
     zoom_control=False # Hiding default controls for a cleaner Felt look
 )
-
-# Variable to hold our CSS filter injection
-css_filter = ""
 
 # Determine which tile set and filters to apply
 if selected_layer == "Carto DB Light":
@@ -124,52 +118,51 @@ elif selected_layer == "Satellite":
 
 else:
     # --- COLOR THEME INJECTION ---
-    # Whenever a custom color theme is selected, we use CartoDB Positron (Light) 
-    # as the base layer, and then inject specific CSS filters to colorize it.
-    
+    # Add the base layer first
     folium.TileLayer('CartoDB positron', name=selected_layer).add_to(m)
+    
+    css_filter = ""
+    bg_color = "#f8f9fa" # Default light background
     
     if selected_layer == "Theme: Carrara":
         # Subtle warm greyscale with light contrast
-        css_filter = "sepia(15%) grayscale(40%) contrast(105%) brightness(98%);"
+        css_filter = "sepia(15%) grayscale(40%) contrast(105%) brightness(98%)"
         
     elif selected_layer == "Theme: Sandstone":
         # Warm brownish/sepia tones, increased saturation
-        css_filter = "sepia(70%) hue-rotate(-15deg) saturate(140%) contrast(110%) brightness(95%);"
+        css_filter = "sepia(70%) hue-rotate(-15deg) saturate(140%) contrast(110%) brightness(95%)"
         
     elif selected_layer == "Theme: Midnight Blue":
         # Invert the light map to make it dark, then hue-shift to blues and gold
-        css_filter = "invert(95%) hue-rotate(195deg) saturate(150%) contrast(130%) brightness(85%);"
+        css_filter = "invert(100%) hue-rotate(185deg) saturate(150%) contrast(115%) brightness(90%)"
+        bg_color = "#111418" # Dark background to prevent white flashes
         
     elif selected_layer == "Theme: Contrast":
         # High contrast, pure black/white/grey
-        css_filter = "grayscale(100%) contrast(180%) brightness(85%);"
+        css_filter = "grayscale(100%) contrast(200%) brightness(85%)"
+        bg_color = "#111418" 
 
-    # Inject the generated CSS filter into the Leaflet tile pane
+    # THE FIX: Inject the generated CSS filter into the header using !important
     custom_css = f"""
     <style>
     .leaflet-tile-pane {{
-        filter: {css_filter};
-        -webkit-filter: {css_filter};
+        filter: {css_filter} !important;
+        -webkit-filter: {css_filter} !important;
         transition: filter 0.5s ease-in-out;
     }}
-    /* Adjust background color behind tiles for darker themes to prevent white flashes */
     .leaflet-container {{
-        background: {'#111418' if 'Midnight' in selected_layer or 'Contrast' in selected_layer else '#f8f9fa'};
+        background: {bg_color} !important;
     }}
     </style>
     """
-    m.get_root().html.add_child(folium.Element(custom_css))
+    m.get_root().header.add_child(folium.Element(custom_css))
 
 # ------------------------------------------------------------------------
 # 4. RENDER MAP 
 # ------------------------------------------------------------------------
-# Set returned_objects=[] so Streamlit doesn't reload the entire app 
-# every time the user pans or zooms, creating a smoother UI experience.
-# We use a large height to ensure it fills the vertical viewport.
 st_folium(
     m, 
     use_container_width=True, 
     height=1000, 
-    returned_objects=[]
+    returned_objects=[] # Prevents Streamlit re-renders on map pan/zoom
 )
