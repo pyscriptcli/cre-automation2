@@ -59,7 +59,7 @@ st.markdown(
 )
 
 # ------------------------------------------------------------------------
-# 2. THEMES & VECTOR STYLING ENGINE
+# 2. THEMES & VECTOR STYLING ENGINE (Granular Roads + Boundaries)
 # ------------------------------------------------------------------------
 CENTER = [121.0359, 14.5794]
 ZOOM = 14
@@ -70,27 +70,30 @@ THEMES = {
         "landcover": "#0f1d33", "water": "#0a1424", "waterway": "#081120",
         "parks": "#142440", "buildings": "#8e7258", "aeroway": "#152640",
         "rail": "#d9b451", "rd_express": "#ffaa00", "rd_major": "#e8b84a",
-        "rd_min_hi": "#7d5f14", "rd_min_md": "#46463e", "rd_min_lo": "#2f2f2a",
-        "rd_path": "#4a4333", "rd_case": "#685c37", "sec_opacity": 0.7,
-        "building_opacity": 0.25, "boundary": "#ff1e1e", "muted": "#8b949e",
+        "rd_secondary": "#c99c37", "rd_tertiary": "#7d5f14", "rd_min_md": "#46463e",
+        "rd_min_lo": "#2f2f2a", "rd_path": "#4a4333", "rd_case": "#685c37",
+        "sec_opacity": 0.8, "ter_opacity": 0.65, "building_opacity": 0.25,
+        "boundary": "#ff1e1e", "muted": "#8b949e",
     },
     "Monochrome": {
         "overlay": "#ece9e2", "text": "#2d2a26", "land": "#ece9e2",
         "landcover": "#e5e2da", "water": "#cdd7db", "waterway": "#bac6cb",
         "parks": "#e2dfd7", "buildings": "#dedad2", "aeroway": "#dbd7cf",
         "rail": "#524e48", "rd_express": "#1a1816", "rd_major": "#2e2a25",
-        "rd_min_hi": "#47423b", "rd_min_md": "#716b61", "rd_min_lo": "#9e978d",
-        "rd_path": "#b0a99f", "rd_case": "#1a1816", "sec_opacity": 0.85,
-        "building_opacity": 0.6, "boundary": "#ff1e1e", "muted": "#716b61",
+        "rd_secondary": "#47423b", "rd_tertiary": "#716b61", "rd_min_md": "#8a8377",
+        "rd_min_lo": "#9e978d", "rd_path": "#b0a99f", "rd_case": "#1a1816",
+        "sec_opacity": 0.85, "ter_opacity": 0.7, "building_opacity": 0.6,
+        "boundary": "#ff1e1e", "muted": "#716b61",
     },
     "White Gold": {
         "overlay": "#ffffff", "text": "#a07d1c", "land": "#fafafa",
         "landcover": "#f1f1ec", "water": "#d4dadc", "waterway": "#c2c9cc",
         "parks": "#e6ebe4", "buildings": "#d8d8d4", "aeroway": "#e4e4e4",
         "rail": "#c99c37", "rd_express": "#f59e0b", "rd_major": "#e5a91d",
-        "rd_min_hi": "#9c7a1a", "rd_min_md": "#e0be74", "rd_min_lo": "#ead9b0",
-        "rd_path": "#e6dabd", "rd_case": "#b08a24", "sec_opacity": 0.6,
-        "building_opacity": 0.5, "boundary": "#ff1e1e", "muted": "#6b7280",
+        "rd_secondary": "#b08a24", "rd_tertiary": "#9c7a1a", "rd_min_md": "#e0be74",
+        "rd_min_lo": "#ead9b0", "rd_path": "#e6dabd", "rd_case": "#b08a24",
+        "sec_opacity": 0.7, "ter_opacity": 0.6, "building_opacity": 0.5,
+        "boundary": "#ff1e1e", "muted": "#6b7280",
     },
 }
 
@@ -117,6 +120,7 @@ def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=
 
 def vector_style(p):
     sec = p["sec_opacity"]
+    ter = p["ter_opacity"]
     return {
         "version": 8,
         "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
@@ -133,24 +137,27 @@ def vector_style(p):
             {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway", "paint": {"line-color": p["aeroway"], "line-width": w((11, 1), (20, 12))}},
             {"id": "building", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
             
-            # Bright Red Dashed Boundaries (Off by default via layout.visibility)
+            # Bright Red Dashed Boundaries (Off by default)
             {"id": "bound_prov", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [2, 4], True, False], "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 2.2, "line-dasharray": [4, 2]}},
-            {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 8, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.6, "line-dasharray": [2, 2], "line-opacity": 0.9}},
+            {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 7, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.8, "line-dasharray": [2, 2], "line-opacity": 0.9}},
             {"id": "bound_brgy", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [9, 10], True, False], "minzoom": 11, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.2, "line-dasharray": [1, 2], "line-opacity": 0.8}},
 
-            # Roads
-            road_layer(p, "case_express", ["motorway"], None, [(5, 1.5), (14, 5.0), (20, 22)], casing=True),
-            road_layer(p, "case_major", ["trunk", "primary"], None, [(6, 1.0), (14, 3.5), (20, 18)], casing=True),
-            road_layer(p, "case_minhi", ["secondary", "tertiary"], None, [(8, 0.8), (14, 2.5), (20, 14)], casing=True, opacity=sec),
+            # Roads (Expressway, Main, Secondary, Tertiary, Paths)
+            road_layer(p, "case_express", ["motorway"], None, [(5, 1.5), (14, 5.5), (20, 24)], casing=True),
+            road_layer(p, "case_major", ["trunk", "primary"], None, [(6, 1.0), (14, 3.8), (20, 18)], casing=True),
+            road_layer(p, "case_secondary", ["secondary"], None, [(8, 0.8), (14, 2.8), (20, 15)], casing=True, opacity=sec),
+            road_layer(p, "case_tertiary", ["tertiary"], None, [(9, 0.6), (14, 2.0), (20, 12)], casing=True, opacity=ter),
+            
             road_layer(p, "rd_path", ["path", "pedestrian", "footway"], p["rd_path"], [(14, 0.6), (20, 5)], minzoom=14),
             road_layer(p, "rd_min_lo", ["service", "track"], p["rd_min_lo"], [(14, 0.6), (20, 6)], minzoom=14),
             road_layer(p, "rd_min_md", ["minor"], p["rd_min_md"], [(13, 0.8), (16, 3.5), (20, 10)], minzoom=13),
-            road_layer(p, "rd_min_hi", ["secondary", "tertiary"], p["rd_min_hi"], [(8, 0.8), (14, 2.5), (20, 14)], opacity=sec),
-            road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 3.5), (20, 18)]),
-            road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 5.0), (20, 22)]),
+            road_layer(p, "rd_tertiary", ["tertiary"], p["rd_tertiary"], [(9, 0.6), (14, 2.0), (20, 12)], opacity=ter),
+            road_layer(p, "rd_secondary", ["secondary"], p["rd_secondary"], [(8, 0.8), (14, 2.8), (20, 15)], opacity=sec),
+            road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 3.8), (20, 18)]),
+            road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 5.5), (20, 24)]),
             road_layer(p, "rail", ["rail"], p["rail"], [(13, 0.5), (20, 2.5)], minzoom=13),
 
-            # Labels
+            # Labels (City, Brgy, Street)
             {"id": "label_city", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["city", "town"], True, False], "minzoom": 6, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((6, 12), (14, 18)), "text-transform": "uppercase", "text-letter-spacing": 0.1}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 2}},
             {"id": "label_brgy", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["suburb", "neighbourhood", "village", "quarter", "hamlet"], True, False], "minzoom": 11, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((11, 10), (16, 14)), "text-letter-spacing": 0.05}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
             {"id": "label_street", "type": "symbol", "source": "omt", "source-layer": "transportation_name", "minzoom": 13, "layout": {"symbol-placement": "line", "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((13, 9), (18, 13))}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
@@ -168,8 +175,8 @@ def raster_style(tile_urls, bg, maxzoom=20):
     }
 
 ALL_STYLES = {
-    "Monochrome": vector_style(THEMES["Monochrome"]),
     "Midnight Blue": vector_style(THEMES["Midnight Blue"]),
+    "Monochrome": vector_style(THEMES["Monochrome"]),
     "White Gold": vector_style(THEMES["White Gold"]),
     "Carto DB Light": raster_style(["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png", "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], "#f8f9fa"),
     "Carto DB Dark": raster_style(["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png", "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"], "#000000"),
@@ -177,7 +184,7 @@ ALL_STYLES = {
     "Satellite": raster_style(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "#000000", 19),
 }
 
-INITIAL_BASEMAP = "Monochrome"
+INITIAL_BASEMAP = "Midnight Blue"
 
 # ------------------------------------------------------------------------
 # 3. OPEN MAP BUILDER FRONTEND & COMPONENT
@@ -202,7 +209,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   }
   #map { position: absolute; inset: 0; width: 100vw; height: 100vh; }
 
-  /* Vertical Toolbar Rail */
+  /* Perfectly Centered Floating Vertical Toolbar */
   #side-rail {
     position: absolute; 
     top: 50%; 
@@ -231,7 +238,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .rail-btn.primary-active { background: #316dca; color: #ffffff; }
   .rail-sep { width: 24px; height: 1px; background: #2d333b; margin: 2px 0; }
 
-  /* Flyout Left Panels */
+  /* Flyout Left Side Panels */
   .left-panel {
     position: absolute; top: 16px; left: 74px; bottom: 16px; width: 340px; z-index: 9;
     background: #181d24f7; backdrop-filter: blur(14px); border: 1px solid #2d333b;
@@ -257,12 +264,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .acc-body.hidden { display: none; }
 
   .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
-  .layer-row input[type=checkbox] { accent-color: #ff1e1e; cursor: pointer; }
+  .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
 
-  /* Boundary Selective Mode Buttons */
-  .bound-mode-bar { display: flex; gap: 4px; background: #1c2128; padding: 3px; border-radius: 6px; border: 1px solid #2d333b; }
-  .bound-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 10px; font-weight: 600; padding: 4px 0; border-radius: 4px; cursor: pointer; }
-  .bound-mode-btn.active { background: #ff1e1e; color: #ffffff; }
+  /* Boundaries Selective Controls */
+  .bound-select-row { display: flex; gap: 6px; margin-top: 4px; }
+  .bound-select-row input[type=text] { flex: 1; background: #1c2128; border: 1px solid #2d333b; color: #f0f6fc; padding: 5px 8px; border-radius: 6px; font-size: 11px; font-family: inherit; }
+  .bound-select-row button { background: #ff1e1e; color: #fff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
 
   /* My Layers Cards */
   .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
@@ -296,19 +303,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   #popup-search { top: 20%; width: 280px; }
   #popup-marker-settings { top: 25%; width: 240px; }
   #popup-text-settings { top: 30%; width: 260px; }
-  #popup-shape-editor { top: 10%; width: 310px; max-height: 80vh; overflow-y: auto; }
-  #popup-custom-map { top: 16px; bottom: 16px; width: 300px; overflow-y: auto; }
-  #popup-export { top: 50%; transform: translateY(-50%); width: 290px; }
+  #popup-shape-editor { top: 8%; width: 320px; max-height: 84vh; overflow-y: auto; }
+  #popup-custom-map { top: 16px; bottom: 16px; width: 310px; overflow-y: auto; }
+  #popup-export { top: 50%; transform: translateY(-50%); width: 260px; }
 
   .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #2d333b; border-radius: 8px; background: #22272e; color: #adbac7; cursor: pointer; }
   .icon-grid button:hover { background: #2d333b; }
   .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
-
-  /* Export Layout Selector Buttons */
-  .layout-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0; }
-  .layout-btn { padding: 6px; background: #22272e; border: 1px solid #2d333b; border-radius: 6px; color: #f0f6fc; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
-  .layout-btn.active { background: #316dca; border-color: #316dca; }
 
   #hint-toast {
     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 15;
@@ -385,38 +387,38 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </div>
       <div class="acc-body" id="body-labels">
         <label class="layer-row"><span>City</span><input type="checkbox" data-g="label_city" checked></label>
-        <label class="layer-row"><span>Baranggay</span><input type="checkbox" data-g="label_brgy" checked></label>
+        <label class="layer-row"><span>Brgy</span><input type="checkbox" data-g="label_brgy" checked></label>
         <label class="layer-row"><span>Street</span><input type="checkbox" data-g="label_street" checked></label>
       </div>
     </div>
 
-    <!-- Roads -->
+    <!-- Roads (Expressway, Main, Secondary, Tertiary) -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-roads">
         <span>Roads</span><span>▾</span>
       </div>
       <div class="acc-body" id="body-roads">
-        <label class="layer-row"><span>Main Roads</span><input type="checkbox" data-g="road_main" checked></label>
-        <label class="layer-row"><span>Secondary Roads</span><input type="checkbox" data-g="road_sec" checked></label>
-        <label class="layer-row"><span>Express Ways</span><input type="checkbox" data-g="road_exp" checked></label>
+        <label class="layer-row"><span>Express Way</span><input type="checkbox" data-g="road_exp" checked></label>
+        <label class="layer-row"><span>Main Road</span><input type="checkbox" data-g="road_main" checked></label>
+        <label class="layer-row"><span>Secondary Road</span><input type="checkbox" data-g="road_sec" checked></label>
+        <label class="layer-row"><span>Tertiary Road</span><input type="checkbox" data-g="road_ter" checked></label>
       </div>
     </div>
 
-    <!-- Boundaries (Red Dashed, Selective / All Control) -->
+    <!-- Boundaries (Red Dashed + Selective City Boundary Fetcher) -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-boundaries">
         <span>Boundaries (Red Dashed)</span><span>▾</span>
       </div>
       <div class="acc-body" id="body-boundaries">
-        <div class="bound-mode-bar">
-          <button class="bound-mode-btn active" id="bModeOff">Off</button>
-          <button class="bound-mode-btn" id="bModeAll">All On</button>
-          <button class="bound-mode-btn" id="bModeSelective">Selective</button>
-        </div>
-        <div id="selectiveBoundaryList" style="display:flex; flex-direction:column; gap:8px; margin-top:4px;">
-          <label class="layer-row"><span>Province</span><input type="checkbox" data-g="bound_prov"></label>
-          <label class="layer-row"><span>City</span><input type="checkbox" data-g="bound_city"></label>
-          <label class="layer-row"><span>Baranggay</span><input type="checkbox" data-g="bound_brgy"></label>
+        <label class="layer-row"><span>All Provinces</span><input type="checkbox" data-g="bound_prov"></label>
+        <label class="layer-row"><span>All Cities</span><input type="checkbox" data-g="bound_city"></label>
+        <label class="layer-row"><span>All Brgys</span><input type="checkbox" data-g="bound_brgy"></label>
+        
+        <div style="font-weight:600; font-size:11px; color:#f0f6fc; margin-top:4px;">Highlight Specific City Boundary</div>
+        <div class="bound-select-row">
+          <input type="text" id="targetCityInput" placeholder="e.g. Quezon City, Pasig…"/>
+          <button id="btnFetchCityBound">Highlight</button>
         </div>
       </div>
     </div>
@@ -462,14 +464,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Opacity</span><input type="range" id="tOp" min="0.1" max="1" step="0.05" value="1"></div>
 </div>
 
-<!-- Left Side Feature Property & Polygon Customizer Editor -->
+<!-- Left Side Shape / Polygon Customizer Editor -->
 <div id="popup-shape-editor" class="float-card">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;" id="editShapeTitle">Edit Layer</span>
     <button class="card-btn" id="closeEditorBtn">✕</button>
   </div>
   <div class="f-row"><span>Name</span><input type="text" id="eName" style="width:140px;"></div>
-  <div class="f-row" id="eColorRow"><span>Border Color</span><input type="color" id="eColor"></div>
+  
+  <!-- Direct Colors & Opacity Controls -->
+  <div class="f-row" id="eBorderColorRow"><span>Border Color</span><input type="color" id="eBorderColor"></div>
+  <div class="f-row" id="eBorderOpRow"><span>Border Opacity</span><input type="range" id="eBorderOp" min="0" max="1" step="0.05"></div>
   <div class="f-row" id="eWidthRow"><span>Border Width</span><input type="range" id="eWidth" min="1" max="16" step="1"></div>
   <div class="f-row" id="eDashRow"><span>Border Style</span>
     <select id="eDashStyle" style="width:110px;">
@@ -478,12 +483,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <option value="dotted">Dotted</option>
     </select>
   </div>
-  <div class="f-row" id="eOpRow"><span>Border Opacity</span><input type="range" id="eOp" min="0.05" max="1" step="0.05"></div>
   <div class="f-row" id="eFillColorRow"><span>Fill Color</span><input type="color" id="eFillColor"></div>
   <div class="f-row" id="eFillOpRow"><span>Fill Opacity</span><input type="range" id="eFillOp" min="0" max="1" step="0.05"></div>
+
+  <!-- Polygon Floating Label Placement -->
+  <div class="f-row" id="eLabelToggleRow" style="display:none;"><span>Show Label</span><input type="checkbox" id="eShowLabel"></div>
+  <div class="f-row" id="eLabelPosRow" style="display:none;"><span>Label Position</span>
+    <select id="eLabelPos" style="width:110px;">
+      <option value="center">Center</option>
+      <option value="top">Above</option>
+      <option value="bottom">Below</option>
+      <option value="left">Left</option>
+      <option value="right">Right</option>
+    </select>
+  </div>
+
   <div class="f-row" id="eMarkerSizeRow" style="display:none;"><span>Icon Size</span><input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
   <div class="f-row" id="eTextRow" style="display:none;"><span>Text</span><input type="text" id="eTextVal" style="width:140px;"></div>
   <div class="f-row" id="eFontSizeRow" style="display:none;"><span>Font Size</span><input type="range" id="eFontSize" min="10" max="42" step="1"></div>
+  
   <div style="display:flex; justify-content:space-between; margin-top:6px;">
     <button id="eDeleteBtn" style="color:#f85149; border:1px solid #da36334d; background:#da36331a; padding:6px 12px; border-radius:6px; cursor:pointer;">Delete</button>
     <button id="eDoneBtn" style="background:#316dca; color:#fff; border:none; padding:6px 16px; border-radius:6px; cursor:pointer;">Done</button>
@@ -500,61 +518,46 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div style="display:flex; flex-wrap:wrap; gap:4px;" id="presetBtnList"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BACKGROUND</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cBgColor" value="#ece9e2"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cBgColor" value="#0a1628"></div>
+
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">EXPRESS WAYS</div>
+  <div class="f-row"><span>Color</span><input type="color" id="cExpColor" value="#ffaa00"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">MAIN ROADS</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cMainColor" value="#2e2a25"></div>
-  <div class="f-row"><span>Thickness</span><input type="range" id="cMainWidth" min="1" max="10" step="0.5" value="3.5"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cMainColor" value="#e8b84a"></div>
+  <div class="f-row"><span>Thickness</span><input type="range" id="cMainWidth" min="1" max="10" step="0.5" value="3.8"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="cMainOp" min="0" max="1" step="0.1" value="1"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">SECONDARY ROADS</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cSecColor" value="#47423b"></div>
-  <div class="f-row"><span>Thickness</span><input type="range" id="cSecWidth" min="0.5" max="8" step="0.5" value="2.5"></div>
-  <div class="f-row"><span>Opacity</span><input type="range" id="cSecOp" min="0" max="1" step="0.1" value="0.85"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cSecColor" value="#c99c37"></div>
+  <div class="f-row"><span>Thickness</span><input type="range" id="cSecWidth" min="0.5" max="8" step="0.5" value="2.8"></div>
+  <div class="f-row"><span>Opacity</span><input type="range" id="cSecOp" min="0" max="1" step="0.1" value="0.8"></div>
 
-  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">EXPRESS WAYS</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cExpColor" value="#1a1816"></div>
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">TERTIARY ROADS</div>
+  <div class="f-row"><span>Color</span><input type="color" id="cTerColor" value="#7d5f14"></div>
+  <div class="f-row"><span>Thickness</span><input type="range" id="cTerWidth" min="0.5" max="6" step="0.5" value="2.0"></div>
+  <div class="f-row"><span>Opacity</span><input type="range" id="cTerOp" min="0" max="1" step="0.1" value="0.65"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BOUNDARIES (RED DASHED)</div>
   <div class="f-row"><span>Color</span><input type="color" id="cBoundColor" value="#ff1e1e"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BUILDINGS</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cBldColor" value="#dedad2"></div>
-  <div class="f-row"><span>Opacity</span><input type="range" id="cBldOp" min="0" max="1" step="0.05" value="0.6"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cBldColor" value="#8e7258"></div>
+  <div class="f-row"><span>Opacity</span><input type="range" id="cBldOp" min="0" max="1" step="0.05" value="0.25"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">WATER</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cWaterColor" value="#cdd7db"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cWaterColor" value="#0a1424"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"></div>
 </div>
 
-<!-- Left Side Export Map Panel -->
+<!-- Left Side Direct Export Map Panel -->
 <div id="popup-export" class="float-card">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;">Export Map</span>
     <button class="card-btn" id="closeExportBtn">✕</button>
   </div>
-  <div style="font-weight:600; font-size:11px; color:#768390;">LAYOUT RATIO</div>
-  <div class="layout-grid">
-    <button class="layout-btn active" data-ratio="screen">Screen</button>
-    <button class="layout-btn" data-ratio="1:1">1:1 Square</button>
-    <button class="layout-btn" data-ratio="16:9">16:9 Wide</button>
-    <button class="layout-btn" data-ratio="4:3">4:3 Standard</button>
-    <button class="layout-btn" data-ratio="9:16">9:16 Story</button>
-    <button class="layout-btn" data-ratio="a4">A4 Poster</button>
-  </div>
-  <div class="f-row"><span>Format</span>
-    <select id="expFormat" style="width:100px;">
-      <option value="image/png">PNG</option>
-      <option value="image/jpeg">JPEG</option>
-    </select>
-  </div>
-  <div class="f-row"><span>Quality Scale</span>
-    <select id="expScale" style="width:100px;">
-      <option value="1">1x (Standard)</option>
-      <option value="2" selected>2x (High Res)</option>
-    </select>
-  </div>
-  <button id="triggerExportBtn" style="background:#316dca; color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:4px;">Download Image</button>
+  <div style="font-size:11px; color:#adbac7;">Click below to download the map image directly.</div>
+  <button id="triggerExportBtn" style="background:#316dca; color:#fff; border:none; padding:9px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:4px;">Download PNG</button>
 </div>
 
 <div id="hint-toast"></div>
@@ -562,7 +565,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <script>
 try {
 const ALL_STYLES = __ALL_STYLES__;
-let currentStyleName = "Monochrome";
+let currentStyleName = "Midnight Blue";
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -580,7 +583,6 @@ let features = [], fid = 0;
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
 let markerShape = 'pin', markerColor = '#e8b84a', markerIconSize = 0.9;
-let exportRatio = 'screen';
 
 const textSettings = {
   content: 'Custom Label',
@@ -593,10 +595,10 @@ const textSettings = {
 // Dragging feature state
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
 
-// Boundaries OFF by default
+// Granular Road & Label Visibility (Boundaries OFF by default)
 const vis = {
   label_city: true, label_brgy: true, label_street: true,
-  road_main: true, road_sec: true, road_exp: true,
+  road_exp: true, road_main: true, road_sec: true, road_ter: true,
   bound_prov: false, bound_city: false, bound_brgy: false
 };
 
@@ -604,9 +606,10 @@ const VIS_MAP = {
   label_city: ['label_city'],
   label_brgy: ['label_brgy'],
   label_street: ['label_street'],
-  road_main: ['case_major_casing', 'rd_major'],
-  road_sec: ['case_minhi_casing', 'rd_min_hi', 'rd_min_md', 'rd_min_lo', 'rd_path'],
   road_exp: ['case_express_casing', 'rd_express'],
+  road_main: ['case_major_casing', 'rd_major'],
+  road_sec: ['case_secondary_casing', 'rd_secondary'],
+  road_ter: ['case_tertiary_casing', 'rd_tertiary', 'rd_min_md', 'rd_min_lo', 'rd_path'],
   bound_prov: ['bound_prov'],
   bound_city: ['bound_city'],
   bound_brgy: ['bound_brgy']
@@ -733,25 +736,25 @@ function addDrawStack() {
       id: 'draw-outline', type: 'line', source: 'draw',
       filter: ['==', ['geometry-type'], 'Polygon'],
       paint: {
-        'line-color': ['coalesce', ['get', 'color'], '#e8b84a'],
+        'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#e8b84a'],
         'line-width': ['coalesce', ['get', 'width'], 3],
-        'line-opacity': ['*', ['coalesce', ['get', 'opacity'], 0.9], ['get', 'visible']]
+        'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['get', 'visible']]
       }
     });
 
-    // Polylines / Routes
+    // Polylines & Light Blue Default Routes
     map.addLayer({
       id: 'draw-line', type: 'line', source: 'draw',
       filter: ['==', ['geometry-type'], 'LineString'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': ['coalesce', ['get', 'color'], '#e8b84a'],
+        'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#38bdf8'],
         'line-width': ['coalesce', ['get', 'width'], 4],
-        'line-opacity': ['*', ['coalesce', ['get', 'opacity'], 0.9], ['get', 'visible']]
+        'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['get', 'visible']]
       }
     });
 
-    // Marker Pins (Dynamically sized via iconSize prop)
+    // Marker Pins
     map.addLayer({
       id: 'draw-marker', type: 'symbol', source: 'draw',
       filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
@@ -764,7 +767,7 @@ function addDrawStack() {
       paint: { 'icon-opacity': ['get', 'visible'] }
     });
 
-    // Custom Text Labels
+    // Custom Text Labels (and Polygon Floating Labels)
     map.addLayer({
       id: 'draw-text', type: 'symbol', source: 'draw',
       filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'text']],
@@ -782,23 +785,45 @@ function addDrawStack() {
         'text-halo-width': 2
       }
     });
+
+    // Specific Polygon Labels Layer
+    map.addLayer({
+      id: 'draw-poly-labels', type: 'symbol', source: 'draw',
+      filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'showLabel'], true]],
+      layout: {
+        'text-field': ['get', 'name'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 13,
+        'text-allow-overlap': true,
+        'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right'],
+        'text-radial-offset': 0.6,
+        'text-justify': 'auto'
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': '#0a1628',
+        'text-halo-width': 2,
+        'text-opacity': ['get', 'visible']
+      }
+    });
+
   } else {
     map.getSource('draw').setData(fc(features));
   }
 
-  // Live Construction Draft Preview Source with target node halos
+  // Live Construction Draft Preview Source
   if (!map.getSource('draft')) {
     map.addSource('draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
       id: 'draft-line', type: 'line', source: 'draft',
       filter: ['==', ['geometry-type'], 'LineString'],
-      paint: { 'line-color': '#e8b84a', 'line-width': 2, 'line-dasharray': [2, 2] }
+      paint: { 'line-color': '#38bdf8', 'line-width': 2.5, 'line-dasharray': [2, 2] }
     });
     map.addLayer({
       id: 'draft-point', type: 'circle', source: 'draft',
       filter: ['==', ['geometry-type'], 'Point'],
       paint: { 
-        'circle-color': ['case', ['get', 'isLastPoint'], '#316dca', '#e8b84a'],
+        'circle-color': ['case', ['get', 'isLastPoint'], '#38bdf8', '#e8b84a'],
         'circle-radius': ['case', ['get', 'isLastPoint'], 10, ['case', ['get', 'isOrigin'], 8, 5]], 
         'circle-stroke-color': '#ffffff', 
         'circle-stroke-width': 2.5 
@@ -878,35 +903,41 @@ function circleCoords(c, edge) {
 }
 
 function fetchMultiPointRoute(pts) {
-  hint('Calculating route…');
+  hint('Calculating light blue route…');
   const coordStr = pts.map(p => `${p[0]},${p[1]}`).join(';');
   fetch(`https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`)
     .then(r => r.json())
     .then(j => {
       const geom = (j.routes && j.routes[0]) ? j.routes[0].geometry : { type: 'LineString', coordinates: pts };
-      addFeatureRecord('route', geom, { color: '#e8b84a', width: 4, opacity: 0.9 });
+      addFeatureRecord('route', geom, { color: '#38bdf8', borderColor: '#38bdf8', width: 4, borderOpacity: 0.9 });
       hint('');
     })
     .catch(() => {
-      addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { color: '#e8b84a', width: 3, opacity: 0.8 });
-      hint('Direct connection fallback');
+      addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { color: '#38bdf8', borderColor: '#38bdf8', width: 3, borderOpacity: 0.8 });
+      hint('Direct route fallback');
     });
 }
 
 function addFeatureRecord(kind, geometry, customProps = {}) {
   const newId = ++fid;
+  const isRoute = kind === 'route';
+  const defaultBorder = isRoute ? '#38bdf8' : '#e8b84a';
+
   const feat = {
     id: newId,
     name: `${kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`,
     kind: kind,
     geometry: geometry,
     props: {
-      color: '#e8b84a',
+      color: defaultBorder,
+      borderColor: defaultBorder,
+      borderOpacity: 0.9,
       width: 3,
-      opacity: 0.9,
       fillColor: '#e8b84a',
       fillOpacity: 0.35,
       dashStyle: 'solid',
+      showLabel: false,
+      labelPos: 'center',
       iconSize: markerIconSize,
       visible: 1,
       ...customProps
@@ -917,6 +948,39 @@ function addFeatureRecord(kind, geometry, customProps = {}) {
   renderMyLayers();
   return feat;
 }
+
+// ----------------- Selective Boundary Fetcher -----------------
+$('btnFetchCityBound').onclick = () => {
+  const q = $('targetCityInput').value.trim();
+  if (!q) return;
+  hint(`Locating & highlighting ${q} boundary…`);
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&limit=1&q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then(j => {
+      if (j.length && j[0].geojson && (j[0].geojson.type === 'Polygon' || j[0].geojson.type === 'MultiPolygon')) {
+        addFeatureRecord('polygon', j[0].geojson, {
+          name: `${q} Boundary`,
+          borderColor: '#ff1e1e',
+          borderOpacity: 1.0,
+          width: 3,
+          dashStyle: 'dashed',
+          fillColor: '#ff1e1e',
+          fillOpacity: 0.15,
+          showLabel: true
+        });
+        if (j[0].boundingbox) {
+          map.fitBounds([
+            [parseFloat(j[0].boundingbox[2]), parseFloat(j[0].boundingbox[0])],
+            [parseFloat(j[0].boundingbox[3]), parseFloat(j[0].boundingbox[1])]
+          ], { padding: 60 });
+        }
+        hint(`${q} boundary added!`);
+      } else {
+        hint('Boundary polygon not found for this area.');
+      }
+    })
+    .catch(() => hint('Boundary request failed'));
+};
 
 // ----------------- Tool Handlers & Drawing Engine -----------------
 document.querySelectorAll('.tool').forEach(btn => {
@@ -943,10 +1007,10 @@ document.querySelectorAll('.tool').forEach(btn => {
       if (t === 'textbox') $('popup-text-settings').classList.add('open');
 
       if (t === 'polyline') hint('Click points · Click last point again to finish');
-      if (t === 'polygon') hint('Click to add vertices · Click origin or any point again to complete');
+      if (t === 'polygon') hint('Click vertices · Click origin or same point to save');
       if (t === 'rectangle') hint('Click corner 1, then click opposite corner');
       if (t === 'circle') hint('Click center, then outer edge');
-      if (t === 'route') hint('Click points · Click the large blue endpoint to finish route');
+      if (t === 'route') hint('Click points · Click the large blue endpoint to finish');
     }
   };
 });
@@ -1126,12 +1190,24 @@ function openShapeEditor(id) {
 
   $('editShapeTitle').textContent = `Edit ${f.name}`;
   $('eName').value = f.name;
-  $('eColor').value = f.props.color || '#e8b84a';
+  $('eBorderColor').value = f.props.borderColor || f.props.color || '#e8b84a';
+  $('eBorderOp').value = f.props.borderOpacity != null ? f.props.borderOpacity : 0.9;
   $('eWidth').value = f.props.width || 3;
-  $('eOp').value = f.props.opacity != null ? f.props.opacity : 0.9;
+  $('eDashStyle').value = f.props.dashStyle || 'solid';
   $('eFillColor').value = f.props.fillColor || f.props.color || '#e8b84a';
   $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
-  $('eDashStyle').value = f.props.dashStyle || 'solid';
+
+  const isPolygon = ['polygon', 'rectangle', 'circle'].includes(f.kind);
+  $('eFillColorRow').style.display = isPolygon ? 'flex' : 'none';
+  $('eFillOpRow').style.display = isPolygon ? 'flex' : 'none';
+  $('eDashRow').style.display = isPolygon || f.kind === 'polyline' ? 'flex' : 'none';
+  $('eLabelToggleRow').style.display = isPolygon ? 'flex' : 'none';
+  $('eLabelPosRow').style.display = isPolygon ? 'flex' : 'none';
+
+  if (isPolygon) {
+    $('eShowLabel').checked = !!f.props.showLabel;
+    $('eLabelPos').value = f.props.labelPos || 'center';
+  }
 
   const isMarker = f.kind === 'marker';
   $('eMarkerSizeRow').style.display = isMarker ? 'flex' : 'none';
@@ -1145,29 +1221,27 @@ function openShapeEditor(id) {
     $('eFontSize').value = f.props.fontSize || 16;
   }
 
-  const isPolygon = ['polygon', 'rectangle', 'circle'].includes(f.kind);
-  $('eFillColorRow').style.display = isPolygon ? 'flex' : 'none';
-  $('eFillOpRow').style.display = isPolygon ? 'flex' : 'none';
-  $('eDashRow').style.display = isPolygon || f.kind === 'polyline' ? 'flex' : 'none';
-
   $('popup-shape-editor').classList.add('open');
 }
 
 $('eName').oninput = e => {
   const f = features.find(x => x.id === selectedId);
-  if (f) { f.name = e.target.value; renderMyLayers(); }
+  if (f) { f.name = e.target.value; syncDraw(); renderMyLayers(); }
 };
-$('eColor').oninput = e => {
+$('eBorderColor').oninput = e => {
   const f = features.find(x => x.id === selectedId);
   if (!f) return;
+  f.props.borderColor = e.target.value;
   f.props.color = e.target.value;
   if (f.kind === 'marker') f.props.iconKey = getIconKey(f.props.shape || 'pin', e.target.value);
   syncDraw();
 };
+$('eBorderOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.borderOpacity = parseFloat(e.target.value); syncDraw(); } };
 $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.width = parseFloat(e.target.value); syncDraw(); } };
-$('eOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.opacity = parseFloat(e.target.value); syncDraw(); } };
 $('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); } };
 $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); } };
+$('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); } };
+$('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); } };
 $('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); } };
 $('eDashStyle').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.dashStyle = e.target.value; syncDraw(); } };
 $('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); } };
@@ -1197,6 +1271,7 @@ function renderMyLayers() {
     if (f.kind === 'circle' && f.props.radiusMeters) {
       subInfo = `Radius: ${f.props.radiusMeters > 1000 ? (f.props.radiusMeters/1000).toFixed(2)+' km' : Math.round(f.props.radiusMeters)+' m'}`;
     }
+    const isPoly = ['polygon', 'rectangle', 'circle'].includes(f.kind);
     return `
       <div class="layer-card">
         <div class="layer-card-top">
@@ -1206,7 +1281,10 @@ function renderMyLayers() {
           <button class="card-btn" data-act="zoom" data-id="${f.id}" title="Zoom To">⤢</button>
           <button class="card-btn" data-act="del" data-id="${f.id}" title="Delete">✕</button>
         </div>
-        <div style="font-size:11px; color:#768390; padding-left:4px;">${subInfo}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#768390; padding:0 4px;">
+          <span>${subInfo}</span>
+          ${isPoly ? `<label style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''}/> Label</label>` : ''}
+        </div>
       </div>
     `;
   }).join('');
@@ -1219,12 +1297,17 @@ function renderMyLayers() {
     };
   });
 
-  container.querySelectorAll('button[data-act]').forEach(b => {
-    b.onclick = () => {
+  container.querySelectorAll('button[data-act], input[data-act]').forEach(b => {
+    b.onchange = b.onclick = (e) => {
+      if (b.tagName === 'INPUT' && e.type !== 'change') return;
+      if (b.tagName === 'BUTTON' && e.type !== 'click') return;
+
       const id = parseInt(b.dataset.id, 10);
       const act = b.dataset.act;
       const f = features.find(x => x.id === id);
       if (!f) return;
+
+      if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); }
       if (act === 'edit') openShapeEditor(id);
       if (act === 'eye') { f.props.visible = f.props.visible ? 0 : 1; syncDraw(); renderMyLayers(); }
       if (act === 'del') { features = features.filter(x => x.id !== id); syncDraw(); renderMyLayers(); }
@@ -1251,33 +1334,7 @@ function calcBounds(f) {
   return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Boundary Selective / All Engine -----------------
-const setBoundMode = mode => {
-  $('bModeOff').classList.toggle('active', mode === 'off');
-  $('bModeAll').classList.toggle('active', mode === 'all');
-  $('bModeSelective').classList.toggle('active', mode === 'selective');
-
-  if (mode === 'off') {
-    ['bound_prov','bound_city','bound_brgy'].forEach(k => {
-      vis[k] = false;
-      const cb = $(`browser-panel`).querySelector(`input[data-g="${k}"]`);
-      if (cb) cb.checked = false;
-    });
-  } else if (mode === 'all') {
-    ['bound_prov','bound_city','bound_brgy'].forEach(k => {
-      vis[k] = true;
-      const cb = $(`browser-panel`).querySelector(`input[data-g="${k}"]`);
-      if (cb) cb.checked = true;
-    });
-  }
-  applyVis();
-};
-
-$('bModeOff').onclick = () => setBoundMode('off');
-$('bModeAll').onclick = () => setBoundMode('all');
-$('bModeSelective').onclick = () => setBoundMode('selective');
-
-// ----------------- Export Screenshot Engine -----------------
+// ----------------- Robust Map Export Engine -----------------
 $('btn-export').onclick = () => {
   const p = $('popup-export');
   const willOpen = !p.classList.contains('open');
@@ -1286,50 +1343,28 @@ $('btn-export').onclick = () => {
 };
 $('closeExportBtn').onclick = () => { $('popup-export').classList.remove('open'); };
 
-document.querySelectorAll('.layout-btn').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    exportRatio = btn.dataset.ratio;
-  };
-});
-
 $('triggerExportBtn').onclick = () => {
-  hint('Generating snapshot export…');
-  const canvas = map.getCanvas();
-  const scale = parseFloat($('expScale').value) || 1;
-  const format = $('expFormat').value || 'image/png';
-
-  let targetW = canvas.width, targetH = canvas.height;
-  if (exportRatio === '1:1') {
-    const dim = Math.min(canvas.width, canvas.height);
-    targetW = dim; targetH = dim;
-  } else if (exportRatio === '16:9') {
-    targetW = canvas.width; targetH = Math.round(canvas.width * (9/16));
-  } else if (exportRatio === '4:3') {
-    targetW = canvas.width; targetH = Math.round(canvas.width * (3/4));
-  } else if (exportRatio === '9:16') {
-    targetH = canvas.height; targetW = Math.round(canvas.height * (9/16));
-  } else if (exportRatio === 'a4') {
-    targetW = canvas.width; targetH = Math.round(canvas.width * 1.414);
+  hint('Exporting snapshot…');
+  try {
+    const dataUrl = map.getCanvas().toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `map_export_${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    hint('Map exported successfully!');
+    $('popup-export').classList.remove('open');
+  } catch(e) {
+    hint('Export fallback triggering…');
+    map.once('render', () => {
+      const a = document.createElement('a');
+      a.href = map.getCanvas().toDataURL('image/png');
+      a.download = `map_export_${Date.now()}.png`;
+      a.click();
+    });
+    map.triggerRepaint();
   }
-
-  const exportCanvas = document.createElement('canvas');
-  exportCanvas.width = targetW * scale;
-  exportCanvas.height = targetH * scale;
-  const ctx = exportCanvas.getContext('2d');
-
-  const sx = (canvas.width - targetW) / 2;
-  const sy = (canvas.height - targetH) / 2;
-
-  ctx.drawImage(canvas, sx, sy, targetW, targetH, 0, 0, exportCanvas.width, exportCanvas.height);
-
-  const link = document.createElement('a');
-  link.download = `map_export_${exportRatio}_${Date.now()}.${format === 'image/jpeg' ? 'jpg' : 'png'}`;
-  link.href = exportCanvas.toDataURL(format, 0.95);
-  link.click();
-  hint('Map exported successfully!');
-  $('popup-export').classList.remove('open');
 };
 
 // ----------------- UI / Rail / Accordion Controls -----------------
@@ -1403,13 +1438,19 @@ $('presetBtnList').querySelectorAll('button').forEach(b => {
 
 const setMapPaint = (id, prop, val) => { if (map.getLayer(id)) map.setPaintProperty(id, prop, val); };
 $('cBgColor').oninput = e => setMapPaint('bg', 'background-color', e.target.value);
+$('cExpColor').oninput = e => setMapPaint('rd_express', 'line-color', e.target.value);
 $('cMainColor').oninput = e => setMapPaint('rd_major', 'line-color', e.target.value);
 $('cMainWidth').oninput = e => setMapPaint('rd_major', 'line-width', parseFloat(e.target.value));
 $('cMainOp').oninput = e => setMapPaint('rd_major', 'line-opacity', parseFloat(e.target.value));
-$('cSecColor').oninput = e => ['rd_min_hi','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-color', e.target.value));
-$('cSecWidth').oninput = e => ['rd_min_hi','rd_min_md'].forEach(id => setMapPaint(id, 'line-width', parseFloat(e.target.value)));
-$('cSecOp').oninput = e => ['rd_min_hi','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-opacity', parseFloat(e.target.value)));
-$('cExpColor').oninput = e => setMapPaint('rd_express', 'line-color', e.target.value);
+
+$('cSecColor').oninput = e => setMapPaint('rd_secondary', 'line-color', e.target.value);
+$('cSecWidth').oninput = e => setMapPaint('rd_secondary', 'line-width', parseFloat(e.target.value));
+$('cSecOp').oninput = e => setMapPaint('rd_secondary', 'line-opacity', parseFloat(e.target.value));
+
+$('cTerColor').oninput = e => ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-color', e.target.value));
+$('cTerWidth').oninput = e => setMapPaint('rd_tertiary', 'line-width', parseFloat(e.target.value));
+$('cTerOp').oninput = e => ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-opacity', parseFloat(e.target.value)));
+
 $('cBoundColor').oninput = e => ['bound_prov','bound_city','bound_brgy'].forEach(id => setMapPaint(id, 'line-color', e.target.value));
 $('cBldColor').oninput = e => { setMapPaint('building', 'fill-color', e.target.value); setMapPaint('building', 'fill-outline-color', e.target.value); };
 $('cBldOp').oninput = e => setMapPaint('building', 'fill-opacity', parseFloat(e.target.value));
