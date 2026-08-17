@@ -23,3 +23,6 @@ google-auth-httplib2>=0.1.0
 PyGithub>=2.0.0
 streamlit-sortables
 sortables
+streamlit
+requests
+supabase
