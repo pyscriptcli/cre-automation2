@@ -12,6 +12,7 @@ APP_URLS = [
     "https://primephilippines2026midyearpropertymarketreport.streamlit.app",
     "https://openflux-playground.streamlit.app",
     "https://open-map-builder.streamlit.app",
+    "https://openflux.streamlit.app",
 ]
 
 async def wake_up_app(url):
