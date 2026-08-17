@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 # 1. PAGE CONFIGURATION & FELT.COM-STYLE UI
 # ------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Open Map Builder",
+    page_title="Felt Map Studio",
     page_icon="🗺️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -42,10 +42,11 @@ basemap_options = [
 
 selected_basemap = st.sidebar.radio("Select Layer", options=basemap_options, index=0)
 
-# Initial label state; the in-map button can also flip it live without reload
+# Initial label state; live tweaks happen in the in-map panel (no reload)
 show_labels = st.sidebar.checkbox("🏷️ Show Labels", value=True)
 
 st.sidebar.markdown("---")
+st.sidebar.caption("Live **opacity sliders** and label toggle are in the map panel (bottom-right) — no reload, camera stays put.")
 
 # ------------------------------------------------------------------------
 # 3. THEME PALETTES & STYLE BUILDERS (MapLibre GL style spec v8)
@@ -59,19 +60,25 @@ THEMES = {
         "overlay": "#0a1628", "text": "#d9b451", "land": "#0d1830",
         "landcover": "#0f1d33", "water": "#0a1424", "waterway": "#081120",
         "parks": "#142440", "buildings": "#8e7258", "aeroway": "#152640",
-        "rail": "#d9b451", "rd_major": "#c99c37", "rd_min_hi": "#a37d1d",
+        "rail": "#d9b451",
+        "rd_major": "#e8b84a",   # bright gold
+        "rd_min_hi": "#7d5f14",  # darker gold, drawn faded
         "rd_min_md": "#46463e", "rd_min_lo": "#2f2f2a", "rd_path": "#4a4333",
         "rd_case": "#685c37",
-        "building_opacity": 0.07,   # barely-there footprints, blends into navy
+        "sec_opacity": 0.7,      # secondary roads sit back
+        "building_opacity": 0.07,
         "muted": "#8b949e",
     },
     "White Gold": {
         "overlay": "#ffffff", "text": "#a07d1c", "land": "#fafafa",
         "landcover": "#f1f1ec", "water": "#d4dadc", "waterway": "#c2c9cc",
         "parks": "#e6ebe4", "buildings": "#d8d8d4", "aeroway": "#e4e4e4",
-        "rail": "#c99c37", "rd_major": "#c99c37", "rd_min_hi": "#d3a845",
+        "rail": "#c99c37",
+        "rd_major": "#e5a91d",   # bright gold pops on white
+        "rd_min_hi": "#9c7a1a",  # darker gold, drawn faded
         "rd_min_md": "#e0be74", "rd_min_lo": "#ead9b0", "rd_path": "#e6dabd",
         "rd_case": "#b08a24",
+        "sec_opacity": 0.6,
         "building_opacity": 0.5,
         "muted": "#6b7280",
     },
@@ -84,13 +91,13 @@ def w(*stops):
         out += [z, val]
     return out
 
-def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False):
+def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=1.0):
     """One transportation line layer filtered by OMT class."""
     lyr = {
         "id": lid, "type": "line", "source": "omt", "source-layer": "transportation",
         "filter": ["match", ["get", "class"], classes, True, False],
         "layout": {"line-cap": "round", "line-join": "round"},
-        "paint": {"line-color": color, "line-width": w(*widths)},
+        "paint": {"line-color": color, "line-width": w(*widths), "line-opacity": opacity},
     }
     if minzoom:
         lyr["minzoom"] = minzoom
@@ -102,6 +109,7 @@ def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False):
 
 def vector_style(p, show_labels):
     """Custom vector style from a palette. Vector tiles = zero gridlines."""
+    sec = p["sec_opacity"]
     return {
         "version": 8,
         "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
@@ -132,7 +140,7 @@ def vector_style(p, show_labels):
             road_layer(p, "case_major", ["motorway", "trunk", "primary"], None,
                        [(6, 1.0), (14, 4.0), (20, 22)], casing=True),
             road_layer(p, "case_minhi", ["secondary", "tertiary"], None,
-                       [(8, 0.8), (14, 3.0), (20, 16)], casing=True),
+                       [(8, 0.8), (14, 3.0), (20, 16)], casing=True, opacity=sec),
             road_layer(p, "rd_path", ["path", "pedestrian", "footway"], p["rd_path"],
                        [(14, 0.6), (20, 6)], minzoom=14),
             road_layer(p, "rd_min_lo", ["service", "track"], p["rd_min_lo"],
@@ -140,11 +148,11 @@ def vector_style(p, show_labels):
             road_layer(p, "rd_min_md", ["minor"], p["rd_min_md"],
                        [(13, 0.8), (16, 4.0), (20, 12)], minzoom=13),
             road_layer(p, "rd_min_hi", ["secondary", "tertiary"], p["rd_min_hi"],
-                       [(8, 0.8), (14, 3.0), (20, 16)]),
+                       [(8, 0.8), (14, 3.0), (20, 16)], opacity=sec),
             road_layer(p, "rd_major", ["motorway", "trunk", "primary"], p["rd_major"],
                        [(6, 1.0), (14, 4.0), (20, 22)]),
             road_layer(p, "rail", ["rail"], p["rail"], [(13, 0.5), (20, 2.5)], minzoom=13),
-            # Place labels; visibility driven by sidebar checkbox + in-map button
+            # Place labels; visibility from checkbox, opacity live from panel slider
             {"id": "label_place", "type": "symbol", "source": "omt", "source-layer": "place",
              "minzoom": 6,
              "layout": {
@@ -160,6 +168,7 @@ def vector_style(p, show_labels):
                  "text-color": p["text"],
                  "text-halo-color": p["overlay"],
                  "text-halo-width": 1.5,
+                 "text-opacity": 1.0,
              }},
         ],
     }
@@ -212,6 +221,36 @@ else:
 # ------------------------------------------------------------------------
 # 4. MAPLIBRE GL RENDERER
 # ------------------------------------------------------------------------
+
+# Live control panel (vector themes only): label toggle + opacity sliders.
+# Applied client-side via setPaintProperty -> no reload, no camera reset.
+PANEL_HTML = """
+<div id="panel">
+  <button id="lblToggle"></button>
+  <div class="row"><span>Roads</span><input id="rdOp" type="range" min="0" max="1" step="0.05" value="1"></div>
+  <div class="row"><span>Labels</span><input id="lbOp" type="range" min="0" max="1" step="0.05" value="1"></div>
+</div>
+"""
+
+PANEL_JS = """
+  // Base opacities baked into the style; sliders scale on top of them
+  const ROAD_BASE = {
+    'case_major_casing': 1, 'case_minhi_casing': __SEC__,
+    'rd_path': 1, 'rd_min_lo': 1, 'rd_min_md': 1,
+    'rd_min_hi': __SEC__, 'rd_major': 1, 'rail': 1
+  };
+  const rdOp = document.getElementById('rdOp');
+  const lbOp = document.getElementById('lbOp');
+  rdOp.addEventListener('input', () => {
+    for (const [id, base] of Object.entries(ROAD_BASE)) {
+      if (map.getLayer(id)) map.setPaintProperty(id, 'line-opacity', base * parseFloat(rdOp.value));
+    }
+  });
+  lbOp.addEventListener('input', () => {
+    if (map.getLayer('label_place')) map.setPaintProperty('label_place', 'text-opacity', parseFloat(lbOp.value));
+  });
+"""
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
@@ -223,10 +262,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   #map { position: absolute; width: 100%; height: 100%; }
   #attr { position: absolute; bottom: 4px; left: 6px; z-index: 2;
           font: 10px sans-serif; color: __MUTED__; pointer-events: none; }
-  #lblToggle { position: absolute; bottom: 10px; right: 10px; z-index: 2;
-               background: #161b22dd; color: #f0f6fc; border: 1px solid #30363d;
-               border-radius: 6px; padding: 6px 10px; font: 11px sans-serif;
-               cursor: pointer; }
+  #panel { position: absolute; bottom: 10px; right: 10px; z-index: 2;
+           background: #161b22ee; border: 1px solid #30363d; border-radius: 8px;
+           padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;
+           font: 11px sans-serif; color: #f0f6fc; width: 160px; }
+  #panel .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #panel input[type=range] { width: 95px; accent-color: #c99c37; }
+  #lblToggle { background: #21262d; color: #f0f6fc; border: 1px solid #30363d;
+               border-radius: 6px; padding: 4px 8px; font: 11px sans-serif; cursor: pointer; }
   #err { display: none; position: absolute; top: 10px; left: 10px; z-index: 3;
          background: #3d1111; color: #ffb4b4; padding: 8px 12px;
          border-radius: 6px; font: 12px monospace; }
@@ -235,7 +278,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
 <div id="map"></div>
 <div id="attr">© OpenStreetMap contributors · OpenFreeMap</div>
-<button id="lblToggle"></button>
+__PANEL__
 <div id="err"></div>
 <script>
 try {
@@ -249,17 +292,21 @@ try {
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-  // Instant label toggle (no Streamlit rerun / map reload)
+  // Label visibility toggle (instant, no reload)
   let labelsOn = __LABELS_JS__;
   const btn = document.getElementById('lblToggle');
-  const applyLabels = () => {
-    if (map.getLayer('label_place')) {
-      map.setLayoutProperty('label_place', 'visibility', labelsOn ? 'visible' : 'none');
-    }
-    btn.textContent = 'Labels: ' + (labelsOn ? 'ON' : 'OFF');
-  };
-  btn.onclick = () => { labelsOn = !labelsOn; applyLabels(); };
-  map.on('load', applyLabels);
+  if (btn) {
+    const applyLabels = () => {
+      if (map.getLayer('label_place')) {
+        map.setLayoutProperty('label_place', 'visibility', labelsOn ? 'visible' : 'none');
+      }
+      btn.textContent = 'Labels: ' + (labelsOn ? 'ON' : 'OFF');
+    };
+    btn.onclick = () => { labelsOn = !labelsOn; applyLabels(); };
+    map.on('load', applyLabels);
+  }
+
+__PANEL_JS__
 
   map.on('error', (e) => console.warn('map error:', e));
 } catch (e) {
@@ -272,13 +319,18 @@ try {
 </html>"""
 
 try:
+    is_vector = selected_basemap in THEMES
     style_json = json.dumps(STYLES[selected_basemap](show_labels))
-    if selected_basemap in THEMES:
-        body_bg, muted = THEMES[selected_basemap]["overlay"], THEMES[selected_basemap]["muted"]
-    elif selected_basemap in ("Carto DB Dark", "Satellite"):
-        body_bg, muted = "#000000", "#8b949e"
+
+    if is_vector:
+        body_bg = THEMES[selected_basemap]["overlay"]
+        muted = THEMES[selected_basemap]["muted"]
+        sec = THEMES[selected_basemap]["sec_opacity"]
+        panel_html, panel_js = PANEL_HTML, PANEL_JS.replace("__SEC__", str(sec))
     else:
-        body_bg, muted = "#f8f9fa", "#6b7280"
+        body_bg = "#000000" if selected_basemap in ("Carto DB Dark", "Satellite") else "#f8f9fa"
+        muted = "#8b949e"
+        panel_html, panel_js = "", ""  # sliders only make sense on vector themes
 
     html = (HTML_TEMPLATE
             .replace("__STYLE__", style_json)
@@ -286,7 +338,9 @@ try:
             .replace("__ZOOM__", str(ZOOM))
             .replace("__BG__", body_bg)
             .replace("__MUTED__", muted)
-            .replace("__LABELS_JS__", "true" if show_labels else "false"))
+            .replace("__LABELS_JS__", "true" if show_labels else "false")
+            .replace("__PANEL__", panel_html)
+            .replace("__PANEL_JS__", panel_js))
     components.html(html, height=950, scrolling=False)
 except Exception as e:
     st.error(f"Map render failed: {e}")
