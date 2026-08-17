@@ -3,7 +3,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & ROOT CSS OVERRIDES
+# 1. PAGE CONFIGURATION & STATE INIT
 # ------------------------------------------------------------------------
 st.set_page_config(
     page_title="Open Map Builder",
@@ -58,10 +58,92 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+DEFAULT_COORDS = [14.5995, 120.9842]
+DEFAULT_RADIUS = 1000
+
+if 'geo_coords' not in st.session_state: st.session_state.geo_coords = DEFAULT_COORDS
+if 'geo_radius' not in st.session_state: st.session_state.geo_radius = DEFAULT_RADIUS
+if 'scanned_records' not in st.session_state: st.session_state.scanned_records = []
+if 'last_scan_lat' not in st.session_state: st.session_state.last_scan_lat = 14.5995
+if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120.9842
+if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
+if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
+if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
+if 'target_config' not in st.session_state: st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
+if 'radius_config' not in st.session_state: st.session_state.radius_config = {"color": "#003366", "fill_opacity": 0.08, "weight": 1.5}
+if 'global_marker_style' not in st.session_state: st.session_state.global_marker_style = "dots"
+if 'global_marker_size' not in st.session_state: st.session_state.global_marker_size = 12
+if 'global_marker_color' not in st.session_state: st.session_state.global_marker_color = "#003366"
+
+POI_CONFIG = {
+    "COMMERCIAL & OFFICES": [
+        ['Corporate Office', '"building"~"office|commercial",i'], 
+        ['IT/Tech Center', '"office"~"it|telecommunication",i'], 
+        ['Business Center', '"building"="commercial"'], 
+        ['Bank', '"amenity"="bank"'], 
+        ['ATM', '"amenity"="atm"'], 
+        ['Office', '"office"="yes"']
+    ],
+    "RETAIL": [
+        ['Mall/Department Store', '"shop"~"mall|department_store",i'], 
+        ['Supermarket', '"shop"~"market|grocery",i'], 
+        ['Convenience Store', '"shop"="convenience"'], 
+        ['Pharmacy', '"amenity"="pharmacy"'], 
+        ['Hardware', '"shop"~"hardware|doityourself",i'], 
+        ['General Shops', '"shop"~"boutique|clothes|shoes",i'], 
+        ['Marketplace', '"amenity"="marketplace"']
+    ],
+    "FOOD, BEVERAGE & HOSPITALITY": [
+        ['Restaurant', '"amenity"="restaurant"'], 
+        ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'], 
+        ['Fast Food', '"amenity"="fast_food"'], 
+        ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'], 
+        ['Bakery/Pastry', '"shop"="bakery"'], 
+        ['Food court', '"amenity"="food_court"'], 
+        ['Hotel', '"tourism"="hotel"'], 
+        ['Hostel', '"tourism"="hostel"']
+    ],
+    "RESIDENTIAL": [
+        ['Apartments', '"building"="apartments"'], 
+        ['House', '"building"="house"'], 
+        ['Residential Area', '"landuse"="residential"'], 
+        ['Condominium', '"building"="residential"']
+    ],
+    "INDUSTRIAL & LOGISTICS": [
+        ['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'], 
+        ['Ports & Terminals', '"industrial"="port"'], 
+        ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'], 
+        ['Warehouses & Depots', '"building"~"warehouse|depot",i'], 
+        ['Industrial Parks', '"landuse"~"industrial|industrial_estate",i']
+    ],
+    "HEALTH & EMERGENCY SERVICES": [
+        ['Hospital', '"amenity"~"hospital|clinic",i'], 
+        ['Clinic', '"amenity"="clinic"'], 
+        ['Police Station', '"amenity"="police"'], 
+        ['Fire Station', '"amenity"="fire_station"']
+    ],
+    "GOVERNMENT, EDUCATION & INFRASTRUCTURE": [
+        ['City Hall', '"amenity"="townhall"'], 
+        ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i'], 
+        ['University/College', '"amenity"~"university|college",i'], 
+        ['K-12 School', '"amenity"="school"'], 
+        ['Post Office', '"amenity"="post_office"']
+    ],
+    "LEISURE, SPORTS & PUBLIC SPACES": [
+        ['Church', '"religion"="christian"'], 
+        ['Mosque', '"religion"="muslim"'], 
+        ['Cinema', '"amenity"="cinema"'], 
+        ['Fuel', '"amenity"="fuel"'], 
+        ['Parking', '"amenity"="parking"'], 
+        ['Sports centre', '"leisure"="sports_centre"'], 
+        ['Busstop', '"highway"="bus_stop"']
+    ]
+}
+
 # ------------------------------------------------------------------------
-# 2. THEMES & VECTOR STYLING ENGINE (Granular Roads + Boundaries)
+# 2. THEMES & VECTOR STYLING ENGINE (Railways & Roads Granularity)
 # ------------------------------------------------------------------------
-CENTER = [121.0359, 14.5794]
+CENTER = [120.9842, 14.5995]
 ZOOM = 14
 
 THEMES = {
@@ -79,7 +161,7 @@ THEMES = {
         "overlay": "#ece9e2", "text": "#2d2a26", "land": "#ece9e2",
         "landcover": "#e5e2da", "water": "#cdd7db", "waterway": "#bac6cb",
         "parks": "#e2dfd7", "buildings": "#dedad2", "aeroway": "#dbd7cf",
-        "rail": "#524e48", "rd_express": "#1a1816", "rd_major": "#2e2a25",
+        "rail": "#1a1816", "rd_express": "#1a1816", "rd_major": "#2e2a25",
         "rd_secondary": "#47423b", "rd_tertiary": "#716b61", "rd_min_md": "#8a8377",
         "rd_min_lo": "#9e978d", "rd_path": "#b0a99f", "rd_case": "#1a1816",
         "sec_opacity": 0.85, "ter_opacity": 0.7, "building_opacity": 0.6,
@@ -137,12 +219,12 @@ def vector_style(p):
             {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway", "paint": {"line-color": p["aeroway"], "line-width": w((11, 1), (20, 12))}},
             {"id": "building", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
             
-            # Bright Red Dashed Boundaries (Off by default)
+            # Boundaries
             {"id": "bound_prov", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [2, 4], True, False], "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 2.2, "line-dasharray": [4, 2]}},
             {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 7, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.8, "line-dasharray": [2, 2], "line-opacity": 0.9}},
             {"id": "bound_brgy", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [9, 10], True, False], "minzoom": 11, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.2, "line-dasharray": [1, 2], "line-opacity": 0.8}},
 
-            # Roads (Expressway, Main, Secondary, Tertiary, Paths)
+            # Roads & Railways
             road_layer(p, "case_express", ["motorway"], None, [(5, 1.5), (14, 5.5), (20, 24)], casing=True),
             road_layer(p, "case_major", ["trunk", "primary"], None, [(6, 1.0), (14, 3.8), (20, 18)], casing=True),
             road_layer(p, "case_secondary", ["secondary"], None, [(8, 0.8), (14, 2.8), (20, 15)], casing=True, opacity=sec),
@@ -155,9 +237,11 @@ def vector_style(p):
             road_layer(p, "rd_secondary", ["secondary"], p["rd_secondary"], [(8, 0.8), (14, 2.8), (20, 15)], opacity=sec),
             road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 3.8), (20, 18)]),
             road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 5.5), (20, 24)]),
-            road_layer(p, "rail", ["rail"], p["rail"], [(13, 0.5), (20, 2.5)], minzoom=13),
+            
+            # Rail Layer
+            {"id": "rd_rail", "type": "line", "source": "omt", "source-layer": "transportation", "filter": ["match", ["get", "class"], ["rail", "transit"], True, False], "minzoom": 10, "paint": {"line-color": p["rail"], "line-width": w((10, 1.2), (15, 2.5), (20, 4)), "line-dasharray": [3, 2]}},
 
-            # Labels (City, Brgy, Street)
+            # Labels
             {"id": "label_city", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["city", "town"], True, False], "minzoom": 6, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((6, 12), (14, 18)), "text-transform": "uppercase", "text-letter-spacing": 0.1}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 2}},
             {"id": "label_brgy", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["suburb", "neighbourhood", "village", "quarter", "hamlet"], True, False], "minzoom": 11, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((11, 10), (16, 14)), "text-letter-spacing": 0.05}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
             {"id": "label_street", "type": "symbol", "source": "omt", "source-layer": "transportation_name", "minzoom": 13, "layout": {"symbol-placement": "line", "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((13, 9), (18, 13))}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
@@ -240,7 +324,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   /* Flyout Left Side Panels */
   .left-panel {
-    position: absolute; top: 16px; left: 74px; bottom: 16px; width: 340px; z-index: 9;
+    position: absolute; top: 16px; left: 74px; bottom: 16px; width: 350px; z-index: 9;
     background: #181d24f7; backdrop-filter: blur(14px); border: 1px solid #2d333b;
     border-radius: 16px; box-shadow: 0 12px 36px rgba(0,0,0,0.6);
     display: none; flex-direction: column; overflow: hidden; color: #adbac7;
@@ -288,6 +372,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
   .card-btn:hover { color: #f0f6fc; background: #2d333b; }
 
+  /* Trade Area Controls */
+  .trade-controls { display: flex; flex-direction: column; gap: 6px; background: #1c2128; padding: 8px; border-radius: 8px; border: 1px solid #2d333b; }
+  .trade-controls select, .trade-controls button { font-family: inherit; font-size: 11px; }
+  .trade-controls select { background: #22272e; color: #f0f6fc; border: 1px solid #2d333b; border-radius: 6px; padding: 5px; }
+  .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 6px; padding: 6px; font-weight: 600; cursor: pointer; }
+  .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .poi-badge { display: flex; justify-content: space-between; background: #22272e; padding: 4px 6px; border-radius: 4px; }
+
   /* Floating Popups on Left Side */
   .float-card {
     position: absolute; left: 74px; z-index: 12; background: #181d24f7; backdrop-filter: blur(14px);
@@ -305,7 +397,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   #popup-text-settings { top: 30%; width: 260px; }
   #popup-shape-editor { top: 8%; width: 320px; max-height: 84vh; overflow-y: auto; }
   #popup-custom-map { top: 16px; bottom: 16px; width: 310px; overflow-y: auto; }
-  #popup-export { top: 50%; transform: translateY(-50%); width: 260px; }
 
   .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #2d333b; border-radius: 8px; background: #22272e; color: #adbac7; cursor: pointer; }
@@ -322,7 +413,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
 <div id="map"></div>
 
-<!-- Vertical Toolbar Rail -->
+<!-- Vertical Toolbar Rail (Cleaned up: No Clear All button) -->
 <div id="side-rail">
   <button class="rail-btn" id="btn-browser-toggle" title="Data Browser / Layers">
     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
@@ -356,14 +447,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button class="rail-btn" id="btn-custom-map" title="Basemap & Vector Styling">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
   </button>
-  <button class="rail-btn" id="btn-export" title="Export Map Screenshot">
+  <button class="rail-btn" id="btn-export-direct" title="Export Map PNG (Instant Download)">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
   </button>
   <button class="rail-btn" id="btn-edit-mode" title="Select & Drag Mode">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
-  </button>
-  <button class="rail-btn" id="btn-clear-all" title="Clear All Drawings">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
   </button>
 </div>
 
@@ -380,6 +468,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <div class="panel-content">
+    <!-- Trade Area Dropdown -->
+    <div class="acc-item">
+      <div class="acc-header" data-target="body-trade-area">
+        <span>Trade Area Analysis</span><span>▾</span>
+      </div>
+      <div class="acc-body" id="body-trade-area">
+        <div class="trade-controls">
+          <label style="font-size:11px; font-weight:600; color:#f0f6fc;">Target Polygon:</label>
+          <select id="tradePolygonSelect"><option value="">-- Choose a polygon --</option></select>
+          <label style="font-size:11px; font-weight:600; color:#f0f6fc; margin-top:2px;">POI Category:</label>
+          <select id="tradeCategorySelect"></select>
+          <button class="trade-btn" id="btnScanTradeArea">Scan POIs Inside Polygon</button>
+        </div>
+        <div id="tradeResults" class="poi-summary"></div>
+      </div>
+    </div>
+
     <!-- Labels -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-labels">
@@ -392,16 +497,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Roads (Expressway, Main, Secondary, Tertiary) -->
+    <!-- Roads & Railways -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-roads">
-        <span>Roads</span><span>▾</span>
+        <span>Roads & Transit</span><span>▾</span>
       </div>
       <div class="acc-body" id="body-roads">
         <label class="layer-row"><span>Express Way</span><input type="checkbox" data-g="road_exp" checked></label>
         <label class="layer-row"><span>Main Road</span><input type="checkbox" data-g="road_main" checked></label>
         <label class="layer-row"><span>Secondary Road</span><input type="checkbox" data-g="road_sec" checked></label>
         <label class="layer-row"><span>Tertiary Road</span><input type="checkbox" data-g="road_ter" checked></label>
+        <label class="layer-row"><span>Railways</span><input type="checkbox" data-g="rd_rail" checked></label>
       </div>
     </div>
 
@@ -417,7 +523,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         
         <div style="font-weight:600; font-size:11px; color:#f0f6fc; margin-top:4px;">Highlight Specific City Boundary</div>
         <div class="bound-select-row">
-          <input type="text" id="targetCityInput" placeholder="e.g. Quezon City, Pasig…"/>
+          <input type="text" id="targetCityInput" placeholder="e.g. Mandaluyong, Pasig…"/>
           <button id="btnFetchCityBound">Highlight</button>
         </div>
       </div>
@@ -538,6 +644,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Thickness</span><input type="range" id="cTerWidth" min="0.5" max="6" step="0.5" value="2.0"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="cTerOp" min="0" max="1" step="0.1" value="0.65"></div>
 
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">RAILWAYS</div>
+  <div class="f-row"><span>Color</span><input type="color" id="cRailColor" value="#d9b451"></div>
+
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BOUNDARIES (RED DASHED)</div>
   <div class="f-row"><span>Color</span><input type="color" id="cBoundColor" value="#ff1e1e"></div>
 
@@ -550,21 +659,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Opacity</span><input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"></div>
 </div>
 
-<!-- Left Side Direct Export Map Panel -->
-<div id="popup-export" class="float-card">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <span style="font-weight:700; color:#f0f6fc;">Export Map</span>
-    <button class="card-btn" id="closeExportBtn">✕</button>
-  </div>
-  <div style="font-size:11px; color:#adbac7;">Click below to download the map image directly.</div>
-  <button id="triggerExportBtn" style="background:#316dca; color:#fff; border:none; padding:9px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:4px;">Download PNG</button>
-</div>
-
 <div id="hint-toast"></div>
 
 <script>
 try {
 const ALL_STYLES = __ALL_STYLES__;
+const POI_CONFIG = __POI_CONFIG__;
 let currentStyleName = "Midnight Blue";
 
 const map = new maplibregl.Map({
@@ -595,10 +695,10 @@ const textSettings = {
 // Dragging feature state
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
 
-// Granular Road & Label Visibility (Boundaries OFF by default)
+// Granular Road, Rail & Label Visibility (Boundaries OFF by default)
 const vis = {
   label_city: true, label_brgy: true, label_street: true,
-  road_exp: true, road_main: true, road_sec: true, road_ter: true,
+  road_exp: true, road_main: true, road_sec: true, road_ter: true, rd_rail: true,
   bound_prov: false, bound_city: false, bound_brgy: false
 };
 
@@ -610,6 +710,7 @@ const VIS_MAP = {
   road_main: ['case_major_casing', 'rd_major'],
   road_sec: ['case_secondary_casing', 'rd_secondary'],
   road_ter: ['case_tertiary_casing', 'rd_tertiary', 'rd_min_md', 'rd_min_lo', 'rd_path'],
+  rd_rail: ['rd_rail'],
   bound_prov: ['bound_prov'],
   bound_city: ['bound_city'],
   bound_brgy: ['bound_brgy']
@@ -619,7 +720,7 @@ const $ = id => document.getElementById(id);
 const hint = t => { $('hint-toast').style.display = t ? 'block' : 'none'; $('hint-toast').textContent = t || ''; };
 
 const closeFloatingCards = () => {
-  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-export','browser-panel'].forEach(id => $(id).classList.remove('open'));
+  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','browser-panel'].forEach(id => $(id).classList.remove('open'));
 };
 
 const resetActiveTools = () => {
@@ -707,6 +808,9 @@ $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
 $('mColor').oninput = e => { markerColor = e.target.value; };
 $('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); };
 
+// ----------------- Populate Trade Area Category Dropdown -----------------
+$('tradeCategorySelect').innerHTML = Object.keys(POI_CONFIG).map(cat => `<option value="${cat}">${cat}</option>`).join('');
+
 // ----------------- Vector Layers Pipeline -----------------
 const fc = list => ({
   type: 'FeatureCollection',
@@ -767,7 +871,7 @@ function addDrawStack() {
       paint: { 'icon-opacity': ['get', 'visible'] }
     });
 
-    // Custom Text Labels (and Polygon Floating Labels)
+    // Custom Text Labels
     map.addLayer({
       id: 'draw-text', type: 'symbol', source: 'draw',
       filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'text']],
@@ -786,7 +890,7 @@ function addDrawStack() {
       }
     });
 
-    // Specific Polygon Labels Layer
+    // Specific Polygon Labels Layer with Anchor Alignment
     map.addLayer({
       id: 'draw-poly-labels', type: 'symbol', source: 'draw',
       filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'showLabel'], true]],
@@ -795,8 +899,8 @@ function addDrawStack() {
         'text-font': ['Noto Sans Regular'],
         'text-size': 13,
         'text-allow-overlap': true,
-        'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right'],
-        'text-radial-offset': 0.6,
+        'text-anchor': ['coalesce', ['get', 'labelPos'], 'center'],
+        'text-radial-offset': 0.8,
         'text-justify': 'auto'
       },
       paint: {
@@ -903,7 +1007,7 @@ function circleCoords(c, edge) {
 }
 
 function fetchMultiPointRoute(pts) {
-  hint('Calculating light blue route…');
+  hint('Calculating route…');
   const coordStr = pts.map(p => `${p[0]},${p[1]}`).join(';');
   fetch(`https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`)
     .then(r => r.json())
@@ -948,6 +1052,86 @@ function addFeatureRecord(kind, geometry, customProps = {}) {
   renderMyLayers();
   return feat;
 }
+
+// ----------------- Trade Area POI Scanner -----------------
+$('btnScanTradeArea').onclick = () => {
+  const polyId = parseInt($('tradePolygonSelect').value, 10);
+  const targetPoly = features.find(f => f.id === polyId);
+  if (!targetPoly) {
+    hint('Please select a target polygon first.');
+    return;
+  }
+  const category = $('tradeCategorySelect').value;
+  const tags = POI_CONFIG[category];
+  if (!tags) return;
+
+  hint(`Querying Overpass for ${category} inside polygon…`);
+  $('tradeResults').innerHTML = '<div style="color:#d9b451;">Scanning OpenStreetMap POIs…</div>';
+
+  // Compute bbox for overpass
+  const bnd = calcBounds(targetPoly);
+  const bbox = `${bnd[0][1]},${bnd[0][0]},${bnd[1][1]},${bnd[1][0]}`; // minLat, minLon, maxLat, maxLon
+
+  let queryParts = '';
+  tags.forEach(t => {
+    const rawTag = t[1];
+    if (rawTag.includes('~')) {
+      const parts = rawTag.split('~');
+      const k = parts[0].replace(/"/g, '');
+      const v = parts[1].replace(/"/g, '').replace(',i', '');
+      queryParts += `node["${k}"~"${v}",i](${bbox});way["${k}"~"${v}",i](${bbox});`;
+    } else if (rawTag.includes('=')) {
+      const parts = rawTag.split('=');
+      const k = parts[0].replace(/"/g, '');
+      const v = parts[1].replace(/"/g, '');
+      queryParts += `node["${k}"="${v}"](${bbox});way["${k}"="${v}"](${bbox});`;
+    }
+  });
+
+  const overpassQuery = `[out:json][timeout:25];(${queryParts});out center 100;`;
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      const results = data.elements || [];
+      if (!results.length) {
+        $('tradeResults').innerHTML = '<div style="color:#8b949e;">No matching POIs found in this trade area.</div>';
+        hint('Scan complete: 0 POIs found.');
+        return;
+      }
+
+      // Aggregate breakdown
+      const counts = {};
+      results.forEach(el => {
+        const name = (el.tags && (el.tags.name || el.tags.amenity || el.tags.shop || el.tags.building)) || 'Unnamed POI';
+        counts[name] = (counts[name] || 0) + 1;
+
+        // Plot scanned POIs on map
+        const lat = el.lat || (el.center && el.center.lat);
+        const lon = el.lon || (el.center && el.center.lon);
+        if (lat && lon) {
+          addFeatureRecord('marker', { type: 'Point', coordinates: [lon, lat] }, {
+            shape: 'circle',
+            color: '#00d2ff',
+            iconSize: 0.6,
+            iconKey: getIconKey('circle', '#00d2ff')
+          });
+        }
+      });
+
+      let html = `<div style="font-weight:700; color:#f0f6fc; margin-bottom:4px;">Found ${results.length} POIs:</div>`;
+      for (const k in counts) {
+        html += `<div class="poi-badge"><span>${k}</span><span style="font-weight:700; color:#38bdf8;">${counts[k]}</span></div>`;
+      }
+      $('tradeResults').innerHTML = html;
+      hint(`Plotted ${results.length} POIs from ${category}!`);
+    })
+    .catch(() => {
+      $('tradeResults').innerHTML = '<div style="color:#ff7b72;">Overpass API busy. Please try again.</div>';
+      hint('Trade Area query timeout');
+    });
+};
 
 // ----------------- Selective Boundary Fetcher -----------------
 $('btnFetchCityBound').onclick = () => {
@@ -1036,7 +1220,6 @@ map.on('mousemove', e => {
 });
 
 map.on('click', e => {
-  // Always inspect/edit shapes when not actively placing vertices
   if (!activeTool || (['marker', 'textbox'].includes(activeTool) === false && draft.length === 0 && !['rectangle', 'circle'].includes(activeTool))) {
     const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
     if (fs.length && fs[0].properties.id != null) {
@@ -1070,7 +1253,6 @@ map.on('click', e => {
     closeFloatingCards();
     openShapeEditor(feat.id);
   } else if (activeTool === 'polyline') {
-    // Clicked last point again to finish
     if (draft.length >= 2) {
       const pScreen = map.project(ll);
       const lastPtScreen = map.project(draft[draft.length - 1]);
@@ -1083,7 +1265,6 @@ map.on('click', e => {
     }
     draft.push(ll);
   } else if (activeTool === 'polygon') {
-    // Clicked same / origin point again saves polygon
     if (draft.length >= 3) {
       const pScreen = map.project(ll);
       for (const pt of draft) {
@@ -1113,7 +1294,6 @@ map.on('click', e => {
       openShapeEditor(feat.id);
     }
   } else if (activeTool === 'route') {
-    // Clicked the prominent last point again to complete route
     if (draft.length >= 2) {
       const pScreen = map.project(ll);
       const lastPtScreen = map.project(draft[draft.length - 1]);
@@ -1240,7 +1420,7 @@ $('eBorderOp').oninput = e => { const f = features.find(x => x.id === selectedId
 $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.width = parseFloat(e.target.value); syncDraw(); } };
 $('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); } };
 $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); } };
-$('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); } };
+$('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); } };
 $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); } };
 $('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); } };
 $('eDashStyle').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.dashStyle = e.target.value; syncDraw(); } };
@@ -1260,6 +1440,11 @@ $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('
 function renderMyLayers() {
   const container = $('my-layers-list');
   $('layer-badge-count').textContent = features.length;
+
+  // Refresh Trade Area Polygon Select Dropdown
+  const polyList = features.filter(f => ['polygon', 'rectangle', 'circle'].includes(f.kind));
+  $('tradePolygonSelect').innerHTML = '<option value="">-- Choose a polygon --</option>' + 
+    polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
 
   if (!features.length) {
     container.innerHTML = '<div style="font-size:12px; color:#768390; padding:6px 0;">No drawings yet. Use the tools to create shapes.</div>';
@@ -1283,7 +1468,18 @@ function renderMyLayers() {
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#768390; padding:0 4px;">
           <span>${subInfo}</span>
-          ${isPoly ? `<label style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''}/> Label</label>` : ''}
+          ${isPoly ? `
+            <div style="display:flex; align-items:center; gap:6px;">
+              <label style="display:flex; align-items:center; gap:3px; cursor:pointer;"><input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''}/> Label</label>
+              <select data-act="labelPosChange" data-id="${f.id}" style="background:#1c2128; color:#adbac7; border:1px solid #2d333b; border-radius:4px; font-size:10px;">
+                <option value="center" ${f.props.labelPos === 'center' ? 'selected' : ''}>Center</option>
+                <option value="top" ${f.props.labelPos === 'top' ? 'selected' : ''}>Above</option>
+                <option value="bottom" ${f.props.labelPos === 'bottom' ? 'selected' : ''}>Below</option>
+                <option value="left" ${f.props.labelPos === 'left' ? 'selected' : ''}>Left</option>
+                <option value="right" ${f.props.labelPos === 'right' ? 'selected' : ''}>Right</option>
+              </select>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -1297,9 +1493,10 @@ function renderMyLayers() {
     };
   });
 
-  container.querySelectorAll('button[data-act], input[data-act]').forEach(b => {
+  container.querySelectorAll('button[data-act], input[data-act], select[data-act]').forEach(b => {
     b.onchange = b.onclick = (e) => {
       if (b.tagName === 'INPUT' && e.type !== 'change') return;
+      if (b.tagName === 'SELECT' && e.type !== 'change') return;
       if (b.tagName === 'BUTTON' && e.type !== 'click') return;
 
       const id = parseInt(b.dataset.id, 10);
@@ -1308,6 +1505,7 @@ function renderMyLayers() {
       if (!f) return;
 
       if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); }
+      if (act === 'labelPosChange') { f.props.labelPos = b.value; syncDraw(); }
       if (act === 'edit') openShapeEditor(id);
       if (act === 'eye') { f.props.visible = f.props.visible ? 0 : 1; syncDraw(); renderMyLayers(); }
       if (act === 'del') { features = features.filter(x => x.id !== id); syncDraw(); renderMyLayers(); }
@@ -1334,37 +1532,24 @@ function calcBounds(f) {
   return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Robust Map Export Engine -----------------
-$('btn-export').onclick = () => {
-  const p = $('popup-export');
-  const willOpen = !p.classList.contains('open');
-  closeFloatingCards();
-  if (willOpen) p.classList.add('open');
-};
-$('closeExportBtn').onclick = () => { $('popup-export').classList.remove('open'); };
-
-$('triggerExportBtn').onclick = () => {
+// ----------------- Direct Bulletproof Export Function -----------------
+$('btn-export-direct').onclick = () => {
   hint('Exporting snapshot…');
-  try {
-    const dataUrl = map.getCanvas().toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `map_export_${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    hint('Map exported successfully!');
-    $('popup-export').classList.remove('open');
-  } catch(e) {
-    hint('Export fallback triggering…');
-    map.once('render', () => {
+  map.once('render', () => {
+    try {
+      const dataUrl = map.getCanvas().toDataURL('image/png');
       const a = document.createElement('a');
-      a.href = map.getCanvas().toDataURL('image/png');
       a.download = `map_export_${Date.now()}.png`;
+      a.href = dataUrl;
+      document.body.appendChild(a);
       a.click();
-    });
-    map.triggerRepaint();
-  }
+      document.body.removeChild(a);
+      hint('Map exported successfully!');
+    } catch(e) {
+      hint('Export failed: Canvas security notice');
+    }
+  });
+  map.triggerRepaint();
 };
 
 // ----------------- UI / Rail / Accordion Controls -----------------
@@ -1442,29 +1627,18 @@ $('cExpColor').oninput = e => setMapPaint('rd_express', 'line-color', e.target.v
 $('cMainColor').oninput = e => setMapPaint('rd_major', 'line-color', e.target.value);
 $('cMainWidth').oninput = e => setMapPaint('rd_major', 'line-width', parseFloat(e.target.value));
 $('cMainOp').oninput = e => setMapPaint('rd_major', 'line-opacity', parseFloat(e.target.value));
-
 $('cSecColor').oninput = e => setMapPaint('rd_secondary', 'line-color', e.target.value);
 $('cSecWidth').oninput = e => setMapPaint('rd_secondary', 'line-width', parseFloat(e.target.value));
 $('cSecOp').oninput = e => setMapPaint('rd_secondary', 'line-opacity', parseFloat(e.target.value));
-
-$('cTerColor').oninput = e => ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-color', e.target.value));
+$('cTerColor').oninput = e => setMapPaint('rd_tertiary', 'line-color', e.target.value);
 $('cTerWidth').oninput = e => setMapPaint('rd_tertiary', 'line-width', parseFloat(e.target.value));
-$('cTerOp').oninput = e => ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-opacity', parseFloat(e.target.value)));
-
+$('cTerOp').oninput = e => setMapPaint('rd_tertiary', 'line-opacity', parseFloat(e.target.value));
+$('cRailColor').oninput = e => setMapPaint('rd_rail', 'line-color', e.target.value);
 $('cBoundColor').oninput = e => ['bound_prov','bound_city','bound_brgy'].forEach(id => setMapPaint(id, 'line-color', e.target.value));
 $('cBldColor').oninput = e => { setMapPaint('building', 'fill-color', e.target.value); setMapPaint('building', 'fill-outline-color', e.target.value); };
 $('cBldOp').oninput = e => setMapPaint('building', 'fill-opacity', parseFloat(e.target.value));
 $('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
-
-$('btn-clear-all').onclick = () => {
-  features = [];
-  draft = [];
-  renderDraft();
-  syncDraw();
-  renderMyLayers();
-  closeFloatingCards();
-};
 
 map.on('error', e => console.warn('Map Notice:', e));
 } catch (e) {
@@ -1479,6 +1653,7 @@ try:
     muted = THEMES[INITIAL_BASEMAP]["muted"]
     html = (
         HTML_TEMPLATE.replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
+        .replace("__POI_CONFIG__", json.dumps(POI_CONFIG))
         .replace("__STYLE__", json.dumps(ALL_STYLES[INITIAL_BASEMAP]))
         .replace("__CENTER__", json.dumps(CENTER))
         .replace("__ZOOM__", str(ZOOM))
