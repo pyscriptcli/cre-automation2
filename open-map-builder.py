@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 # 1. PAGE CONFIGURATION & FELT.COM-STYLE UI
 # ------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Felt Map Studio",
+    page_title="Open Map Builder",
     page_icon="🗺️",
     layout="wide",
     initial_sidebar_state="expanded"
