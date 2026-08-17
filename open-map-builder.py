@@ -303,13 +303,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0a1628; }
   #map { position: absolute; inset: 0; width: 100vw; height: 100vh; z-index: 1; }
 
-  /* Scrollbar styling */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb { background: #adbac7; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #8b949e; }
-  * { scrollbar-width: thin; scrollbar-color: #adbac7 rgba(0,0,0,0.1); }
-
   select, select option {
     background-color: #0f172a !important;
     color: #f8fafc !important;
@@ -342,47 +335,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .save-badge.saving { color: #d9b451; border-color: rgba(217, 180, 81, 0.4); }
   .save-badge.saved { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); }
 
-  /* Floating cards */
+  /* Floating cards - left side for panels, right side for tools */
   .float-card {
-    position: absolute; z-index: 12;
+    position: absolute; top: 68px; z-index: 12;
     background-color: rgba(9, 16, 24, 0.97);
-    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 14px;
     box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75); display: none; flex-direction: column;
-    gap: 8px; font-size: 12px; color: #adbac7;
+    gap: 10px; font-size: 12px; color: #adbac7;
     max-height: 80vh; overflow-y: auto;
   }
   .float-card.open { display: flex; }
-  .left-card { top: 68px; left: 16px; right: auto; transform: none; width: 360px; }
-  .right-card { top: 68px; right: 16px; left: auto; transform: none; width: 320px; }
-  .center-card { top: 68px; left: 50%; transform: translateX(-50%); width: 320px; }
-  .modal-scrim {
-    position: fixed; inset: 0; z-index: 20; display: none;
-    align-items: center; justify-content: center;
-    background-color: rgba(0, 0, 0, 0.6);
-  }
-  .modal-scrim.visible { display: flex; }
+  .left-card { left: 16px; right: auto; transform: none; width: 360px; }
+  .right-card { right: 16px; left: auto; transform: none; width: 320px; }
 
-  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 8px; }
   .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #f0f6fc; }
-  .icon-action-btn { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer; color: #adbac7; }
-  .icon-action-btn:hover { background: rgba(255,255,255,0.15); color: #f0f6fc; }
-  .panel-content { overflow-y: auto; padding: 4px 0; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+  .icon-action-btn { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); border-radius: 8px; cursor: pointer; color: #adbac7; }
+  .icon-action-btn:hover { background: rgba(255, 255, 255, 0.15); color: #f0f6fc; }
+  .panel-content { overflow-y: auto; padding: 8px 0; display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
 
-  .acc-item { border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px; }
-  .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 4px 0; }
-  .acc-body { padding: 4px 0 2px 0; display: flex; flex-direction: column; gap: 6px; }
+  .acc-item { border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
+  .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 6px 0; }
+  .acc-body { padding: 6px 0 2px 0; display: flex; flex-direction: column; gap: 8px; }
   .acc-body.hidden { display: none !important; }
 
   .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
   .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
 
-  .dimension-mode-bar { display: flex; gap: 4px; background: rgba(0,0,0,0.35); padding: 3px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
-  .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 4px 0; border-radius: 6px; cursor: pointer; }
+  .dimension-mode-bar { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.35); padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 6px; cursor: pointer; }
   .dimension-mode-btn.active { background: #316dca; color: #ffffff; }
 
   .bound-select-row { display: flex; gap: 6px; margin-top: 4px; position: relative; }
-  .bound-select-row input[type=text] { flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: #f0f6fc; padding: 5px 8px; border-radius: 8px; font-size: 11px; }
-  .bound-select-row button { background: #ff1e1e; color: #fff; border: none; border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .bound-select-row input[type=text] { flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.12); color: #f0f6fc; padding: 6px 8px; border-radius: 8px; font-size: 11px; }
+  .bound-select-row button { background: #ff1e1e; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
   .autocomplete-list {
     position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
     background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
@@ -391,16 +377,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .autocomplete-item { padding: 6px 8px; cursor: pointer; font-size: 11px; color: #adbac7; }
   .autocomplete-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
-  .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 4px; }
+  .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
   .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
-  .group-container { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; }
-  .group-header { background: rgba(255,255,255,0.05); padding: 6px 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  .group-container { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; }
+  .group-header { background: rgba(255, 255, 255, 0.05); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
   .group-title-input { background: transparent; border: none; font-weight: 700; color: #f0f6fc; font-size: 12px; width: 140px; }
-  .group-title-input:focus { background: rgba(0,0,0,0.5); outline: none; border-radius: 4px; padding: 2px 4px; }
+  .group-title-input:focus { background: rgba(0, 0, 0, 0.5); outline: none; border-radius: 4px; padding: 2px 4px; }
   .group-items { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
   .group-items.hidden { display: none !important; }
 
-  .layer-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; cursor: grab; }
+  .layer-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; cursor: grab; }
   .layer-card:active { cursor: grabbing; }
   .layer-card-top { display: flex; align-items: center; gap: 6px; }
   .layer-card-top input[type=checkbox] { width: 14px; height: 14px; accent-color: #316dca; cursor: pointer; }
@@ -409,8 +395,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
   .card-btn:hover { color: #f0f6fc; background: rgba(255,255,255,0.1); }
 
-  .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); }
-  .trade-controls select { background: #0f172a; color: #f0f6fc; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
+  .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .trade-controls select { background: #0f172a; color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
   .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; }
   .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
   .poi-badge { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 5px 8px; border-radius: 6px; }
@@ -505,7 +491,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   }
   .file-input-label:hover { background: #255bb0; }
 
-  /* Search place UI centered */
+  /* Search place UI Google Maps style */
   .search-wrapper {
     display: flex; align-items: center; gap: 6px;
     background: #fff; border-radius: 24px; padding: 4px 12px;
@@ -530,22 +516,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .search-result-icon {
     width: 20px; height: 20px; flex-shrink: 0; color: #5f6368;
   }
-
-  /* Trade Area Modal */
-  #trade-area-modal .float-card {
-    position: relative; top: auto; left: auto; transform: none; right: auto;
-    max-height: 85vh; width: 500px; max-width: 90vw; padding: 16px;
-  }
-  .trade-area-poi-row {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
-  }
-  .trade-area-poi-row label {
-    display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap;
-  }
-  .custom-query-collapse-header {
-    display: flex; align-items: center; justify-content: space-between;
-    cursor: pointer; font-weight: 600; color: #f0f6fc; font-size: 12px;
-  }
+  
+  .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
+  .float-card input[type=color] { border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; background: transparent; }
+  .float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; }
+  .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 </style>
 </head>
 <body>
@@ -739,7 +714,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </div>
 
 <!-- Right side tool popups -->
-<div id="popup-search" class="float-card center-card">
+<div id="popup-search" class="float-card right-card">
   <div class="search-wrapper">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
     <input type="text" id="searchInput" placeholder="Search for a place" />
@@ -760,12 +735,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <option value="none">None</option>
       <option value="2d">2D Frame</option>
       <option value="3d">3D Frame</option>
-      <option value="pinphoto">Pin with Photo</option>
-      <option value="boxarrow">Box with Arrow</option>
     </select>
   </div>
   <div class="f-row"><span>Icon Color</span><input type="color" id="mColor" value="#003366"></div>
-  <div class="f-row"><span>Icon Size</span><input type="range" id="mSize" min="0.4" max="4.0" step="0.1" value="0.9"></div>
+  <div class="f-row"><span>Icon Size</span><input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"></div>
 </div>
 
 <div id="popup-text-settings" class="float-card right-card">
@@ -808,7 +781,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </select>
   </div>
 
-  <div class="f-row" id="eMarkerSizeRow" style="display:none;"><span>Icon Size</span><input type="range" id="eMarkerSize" min="0.4" max="4.0" step="0.1"></div>
+  <div class="f-row" id="eMarkerSizeRow" style="display:none;"><span>Icon Size</span><input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
   <div class="f-row" id="eTextRow" style="display:none;"><span>Text</span><input type="text" id="eTextVal" style="width:140px;"></div>
   <div class="f-row" id="eFontSizeRow" style="display:none;"><span>Font Size</span><input type="range" id="eFontSize" min="10" max="42" step="1"></div>
   
@@ -884,45 +857,35 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="triggerExportBtn" style="background:#316dca; color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:4px;">Download Rendered Image</button>
 </div>
 
-<!-- Trade Area Analysis Modal -->
-<div id="trade-area-modal" class="modal-scrim">
-  <div class="float-card open" style="width:500px; max-width:90vw; max-height:85vh; padding:16px;">
-    <div class="panel-header">
-      <div class="panel-title">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
-        <span>Trade Area Analysis</span>
-      </div>
-      <button class="card-btn" id="closeTradeAreaBtn">✕</button>
-    </div>
-
-    <div class="f-row"><span>Target Polygon</span>
-      <select id="tradePolygonSelect" style="width:170px;"><option value="">-- Choose --</option></select>
-    </div>
-
-    <div style="font-weight:600; font-size:11px; color:#768390;">POI CATEGORIES</div>
-    <div id="poiCategoryCheckboxes" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
-    </div>
-
-    <button class="trade-btn" id="btnScanTradeArea">Scan POIs</button>
-    <div id="tradeResults" class="poi-summary"></div>
-
-    <hr style="border-color:rgba(255,255,255,0.1); width:100%;"/>
-
-    <div class="custom-query-collapse-header" id="customQueryToggle">
-      <span>CUSTOM OVERPASS QUERY</span>
-      <span style="font-size:14px;">▸</span>
-    </div>
-    <div id="customQueryBody" style="display:none;">
-      <textarea id="overpassQueryInput" rows="5" style="background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px; font-size:12px;"></textarea>
-      <div class="f-row"><span>Result type</span>
-        <select id="overpassResultType" style="width:110px;">
-          <option value="marker">Markers</option>
-          <option value="polygon">Polygons</option>
-        </select>
-      </div>
-      <button id="btnRunOverpass" class="trade-btn">Run Custom Query</button>
-    </div>
+<!-- Trade Area Analysis dedicated popup -->
+<div id="popup-trade-area" class="float-card right-card" style="width:360px;">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <span style="font-weight:700; color:#f0f6fc;">Trade Area Analysis</span>
+    <button class="card-btn" id="closeTradeAreaBtn">✕</button>
   </div>
+
+  <div class="f-row"><span>Target Polygon</span>
+    <select id="tradePolygonSelect" style="width:170px;"><option value="">-- Choose --</option></select>
+  </div>
+
+  <div style="font-weight:600; font-size:11px; color:#768390;">POI CATEGORIES (multi-select)</div>
+  <div id="poiCategoryCheckboxes" style="display:flex; flex-wrap:wrap; gap:6px; max-height:200px; overflow-y:auto;">
+  </div>
+
+  <button class="trade-btn" id="btnScanTradeArea">Scan POIs</button>
+  <div id="tradeResults" class="poi-summary"></div>
+
+  <hr style="border-color:rgba(255,255,255,0.1); width:100%;"/>
+
+  <div style="font-weight:600; font-size:11px; color:#768390;">CUSTOM OVERPASS QUERY</div>
+  <textarea id="overpassQueryInput" rows="5" style="background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px; font-size:12px;"></textarea>
+  <div class="f-row"><span>Result type</span>
+    <select id="overpassResultType" style="width:110px;">
+      <option value="marker">Markers</option>
+      <option value="polygon">Polygons</option>
+    </select>
+  </div>
+  <button id="btnRunOverpass" class="trade-btn">Run Custom Query</button>
 </div>
 
 <div id="launcher-modal-scrim" class="visible">
@@ -1060,11 +1023,10 @@ const markDirty = () => {
 };
 
 const closeFloatingCards = () => {
-  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-export','browser-panel','mylayers-panel'].forEach(id => {
+  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-export','browser-panel','mylayers-panel','popup-trade-area'].forEach(id => {
     const el = $(id);
     if (el) el.classList.remove('open');
   });
-  $('trade-area-modal').classList.remove('visible');
 };
 
 const resetActiveTools = () => {
@@ -1340,7 +1302,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ----------------- Marker Icon Pipeline (Standard & Custom Frames) -----------------
+// ----------------- Marker Icon Pipeline -----------------
 function renderIconCanvas(shape, color) {
   const c = document.createElement('canvas');
   c.width = 64; c.height = 64;
@@ -1422,58 +1384,6 @@ function createCustomMarkerImage(dataUrl, frame) {
         ctx.shadowOffsetY = 0;
         const innerPad = 12;
         ctx.drawImage(img, innerPad, innerPad, baseSize - innerPad*2, baseSize - innerPad*2);
-      } else if (frame === 'pinphoto') {
-        // Pin shape with circular photo inside
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(32, 22, 14, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(32, 22, 12, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.save();
-        ctx.clip();
-        ctx.drawImage(img, 20, 10, 24, 24);
-        ctx.restore();
-        ctx.beginPath();
-        ctx.arc(32, 22, 14, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.stroke();
-        // Triangle tail
-        ctx.beginPath();
-        ctx.moveTo(20, 32);
-        ctx.lineTo(44, 32);
-        ctx.lineTo(32, 50);
-        ctx.closePath();
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-      } else if (frame === 'boxarrow') {
-        // Box with arrow pointing down to map location
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        // Box
-        const boxX = 10, boxY = 10, boxW = 44, boxH = 32;
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(boxX, boxY, boxW, boxH, 6) : ctx.rect(boxX, boxY, boxW, boxH);
-        ctx.fill();
-        // Image inside box
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(boxX+3, boxY+3, boxW-6, boxH-6, 4) : ctx.rect(boxX+3, boxY+3, boxW-6, boxH-6);
-        ctx.clip();
-        ctx.drawImage(img, boxX+3, boxY+3, boxW-6, boxH-6);
-        ctx.restore();
-        // Arrow
-        ctx.beginPath();
-        ctx.moveTo(32, boxY + boxH);
-        ctx.lineTo(28, boxY + boxH + 10);
-        ctx.lineTo(36, boxY + boxH + 10);
-        ctx.closePath();
-        ctx.fill();
       } else {
         ctx.drawImage(img, 0, 0, baseSize, baseSize);
       }
@@ -1882,30 +1792,30 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
   return feat;
 }
 
-// ----------------- Trade Area POI Scanner -----------------
+// ----------------- Trade Area POI Scanner (advanced) -----------------
 function populateTradeAreaCheckboxes() {
   const container = $('poiCategoryCheckboxes');
   let html = '';
   for (const category in POI_CONFIG) {
     html += `<div style="font-weight:600; font-size:11px; margin-top:4px;">${category}</div>`;
-    html += '<div class="trade-area-poi-row">';
     POI_CONFIG[category].forEach(([label, tag], idx) => {
-      html += `<label><input type="checkbox" class="poi-cat-check" data-cat="${category}" data-tag="${tag}" data-label="${label}" style="accent-color:#316dca;"> ${label}</label>`;
+      html += `<label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; margin-right:8px;">
+        <input type="checkbox" class="poi-cat-check" data-cat="${category}" data-tag="${tag}" data-label="${label}" style="accent-color:#316dca;"> ${label}
+      </label>`;
     });
-    html += '</div>';
   }
   container.innerHTML = html;
 }
 
 $('btnOpenTradeArea').onclick = () => {
   closeFloatingCards();
-  $('trade-area-modal').classList.add('visible');
+  $('popup-trade-area').classList.add('open');
   // Refresh polygon select
   const polyList = features.filter(f => ['polygon','rectangle','circle'].includes(f.kind));
   $('tradePolygonSelect').innerHTML = '<option value="">-- Choose --</option>' + polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
 };
 
-$('closeTradeAreaBtn').onclick = () => { $('trade-area-modal').classList.remove('visible'); };
+$('closeTradeAreaBtn').onclick = () => { $('popup-trade-area').classList.remove('open'); };
 
 $('btnScanTradeArea').onclick = () => {
   const polyId = parseInt($('tradePolygonSelect').value, 10);
@@ -1915,6 +1825,7 @@ $('btnScanTradeArea').onclick = () => {
     return;
   }
 
+  // Gather selected tags
   const selectedTags = [];
   document.querySelectorAll('.poi-cat-check:checked').forEach(cb => {
     selectedTags.push(cb.dataset.tag);
@@ -1996,19 +1907,7 @@ $('btnScanTradeArea').onclick = () => {
     });
 };
 
-// ----------------- Custom Overpass Query (collapsible) -----------------
-$('customQueryToggle').onclick = () => {
-  const body = $('customQueryBody');
-  const toggleIcon = $('customQueryToggle').querySelector('span:last-child');
-  if (body.style.display === 'none') {
-    body.style.display = 'block';
-    toggleIcon.textContent = '▾';
-  } else {
-    body.style.display = 'none';
-    toggleIcon.textContent = '▸';
-  }
-};
-
+// ----------------- Custom Overpass Query (inside Trade Area) -----------------
 $('btnRunOverpass').onclick = () => {
   const ql = $('overpassQueryInput').value.trim();
   if (!ql) { hint('Please enter an Overpass QL query'); return; }
@@ -2218,8 +2117,13 @@ map.on('mousemove', e => {
     const translateCoords = coords => {
       if (typeof coords[0] === 'number') return [coords[0] + dx, coords[1] + dy];
       return coords.map(translateCoords);
-    };
+    }
     f.geometry.coordinates = translateCoords(dragOriginalCoords);
+    
+    // Update center if it's a circle
+    if (f.kind === 'circle' && f.props.center) {
+        f.props.center = [f.props.center[0] + dx, f.props.center[1] + dy];
+    }
     syncDraw();
     markDirty();
   }
@@ -2227,11 +2131,18 @@ map.on('mousemove', e => {
   if (isDraggingVertex && draggedPolyId != null && draggedVertexIdx >= 0) {
     const f = features.find(x => x.id === draggedPolyId);
     if (f && f.geometry && f.geometry.coordinates) {
-      if (['polygon','rectangle','circle'].includes(f.kind) && f.geometry.coordinates[0]) {
+      if (['polygon','rectangle'].includes(f.kind) && f.geometry.coordinates[0]) {
         const coords = f.geometry.coordinates[0];
         coords[draggedVertexIdx] = cursorLL;
         if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
-      } else if (f.kind === 'polyline' && f.geometry.coordinates) {
+      } else if (f.kind === 'circle' && f.geometry.coordinates[0]) {
+        // Redraw circle dynamically from original center to new mouse pos
+        if (f.props.center) {
+          const { coords, r } = circleCoords(f.props.center, cursorLL);
+          f.geometry.coordinates = coords;
+          f.props.radiusMeters = r;
+        }
+      } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry.coordinates) {
         f.geometry.coordinates[draggedVertexIdx] = cursorLL;
       }
       syncDraw();
@@ -2318,7 +2229,7 @@ map.on('click', e => {
     draft.push(ll);
     if (draft.length === 2) {
       const { coords, r } = circleCoords(draft[0], draft[1]);
-      const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { radiusMeters: r });
+      const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { radiusMeters: r, center: draft[0] });
       resetActiveTools();
       openShapeEditor(feat.id);
     }
@@ -2362,7 +2273,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ----------------- Edit Mode -----------------
+// ----------------- Edit Mode (Unified Drag Shape & Edit Vertices) -----------------
 $('btn-edit-mode').onclick = () => {
   editMode = !editMode;
   $('btn-edit-mode').classList.toggle('primary-active', editMode);
@@ -2370,7 +2281,7 @@ $('btn-edit-mode').onclick = () => {
   document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
   closeFloatingCards();
   syncVertexHandles();
-  hint(editMode ? 'Edit mode: drag shapes or vertices (blue dots)' : '');
+  hint(editMode ? 'Edit mode: drag shapes or click blue dots to edit vertices' : '');
 };
 
 map.on('mousedown', e => {
@@ -2522,6 +2433,13 @@ function renderLayerCardHtml(f) {
       <div class="layer-card-top">
         <input type="checkbox" class="layer-select-check" data-id="${f.id}" ${isSelected ? 'checked' : ''} />
         <input class="layer-name-input" data-id="${f.id}" value="${f.name}" title="Click to rename" />
+        
+        ${isPoly ? `
+          <label style="display:flex; align-items:center; gap:2px; cursor:pointer; font-size:10px; color:#768390; margin-right:4px;">
+            <input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''} style="width:10px;height:10px;accent-color:#316dca;"/> Label
+          </label>
+        ` : ''}
+
         <button class="card-btn" data-act="edit" data-id="${f.id}" title="Edit Properties">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
         </button>
@@ -2535,12 +2453,7 @@ function renderLayerCardHtml(f) {
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#768390; padding:0 4px;">
-        <span>${subInfo}</span>
-        ${isPoly ? `
-          <label style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''}/> Label</label>
-        ` : ''}
-      </div>
+      <div style="font-size:10px; color:#768390; padding:0 18px;">${subInfo}</div>
     </div>
   `;
 }
@@ -2874,7 +2787,7 @@ $('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFlo
 $('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
-// ----------------- Import -----------------
+// ----------------- Import System (KML, KMZ, GeoJSON, SHP) -----------------
 $('btn-import').onclick = () => {
   const input = document.createElement('input');
   input.type = 'file';
