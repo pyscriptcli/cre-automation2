@@ -1,5 +1,4 @@
 import json
-import os
 import re
 import streamlit as st
 import streamlit.components.v1 as components
@@ -9,8 +8,7 @@ import requests
 # 1. PAGE CONFIGURATION & ROOT CSS OVERRIDES
 # ------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Open Map Builder",
-    page_icon="🗺️",
+    page_title="Project Atlas",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -68,7 +66,7 @@ st.markdown(
 )
 
 # ------------------------------------------------------------------------
-# 2. SUPABASE CONNECTION & REST API PIPELINE
+# 2. SUPABASE REST INTEGRATION (Direct & Resilient)
 # ------------------------------------------------------------------------
 SUPABASE_URL = st.secrets.get("supabase", {}).get("url", "https://cyczyaswxkpdcremqnkn.supabase.co")
 SUPABASE_KEY = st.secrets.get("supabase", {}).get("key", "sb_publishable_pUppHGjwmT1mLlhWGZH6Og_4GcCLCPR")
@@ -86,7 +84,7 @@ def get_headers():
 def fetch_projects():
     try:
         url = f"{BASE_API_URL}/map_projects?select=id,name,updated_at,basemap,zoom,center,features,custom_groups,layer_visibilities&order=updated_at.desc"
-        res = requests.get(url, headers=get_headers(), timeout=8)
+        res = requests.get(url, headers=get_headers(), timeout=6)
         if res.status_code == 200:
             return res.json()
         return []
@@ -96,7 +94,7 @@ def fetch_projects():
 ALL_PROJECTS_LIST = fetch_projects()
 
 # ------------------------------------------------------------------------
-# 3. POI & VECTOR STYLES CONFIGURATION
+# 3. POI TAXONOMY & VECTOR BASEMAP THEMES
 # ------------------------------------------------------------------------
 POI_CONFIG = {
     "COMMERCIAL & OFFICES": [
@@ -284,7 +282,7 @@ ALL_STYLES = {
 }
 
 # ------------------------------------------------------------------------
-# 4. EMBEDDED MAPBOX/MAPLIBRE APP WITH UNIFIED TOP TOOLBAR & IOS 26 DIALOG
+# 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -301,13 +299,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   * { box-sizing: border-box; user-select: none; font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
   html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0a1628; }
   #map-wrapper { position: absolute; inset: 0; width: 100vw; height: 100vh; transition: filter 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-  #map-wrapper.blurred { filter: blur(28px) brightness(0.65) saturate(1.2); transform: scale(0.985); pointer-events: none; }
+  #map-wrapper.blurred { filter: blur(28px) brightness(0.65) saturate(1.2); transform: scale(0.985); }
   #map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-  /* Unified Top Island Toolbar */
+  /* Top Centered Unified Toolbar Island */
   #top-toolbar-bar {
     position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
-    background: rgba(22, 27, 34, 0.72); backdrop-filter: blur(20px) saturate(190%);
+    background: rgba(22, 27, 34, 0.75); backdrop-filter: blur(20px) saturate(190%);
     border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 36px; padding: 4px 10px;
     display: flex; align-items: center; gap: 4px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
     color: #f0f6fc;
@@ -354,7 +352,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
   .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
 
-  /* Dimension 2D / 3D Mode */
+  /* Dimension Toggle */
   .dimension-mode-bar { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.25); padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); }
   .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 6px; cursor: pointer; }
   .dimension-mode-btn.active { background: #316dca; color: #ffffff; }
@@ -363,7 +361,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .bound-select-row input[type=text] { flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.12); color: #f0f6fc; padding: 6px 8px; border-radius: 8px; font-size: 11px; }
   .bound-select-row button { background: #ff1e1e; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
 
-  /* My Layers & Collapsible Grouping */
+  /* My Layers & Grouping Container */
   .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
   .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
   .group-container { background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; }
@@ -387,7 +385,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
   .poi-badge { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 5px 8px; border-radius: 6px; }
 
-  /* Floating Popups */
+  /* Floating Tool Options Popups */
   .float-card {
     position: absolute; top: 68px; left: 50%; transform: translateX(-50%); z-index: 12;
     background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(24px) saturate(190%);
@@ -436,22 +434,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: none;
   }
 
-  /* iOS 26 Glassmorphic Minimalist Launcher Modal Overlay */
+  /* iOS 26 Glassmorphic Launcher Overlay */
   #launcher-modal-scrim {
     position: fixed; inset: 0; z-index: 9999;
     display: flex; align-items: center; justify-content: center;
-    background: rgba(5, 10, 20, 0.45); backdrop-filter: blur(32px) saturate(200%);
-    opacity: 0; pointer-events: none; transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    background: rgba(5, 10, 20, 0.4); backdrop-filter: blur(24px) saturate(180%);
+    opacity: 0; pointer-events: none; transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
   #launcher-modal-scrim.visible { opacity: 1; pointer-events: auto; }
 
   .ios26-card {
-    width: 90%; max-width: 480px; max-height: 85vh;
-    background: rgba(25, 32, 45, 0.65); backdrop-filter: blur(40px) saturate(210%);
-    border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 28px;
+    width: 90%; max-width: 440px; max-height: 82vh;
+    background: rgba(25, 32, 45, 0.72); backdrop-filter: blur(40px) saturate(210%);
+    border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 24px;
     box-shadow: 0 32px 80px -12px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.25);
     display: flex; flex-direction: column; overflow: hidden; color: #ffffff;
-    transform: scale(0.94) translateY(12px); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: scale(0.95) translateY(8px); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
   #launcher-modal-scrim.visible .ios26-card { transform: scale(1) translateY(0); }
 
@@ -459,7 +457,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .ios26-title { font-size: 20px; font-weight: 800; letter-spacing: -0.4px; color: #ffffff; }
   .ios26-subtitle { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
 
-  /* iOS 26 Segmented Control */
   .ios26-seg {
     margin: 0 24px 14px 24px; display: flex; background: rgba(0, 0, 0, 0.32);
     padding: 3px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.08);
@@ -467,14 +464,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .ios26-seg-btn {
     flex: 1; border: none; background: transparent; color: rgba(255, 255, 255, 0.65);
     font-size: 12px; font-weight: 600; padding: 7px 0; border-radius: 11px; cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .ios26-seg-btn.active {
     background: rgba(255, 255, 255, 0.18); color: #ffffff;
     box-shadow: 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.2);
   }
 
-  .ios26-body { padding: 0 24px 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .ios26-body { padding: 0 24px 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
   .ios26-input-group { display: flex; flex-direction: column; gap: 6px; }
   .ios26-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.5); }
   .ios26-input {
@@ -486,16 +483,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   .ios26-proj-item {
     background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px; padding: 12px 16px; display: flex; justify-content: space-between;
-    align-items: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 14px; padding: 10px 14px; display: flex; justify-content: space-between;
+    align-items: center; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .ios26-proj-item:hover {
-    background: rgba(255, 255, 255, 0.12); border-color: rgba(56, 189, 248, 0.4);
-    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.1); border-color: rgba(56, 189, 248, 0.3);
   }
   .ios26-action-btn {
     background: #316dca; color: #ffffff; border: none; border-radius: 14px;
-    padding: 12px; font-weight: 700; font-size: 13px; cursor: pointer;
+    padding: 11px; font-weight: 700; font-size: 13px; cursor: pointer;
     box-shadow: 0 8px 24px rgba(49, 109, 202, 0.4), inset 0 1px 1px rgba(255,255,255,0.3);
     transition: transform 0.15s, background 0.15s;
   }
@@ -517,7 +513,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="tb-sep"></div>
 
   <div id="project-meta-cluster">
-    <span id="project-name-display" title="Click to rename project">__PROJECT_NAME__</span>
+    <span id="project-name-display" title="Click to rename project">Untitled Project 1</span>
     <div class="save-badge" id="save-status-badge">
       <span id="save-dot">●</span>
       <span id="save-text">Saved</span>
@@ -708,7 +704,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Opacity</span><input type="range" id="tOp" min="0.1" max="1" step="0.05" value="1"></div>
 </div>
 
-<!-- Left Side Shape / Polygon Customizer Editor -->
+<!-- Left Side Shape Customizer Editor -->
 <div id="popup-shape-editor" class="float-card">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;" id="editShapeTitle">Edit Layer</span>
@@ -822,7 +818,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="launcher-modal-scrim" class="visible">
   <div class="ios26-card">
     <div class="ios26-header">
-      <div class="ios26-title">Open Map Builder</div>
+      <div class="ios26-title">Project Atlas</div>
       <div class="ios26-subtitle">Select or initialize a spatial workspace.</div>
     </div>
 
@@ -838,28 +834,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="ios26-body" id="seg-content-new" style="display:none;">
       <div class="ios26-input-group">
         <label class="ios26-label">Workspace Name</label>
-        <input class="ios26-input" id="new-proj-name" placeholder="e.g. Metro Manila Expansion" value="Manila Spatial Study" />
+        <input class="ios26-input" id="new-proj-name" placeholder="e.g. Untitled Project 1" />
       </div>
 
-      <div style="display:flex; gap:10px;">
-        <div class="ios26-input-group" style="flex:1;">
-          <label class="ios26-label">Basemap Theme</label>
-          <select class="ios26-input" id="new-proj-theme" style="padding:9px 12px;">
-            <option value="Midnight Blue">Midnight Blue</option>
-            <option value="Monochrome">Monochrome</option>
-            <option value="White Gold">White Gold</option>
-            <option value="Satellite">Satellite</option>
-            <option value="Carto DB Dark">Carto DB Dark</option>
-            <option value="Carto DB Light">Carto DB Light</option>
-          </select>
-        </div>
-        <div class="ios26-input-group" style="flex:1;">
-          <label class="ios26-label">Center Coords</label>
-          <input class="ios26-input" id="new-proj-coords" value="14.5995, 120.9842" />
-        </div>
-      </div>
-
-      <button class="ios26-action-btn" id="btn-create-project-submit" style="margin-top:6px;">Initialize Workspace</button>
+      <button class="ios26-action-btn" id="btn-create-project-submit" style="margin-top:4px;">Create Workspace</button>
     </div>
   </div>
 </div>
@@ -889,7 +867,7 @@ const map = new maplibregl.Map({
 });
 map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 
-// Blur background map initially for modal overlay
+// Ensure clean blur effect on modal mount
 $('map-wrapper').classList.add('blurred');
 
 // ----------------- State Machine -----------------
@@ -964,11 +942,26 @@ const resetActiveTools = () => {
   hint('');
 };
 
+// ----------------- Project Auto-Naming Increment Calculation -----------------
+function getNextUntitledProjectName() {
+  const untitledRegex = /^Untitled Project (\d+)$/i;
+  let maxN = 0;
+  ALL_PROJECTS.forEach(p => {
+    const match = (p.name || '').match(untitledRegex);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxN) maxN = num;
+    }
+  });
+  return `Untitled Project ${maxN + 1}`;
+}
+
 // ----------------- iOS 26 Home Launcher Modal UI -----------------
 function openHomeDialog() {
   closeFloatingCards();
   $('map-wrapper').classList.add('blurred');
   $('launcher-modal-scrim').classList.add('visible');
+  $('new-proj-name').value = getNextUntitledProjectName();
   renderProjectsList();
 }
 
@@ -991,21 +984,26 @@ $('seg-btn-new').onclick = () => {
   $('seg-btn-existing').classList.remove('active');
   $('seg-content-new').style.display = 'flex';
   $('seg-content-existing').style.display = 'none';
+  $('new-proj-name').value = getNextUntitledProjectName();
+  $('new-proj-name').focus();
 };
 
 function renderProjectsList() {
   const container = $('existing-projects-container');
   if (!ALL_PROJECTS || !ALL_PROJECTS.length) {
-    container.innerHTML = `<div style="color:rgba(255,255,255,0.5); font-size:12px; text-align:center; padding:16px;">No projects in Supabase. Create your first project above.</div>`;
+    container.innerHTML = `<div style="color:rgba(255,255,255,0.5); font-size:12px; text-align:center; padding:16px;">No saved projects. Create your first workspace above.</div>`;
     return;
   }
   container.innerHTML = ALL_PROJECTS.map(p => `
-    <div class="ios26-proj-item" onclick="loadProjectDirectly('${p.id}')">
-      <div style="display:flex; flex-direction:column; gap:2px;">
-        <span style="font-weight:700; font-size:13px; color:#ffffff;">${p.name || 'Untitled Workspace'}</span>
+    <div class="ios26-proj-item">
+      <div style="display:flex; flex-direction:column; gap:2px; flex:1; cursor:pointer;" onclick="loadProjectDirectly('${p.id}')">
+        <span style="font-weight:700; font-size:13px; color:#ffffff;">${p.name || 'Untitled Project'}</span>
         <span style="font-size:11px; color:rgba(255,255,255,0.5);">${p.basemap || 'Midnight Blue'} · ${p.features ? p.features.length : 0} layers</span>
       </div>
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button class="card-btn" onclick="renameProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Rename">✎</button>
+        <button class="card-btn" onclick="deleteProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Delete" style="color:#ff7b72;">✕</button>
+      </div>
     </div>
   `).join('');
 }
@@ -1014,7 +1012,7 @@ window.loadProjectDirectly = function(projectId) {
   const p = ALL_PROJECTS.find(x => x.id === projectId);
   if (!p) return;
   currentProjectId = p.id;
-  currentProjectName = p.name || 'Workspace';
+  currentProjectName = p.name || 'Untitled Project';
   $('project-name-display').textContent = currentProjectName;
   
   features = p.features || [];
@@ -1043,18 +1041,63 @@ window.loadProjectDirectly = function(projectId) {
   });
 
   closeHomeDialog();
-  hint(`Loaded project "${currentProjectName}"`);
+  hint(`Loaded "${currentProjectName}"`);
+};
+
+window.renameProjectFromLauncher = async function(e, projectId, oldName) {
+  e.stopPropagation();
+  const newName = prompt('Rename workspace:', oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+  const target = ALL_PROJECTS.find(x => x.id === projectId);
+  if (target) target.name = newName.trim();
+
+  if (currentProjectId === projectId) {
+    currentProjectName = newName.trim();
+    $('project-name-display').textContent = currentProjectName;
+  }
+
+  renderProjectsList();
+
+  try {
+    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ name: newName.trim(), updated_at: new Date().toISOString() })
+    });
+  } catch(err) {}
+};
+
+window.deleteProjectFromLauncher = async function(e, projectId, name) {
+  e.stopPropagation();
+  if (!confirm(`Delete project "${name}" permanently?`)) return;
+
+  ALL_PROJECTS = ALL_PROJECTS.filter(x => x.id !== projectId);
+  renderProjectsList();
+
+  try {
+    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+  } catch(err) {}
 };
 
 $('btn-create-project-submit').onclick = async () => {
-  const pName = $('new-proj-name').value.trim() || 'Untitled Workspace';
-  const pTheme = $('new-proj-theme').value;
-  const pCoords = $('new-proj-coords').value.split(',').map(s => parseFloat(s.trim()));
-  const centerLL = (pCoords.length === 2 && !isNaN(pCoords[0])) ? [pCoords[1], pCoords[0]] : [120.9842, 14.5995];
+  const pName = $('new-proj-name').value.trim() || getNextUntitledProjectName();
+  const centerLL = [120.9842, 14.5995];
 
   const payload = {
     name: pName,
-    basemap: pTheme,
+    basemap: "Midnight Blue",
     center: centerLL,
     zoom: 14,
     pitch: 0,
@@ -2163,7 +2206,7 @@ $('triggerExportBtn').onclick = () => {
       ctx.drawImage(srcCanvas, sx, sy, targetW, targetH, 0, 0, targetW, targetH);
 
       const a = document.createElement('a');
-      a.download = `map_${currentExportRatio}_${Date.now()}.png`;
+      a.download = `atlas_${currentExportRatio}_${Date.now()}.png`;
       a.href = outCanvas.toDataURL('image/png', 0.95);
       document.body.appendChild(a);
       a.click();
@@ -2173,7 +2216,7 @@ $('triggerExportBtn').onclick = () => {
     } catch(e) {
       hint('Direct export fallback');
       const a = document.createElement('a');
-      a.download = `map_export_${Date.now()}.png`;
+      a.download = `atlas_export_${Date.now()}.png`;
       a.href = map.getCanvas().toDataURL('image/png');
       a.click();
     }
@@ -2287,16 +2330,26 @@ map.on('error', e => console.warn('Map Notice:', e));
 </html>"""
 
 # ------------------------------------------------------------------------
-# 5. RENDER COMPONENT
+# 5. INITIAL STATE & COMPONENT MOUNTING
 # ------------------------------------------------------------------------
 try:
-    initial_theme_name = ALL_PROJECTS_LIST[0].get("basemap", "Midnight Blue") if ALL_PROJECTS_LIST else "Midnight Blue"
-    initial_center = ALL_PROJECTS_LIST[0].get("center", [120.9842, 14.5995]) if ALL_PROJECTS_LIST else [120.9842, 14.5995]
-    initial_zoom = ALL_PROJECTS_LIST[0].get("zoom", 14) if ALL_PROJECTS_LIST else 14
-    initial_name = ALL_PROJECTS_LIST[0].get("name", "Untitled Workspace") if ALL_PROJECTS_LIST else "Untitled Workspace"
-    initial_id = str(ALL_PROJECTS_LIST[0].get("id", "temp-id")) if ALL_PROJECTS_LIST else "local-temp"
-    initial_features = ALL_PROJECTS_LIST[0].get("features", []) if ALL_PROJECTS_LIST else []
-    initial_custom_groups = ALL_PROJECTS_LIST[0].get("custom_groups", {"Trade Area Scan": {"collapsed": False, "ids": []}}) if ALL_PROJECTS_LIST else {"Trade Area Scan": {"collapsed": False, "ids": []}}
+    initial_theme = "Midnight Blue"
+    initial_center = [120.9842, 14.5995]
+    initial_zoom = 14
+    initial_name = "Untitled Project 1"
+    initial_id = "local-temp"
+    initial_features = []
+    initial_custom_groups = {"Trade Area Scan": {"collapsed": False, "ids": []}}
+
+    if ALL_PROJECTS_LIST:
+        latest = ALL_PROJECTS_LIST[0]
+        initial_id = str(latest.get("id", "local-temp"))
+        initial_name = latest.get("name", "Untitled Project 1")
+        initial_theme = latest.get("basemap", "Midnight Blue")
+        initial_center = latest.get("center", [120.9842, 14.5995])
+        initial_zoom = latest.get("zoom", 14)
+        initial_features = latest.get("features", [])
+        initial_custom_groups = latest.get("custom_groups", {"Trade Area Scan": {"collapsed": False, "ids": []}})
 
     html = (
         HTML_TEMPLATE.replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
@@ -2306,13 +2359,13 @@ try:
         .replace("__ALL_PROJECTS_JSON__", json.dumps(ALL_PROJECTS_LIST))
         .replace("__PROJECT_ID__", initial_id)
         .replace("__PROJECT_NAME__", initial_name)
-        .replace("__INITIAL_BASEMAP__", initial_theme_name)
+        .replace("__INITIAL_BASEMAP__", initial_theme)
         .replace("__INITIAL_FEATURES__", json.dumps(initial_features))
         .replace("__INITIAL_CUSTOM_GROUPS__", json.dumps(initial_custom_groups))
         .replace("__CENTER__", json.dumps(initial_center))
         .replace("__ZOOM__", str(initial_zoom))
-        .replace("__BG__", THEMES.get(initial_theme_name, THEMES["Midnight Blue"])["overlay"])
+        .replace("__BG__", THEMES.get(initial_theme, THEMES["Midnight Blue"])["overlay"])
     )
     components.html(html, height=1000, scrolling=False)
 except Exception as e:
-    st.error(f"Studio failed to load: {e}")
+    st.error(f"Failed to load application: {e}")
