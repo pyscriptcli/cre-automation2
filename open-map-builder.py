@@ -1,552 +1,465 @@
-# ========== IMPORTS ==========
 import streamlit as st
 import folium
-from streamlit_folium import folium_static
+from streamlit_folium import st_folium
+from folium import Element
 from geopy.geocoders import Nominatim
-from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
-from PIL import Image, ImageDraw, ImageFont
-import io
-import base64
-import requests
-import json
-import time
-import os
 import tempfile
-import re
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.common.exceptions import TimeoutException, WebDriverException
-import streamlit.components.v1 as components
+import os
+import time
 
 # ========== CONFIGURATION ==========
-
-# 12 curated themes: each defines CSS filter values for base tiles
-# and colors for overlays (water, park, building, road, background, text)
 THEMES = {
-    "Carrara": {
-        "filter": "brightness(1.05) contrast(1.0) saturate(0.9) hue-rotate(0deg) sepia(0.1)",
-        "colors": {"water": "#4a90d9", "park": "#6b8e23", "building": "#d3c5b0", "road": "#b0a090", "bg": "#f5f0eb", "text": "#3a2e25"}
-    },
-    "Blush": {
-        "filter": "brightness(1.1) contrast(0.95) saturate(1.1) hue-rotate(-10deg) sepia(0.15)",
-        "colors": {"water": "#9fc7d9", "park": "#d9b8a8", "building": "#e8d5c4", "road": "#c4b0a0", "bg": "#f9ede8", "text": "#5a3e3a"}
-    },
-    "Sandstone": {
-        "filter": "brightness(0.95) contrast(1.1) saturate(0.8) hue-rotate(0deg) sepia(0.3)",
-        "colors": {"water": "#8a9ba8", "park": "#a89878", "building": "#d4c4a8", "road": "#b8a890", "bg": "#f0e8d8", "text": "#4a3e2a"}
-    },
-    "Midnight": {
-        "filter": "brightness(0.6) contrast(1.2) saturate(0.7) hue-rotate(180deg) sepia(0.0)",
-        "colors": {"water": "#1a2a4a", "park": "#2a3a2a", "building": "#3a3a4a", "road": "#4a4a5a", "bg": "#1a1a2a", "text": "#e0e0f0"}
-    },
-    "Forest": {
-        "filter": "brightness(0.9) contrast(1.0) saturate(1.2) hue-rotate(90deg) sepia(0.1)",
-        "colors": {"water": "#2a6a6a", "park": "#3a8a3a", "building": "#6a7a5a", "road": "#7a8a6a", "bg": "#e8f0e0", "text": "#2a3a1a"}
-    },
-    "Ocean": {
-        "filter": "brightness(0.95) contrast(1.0) saturate(1.3) hue-rotate(200deg) sepia(0.0)",
-        "colors": {"water": "#1a5a8a", "park": "#3a7a6a", "building": "#8aa0b0", "road": "#6a8a9a", "bg": "#e8f0f8", "text": "#0a2a3a"}
-    },
-    "Monochrome": {
-        "filter": "brightness(1.0) contrast(1.1) saturate(0.0) hue-rotate(0deg) sepia(0.0)",
-        "colors": {"water": "#888888", "park": "#aaaaaa", "building": "#cccccc", "road": "#999999", "bg": "#f0f0f0", "text": "#222222"}
-    },
-    "Vintage": {
-        "filter": "brightness(0.9) contrast(0.9) saturate(0.8) hue-rotate(0deg) sepia(0.6)",
-        "colors": {"water": "#8a7a5a", "park": "#9a8a5a", "building": "#c4b08a", "road": "#a89878", "bg": "#f0e8d0", "text": "#4a3a2a"}
-    },
-    "Warm": {
-        "filter": "brightness(1.0) contrast(1.0) saturate(1.1) hue-rotate(20deg) sepia(0.1)",
-        "colors": {"water": "#c47a4a", "park": "#d4a04a", "building": "#e8c8a0", "road": "#d4b090", "bg": "#faf0e0", "text": "#4a2a1a"}
-    },
-    "Cool": {
-        "filter": "brightness(1.0) contrast(1.0) saturate(1.1) hue-rotate(-30deg) sepia(0.0)",
-        "colors": {"water": "#5a7a9a", "park": "#6a9a8a", "building": "#a0b8c8", "road": "#8aa0b0", "bg": "#e8f0f8", "text": "#1a2a3a"}
-    },
-    "Moss": {
-        "filter": "brightness(0.9) contrast(1.05) saturate(1.0) hue-rotate(60deg) sepia(0.2)",
-        "colors": {"water": "#4a7a5a", "park": "#5a8a3a", "building": "#8a9a6a", "road": "#7a8a5a", "bg": "#eaf0e0", "text": "#2a3a1a"}
-    },
-    "Terracotta": {
-        "filter": "brightness(1.0) contrast(1.0) saturate(1.2) hue-rotate(-10deg) sepia(0.25)",
-        "colors": {"water": "#8a6a5a", "park": "#b08a5a", "building": "#d4b090", "road": "#c4a080", "bg": "#f5ede0", "text": "#4a2a1a"}
-    }
+    "Standard (OSM)": "OpenStreetMap",
+    "Midnight": "CartoDB dark_matter",
+    "Monochrome": "CartoDB positron",
+    "Explorer": "CartoDB voyager",
+    "Satellite": "Esri World Imagery",
+    "Oceanic": "Esri Ocean Basemap",
+    "National Geo": "Esri NatGeoWorldMap",
+    "Topographic": "OpenTopoMap",
+    "Light Map": "CartoDB positron",
+    "Dark Map": "CartoDB dark_matter"
 }
 
-# Google Fonts (10+)
 FONTS = [
-    "Roboto", "Open Sans", "Playfair Display", "Montserrat", "Lora",
-    "Raleway", "Merriweather", "Oswald", "Nunito", "Quicksand",
-    "Poppins", "Lato", "PT Sans", "Source Sans Pro"
+    "Playfair Display", "Cormorant Garamond", "Roboto", "Open Sans", "Montserrat", 
+    "Lora", "Raleway", "Merriweather", "Oswald", "Nunito", "Quicksand"
 ]
 
-# Map layers toggles
-LAYERS = ["Water", "Parks", "Buildings", "Roads"]
+# ========== PAGE CONFIG ==========
+st.set_page_config(page_title="Poster Studio", page_icon="🎨", layout="wide", initial_sidebar_state="expanded")
 
 # ========== SESSION STATE INIT ==========
-def init_session_state():
-    defaults = {
-        "lat": 48.8566,
-        "lon": 2.3522,
-        "location_name": "Paris, France",
-        "theme": "Midnight",
-        "show_water": True,
-        "show_parks": True,
-        "show_buildings": False,
-        "show_roads": False,
-        "show_label": True,
-        "font": "Playfair Display",
-        "font_size": 36,
-        "zoom": 12,
-        "osm_data": None,  # cached GeoJSON features
-        "map_html": None,  # cached HTML for export
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = True
+if "lat" not in st.session_state:
+    st.session_state.lat = 48.8566
+    st.session_state.lon = 2.3522
+    st.session_state.zoom = 13
+    st.session_state.location_name = "Paris, France"
+    st.session_state.query = "Paris, France"
+
+# ========== CSS INJECTION ==========
+CUSTOM_CSS = """
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600&display=swap');
+
+    :root {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --bg-tertiary: #334155;
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --accent-primary: #6366f1;
+        --accent-secondary: #8b5cf6;
+        --border-color: #334155;
+        --card-bg: #1e293b;
     }
-    for key, val in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = val
 
-init_session_state()
+    /* Hide Streamlit Chrome */
+    #MainMenu, footer, header[data-testid="stHeader"] {
+        display: none !important;
+    }
 
-# ========== HELPER FUNCTIONS ==========
+    /* Keep Sidebar Toggle Button but style it as a floating pill */
+    [data-testid="collapsedControl"] {
+        display: flex !important;
+        position: fixed !important;
+        top: 20px !important;
+        left: 20px !important;
+        z-index: 9999 !important;
+        background-color: var(--bg-secondary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 8px !important;
+        padding: 6px !important;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2) !important;
+    }
+    [data-testid="collapsedControl"] svg {
+        fill: var(--text-primary) !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
 
-@st.cache_data(ttl=86400, show_spinner=False)
-def geocode_location(query: str) -> tuple:
-    """Return (lat, lon, display_name) using Nominatim, with manual coordinate fallback."""
-    # Try manual coordinate parse
-    coord_pattern = r"^\s*([-+]?\d*\.?\d+)\s*[,;]\s*([-+]?\d*\.?\d+)\s*$"
-    match = re.match(coord_pattern, query.strip())
-    if match:
-        lat = float(match.group(1))
-        lon = float(match.group(2))
-        return lat, lon, f"{lat:.4f}, {lon:.4f} (manual)"
+    /* Global Typography */
+    html, body, [class*="st-"] {
+        font-family: 'Inter', sans-serif !important;
+        color: var(--text-primary) !important;
+    }
 
-    # Use Nominatim
-    geolocator = Nominatim(user_agent="terraink_clone")
+    /* App Background */
+    .stApp {
+        background-color: var(--bg-primary) !important;
+    }
+
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        width: 360px !important;
+        background-color: var(--bg-secondary) !important;
+        border-right: 1px solid var(--border-color) !important;
+    }
+    
+    section[data-testid="stSidebar"] > div {
+        padding: 2rem 1.5rem !important;
+        padding-top: 5rem !important; /* Space for fixed toggle button */
+    }
+
+    /* Main Content Adjustment */
+    .main .block-container {
+        padding-top: 2rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+        max-width: 100% !important;
+    }
+
+    /* Cards / Containers */
+    .control-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-header {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-secondary);
+        margin-bottom: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* Inputs & Widgets */
+    .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] {
+        background-color: var(--bg-tertiary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 8px !important;
+        color: var(--text-primary) !important;
+        transition: all 0.2s ease;
+    }
+    
+    .stTextInput input:focus, .stNumberInput input:focus {
+        border-color: var(--accent-primary) !important;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+    }
+
+    /* Buttons */
+    .stButton button[kind="primary"] {
+        background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.75rem 1.5rem !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4) !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .stButton button[kind="primary"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 8px -1px rgba(99, 102, 241, 0.5) !important;
+    }
+
+    .stButton button[kind="secondary"] {
+        background-color: transparent !important;
+        color: var(--accent-primary) !important;
+        border: 1px solid var(--accent-primary) !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    /* Toggle Switches */
+    .stToggle div[data-baseweb="toggle"] {
+        background-color: var(--bg-tertiary) !important;
+    }
+    .stToggle div[data-baseweb="toggle"][aria-checked="true"] {
+        background-color: var(--accent-primary) !important;
+    }
+
+    /* Map Canvas Styling */
+    iframe {
+        border-radius: 16px !important;
+        border: 1px solid var(--border-color) !important;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2) !important;
+        height: calc(100vh - 140px) !important;
+    }
+
+    /* Typography Preview */
+    .font-preview {
+        font-family: var(--preview-font), serif;
+        font-size: 1.5rem;
+        color: var(--text-primary);
+        margin-top: 0.5rem;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        background: var(--bg-tertiary);
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid var(--border-color);
+    }
+
+    /* Coordinate Helper Text */
+    .coord-text {
+        font-family: 'Courier New', monospace;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-top: -0.5rem;
+        margin-bottom: 1.5rem;
+        background: var(--bg-tertiary);
+        padding: 4px 8px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    
+    /* Download Button Special Styling */
+    .download-section {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .download-section .stButton button {
+        width: 100%;
+        padding: 1rem !important;
+        font-size: 1.1rem !important;
+    }
+    
+    /* Top Bar Logo */
+    .top-bar-logo {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-left: 40px; /* Space for toggle button */
+    }
+    
+    .top-bar-controls {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+    }
+
+</style>
+"""
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# Light Mode Override
+if not st.session_state.dark_mode:
+    LIGHT_MODE_CSS = """
+    <style>
+    :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-tertiary: #e2e8f0;
+        --text-primary: #0f172a;
+        --text-secondary: #64748b;
+        --accent-primary: #4f46e5;
+        --accent-secondary: #7c3aed;
+        --border-color: #cbd5e1;
+        --card-bg: #ffffff;
+    }
+    </style>
+    """
+    st.markdown(LIGHT_MODE_CSS, unsafe_allow_html=True)
+
+# ========== HELPER FUNCTIONS (UNCHANGED BACKEND) ==========
+@st.cache_data(ttl=3600)
+def geocode_location(query: str):
+    geolocator = Nominatim(user_agent="terraink_clone_app_v2_ui")
     try:
-        location = geolocator.geocode(query, timeout=10)
+        location = geolocator.geocode(query)
         if location:
             return location.latitude, location.longitude, location.address
-        else:
-            st.error(f"Location '{query}' not found. Please try a different name or enter coordinates.")
-            return None, None, None
-    except (GeocoderTimedOut, GeocoderUnavailable) as e:
-        st.error(f"Geocoding service unavailable: {e}. Please enter coordinates manually.")
-        return None, None, None
+    except Exception as e:
+        st.error(f"Geocoding error: {e}")
+    return None, None, None
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_osm_features(lat, lon, radius=5000):
-    """Query Overpass API for water, parks, buildings, roads within a bounding box."""
-    # Build bounding box (approx 0.05° per 5 km)
-    delta = 0.05 * (radius / 5000.0)
-    bbox = (lon - delta, lat - delta, lon + delta, lat + delta)
-    bbox_str = f"{bbox[1]},{bbox[0]},{bbox[3]},{bbox[2]}"
-
-    # Define queries for each feature type
-    queries = {
-        "water": f"""
-            [out:json][timeout:25];
-            (way["natural"="water"]({bbox_str});
-             way["waterway"]({bbox_str});
-             relation["natural"="water"]({bbox_str}););
-            out body;>;
-        """,
-        "parks": f"""
-            [out:json][timeout:25];
-            (way["leisure"="park"]({bbox_str});
-             way["landuse"="recreation_ground"]({bbox_str});
-             way["leisure"="garden"]({bbox_str}););
-            out body;>;
-        """,
-        "buildings": f"""
-            [out:json][timeout:25];
-            (way["building"]({bbox_str});
-             way["building:part"]({bbox_str}););
-            out body;>;
-        """,
-        "roads": f"""
-            [out:json][timeout:25];
-            (way["highway"]({bbox_str}););
-            out body;>;
-        """
-    }
-
-    results = {}
-    for key, query in queries.items():
-        try:
-            response = requests.post(
-                "https://overpass-api.de/api/interpreter",
-                data={"data": query},
-                timeout=30
-            )
-            if response.status_code == 200:
-                data = response.json()
-                # Convert to GeoJSON-like features
-                features = []
-                for element in data.get("elements", []):
-                    if element["type"] == "way" and "geometry" in element:
-                        # Simple conversion: list of lat,lon pairs -> GeoJSON LineString or Polygon
-                        coords = [[p["lon"], p["lat"]] for p in element["geometry"]]
-                        if element.get("tags", {}).get("area") == "yes" or key in ["water", "parks", "buildings"]:
-                            # Treat as polygon (closed)
-                            if len(coords) > 2 and coords[0] != coords[-1]:
-                                coords.append(coords[0])
-                            geom_type = "Polygon"
-                            geometry = [coords]
-                        else:
-                            geom_type = "LineString"
-                            geometry = coords
-                        features.append({
-                            "type": "Feature",
-                            "geometry": {
-                                "type": geom_type,
-                                "coordinates": geometry
-                            },
-                            "properties": element.get("tags", {})
-                        })
-                results[key] = features
-            else:
-                results[key] = []
-        except Exception as e:
-            st.warning(f"Could not fetch {key} data: {e}")
-            results[key] = []
-    return results
-
-def generate_map(lat, lon, zoom, theme_name, show_water, show_parks, show_buildings, show_roads):
-    """Generate a Folium map with tile filter and overlay features."""
-    theme = THEMES[theme_name]
-    colors = theme["colors"]
-    filter_val = theme["filter"]
-
-    # Create base map
+def generate_map(lat, lon, zoom, theme_name, layers, show_label, font, font_size, location_name):
     m = folium.Map(location=[lat, lon], zoom_start=zoom, tiles=None)
-
-    # Add OpenStreetMap tile layer with custom CSS filter
-    tile = folium.TileLayer(
-        tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        name="OSM",
-        overlay=False,
-        control=False
-    )
-    tile.add_to(m)
-
-    # Inject CSS filter via custom JavaScript
-    filter_js = f"""
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {{
-            var tileContainer = document.querySelector('.leaflet-tile-pane');
-            if (tileContainer) {{
-                tileContainer.style.filter = "{filter_val}";
-            }}
-        }});
-        </script>
-    """
-    m.get_root().html.add_child(folium.Element(filter_js))
-
-    # Fetch OSM features if not cached
-    if st.session_state.osm_data is None:
-        with st.spinner("Fetching map features..."):
-            st.session_state.osm_data = fetch_osm_features(lat, lon)
-    osm_data = st.session_state.osm_data
-
-    # Add feature overlays
-    feature_groups = {}
-
-    # Water
-    if show_water and osm_data.get("water"):
-        fg_water = folium.FeatureGroup(name="Water", show=True)
-        for feat in osm_data["water"]:
-            geom = feat["geometry"]
-            if geom["type"] == "Polygon":
-                folium.GeoJson(
-                    feat,
-                    style_function=lambda x, color=colors["water"]: {
-                        "fillColor": color,
-                        "color": color,
-                        "weight": 1,
-                        "fillOpacity": 0.6
-                    }
-                ).add_to(fg_water)
-        fg_water.add_to(m)
-        feature_groups["water"] = fg_water
-
-    # Parks
-    if show_parks and osm_data.get("parks"):
-        fg_parks = folium.FeatureGroup(name="Parks", show=True)
-        for feat in osm_data["parks"]:
-            geom = feat["geometry"]
-            if geom["type"] == "Polygon":
-                folium.GeoJson(
-                    feat,
-                    style_function=lambda x, color=colors["park"]: {
-                        "fillColor": color,
-                        "color": color,
-                        "weight": 1,
-                        "fillOpacity": 0.5
-                    }
-                ).add_to(fg_parks)
-        fg_parks.add_to(m)
-        feature_groups["parks"] = fg_parks
-
-    # Buildings
-    if show_buildings and osm_data.get("buildings"):
-        fg_buildings = folium.FeatureGroup(name="Buildings", show=True)
-        for feat in osm_data["buildings"]:
-            geom = feat["geometry"]
-            if geom["type"] == "Polygon":
-                folium.GeoJson(
-                    feat,
-                    style_function=lambda x, color=colors["building"]: {
-                        "fillColor": color,
-                        "color": color,
-                        "weight": 1,
-                        "fillOpacity": 0.7
-                    }
-                ).add_to(fg_buildings)
-        fg_buildings.add_to(m)
-        feature_groups["buildings"] = fg_buildings
-
-    # Roads (as lines)
-    if show_roads and osm_data.get("roads"):
-        fg_roads = folium.FeatureGroup(name="Roads", show=True)
-        for feat in osm_data["roads"]:
-            geom = feat["geometry"]
-            if geom["type"] == "LineString":
-                folium.GeoJson(
-                    feat,
-                    style_function=lambda x, color=colors["road"]: {
-                        "color": color,
-                        "weight": 2,
-                        "opacity": 0.6
-                    }
-                ).add_to(fg_roads)
-        fg_roads.add_to(m)
-        feature_groups["roads"] = fg_roads
-
-    # Add layer control
+    folium.TileLayer(THEMES[theme_name], name="Base Map").add_to(m)
+    if layers.get("water"):
+        folium.TileLayer('OpenSeaMap', name='Water (Sea Overlay)').add_to(m)
     folium.LayerControl(collapsed=False).add_to(m)
-
+    
+    if show_label:
+        font_css = f"<link href='https://fonts.googleapis.com/css2?family={font.replace(' ', '+')}:wght@700&display=swap' rel='stylesheet'>"
+        html = f"""
+        {font_css}
+        <div style="position: absolute; 
+                    bottom: 8%; left: 50%; 
+                    transform: translateX(-50%);
+                    background: rgba(255, 255, 255, 0.15);
+                    backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
+                    padding: 16px 32px;
+                    border-radius: 16px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: #ffffff; 
+                    font-family: '{font}', serif; 
+                    font-size: {font_size}px; 
+                    font-weight: 700;
+                    z-index: 1000;
+                    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+                    letter-spacing: 1.5px;
+                    text-transform: uppercase;">
+            {location_name}
+        </div>
+        """
+        m.get_root().html.add_child(Element(html))
     return m
 
-def export_poster(lat, lon, zoom, theme_name, show_water, show_parks, show_buildings, show_roads,
-                  show_label, font_family, font_size, location_name, width, height):
-    """Generate a PNG of the map with text overlay using Selenium."""
-    # Generate map HTML
-    m = generate_map(lat, lon, zoom, theme_name, show_water, show_parks, show_buildings, show_roads)
-    map_html = m.get_root().render()
-
-    # Build full HTML page with text overlay
-    label_html = ""
-    if show_label:
-        label_html = f"""
-        <div style="position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 1000;">
-            <h1 style="font-family: '{font_family}'; font-size: {font_size}px; color: {THEMES[theme_name]['colors']['text']}; text-shadow: 0 2px 10px rgba(0,0,0,0.3); margin: 0; padding: 0 20px;">
-                {location_name}
-            </h1>
-        </div>
-        """
-
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link href="https://fonts.googleapis.com/css2?family={font_family.replace(' ', '+')}:wght@700&display=swap" rel="stylesheet">
-        <style>
-            body {{ margin: 0; padding: 0; background-color: {THEMES[theme_name]['colors']['bg']}; }}
-            #map {{ width: 100%; height: 100%; position: relative; }}
-            .leaflet-container {{ background: {THEMES[theme_name]['colors']['bg']} !important; }}
-        </style>
-    </head>
-    <body>
-        <div id="map">
-            {map_html}
-            {label_html}
-        </div>
-    </body>
-    </html>
-    """
-
-    # Write to temporary file
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as f:
-        f.write(html_content)
-        html_path = f.name
-
-    # Setup Selenium headless Chrome
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument(f"--window-size={width},{height}")
-
+def export_poster(html_content, width, height):
     try:
-        # Use webdriver-manager to get ChromeDriver
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-        driver.get(f"file://{html_path}")
-        time.sleep(2)  # Allow map to render
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+    except ImportError:
+        st.error("Selenium not installed.")
+        return None
 
-        # Take screenshot
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    options.add_argument(f'--window-size={width},{height}')
+    
+    if os.path.exists("/usr/bin/chromium"):
+        options.binary_location = "/usr/bin/chromium"
+    
+    with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as f:
+        f.write(html_content)
+        temp_path = f.name
+        
+    try:
+        driver = webdriver.Chrome(options=options)
+        driver.get(f"file://{temp_path}")
+        time.sleep(4)
         png = driver.get_screenshot_as_png()
         driver.quit()
-        os.unlink(html_path)
         return png
-    except (WebDriverException, TimeoutException) as e:
-        st.error(f"Export failed: {e}. Please ensure Chrome browser is installed.")
-        # Fallback: generate a simple image with text only
-        img = Image.new("RGB", (width, height), THEMES[theme_name]['colors']['bg'])
-        draw = ImageDraw.Draw(img)
-        if show_label:
-            try:
-                # Attempt to use the font (may not be installed locally)
-                font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", font_size)
-            except:
-                font = ImageFont.load_default()
-            # Simple text placement
-            bbox = draw.textbbox((0,0), location_name, font=font)
-            text_w = bbox[2] - bbox[0]
-            text_h = bbox[3] - bbox[1]
-            x = (width - text_w) // 2
-            y = height - text_h - 30
-            draw.text((x, y), location_name, fill=THEMES[theme_name]['colors']['text'], font=font)
-        img_bytes = io.BytesIO()
-        img.save(img_bytes, format="PNG")
-        return img_bytes.getvalue()
+    except Exception as e:
+        st.error(f"Export failed: {e}")
+        return None
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 # ========== UI LAYOUT ==========
 
-st.set_page_config(page_title="Terraink Clone - Map Poster Generator", layout="wide")
+# Top Bar
+top_col1, top_col2 = st.columns([8, 2])
+with top_col1:
+    st.markdown("<div class='top-bar-logo'>🎨 Poster Studio</div>", unsafe_allow_html=True)
+with top_col2:
+    st.markdown("<div class='top-bar-controls'>", unsafe_allow_html=True)
+    dark_mode = st.toggle("Dark Mode", value=st.session_state.dark_mode, key="theme_toggle")
+    if dark_mode != st.session_state.dark_mode:
+        st.session_state.dark_mode = dark_mode
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<hr style='margin: 1rem 0 2rem 0; border-color: var(--border-color); opacity: 0.3;'>", unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    st.header("📍 Location")
-    location_query = st.text_input("Search for a place", value=st.session_state.location_name)
-    col1, col2 = st.columns([2,1])
-    with col1:
-        if st.button("Search", use_container_width=True):
-            with st.spinner("Geocoding..."):
-                lat, lon, name = geocode_location(location_query)
-                if lat is not None:
-                    st.session_state.lat = lat
-                    st.session_state.lon = lon
-                    st.session_state.location_name = name
-                    st.session_state.osm_data = None  # invalidate cache
-                    st.rerun()
-    with col2:
-        if st.button("Reset", use_container_width=True):
-            st.session_state.lat = 48.8566
-            st.session_state.lon = 2.3522
-            st.session_state.location_name = "Paris, France"
-            st.session_state.osm_data = None
-            st.rerun()
-
-    st.divider()
-    st.header("🎨 Theme")
-    theme_names = list(THEMES.keys())
-    selected_theme = st.selectbox("Theme", theme_names, index=theme_names.index(st.session_state.theme))
-    st.session_state.theme = selected_theme
-
-    st.divider()
-    st.header("🗺️ Map Layers")
-    show_water = st.checkbox("Water", value=st.session_state.show_water)
-    show_parks = st.checkbox("Parks", value=st.session_state.show_parks)
-    show_buildings = st.checkbox("Buildings", value=st.session_state.show_buildings)
-    show_roads = st.checkbox("Roads", value=st.session_state.show_roads)
-    st.session_state.show_water = show_water
-    st.session_state.show_parks = show_parks
-    st.session_state.show_buildings = show_buildings
-    st.session_state.show_roads = show_roads
-
-    st.divider()
-    st.header("✍️ Typography")
-    show_label = st.checkbox("Show city label", value=st.session_state.show_label)
-    st.session_state.show_label = show_label
-    font_family = st.selectbox("Font", FONTS, index=FONTS.index(st.session_state.font) if st.session_state.font in FONTS else 0)
-    st.session_state.font = font_family
-    font_size = st.slider("Font size", 16, 72, st.session_state.font_size)
-    st.session_state.font_size = font_size
-
-    st.divider()
-    st.header("📤 Export")
-    export_width = st.number_input("Width (px)", min_value=400, max_value=4000, value=1200, step=100)
-    export_height = st.number_input("Height (px)", min_value=400, max_value=4000, value=1600, step=100)
-    if st.button("Download Poster", type="primary", use_container_width=True):
-        with st.spinner("Generating high-resolution poster..."):
-            png_data = export_poster(
-                st.session_state.lat,
-                st.session_state.lon,
-                st.session_state.get("zoom", 12),
-                st.session_state.theme,
-                st.session_state.show_water,
-                st.session_state.show_parks,
-                st.session_state.show_buildings,
-                st.session_state.show_roads,
-                st.session_state.show_label,
-                st.session_state.font,
-                st.session_state.font_size,
-                st.session_state.location_name,
-                export_width,
-                export_height
-            )
-            if png_data:
-                b64 = base64.b64encode(png_data).decode()
-                href = f'<a href="data:image/png;base64,{b64}" download="poster.png">Click here to download</a>'
-                st.markdown(href, unsafe_allow_html=True)
+    st.markdown("<div class='card-header'>📍 LOCATION</div>", unsafe_allow_html=True)
+    search_col1, search_col2 = st.columns([4, 1])
+    with search_col1:
+        query = st.text_input("Search", value=st.session_state.query, label_visibility="collapsed", placeholder="Search for a place...")
+    with search_col2:
+        search_btn = st.button("🌍", use_container_width=True, help="Search Location")
+        
+    st.markdown(f"<div class='coord-text'>Lat: {st.session_state.lat:.4f}, Lon: {st.session_state.lon:.4f}</div>", unsafe_allow_html=True)
+    
+    if search_btn:
+        with st.spinner("Searching..."):
+            lat, lon, name = geocode_location(query)
+            if lat:
+                st.session_state.lat = lat
+                st.session_state.lon = lon
+                st.session_state.location_name = name
+                st.session_state.query = query
+                st.session_state.zoom = 13
+                st.toast(f"Found: {name}", icon="📍")
+                st.rerun()
             else:
-                st.error("Export failed. Please check that Chrome is installed.")
+                st.warning("Location not found. Try a different search term.")
 
-# Main area: Map
-st.title("🗺️ Terraink Clone - Map Poster Generator")
-st.caption("Interactive map with customizable themes and layers. Adjust controls on the left.")
+    st.markdown("<div class='control-card'><div class='card-header'>🎨 THEME & COLORS</div>", unsafe_allow_html=True)
+    theme = st.selectbox("Map Style", list(THEMES.keys()))
+    c1, c2 = st.columns(2)
+    with c1:
+        road_color = st.color_picker("Roads", "#ffffff")
+        water_color = st.color_picker("Water", "#000000")
+    with c2:
+        park_color = st.color_picker("Parks", "#000000")
+        bldg_color = st.color_picker("Buildings", "#000000")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# Display current location info
-col_info1, col_info2 = st.columns(2)
-with col_info1:
-    st.metric("Location", st.session_state.location_name)
-with col_info2:
-    st.metric("Coordinates", f"{st.session_state.lat:.4f}, {st.session_state.lon:.4f}")
+    st.markdown("<div class='control-card'><div class='card-header'>🗺️ MAP LAYERS</div>", unsafe_allow_html=True)
+    roads = st.toggle("Roads", value=True)
+    water = st.toggle("Water", value=True)
+    parks = st.toggle("Parks", value=True)
+    buildings = st.toggle("Buildings", value=False)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# Generate and show map
+    st.markdown("<div class='control-card'><div class='card-header'>✍️ TYPOGRAPHY</div>", unsafe_allow_html=True)
+    show_label = st.toggle("Show Title", value=True)
+    font = st.selectbox("Font Family", FONTS)
+    st.markdown(f"<div class='font-preview' style='--preview-font: \"{font}\"'>{st.session_state.location_name}</div>", unsafe_allow_html=True)
+    font_size = st.slider("Size", 16, 72, 36)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='download-section'><div class='card-header'>📸 EXPORT</div>", unsafe_allow_html=True)
+    exp_c1, exp_c2 = st.columns(2)
+    with exp_c1: width = st.number_input("W", value=1200, step=100)
+    with exp_c2: height = st.number_input("H", value=1600, step=100)
+    export_clicked = st.button("⬇️ Download High-Res Poster", type="primary", use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# Main Canvas
 map_obj = generate_map(
-    st.session_state.lat,
-    st.session_state.lon,
-    st.session_state.get("zoom", 12),
-    st.session_state.theme,
-    st.session_state.show_water,
-    st.session_state.show_parks,
-    st.session_state.show_buildings,
-    st.session_state.show_roads
+    st.session_state.lat, st.session_state.lon, st.session_state.zoom,
+    theme, {"roads": roads, "water": water, "parks": parks, "buildings": buildings},
+    show_label, font, font_size, st.session_state.location_name
 )
 
-# Use folium_static with a larger height
-folium_static(map_obj, width=900, height=600)
+map_data = st_folium(map_obj, width=None, height=800, returned_objects=["center", "zoom"])
 
-# If label is shown, we also display a text overlay (simulated using st.markdown)
-# Note: The actual map HTML already includes the label via export, but for preview we can show it.
-# However, folium_static renders the map in an iframe, so we can't overlay text directly.
-# We'll just show a preview text below the map for reference.
-if st.session_state.show_label:
-    st.markdown(
-        f"<h2 style='font-family: {st.session_state.font}; font-size: {st.session_state.font_size}px; text-align: center; color: {THEMES[st.session_state.theme]['colors']['text']};'>"
-        f"{st.session_state.location_name}</h2>",
-        unsafe_allow_html=True
-    )
-
-# Store zoom level from map interaction? Not possible with folium_static; we can add a zoom slider.
-# For simplicity, we can add a zoom control in sidebar.
-st.sidebar.divider()
-st.sidebar.header("Zoom")
-zoom_level = st.sidebar.slider("Zoom", 5, 18, st.session_state.get("zoom", 12))
-st.session_state.zoom = zoom_level
-# Rerun on zoom change
-if zoom_level != st.session_state.get("last_zoom", None):
-    st.session_state.last_zoom = zoom_level
-    st.rerun()
-
-# ========== FOOTER ==========
-st.sidebar.markdown("---")
-st.sidebar.caption("Built with Streamlit, Folium, and Selenium")
+if map_data and map_data.get("center"):
+    if map_data["center"]["lat"] != st.session_state.lat or map_data["center"]["lng"] != st.session_state.lon:
+        st.session_state.lat = map_data["center"]["lat"]
+        st.session_state.lon = map_data["center"]["lng"]
+        st.session_state.zoom = map_data["zoom"]
+        
+if export_clicked:
+    with st.spinner("Rendering your poster..."):
+        export_m = generate_map(
+            st.session_state.lat, st.session_state.lon, st.session_state.zoom,
+            theme, {"roads": roads, "water": water, "parks": parks, "buildings": buildings},
+            show_label, font, font_size, st.session_state.location_name
+        )
+        export_m.get_root().width = f"{width}px"
+        export_m.get_root().height = f"{height}px"
+        
+        html_str = export_m.get_root().render()
+        png_data = export_poster(html_str, width, height)
+        
+        if png_data:
+            st.toast("Poster ready! Downloading...", icon="✅")
+            st.download_button(
+                label="Click here to save your PNG",
+                data=png_data,
+                file_name=f"poster_{st.session_state.location_name.replace(' ', '_')}_{width}x{height}.png",
+                mime="image/png",
+                type="primary",
+                use_container_width=True
+            )
