@@ -339,7 +339,7 @@ ALL_STYLES = {
 INITIAL_BASEMAP = "Midnight Blue"
 
 # ------------------------------------------------------------------------
-# 3. OPEN MAP BUILDER APP ENGINE
+# 3. OPEN MAP BUILDER FRONTEND
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -357,115 +357,116 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: __BG__; font-family: 'Century Gothic Custom', system-ui, -apple-system, sans-serif; }
   #map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-  /* Left Vertical Sidebar Rail */
+  /* Floating Dark Rounded Vertical Toolbar Rail */
   #side-rail {
-    position: absolute; top: 0; left: 0; bottom: 0; width: 46px; z-index: 10;
-    background: #ffffff; border-right: 1px solid #e1e4e8;
-    display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px;
-    box-shadow: 2px 0 8px rgba(0,0,0,0.06);
+    position: absolute; top: 16px; left: 16px; bottom: 16px; width: 54px; z-index: 10;
+    background: #181d24f2; backdrop-filter: blur(12px); border: 1px solid #2d333b;
+    border-radius: 28px;
+    display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   }
   .rail-btn {
-    width: 36px; height: 36px; display: grid; place-items: center;
-    background: transparent; border: none; color: #4a5568; border-radius: 6px;
+    width: 38px; height: 38px; display: grid; place-items: center;
+    background: transparent; border: none; color: #adbac7; border-radius: 12px;
     cursor: pointer; transition: all 0.15s ease;
   }
-  .rail-btn:hover { background: #f0f2f5; color: #1a202c; }
-  .rail-btn.active { background: #e2e8f0; color: #0f172a; }
-  .rail-btn.primary-active { background: #0f172a; color: #ffffff; }
-  .rail-sep { width: 28px; height: 1px; background: #e2e8f0; margin: 4px 0; }
+  .rail-btn:hover { background: #22272e; color: #cdd9e5; }
+  .rail-btn.active { background: #2d333b; color: #f0f6fc; }
+  .rail-btn.primary-active { background: #316dca; color: #ffffff; }
+  .rail-sep { width: 28px; height: 1px; background: #2d333b; margin: 4px 0; }
 
-  /* Flyout / Data Browser Sidebar Panel */
-  #browser-panel {
-    position: absolute; top: 0; left: 46px; bottom: 0; width: 340px; z-index: 9;
-    background: #ffffff; border-right: 1px solid #e1e4e8;
-    box-shadow: 4px 0 16px rgba(0,0,0,0.08);
-    display: flex; flex-direction: column; overflow: hidden;
-    transform: translateX(0); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Flyout Left Side Panels */
+  .left-panel {
+    position: absolute; top: 16px; left: 80px; bottom: 16px; width: 340px; z-index: 9;
+    background: #181d24f7; backdrop-filter: blur(14px); border: 1px solid #2d333b;
+    border-radius: 16px; box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+    display: none; flex-direction: column; overflow: hidden; color: #adbac7;
   }
-  #browser-panel.collapsed { transform: translateX(-100%); }
+  .left-panel.open { display: flex; }
 
   .panel-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px; border-bottom: 1px solid #eef0f2;
+    padding: 14px 16px; border-bottom: 1px solid #22272e;
   }
-  .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #1a202c; }
-  .panel-actions { display: flex; gap: 4px; }
-  .icon-action-btn { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #e2e8f0; background: #ffffff; border-radius: 6px; cursor: pointer; color: #4a5568; }
-  .icon-action-btn:hover { background: #f8fafc; color: #1a202c; }
+  .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #f0f6fc; }
+  .icon-action-btn { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #2d333b; background: #22272e; border-radius: 6px; cursor: pointer; color: #adbac7; }
+  .icon-action-btn:hover { background: #2d333b; color: #f0f6fc; }
 
-  .panel-content { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .panel-content { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; font-size: 12px; }
 
-  /* Accordion Sections */
-  .acc-item { border-bottom: 1px solid #edf2f7; padding-bottom: 8px; }
-  .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #2d3748; cursor: pointer; padding: 6px 0; }
+  /* Accordion */
+  .acc-item { border-bottom: 1px solid #22272e; padding-bottom: 8px; }
+  .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 6px 0; }
   .acc-body { padding: 8px 0 4px 0; display: flex; flex-direction: column; gap: 8px; }
   .acc-body.hidden { display: none; }
 
-  .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #4a5568; }
-  .layer-row input[type=checkbox] { accent-color: #0f172a; cursor: pointer; }
+  .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
+  .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
 
-  /* Layers Group in Panel */
-  .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 14px; color: #1a202c; margin-top: 6px; }
-  .badge-count { background: #0f172a; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
+  /* My Layers Group */
+  .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
+  .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
 
   .layer-card {
-    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
+    background: #22272e; border: 1px solid #2d333b; border-radius: 8px; padding: 8px 10px;
     display: flex; flex-direction: column; gap: 6px; margin-top: 6px;
   }
   .layer-card-top { display: flex; align-items: center; gap: 6px; }
   .layer-name-input {
     flex: 1; border: 1px solid transparent; background: transparent; font-weight: 600;
-    font-size: 12px; color: #1a202c; padding: 2px 4px; border-radius: 4px; font-family: inherit;
+    font-size: 12px; color: #f0f6fc; padding: 2px 4px; border-radius: 4px; font-family: inherit;
   }
-  .layer-name-input:focus { border-color: #cbd5e1; background: #ffffff; outline: none; }
-  .card-btn { background: transparent; border: none; color: #64748b; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
-  .card-btn:hover { color: #0f172a; background: #e2e8f0; }
+  .layer-name-input:focus { border-color: #316dca; background: #1c2128; outline: none; }
+  .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+  .card-btn:hover { color: #f0f6fc; background: #2d333b; }
 
-  /* Floating Popups & Draw Tool Setting Panels */
+  /* Floating Popups on Left Side */
   .float-card {
-    position: absolute; z-index: 12; background: #ffffff; border: 1px solid #e2e8f0;
-    border-radius: 10px; padding: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15);
-    display: none; flex-direction: column; gap: 8px; font-size: 12px; color: #2d3748;
+    position: absolute; left: 80px; z-index: 12; background: #181d24f7; backdrop-filter: blur(14px);
+    border: 1px solid #2d333b; border-radius: 14px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    display: none; flex-direction: column; gap: 10px; font-size: 12px; color: #adbac7;
   }
   .float-card.open { display: flex; }
   .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  .float-card input[type=range] { accent-color: #0f172a; width: 100px; cursor: pointer; }
-  .float-card input[type=color] { border: none; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; background: transparent; }
-  .float-card input[type=text], .float-card select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; font-family: inherit; font-size: 12px; }
+  .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
+  .float-card input[type=color] { border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; background: transparent; }
+  .float-card input[type=text], .float-card select { background: #1c2128; color: #f0f6fc; border: 1px solid #2d333b; border-radius: 6px; padding: 6px 8px; font-family: inherit; font-size: 12px; }
 
-  #popup-marker-settings { top: 60px; left: 56px; width: 220px; }
-  #popup-text-settings { top: 100px; left: 56px; width: 240px; }
-  #popup-shape-editor { top: 20px; right: 20px; width: 280px; }
-  #popup-custom-map { top: 20px; right: 20px; width: 270px; max-height: 85vh; overflow-y: auto; }
-  #popup-search { top: 46px; left: 56px; width: 280px; }
+  #popup-search { top: 60px; width: 280px; }
+  #popup-marker-settings { top: 105px; width: 240px; }
+  #popup-text-settings { top: 150px; width: 260px; }
+  #popup-shape-editor { top: 16px; width: 300px; }
+  #popup-custom-map { top: 16px; bottom: 16px; width: 300px; overflow-y: auto; }
 
   .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .icon-grid button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #e2e8f0; border-radius: 6px; background: #ffffff; color: #4a5568; cursor: pointer; }
-  .icon-grid button.active { border-color: #0f172a; background: #0f172a; color: #ffffff; }
+  .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #2d333b; border-radius: 8px; background: #22272e; color: #adbac7; cursor: pointer; }
+  .icon-grid button:hover { background: #2d333b; }
+  .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
 
   #hint-toast {
     position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 15;
-    background: #0f172ae6; color: #ffffff; border-radius: 20px; padding: 7px 18px;
-    font-size: 12px; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none;
+    background: #181d24ee; color: #f0f6fc; border: 1px solid #2d333b; border-radius: 20px; padding: 7px 18px;
+    font-size: 12px; backdrop-filter: blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: none;
   }
-  #err { position: absolute; top: 10px; right: 10px; z-index: 20; background: #fee2e2; color: #991b1b; padding: 8px 12px; border-radius: 6px; font-size: 12px; display: none; }
+  #err { position: absolute; top: 10px; right: 10px; z-index: 20; background: #3d1111; color: #ffb4b4; padding: 8px 12px; border-radius: 6px; font-size: 12px; display: none; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 
-<!-- Left Vertical Orientation Toolbar Rail -->
+<!-- Floating Dark Vertical Toolbar Rail -->
 <div id="side-rail">
   <button class="rail-btn" id="btn-browser-toggle" title="Data Browser / Layers">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
   </button>
+  <div class="rail-sep"></div>
   <button class="rail-btn" id="btn-search" title="Search Location">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
   </button>
-  <button class="rail-btn tool" data-tool="marker" title="Marker Pin">
+  <button class="rail-btn tool" data-tool="marker" title="Place Marker Pin">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
   </button>
-  <button class="rail-btn tool" data-tool="textbox" title="Text Label">
+  <button class="rail-btn tool" data-tool="textbox" title="Add Text Label">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
   </button>
   <button class="rail-btn tool" data-tool="polyline" title="Draw Polyline">
@@ -487,7 +488,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button class="rail-btn" id="btn-custom-map" title="Basemap & Vector Styling">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
   </button>
-  <button class="rail-btn" id="btn-edit-mode" title="Select, Drag & Edit Features">
+  <button class="rail-btn" id="btn-edit-mode" title="Select & Drag Mode">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
   </button>
   <button class="rail-btn" id="btn-clear-all" title="Clear All Drawings">
@@ -495,15 +496,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </button>
 </div>
 
-<!-- Flyout Data Browser Panel -->
-<div id="browser-panel">
+<!-- Left Side Data Browser Panel -->
+<div id="browser-panel" class="left-panel">
   <div class="panel-header">
     <div class="panel-title">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
-      <span>Data browser</span>
+      <span>Data Browser</span>
     </div>
     <div class="panel-actions">
-      <button class="icon-action-btn" id="btn-collapse-browser" title="Collapse Panel">‹</button>
       <button class="icon-action-btn" id="btn-close-browser" title="Close">✕</button>
     </div>
   </div>
@@ -529,26 +529,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <span class="badge-count" id="layer-badge-count">0</span>
     </div>
     <div id="my-layers-list">
-      <div style="font-size:12px; color:#94a3b8; padding: 6px 0;">No drawings yet. Use the tools to create shapes.</div>
+      <div style="font-size:12px; color:#768390; padding: 6px 0;">No drawings yet. Use the tools to create shapes.</div>
     </div>
   </div>
 </div>
 
-<!-- Search Panel Floating Card -->
+<!-- Left Side Search Card -->
 <div id="popup-search" class="float-card">
   <input type="text" id="searchInput" placeholder="Search location (Press Enter)…" />
 </div>
 
-<!-- Marker Settings Card -->
+<!-- Left Side Marker Settings Card -->
 <div id="popup-marker-settings" class="float-card">
-  <div style="font-weight:600; font-size:11px; color:#64748b;">CHOOSE MARKER ICON</div>
+  <div style="font-weight:600; font-size:11px; color:#768390;">CHOOSE MARKER ICON</div>
   <div class="icon-grid" id="markerIconGrid"></div>
-  <div class="f-row"><span>Icon Color</span><input type="color" id="mColor" value="#0f172a"></div>
+  <div class="f-row"><span>Icon Color</span><input type="color" id="mColor" value="#e8b84a"></div>
 </div>
 
-<!-- Text Tool Configuration Card -->
+<!-- Left Side Text Tool Settings Card -->
 <div id="popup-text-settings" class="float-card">
-  <div style="font-weight:600; font-size:11px; color:#64748b;">TEXT CONFIGURATION</div>
+  <div style="font-weight:600; font-size:11px; color:#768390;">TEXT CONFIGURATION</div>
   <input type="text" id="tContent" value="Custom Label" placeholder="Text content…"/>
   <div class="f-row"><span>Font</span>
     <select id="tFont" style="width:130px;">
@@ -559,61 +559,61 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </select>
   </div>
   <div class="f-row"><span>Font Size</span><input type="range" id="tSize" min="10" max="42" step="1" value="16"></div>
-  <div class="f-row"><span>Color</span><input type="color" id="tColor" value="#0f172a"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="tColor" value="#d9b451"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="tOp" min="0.1" max="1" step="0.05" value="1"></div>
 </div>
 
-<!-- Feature Property / Polygon Customizer Editor Card -->
+<!-- Left Side Feature Property & Polygon Customizer Editor -->
 <div id="popup-shape-editor" class="float-card">
   <div style="display:flex; justify-content:space-between; align-items:center;">
-    <span style="font-weight:700;" id="editShapeTitle">Edit Layer</span>
+    <span style="font-weight:700; color:#f0f6fc;" id="editShapeTitle">Edit Layer</span>
     <button class="card-btn" id="closeEditorBtn">✕</button>
   </div>
   <div class="f-row"><span>Name</span><input type="text" id="eName" style="width:140px;"></div>
-  <div class="f-row" id="eColorRow"><span>Color</span><input type="color" id="eColor"></div>
+  <div class="f-row" id="eColorRow"><span>Line Color</span><input type="color" id="eColor"></div>
   <div class="f-row" id="eWidthRow"><span>Thickness</span><input type="range" id="eWidth" min="1" max="16" step="1"></div>
   <div class="f-row" id="eOpRow"><span>Opacity</span><input type="range" id="eOp" min="0.05" max="1" step="0.05"></div>
   <div class="f-row" id="eFillColorRow"><span>Fill Color</span><input type="color" id="eFillColor"></div>
   <div class="f-row" id="eFillOpRow"><span>Fill Opacity</span><input type="range" id="eFillOp" min="0" max="1" step="0.05"></div>
   <div class="f-row" id="eTextRow" style="display:none;"><span>Text</span><input type="text" id="eTextVal" style="width:140px;"></div>
-  <div class="f-row" id="eFontSizeRow" style="display:none;"><span>Size</span><input type="range" id="eFontSize" min="10" max="42" step="1"></div>
+  <div class="f-row" id="eFontSizeRow" style="display:none;"><span>Font Size</span><input type="range" id="eFontSize" min="10" max="42" step="1"></div>
   <div style="display:flex; justify-content:space-between; margin-top:6px;">
-    <button id="eDeleteBtn" style="color:#ef4444; border:1px solid #fecaca; background:#fef2f2; padding:5px 10px; border-radius:6px; cursor:pointer;">Delete</button>
-    <button id="eDoneBtn" style="background:#0f172a; color:#fff; border:none; padding:5px 14px; border-radius:6px; cursor:pointer;">Save</button>
+    <button id="eDeleteBtn" style="color:#f85149; border:1px solid #da36334d; background:#da36331a; padding:6px 12px; border-radius:6px; cursor:pointer;">Delete</button>
+    <button id="eDoneBtn" style="background:#316dca; color:#fff; border:none; padding:6px 16px; border-radius:6px; cursor:pointer;">Done</button>
   </div>
 </div>
 
-<!-- Basemap Background & Vector Customizer Panel -->
+<!-- Left Side Basemap & Vector Customizer Panel -->
 <div id="popup-custom-map" class="float-card">
   <div style="display:flex; justify-content:space-between; align-items:center;">
-    <span style="font-weight:700;">Vector & Basemap Style</span>
+    <span style="font-weight:700; color:#f0f6fc;">Vector & Basemap Style</span>
     <button class="card-btn" id="closeCustomMapBtn">✕</button>
   </div>
-  <div style="font-weight:600; font-size:11px; color:#64748b; margin-top:4px;">BASEMAP PRESETS</div>
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:4px;">BASEMAP PRESETS</div>
   <div style="display:flex; flex-wrap:wrap; gap:4px;" id="presetBtnList"></div>
 
-  <div style="font-weight:600; font-size:11px; color:#64748b; margin-top:6px;">BACKGROUND</div>
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BACKGROUND</div>
   <div class="f-row"><span>Color</span><input type="color" id="cBgColor" value="#0a1628"></div>
 
-  <div style="font-weight:600; font-size:11px; color:#64748b; margin-top:6px;">MAIN ROADS</div>
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">MAIN ROADS</div>
   <div class="f-row"><span>Color</span><input type="color" id="cMainColor" value="#e8b84a"></div>
   <div class="f-row"><span>Thickness</span><input type="range" id="cMainWidth" min="1" max="10" step="0.5" value="4"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="cMainOp" min="0" max="1" step="0.1" value="1"></div>
 
-  <div style="font-weight:600; font-size:11px; color:#64748b; margin-top:6px;">SECONDARY ROADS</div>
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">SECONDARY ROADS</div>
   <div class="f-row"><span>Color</span><input type="color" id="cSecColor" value="#7d5f14"></div>
   <div class="f-row"><span>Thickness</span><input type="range" id="cSecWidth" min="0.5" max="8" step="0.5" value="3"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="cSecOp" min="0" max="1" step="0.1" value="0.7"></div>
 
-  <div style="font-weight:600; font-size:11px; color:#64748b; margin-top:6px;">BUILDINGS</div>
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BUILDINGS</div>
   <div class="f-row"><span>Color</span><input type="color" id="cBldColor" value="#8e7258"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="cBldOp" min="0" max="1" step="0.05" value="0.25"></div>
 
-  <div style="font-weight:600; font-size:11px; color:#64748b; margin-top:6px;">WATER</div>
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">WATER</div>
   <div class="f-row"><span>Color</span><input type="color" id="cWaterColor" value="#0a1424"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"></div>
 
-  <div style="font-weight:600; font-size:11px; color:#64748b; margin-top:6px;">LABELS</div>
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">LABELS</div>
   <div class="f-row"><span>Color</span><input type="color" id="cLblColor" value="#d9b451"></div>
 </div>
 
@@ -625,6 +625,7 @@ try {
 const ALL_STYLES = __ALL_STYLES__;
 let currentStyleName = "Midnight Blue";
 
+// Map instance WITHOUT default navigation controls (no zoom plus/minus)
 const map = new maplibregl.Map({
   container: 'map',
   style: __STYLE__,
@@ -633,20 +634,19 @@ const map = new maplibregl.Map({
   attributionControl: false,
   fadeDuration: 0
 });
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 
 // ----------------- State Machine -----------------
 let features = [], fid = 0;
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
-let markerShape = 'pin', markerColor = '#0f172a';
+let markerShape = 'pin', markerColor = '#e8b84a';
 
 const textSettings = {
   content: 'Custom Label',
   font: 'Century Gothic Custom',
   size: 16,
-  color: '#0f172a',
+  color: '#d9b451',
   opacity: 1.0
 };
 
@@ -666,7 +666,17 @@ const $ = id => document.getElementById(id);
 const hint = t => { $('hint-toast').style.display = t ? 'block' : 'none'; $('hint-toast').textContent = t || ''; };
 
 const closeFloatingCards = () => {
-  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search'].forEach(id => $(id).classList.remove('open'));
+  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','browser-panel'].forEach(id => $(id).classList.remove('open'));
+};
+
+const resetActiveTools = () => {
+  activeTool = null;
+  draft = [];
+  renderDraft();
+  document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
+  map.getCanvas().style.cursor = '';
+  map.doubleClickZoom.enable();
+  hint('');
 };
 
 // ----------------- Marker Canvas Icon Pipeline -----------------
@@ -675,7 +685,7 @@ function renderIconCanvas(shape, color) {
   c.width = 64; c.height = 64;
   const ctx = c.getContext('2d');
   ctx.clearRect(0,0,64,64);
-  ctx.strokeStyle = '#ffffff';
+  ctx.strokeStyle = '#0a1628';
   ctx.lineWidth = 3;
   ctx.fillStyle = color;
   ctx.lineJoin = 'round';
@@ -706,7 +716,7 @@ function renderIconCanvas(shape, color) {
   }
   ctx.fill(); ctx.stroke();
 
-  // Draw inner contrasting dot
+  // Inner contrasting dot
   ctx.beginPath();
   ctx.fillStyle = '#ffffff';
   ctx.arc(32, shape === 'pin' ? 24 : 32, 5, 0, Math.PI * 2);
@@ -763,7 +773,7 @@ function addDrawStack() {
       id: 'draw-fill', type: 'fill', source: 'draw',
       filter: ['==', ['geometry-type'], 'Polygon'],
       paint: {
-        'fill-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#0f172a'],
+        'fill-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
         'fill-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.35], ['get', 'visible']]
       }
     });
@@ -773,7 +783,7 @@ function addDrawStack() {
       id: 'draw-outline', type: 'line', source: 'draw',
       filter: ['==', ['geometry-type'], 'Polygon'],
       paint: {
-        'line-color': ['coalesce', ['get', 'color'], '#0f172a'],
+        'line-color': ['coalesce', ['get', 'color'], '#e8b84a'],
         'line-width': ['coalesce', ['get', 'width'], 3],
         'line-opacity': ['*', ['coalesce', ['get', 'opacity'], 0.9], ['get', 'visible']]
       }
@@ -785,7 +795,7 @@ function addDrawStack() {
       filter: ['==', ['geometry-type'], 'LineString'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': ['coalesce', ['get', 'color'], '#0f172a'],
+        'line-color': ['coalesce', ['get', 'color'], '#e8b84a'],
         'line-width': ['coalesce', ['get', 'width'], 4],
         'line-opacity': ['*', ['coalesce', ['get', 'opacity'], 0.9], ['get', 'visible']]
       }
@@ -816,9 +826,9 @@ function addDrawStack() {
         'text-anchor': 'center'
       },
       paint: {
-        'text-color': ['coalesce', ['get', 'color'], '#0f172a'],
+        'text-color': ['coalesce', ['get', 'color'], '#d9b451'],
         'text-opacity': ['*', ['coalesce', ['get', 'opacity'], 1], ['get', 'visible']],
-        'text-halo-color': '#ffffff',
+        'text-halo-color': '#0a1628',
         'text-halo-width': 2
       }
     });
@@ -832,12 +842,12 @@ function addDrawStack() {
     map.addLayer({
       id: 'draft-line', type: 'line', source: 'draft',
       filter: ['==', ['geometry-type'], 'LineString'],
-      paint: { 'line-color': '#0f172a', 'line-width': 2, 'line-dasharray': [2, 2] }
+      paint: { 'line-color': '#e8b84a', 'line-width': 2, 'line-dasharray': [2, 2] }
     });
     map.addLayer({
       id: 'draft-point', type: 'circle', source: 'draft',
       filter: ['==', ['geometry-type'], 'Point'],
-      paint: { 'circle-color': '#0f172a', 'circle-radius': 4, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 }
+      paint: { 'circle-color': '#e8b84a', 'circle-radius': 4, 'circle-stroke-color': '#0a1628', 'circle-stroke-width': 2 }
     });
   }
 }
@@ -905,18 +915,18 @@ function circleCoords(c, edge) {
 }
 
 function fetchMultiPointRoute(pts) {
-  hint('Calculating routing paths…');
+  hint('Calculating route…');
   const coordStr = pts.map(p => `${p[0]},${p[1]}`).join(';');
   fetch(`https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`)
     .then(r => r.json())
     .then(j => {
       const geom = (j.routes && j.routes[0]) ? j.routes[0].geometry : { type: 'LineString', coordinates: pts };
-      addFeatureRecord('route', geom, { color: '#0f172a', width: 4, opacity: 0.9 });
+      addFeatureRecord('route', geom, { color: '#e8b84a', width: 4, opacity: 0.9 });
       hint('');
     })
     .catch(() => {
-      addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { color: '#0f172a', width: 3, opacity: 0.8 });
-      hint('OSRM direct line connection fallback');
+      addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { color: '#e8b84a', width: 3, opacity: 0.8 });
+      hint('OSRM direct connection used');
     });
 }
 
@@ -928,11 +938,11 @@ function addFeatureRecord(kind, geometry, customProps = {}) {
     kind: kind,
     geometry: geometry,
     props: {
-      color: '#0f172a',
+      color: '#e8b84a',
       width: 3,
       opacity: 0.9,
-      fillColor: '#0f172a',
-      fillOpacity: 0.3,
+      fillColor: '#e8b84a',
+      fillOpacity: 0.35,
       visible: 1,
       ...customProps
     }
@@ -948,10 +958,8 @@ document.querySelectorAll('.tool').forEach(btn => {
   btn.onclick = () => {
     const t = btn.dataset.tool;
     if (activeTool === t) {
-      activeTool = null;
-      btn.classList.remove('primary-active');
+      resetActiveTools();
       closeFloatingCards();
-      hint('');
     } else {
       document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
       $('btn-edit-mode').classList.remove('primary-active');
@@ -963,14 +971,17 @@ document.querySelectorAll('.tool').forEach(btn => {
       draft = [];
       renderDraft();
 
+      map.getCanvas().style.cursor = 'crosshair';
+      map.doubleClickZoom.disable();
+
       if (t === 'marker') $('popup-marker-settings').classList.add('open');
       if (t === 'textbox') $('popup-text-settings').classList.add('open');
 
-      if (t === 'polyline') hint('Click points · Right-click: undo · Double-click / Enter: finish');
-      if (t === 'polygon') hint('Click polygon vertices · Right-click: undo · Double-click / Enter: close');
-      if (t === 'rectangle') hint('Click 1st corner, then opposite corner');
-      if (t === 'circle') hint('Click circle center, then outer edge');
-      if (t === 'route') hint('Click route points A, B, C… Double-click last point to finish route');
+      if (t === 'polyline') hint('Click points · Right-click: undo · Double-click: finish');
+      if (t === 'polygon') hint('Click polygon vertices · Right-click: undo · Double-click: complete & edit');
+      if (t === 'rectangle') hint('Click corner 1, then click opposite corner');
+      if (t === 'circle') hint('Click center, then outer edge');
+      if (t === 'route') hint('Click points A, B, C… Double-click last point to finish');
     }
   };
 });
@@ -979,7 +990,7 @@ map.on('mousemove', e => {
   cursorLL = [e.lngLat.lng, e.lngLat.lat];
   if (activeTool) renderDraft();
 
-  // Handling feature dragging
+  // Handling feature dragging in Edit Mode
   if (isDragging && dragFeatureId) {
     const dx = cursorLL[0] - dragStartCoord[0];
     const dy = cursorLL[1] - dragStartCoord[1];
@@ -996,46 +1007,54 @@ map.on('mousemove', e => {
 });
 
 map.on('click', e => {
-  if (editMode) {
+  // Always allow clicking shapes to trigger editing (when not currently building multi-click geometries)
+  if (!activeTool || (['marker', 'textbox'].includes(activeTool) === false && draft.length === 0 && !['rectangle', 'circle'].includes(activeTool))) {
     const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
     if (fs.length && fs[0].properties.id != null) {
       openShapeEditor(parseInt(fs[0].properties.id, 10));
+      resetActiveTools();
+      return;
     }
-    return;
   }
+
   if (!activeTool) return;
   const ll = [e.lngLat.lng, e.lngLat.lat];
 
   if (activeTool === 'marker') {
-    addFeatureRecord('marker', { type: 'Point', coordinates: ll }, {
+    const feat = addFeatureRecord('marker', { type: 'Point', coordinates: ll }, {
       shape: markerShape,
       color: markerColor,
       iconKey: getIconKey(markerShape, markerColor)
     });
+    resetActiveTools();
+    closeFloatingCards();
+    openShapeEditor(feat.id);
   } else if (activeTool === 'textbox') {
-    addFeatureRecord('text', { type: 'Point', coordinates: ll }, {
+    const feat = addFeatureRecord('text', { type: 'Point', coordinates: ll }, {
       text: $('tContent').value || 'Label',
       fontSize: parseInt($('tSize').value, 10),
       color: $('tColor').value,
       opacity: parseFloat($('tOp').value)
     });
+    resetActiveTools();
+    closeFloatingCards();
+    openShapeEditor(feat.id);
   } else if (activeTool === 'polyline' || activeTool === 'polygon') {
     draft.push(ll);
   } else if (activeTool === 'rectangle') {
     draft.push(ll);
     if (draft.length === 2) {
-      addFeatureRecord('rectangle', { type: 'Polygon', coordinates: rectCoords(draft[0], draft[1]) });
-      draft = [];
-      renderDraft();
+      const feat = addFeatureRecord('rectangle', { type: 'Polygon', coordinates: rectCoords(draft[0], draft[1]) });
+      resetActiveTools();
+      openShapeEditor(feat.id);
     }
   } else if (activeTool === 'circle') {
     draft.push(ll);
     if (draft.length === 2) {
       const { coords, r } = circleCoords(draft[0], draft[1]);
-      addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { radiusMeters: r });
-      draft = [];
-      renderDraft();
-      hint('');
+      const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { radiusMeters: r });
+      resetActiveTools();
+      openShapeEditor(feat.id);
     }
   } else if (activeTool === 'route') {
     draft.push(ll);
@@ -1046,16 +1065,18 @@ map.on('click', e => {
 map.on('dblclick', () => {
   if (activeTool === 'polyline' && draft.length >= 2) {
     draft.pop();
-    addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
-    draft = []; renderDraft(); hint('');
+    const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
+    resetActiveTools();
+    openShapeEditor(feat.id);
   } else if (activeTool === 'polygon' && draft.length >= 3) {
     draft.pop();
-    addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
-    draft = []; renderDraft(); hint('');
+    const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
+    resetActiveTools(); // Unselects tool and resets toolbar
+    openShapeEditor(feat.id); // Triggers edit menu immediately
   } else if (activeTool === 'route' && draft.length >= 2) {
     draft.pop();
     fetchMultiPointRoute(draft);
-    draft = []; renderDraft();
+    resetActiveTools();
   }
 });
 
@@ -1068,9 +1089,8 @@ document.addEventListener('keydown', e => {
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if (e.key === 'Enter') map.fire('dblclick');
   if (e.key === 'Escape') {
-    draft = []; renderDraft(); closeFloatingCards();
-    document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
-    activeTool = null; hint('');
+    resetActiveTools();
+    closeFloatingCards();
   }
 });
 
@@ -1081,7 +1101,7 @@ $('btn-edit-mode').onclick = () => {
   activeTool = null;
   document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
   closeFloatingCards();
-  hint(editMode ? 'Drag any drawing to move it · Click pencil in My Layers to edit properties' : '');
+  hint(editMode ? 'Drag any shape on the map to reposition · Click any shape to edit' : '');
 };
 
 map.on('mousedown', e => {
@@ -1110,13 +1130,15 @@ function openShapeEditor(id) {
   const f = features.find(x => x.id === id);
   if (!f) return;
   selectedId = id;
+  closeFloatingCards();
+
   $('editShapeTitle').textContent = `Edit ${f.name}`;
   $('eName').value = f.name;
-  $('eColor').value = f.props.color || '#0f172a';
+  $('eColor').value = f.props.color || '#e8b84a';
   $('eWidth').value = f.props.width || 3;
   $('eOp').value = f.props.opacity != null ? f.props.opacity : 0.9;
-  $('eFillColor').value = f.props.fillColor || f.props.color || '#0f172a';
-  $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.3;
+  $('eFillColor').value = f.props.fillColor || f.props.color || '#e8b84a';
+  $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
 
   const isText = f.kind === 'text';
   $('eTextRow').style.display = isText ? 'flex' : 'none';
@@ -1166,7 +1188,7 @@ function renderMyLayers() {
   $('layer-badge-count').textContent = features.length;
 
   if (!features.length) {
-    container.innerHTML = '<div style="font-size:12px; color:#94a3b8; padding:6px 0;">No drawings yet. Use the tools to create shapes.</div>';
+    container.innerHTML = '<div style="font-size:12px; color:#768390; padding:6px 0;">No drawings yet. Use the tools to create shapes.</div>';
     return;
   }
 
@@ -1184,7 +1206,7 @@ function renderMyLayers() {
           <button class="card-btn" data-act="zoom" data-id="${f.id}" title="Zoom To">⤢</button>
           <button class="card-btn" data-act="del" data-id="${f.id}" title="Delete">✕</button>
         </div>
-        <div style="font-size:11px; color:#64748b; padding-left:4px;">${subInfo}</div>
+        <div style="font-size:11px; color:#768390; padding-left:4px;">${subInfo}</div>
       </div>
     `;
   }).join('');
@@ -1208,7 +1230,7 @@ function renderMyLayers() {
       if (act === 'del') { features = features.filter(x => x.id !== id); syncDraw(); renderMyLayers(); }
       if (act === 'zoom') {
         const bnd = calcBounds(f);
-        if (bnd) map.fitBounds(bnd, { padding: 60, maxZoom: 17 });
+        if (bnd) map.fitBounds(bnd, { padding: 80, maxZoom: 17 });
       }
     };
   });
@@ -1231,10 +1253,12 @@ function calcBounds(f) {
 
 // ----------------- UI / Rail / Accordion Controls -----------------
 $('btn-browser-toggle').onclick = () => {
-  $('browser-panel').classList.toggle('collapsed');
+  const p = $('browser-panel');
+  const willOpen = !p.classList.contains('open');
+  closeFloatingCards();
+  if (willOpen) p.classList.add('open');
 };
-$('btn-collapse-browser').onclick = () => { $('browser-panel').classList.add('collapsed'); };
-$('btn-close-browser').onclick = () => { $('browser-panel').classList.add('collapsed'); };
+$('btn-close-browser').onclick = () => { $('browser-panel').classList.remove('open'); };
 
 document.querySelectorAll('.acc-header').forEach(h => {
   h.onclick = () => {
@@ -1251,11 +1275,12 @@ document.querySelectorAll('#body-data-layers input[data-g]').forEach(cb => {
   };
 });
 
-// Search bar toggle
+// Search location toggle
 $('btn-search').onclick = () => {
   const p = $('popup-search');
-  p.classList.toggle('open');
-  if (p.classList.contains('open')) $('searchInput').focus();
+  const willOpen = !p.classList.contains('open');
+  closeFloatingCards();
+  if (willOpen) { p.classList.add('open'); $('searchInput').focus(); }
 };
 $('searchInput').addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
@@ -1275,11 +1300,16 @@ $('searchInput').addEventListener('keydown', e => {
 });
 
 // Basemap vector customizer
-$('btn-custom-map').onclick = () => { $('popup-custom-map').classList.toggle('open'); };
+$('btn-custom-map').onclick = () => {
+  const p = $('popup-custom-map');
+  const willOpen = !p.classList.contains('open');
+  closeFloatingCards();
+  if (willOpen) p.classList.add('open');
+};
 $('closeCustomMapBtn').onclick = () => { $('popup-custom-map').classList.remove('open'); };
 
 $('presetBtnList').innerHTML = Object.keys(ALL_STYLES).map(n =>
-  `<button style="border:1px solid #e2e8f0; background:#f8fafc; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer;" data-n="${n}">${n}</button>`
+  `<button style="border:1px solid #2d333b; background:#22272e; color:#adbac7; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer;" data-n="${n}">${n}</button>`
 ).join('');
 
 $('presetBtnList').querySelectorAll('button').forEach(b => {
