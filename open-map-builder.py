@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 import requests
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & ROOT CSS OVERRIDES
+# 1. PAGE CONFIGURATION & ROOT OVERRIDES
 # ------------------------------------------------------------------------
 st.set_page_config(
     page_title="Project Atlas",
@@ -300,6 +300,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0a1628; }
   #map { position: absolute; inset: 0; width: 100vw; height: 100vh; z-index: 1; }
 
+  /* Select dropdown fix: dark navy background with pure white text */
+  select, select option {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+  }
+  select option:hover, select option:checked {
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+  }
+
   /* Top Centered Unified Toolbar Island */
   #top-toolbar-bar {
     position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
@@ -377,7 +387,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   /* Trade Area Controls */
   .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
-  .trade-controls select { background: rgba(255,255,255,0.06); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
+  .trade-controls select { background: #0f172a; color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
   .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; }
   .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
   .poi-badge { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 5px 8px; border-radius: 6px; }
@@ -435,7 +445,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   #launcher-modal-scrim {
     position: fixed; inset: 0; z-index: 9999;
     display: flex; align-items: center; justify-content: center;
-    background-color: rgba(5, 10, 18, 0.85);
+    background-color: rgba(9, 16, 24, 0.97);
     opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
   #launcher-modal-scrim.visible { opacity: 1; pointer-events: auto; }
@@ -494,16 +504,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 <div id="map"></div>
 
-<!-- Unified Top Island Toolbar -->
+<!-- Unified Top Island Toolbar Organized by Optimal UX Hierarchy -->
 <div id="top-toolbar-bar">
+  <!-- 1. System / Project Navigation -->
   <button class="tb-btn" id="btn-home-dialog" title="Project Selection (Home)">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
   </button>
   
-  <div class="tb-sep"></div>
-
   <div id="project-meta-cluster">
-    <span id="project-name-display" title="Click to rename project">Untitled Project 1</span>
+    <span id="project-name-display" title="Click to rename workspace">Untitled Project 1</span>
     <div class="save-badge" id="save-status-badge">
       <span id="save-dot">●</span>
       <span id="save-text">Saved</span>
@@ -516,50 +525,60 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <div class="tb-sep"></div>
 
+  <!-- 2. Inspection & Layer Browsers -->
   <button class="tb-btn" id="btn-browser-toggle" title="Data Browser">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
   </button>
   <button class="tb-btn" id="btn-mylayers-toggle" title="My Layers">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
   </button>
-
-  <div class="tb-sep"></div>
-
   <button class="tb-btn" id="btn-search" title="Search Place">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
   </button>
-  <button class="tb-btn tool" data-tool="marker" title="Marker Pin">
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
-  </button>
-  <button class="tb-btn tool" data-tool="textbox" title="Text Label">
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
-  </button>
-  <button class="tb-btn tool" data-tool="polyline" title="Polyline">
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"></path></svg>
-  </button>
-  <button class="tb-btn tool" data-tool="polygon" title="Polygon">
+
+  <div class="tb-sep"></div>
+
+  <!-- 3. Primary Creation Geometry Tools -->
+  <button class="tb-btn tool" data-tool="polygon" title="Draw Polygon">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path></svg>
   </button>
-  <button class="tb-btn tool" data-tool="rectangle" title="Rectangle">
+  <button class="tb-btn tool" data-tool="rectangle" title="Draw Rectangle">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"></rect></svg>
   </button>
-  <button class="tb-btn tool" data-tool="circle" title="Circle">
+  <button class="tb-btn tool" data-tool="circle" title="Draw Circle (with Radius)">
     <svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="8" fill="currentColor"></circle></svg>
   </button>
-  <button class="tb-btn tool" data-tool="route" title="Route">
+  <button class="tb-btn tool" data-tool="polyline" title="Draw Polyline">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"></path></svg>
+  </button>
+  <button class="tb-btn tool" data-tool="route" title="Route A to B">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="19" r="2.5"></circle><circle cx="19" cy="5" r="2.5"></circle><path d="M7 17c4-1 3-8 8-9"></path></svg>
+  </button>
+  <button class="tb-btn tool" data-tool="marker" title="Place Marker Pin">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
+  </button>
+  <button class="tb-btn tool" data-tool="textbox" title="Add Text Label">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
   </button>
 
   <div class="tb-sep"></div>
 
+  <!-- 4. Direct Manipulation & Vertex Edit Mode -->
+  <button class="tb-btn" id="btn-edit-mode" title="Select & Drag Features">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+  </button>
+  <button class="tb-btn" id="btn-vertex-mode" title="Edit Polygon Points (Vertices)">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><circle cx="12" cy="18" r="3"></circle><line x1="6" y1="6" x2="18" y2="6"></line><line x1="6" y1="6" x2="12" y2="18"></line><line x1="18" y1="6" x2="12" y2="18"></line></svg>
+  </button>
+
+  <div class="tb-sep"></div>
+
+  <!-- 5. Styling & Layout Export -->
   <button class="tb-btn" id="btn-custom-map" title="Basemap Styling">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
   </button>
-  <button class="tb-btn" id="btn-export-dialog" title="Export Map">
+  <button class="tb-btn" id="btn-export-dialog" title="Export Map Layout">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-  </button>
-  <button class="tb-btn" id="btn-edit-mode" title="Select & Drag">
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
   </button>
 </div>
 
@@ -862,11 +881,14 @@ let features = __INITIAL_FEATURES__;
 let fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
 let customGroups = __INITIAL_CUSTOM_GROUPS__ || { "Trade Area Scan": { collapsed: false, ids: [] } };
 
-let activeTool = null, editMode = false;
+let activeTool = null, editMode = false, vertexMode = false;
 let draft = [], cursorLL = null, selectedId = null;
 let markerShape = 'pin', markerColor = '#003366', markerIconSize = 0.9;
 let currentExportRatio = 'screen';
 let isDirty = false;
+
+// Vertex dragging state
+let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null;
 
 const textSettings = {
   content: 'Custom Label',
@@ -1167,7 +1189,7 @@ async function saveProjectToSupabase(showToast = false) {
     if (res.ok) {
       isDirty = false;
       setSaveBadgeStatus('saved');
-      if (showToast) hint('Project saved to Supabase!');
+      if (showToast) hint('Project Saved!');
     } else {
       setSaveBadgeStatus('unsaved');
       if (showToast) hint('Failed to save project');
@@ -1364,6 +1386,7 @@ function addDrawStack() {
     map.getSource('draw').setData(fc(features));
   }
 
+  // Draft preview layer
   if (!map.getSource('draft')) {
     map.addSource('draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
@@ -1381,9 +1404,48 @@ function addDrawStack() {
       }
     });
   }
+
+  // Vertex Editing Handles Layer (Direct Vertex Manipulation)
+  if (!map.getSource('vertex-handles')) {
+    map.addSource('vertex-handles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+      id: 'vertex-points', type: 'circle', source: 'vertex-handles',
+      paint: {
+        'circle-color': '#38bdf8',
+        'circle-radius': 6,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 2
+      }
+    });
+  }
 }
 
-const syncDraw = () => { if (map.getSource('draw')) map.getSource('draw').setData(fc(features)); };
+const syncDraw = () => { 
+  if (map.getSource('draw')) map.getSource('draw').setData(fc(features)); 
+  syncVertexHandles();
+};
+
+function syncVertexHandles() {
+  if (!map.getSource('vertex-handles')) return;
+  if (!vertexMode) {
+    map.getSource('vertex-handles').setData({ type: 'FeatureCollection', features: [] });
+    return;
+  }
+  const handleFeats = [];
+  features.forEach(f => {
+    if (f.kind === 'polygon' && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+      const coords = f.geometry.coordinates[0];
+      for (let i = 0; i < coords.length - 1; i++) {
+        handleFeats.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: coords[i] },
+          properties: { polyId: f.id, vIdx: i }
+        });
+      }
+    }
+  });
+  map.getSource('vertex-handles').setData({ type: 'FeatureCollection', features: handleFeats });
+}
 
 function renderDraft() {
   if (!map.getSource('draft')) return;
@@ -1667,7 +1729,7 @@ $('btnFetchCityBound').onclick = () => {
 
 // ----------------- Overpass Tag Inspector Popup -----------------
 map.on('click', 'draw-marker', e => {
-  if (editMode || activeTool) return;
+  if (editMode || vertexMode || activeTool) return;
   if (!e.features.length) return;
   const fProps = e.features[0].properties;
   let tags = {};
@@ -1699,7 +1761,10 @@ document.querySelectorAll('.tool').forEach(btn => {
     } else {
       document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
       $('btn-edit-mode').classList.remove('primary-active');
+      $('btn-vertex-mode').classList.remove('primary-active');
       editMode = false;
+      vertexMode = false;
+      syncVertexHandles();
       closeFloatingCards();
 
       activeTool = t;
@@ -1726,6 +1791,7 @@ map.on('mousemove', e => {
   cursorLL = [e.lngLat.lng, e.lngLat.lat];
   if (activeTool) renderDraft();
 
+  // Move entire feature in Edit Mode
   if (isDragging && dragFeatureId) {
     const dx = cursorLL[0] - dragStartCoord[0];
     const dy = cursorLL[1] - dragStartCoord[1];
@@ -1740,15 +1806,31 @@ map.on('mousemove', e => {
     syncDraw();
     markDirty();
   }
+
+  // Drag vertex point handle in Vertex Edit Mode
+  if (isDraggingVertex && draggedPolyId != null && draggedVertexIdx >= 0) {
+    const f = features.find(x => x.id === draggedPolyId);
+    if (f && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+      const coords = f.geometry.coordinates[0];
+      coords[draggedVertexIdx] = cursorLL;
+      if (draggedVertexIdx === 0) {
+        coords[coords.length - 1] = cursorLL; // maintain polygon closure
+      }
+      syncDraw();
+      markDirty();
+    }
+  }
 });
 
 map.on('click', e => {
   if (!activeTool || (['marker', 'textbox'].includes(activeTool) === false && draft.length === 0 && !['rectangle', 'circle'].includes(activeTool))) {
-    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
-    if (fs.length && fs[0].properties.id != null) {
-      openShapeEditor(parseInt(fs[0].properties.id, 10));
-      resetActiveTools();
-      return;
+    if (!vertexMode) {
+      const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+      if (fs.length && fs[0].properties.id != null) {
+        openShapeEditor(parseInt(fs[0].properties.id, 10));
+        resetActiveTools();
+        return;
+      }
     }
   }
 
@@ -1853,26 +1935,56 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ----------------- Edit & Drag Mode Engine -----------------
+// ----------------- Select / Drag Mode -----------------
 $('btn-edit-mode').onclick = () => {
   editMode = !editMode;
+  vertexMode = false;
+  $('btn-vertex-mode').classList.remove('primary-active');
   $('btn-edit-mode').classList.toggle('primary-active', editMode);
   activeTool = null;
   document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
   closeFloatingCards();
+  syncVertexHandles();
   hint(editMode ? 'Drag shapes to reposition · Click to edit styles' : '');
 };
 
+// ----------------- Polygon Vertex / Points Editing Mode -----------------
+$('btn-vertex-mode').onclick = () => {
+  vertexMode = !vertexMode;
+  editMode = false;
+  $('btn-edit-mode').classList.remove('primary-active');
+  $('btn-vertex-mode').classList.toggle('primary-active', vertexMode);
+  activeTool = null;
+  document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
+  closeFloatingCards();
+  syncVertexHandles();
+  hint(vertexMode ? 'Click and drag any blue point handle to reshape polygon vertices' : '');
+};
+
 map.on('mousedown', e => {
-  if (!editMode) return;
-  const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
-  if (fs.length && fs[0].properties.id != null) {
-    isDragging = true;
-    dragFeatureId = parseInt(fs[0].properties.id, 10);
-    dragStartCoord = [e.lngLat.lng, e.lngLat.lat];
-    const f = features.find(x => x.id === dragFeatureId);
-    if (f) dragOriginalCoords = JSON.parse(JSON.stringify(f.geometry.coordinates));
-    map.dragPan.disable();
+  // Check if dragging a vertex point
+  if (vertexMode) {
+    const vHits = map.queryRenderedFeatures(e.point, { layers: ['vertex-points'] });
+    if (vHits.length && vHits[0].properties.polyId != null) {
+      isDraggingVertex = true;
+      draggedPolyId = parseInt(vHits[0].properties.polyId, 10);
+      draggedVertexIdx = parseInt(vHits[0].properties.vIdx, 10);
+      map.dragPan.disable();
+      return;
+    }
+  }
+
+  // Check if dragging an entire shape
+  if (editMode) {
+    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+    if (fs.length && fs[0].properties.id != null) {
+      isDragging = true;
+      dragFeatureId = parseInt(fs[0].properties.id, 10);
+      dragStartCoord = [e.lngLat.lng, e.lngLat.lat];
+      const f = features.find(x => x.id === dragFeatureId);
+      if (f) dragOriginalCoords = JSON.parse(JSON.stringify(f.geometry.coordinates));
+      map.dragPan.disable();
+    }
   }
 });
 
@@ -1880,6 +1992,13 @@ map.on('mouseup', () => {
   if (isDragging) {
     isDragging = false;
     dragFeatureId = null;
+    map.dragPan.enable();
+    markDirty();
+  }
+  if (isDraggingVertex) {
+    isDraggingVertex = false;
+    draggedPolyId = null;
+    draggedVertexIdx = -1;
     map.dragPan.enable();
     markDirty();
   }
