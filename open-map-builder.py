@@ -99,12 +99,11 @@ else:
     st.sidebar.caption(f"Active layer: **{selected_basemap}**")
 
 # ------------------------------------------------------------------------
-# 3. MAP BUILDER & COLOR TRANSFORMATION
+# 3. MAP BUILDER & ZERO-GRIDLINE CONFIGURATION
 # ------------------------------------------------------------------------
 
 CENTER_COORDS = [14.5794, 121.0359]
 
-# Integer zoom snap prevents sub-pixel rounding splits across tile borders
 m = folium.Map(
     location=CENTER_COORDS,
     zoom_start=14,
@@ -115,22 +114,27 @@ m = folium.Map(
     zoom_delta=1
 )
 
-# Seamless tile CSS: eliminates 1px sub-pixel gaps & grid lines completely
-tile_seam_fix = """
-    .leaflet-tile {
-        margin: -1px !important;
-        padding: 1px !important;
-        box-shadow: 0 0 1px 1px #0a1628 !important;
-        outline: 1px solid #0a1628 !important;
-        outline-offset: -1px !important;
+# Strips all borders, outlines, shadows, and margins to eliminate gridlines completely
+transparent_grid_css = """
+    .leaflet-tile,
+    .leaflet-tile-container,
+    .leaflet-tile-pane,
+    .leaflet-layer {
         border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
         -webkit-backface-visibility: hidden !important;
         backface-visibility: hidden !important;
+        transform: translate3d(0, 0, 0);
+    }
+    .leaflet-tile {
+        background: transparent !important;
     }
 """
 
 if selected_basemap == "Midnight Blue":
-    # Clean vector basemap without text label interference
     folium.TileLayer(
         tiles='https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}@2x.png',
         attr='&copy; OpenStreetMap contributors &copy; CARTO',
@@ -140,10 +144,6 @@ if selected_basemap == "Midnight Blue":
         detect_retina=True
     ).add_to(m)
 
-    # Linear color matrix:
-    # 1. Maps landmass (L≈0.15) to deep navy (#0a1628)
-    # 2. Maps water (L≈0.10) to dark navy-black (#040914)
-    # 3. Maps roads & highways (L≈0.45-0.80) to pure rich gold (#c99c37 - #e5b33e)
     midnight_svg_filter = f"""
     <svg xmlns="http://www.w3.org/2000/svg" style="position: absolute; width: 0; height: 0; pointer-events: none;">
         <filter id="midnight-gold-matrix" color-interpolation-filters="sRGB">
@@ -155,7 +155,7 @@ if selected_basemap == "Midnight Blue":
         </filter>
     </svg>
     <style>
-    {tile_seam_fix}
+    {transparent_grid_css}
     .leaflet-tile-pane {{
         filter: url(#midnight-gold-matrix) !important;
         -webkit-filter: url(#midnight-gold-matrix) !important;
@@ -169,15 +169,15 @@ if selected_basemap == "Midnight Blue":
 
 elif selected_basemap == "Carto DB Light":
     folium.TileLayer('CartoDB positron', name="Carto DB Light").add_to(m)
-    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #f8f9fa !important; }}</style>"))
+    m.get_root().header.add_child(folium.Element(f"<style>{transparent_grid_css} .leaflet-container {{ background: #f8f9fa !important; }}</style>"))
 
 elif selected_basemap == "Carto DB Dark":
     folium.TileLayer('CartoDB dark_matter', name="Carto DB Dark").add_to(m)
-    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>"))
+    m.get_root().header.add_child(folium.Element(f"<style>{transparent_grid_css} .leaflet-container {{ background: #000000 !important; }}</style>"))
 
 elif selected_basemap == "OSM":
     folium.TileLayer('OpenStreetMap', name="OSM").add_to(m)
-    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix}</style>"))
+    m.get_root().header.add_child(folium.Element(f"<style>{transparent_grid_css}</style>"))
 
 elif selected_basemap == "Satellite":
     folium.TileLayer(
@@ -186,7 +186,7 @@ elif selected_basemap == "Satellite":
         name='Satellite',
         max_zoom=19
     ).add_to(m)
-    m.get_root().header.add_child(folium.Element(f"<style>{tile_seam_fix} .leaflet-container {{ background: #000 !important; }}</style>"))
+    m.get_root().header.add_child(folium.Element(f"<style>{transparent_grid_css} .leaflet-container {{ background: #000000 !important; }}</style>"))
 
 # ------------------------------------------------------------------------
 # 4. RENDER FULL-SCREEN MAP
