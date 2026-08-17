@@ -15,7 +15,6 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Complete Chrome Elimination (Fixes black top border & scroll gaps) */
     [data-testid="stSidebar"], section[data-testid="stSidebar"],
     header, #MainMenu, footer, [data-testid="stHeader"] { 
         display: none !important; 
@@ -73,7 +72,16 @@ THEMES = {
         "rail": "#d9b451", "rd_express": "#ffaa00", "rd_major": "#e8b84a",
         "rd_min_hi": "#7d5f14", "rd_min_md": "#46463e", "rd_min_lo": "#2f2f2a",
         "rd_path": "#4a4333", "rd_case": "#685c37", "sec_opacity": 0.7,
-        "building_opacity": 0.25, "boundary": "#ff6b6b", "muted": "#8b949e",
+        "building_opacity": 0.25, "boundary": "#ff1e1e", "muted": "#8b949e",
+    },
+    "Monochrome": {
+        "overlay": "#ece9e2", "text": "#2d2a26", "land": "#ece9e2",
+        "landcover": "#e5e2da", "water": "#cdd7db", "waterway": "#bac6cb",
+        "parks": "#e2dfd7", "buildings": "#dedad2", "aeroway": "#dbd7cf",
+        "rail": "#524e48", "rd_express": "#1a1816", "rd_major": "#2e2a25",
+        "rd_min_hi": "#47423b", "rd_min_md": "#716b61", "rd_min_lo": "#9e978d",
+        "rd_path": "#b0a99f", "rd_case": "#1a1816", "sec_opacity": 0.85,
+        "building_opacity": 0.6, "boundary": "#ff1e1e", "muted": "#716b61",
     },
     "White Gold": {
         "overlay": "#ffffff", "text": "#a07d1c", "land": "#fafafa",
@@ -82,7 +90,7 @@ THEMES = {
         "rail": "#c99c37", "rd_express": "#f59e0b", "rd_major": "#e5a91d",
         "rd_min_hi": "#9c7a1a", "rd_min_md": "#e0be74", "rd_min_lo": "#ead9b0",
         "rd_path": "#e6dabd", "rd_case": "#b08a24", "sec_opacity": 0.6,
-        "building_opacity": 0.5, "boundary": "#dc2626", "muted": "#6b7280",
+        "building_opacity": 0.5, "boundary": "#ff1e1e", "muted": "#6b7280",
     },
 }
 
@@ -103,7 +111,7 @@ def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=
         lyr["minzoom"] = minzoom
     if casing:
         lyr["paint"]["line-color"] = p["rd_case"]
-        lyr["paint"]["line-width"] = w(*[(z, val + 2.0) for z, val in widths])
+        lyr["paint"]["line-width"] = w(*[(z, val + 1.8) for z, val in widths])
         lyr["id"] = lid + "_casing"
     return lyr
 
@@ -125,24 +133,24 @@ def vector_style(p):
             {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway", "paint": {"line-color": p["aeroway"], "line-width": w((11, 1), (20, 12))}},
             {"id": "building", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
             
-            # Boundaries (Province, City, Barangay / Sub-district)
-            {"id": "bound_prov", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [2, 4], True, False], "paint": {"line-color": p["boundary"], "line-width": 2, "line-dasharray": [4, 2]}},
-            {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 8, "paint": {"line-color": p["boundary"], "line-width": 1.5, "line-dasharray": [2, 2], "line-opacity": 0.8}},
-            {"id": "bound_brgy", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [9, 10], True, False], "minzoom": 12, "paint": {"line-color": p["boundary"], "line-width": 1, "line-dasharray": [1, 2], "line-opacity": 0.6}},
+            # Bright Red Dashed Boundaries (Off by default via layout.visibility)
+            {"id": "bound_prov", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [2, 4], True, False], "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 2.2, "line-dasharray": [4, 2]}},
+            {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 8, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.6, "line-dasharray": [2, 2], "line-opacity": 0.9}},
+            {"id": "bound_brgy", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [9, 10], True, False], "minzoom": 11, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.2, "line-dasharray": [1, 2], "line-opacity": 0.8}},
 
-            # Roads (Expressways, Main Roads, Secondary Roads)
-            road_layer(p, "case_express", ["motorway"], None, [(5, 1.5), (14, 6.0), (20, 26)], casing=True),
-            road_layer(p, "case_major", ["trunk", "primary"], None, [(6, 1.0), (14, 4.0), (20, 22)], casing=True),
-            road_layer(p, "case_minhi", ["secondary", "tertiary"], None, [(8, 0.8), (14, 3.0), (20, 16)], casing=True, opacity=sec),
-            road_layer(p, "rd_path", ["path", "pedestrian", "footway"], p["rd_path"], [(14, 0.6), (20, 6)], minzoom=14),
-            road_layer(p, "rd_min_lo", ["service", "track"], p["rd_min_lo"], [(14, 0.6), (20, 7)], minzoom=14),
-            road_layer(p, "rd_min_md", ["minor"], p["rd_min_md"], [(13, 0.8), (16, 4.0), (20, 12)], minzoom=13),
-            road_layer(p, "rd_min_hi", ["secondary", "tertiary"], p["rd_min_hi"], [(8, 0.8), (14, 3.0), (20, 16)], opacity=sec),
-            road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 4.0), (20, 22)]),
-            road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 6.0), (20, 26)]),
+            # Roads
+            road_layer(p, "case_express", ["motorway"], None, [(5, 1.5), (14, 5.0), (20, 22)], casing=True),
+            road_layer(p, "case_major", ["trunk", "primary"], None, [(6, 1.0), (14, 3.5), (20, 18)], casing=True),
+            road_layer(p, "case_minhi", ["secondary", "tertiary"], None, [(8, 0.8), (14, 2.5), (20, 14)], casing=True, opacity=sec),
+            road_layer(p, "rd_path", ["path", "pedestrian", "footway"], p["rd_path"], [(14, 0.6), (20, 5)], minzoom=14),
+            road_layer(p, "rd_min_lo", ["service", "track"], p["rd_min_lo"], [(14, 0.6), (20, 6)], minzoom=14),
+            road_layer(p, "rd_min_md", ["minor"], p["rd_min_md"], [(13, 0.8), (16, 3.5), (20, 10)], minzoom=13),
+            road_layer(p, "rd_min_hi", ["secondary", "tertiary"], p["rd_min_hi"], [(8, 0.8), (14, 2.5), (20, 14)], opacity=sec),
+            road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 3.5), (20, 18)]),
+            road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 5.0), (20, 22)]),
             road_layer(p, "rail", ["rail"], p["rail"], [(13, 0.5), (20, 2.5)], minzoom=13),
 
-            # Labels (City, Barangay/Neighbourhood, Streets)
+            # Labels
             {"id": "label_city", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["city", "town"], True, False], "minzoom": 6, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((6, 12), (14, 18)), "text-transform": "uppercase", "text-letter-spacing": 0.1}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 2}},
             {"id": "label_brgy", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["suburb", "neighbourhood", "village", "quarter", "hamlet"], True, False], "minzoom": 11, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((11, 10), (16, 14)), "text-letter-spacing": 0.05}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
             {"id": "label_street", "type": "symbol", "source": "omt", "source-layer": "transportation_name", "minzoom": 13, "layout": {"symbol-placement": "line", "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((13, 9), (18, 13))}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
@@ -160,6 +168,7 @@ def raster_style(tile_urls, bg, maxzoom=20):
     }
 
 ALL_STYLES = {
+    "Monochrome": vector_style(THEMES["Monochrome"]),
     "Midnight Blue": vector_style(THEMES["Midnight Blue"]),
     "White Gold": vector_style(THEMES["White Gold"]),
     "Carto DB Light": raster_style(["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png", "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], "#f8f9fa"),
@@ -168,7 +177,7 @@ ALL_STYLES = {
     "Satellite": raster_style(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "#000000", 19),
 }
 
-INITIAL_BASEMAP = "Midnight Blue"
+INITIAL_BASEMAP = "Monochrome"
 
 # ------------------------------------------------------------------------
 # 3. OPEN MAP BUILDER FRONTEND & COMPONENT
@@ -193,7 +202,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   }
   #map { position: absolute; inset: 0; width: 100vw; height: 100vh; }
 
-  /* Perfectly Centered Floating Vertical Toolbar */
+  /* Vertical Toolbar Rail */
   #side-rail {
     position: absolute; 
     top: 50%; 
@@ -222,7 +231,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .rail-btn.primary-active { background: #316dca; color: #ffffff; }
   .rail-sep { width: 24px; height: 1px; background: #2d333b; margin: 2px 0; }
 
-  /* Flyout Left Side Panels */
+  /* Flyout Left Panels */
   .left-panel {
     position: absolute; top: 16px; left: 74px; bottom: 16px; width: 340px; z-index: 9;
     background: #181d24f7; backdrop-filter: blur(14px); border: 1px solid #2d333b;
@@ -248,7 +257,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .acc-body.hidden { display: none; }
 
   .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
-  .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
+  .layer-row input[type=checkbox] { accent-color: #ff1e1e; cursor: pointer; }
+
+  /* Boundary Selective Mode Buttons */
+  .bound-mode-bar { display: flex; gap: 4px; background: #1c2128; padding: 3px; border-radius: 6px; border: 1px solid #2d333b; }
+  .bound-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 10px; font-weight: 600; padding: 4px 0; border-radius: 4px; cursor: pointer; }
+  .bound-mode-btn.active { background: #ff1e1e; color: #ffffff; }
 
   /* My Layers Cards */
   .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
@@ -306,7 +320,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
 <div id="map"></div>
 
-<!-- Perfectly Centered Floating Vertical Toolbar Rail -->
+<!-- Vertical Toolbar Rail -->
 <div id="side-rail">
   <button class="rail-btn" id="btn-browser-toggle" title="Data Browser / Layers">
     <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
@@ -388,15 +402,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Boundaries -->
+    <!-- Boundaries (Red Dashed, Selective / All Control) -->
     <div class="acc-item">
       <div class="acc-header" data-target="body-boundaries">
-        <span>Boundaries</span><span>▾</span>
+        <span>Boundaries (Red Dashed)</span><span>▾</span>
       </div>
       <div class="acc-body" id="body-boundaries">
-        <label class="layer-row"><span>Province</span><input type="checkbox" data-g="bound_prov" checked></label>
-        <label class="layer-row"><span>City</span><input type="checkbox" data-g="bound_city" checked></label>
-        <label class="layer-row"><span>Baranggay</span><input type="checkbox" data-g="bound_brgy" checked></label>
+        <div class="bound-mode-bar">
+          <button class="bound-mode-btn active" id="bModeOff">Off</button>
+          <button class="bound-mode-btn" id="bModeAll">All On</button>
+          <button class="bound-mode-btn" id="bModeSelective">Selective</button>
+        </div>
+        <div id="selectiveBoundaryList" style="display:flex; flex-direction:column; gap:8px; margin-top:4px;">
+          <label class="layer-row"><span>Province</span><input type="checkbox" data-g="bound_prov"></label>
+          <label class="layer-row"><span>City</span><input type="checkbox" data-g="bound_city"></label>
+          <label class="layer-row"><span>Baranggay</span><input type="checkbox" data-g="bound_brgy"></label>
+        </div>
       </div>
     </div>
 
@@ -421,6 +442,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div style="font-weight:600; font-size:11px; color:#768390;">CHOOSE MARKER ICON</div>
   <div class="icon-grid" id="markerIconGrid"></div>
   <div class="f-row"><span>Icon Color</span><input type="color" id="mColor" value="#e8b84a"></div>
+  <div class="f-row"><span>Icon Size</span><input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"></div>
 </div>
 
 <!-- Left Side Text Tool Settings Card -->
@@ -459,6 +481,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row" id="eOpRow"><span>Border Opacity</span><input type="range" id="eOp" min="0.05" max="1" step="0.05"></div>
   <div class="f-row" id="eFillColorRow"><span>Fill Color</span><input type="color" id="eFillColor"></div>
   <div class="f-row" id="eFillOpRow"><span>Fill Opacity</span><input type="range" id="eFillOp" min="0" max="1" step="0.05"></div>
+  <div class="f-row" id="eMarkerSizeRow" style="display:none;"><span>Icon Size</span><input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
   <div class="f-row" id="eTextRow" style="display:none;"><span>Text</span><input type="text" id="eTextVal" style="width:140px;"></div>
   <div class="f-row" id="eFontSizeRow" style="display:none;"><span>Font Size</span><input type="range" id="eFontSize" min="10" max="42" step="1"></div>
   <div style="display:flex; justify-content:space-between; margin-top:6px;">
@@ -477,30 +500,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div style="display:flex; flex-wrap:wrap; gap:4px;" id="presetBtnList"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BACKGROUND</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cBgColor" value="#0a1628"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cBgColor" value="#ece9e2"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">MAIN ROADS</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cMainColor" value="#e8b84a"></div>
-  <div class="f-row"><span>Thickness</span><input type="range" id="cMainWidth" min="1" max="10" step="0.5" value="4"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cMainColor" value="#2e2a25"></div>
+  <div class="f-row"><span>Thickness</span><input type="range" id="cMainWidth" min="1" max="10" step="0.5" value="3.5"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="cMainOp" min="0" max="1" step="0.1" value="1"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">SECONDARY ROADS</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cSecColor" value="#7d5f14"></div>
-  <div class="f-row"><span>Thickness</span><input type="range" id="cSecWidth" min="0.5" max="8" step="0.5" value="3"></div>
-  <div class="f-row"><span>Opacity</span><input type="range" id="cSecOp" min="0" max="1" step="0.1" value="0.7"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cSecColor" value="#47423b"></div>
+  <div class="f-row"><span>Thickness</span><input type="range" id="cSecWidth" min="0.5" max="8" step="0.5" value="2.5"></div>
+  <div class="f-row"><span>Opacity</span><input type="range" id="cSecOp" min="0" max="1" step="0.1" value="0.85"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">EXPRESS WAYS</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cExpColor" value="#ffaa00"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cExpColor" value="#1a1816"></div>
 
-  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BOUNDARIES</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cBoundColor" value="#ff6b6b"></div>
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BOUNDARIES (RED DASHED)</div>
+  <div class="f-row"><span>Color</span><input type="color" id="cBoundColor" value="#ff1e1e"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BUILDINGS</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cBldColor" value="#8e7258"></div>
-  <div class="f-row"><span>Opacity</span><input type="range" id="cBldOp" min="0" max="1" step="0.05" value="0.25"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cBldColor" value="#dedad2"></div>
+  <div class="f-row"><span>Opacity</span><input type="range" id="cBldOp" min="0" max="1" step="0.05" value="0.6"></div>
 
   <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">WATER</div>
-  <div class="f-row"><span>Color</span><input type="color" id="cWaterColor" value="#0a1424"></div>
+  <div class="f-row"><span>Color</span><input type="color" id="cWaterColor" value="#cdd7db"></div>
   <div class="f-row"><span>Opacity</span><input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"></div>
 </div>
 
@@ -539,7 +562,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <script>
 try {
 const ALL_STYLES = __ALL_STYLES__;
-let currentStyleName = "Midnight Blue";
+let currentStyleName = "Monochrome";
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -556,7 +579,7 @@ map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 let features = [], fid = 0;
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
-let markerShape = 'pin', markerColor = '#e8b84a';
+let markerShape = 'pin', markerColor = '#e8b84a', markerIconSize = 0.9;
 let exportRatio = 'screen';
 
 const textSettings = {
@@ -570,11 +593,11 @@ const textSettings = {
 // Dragging feature state
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
 
-// Granular Categorized Visibilities
+// Boundaries OFF by default
 const vis = {
   label_city: true, label_brgy: true, label_street: true,
   road_main: true, road_sec: true, road_exp: true,
-  bound_prov: true, bound_city: true, bound_brgy: true
+  bound_prov: false, bound_city: false, bound_brgy: false
 };
 
 const VIS_MAP = {
@@ -643,7 +666,6 @@ function renderIconCanvas(shape, color) {
   }
   ctx.fill(); ctx.stroke();
 
-  // Inner contrasting dot
   ctx.beginPath();
   ctx.fillStyle = '#ffffff';
   ctx.arc(32, shape === 'pin' ? 24 : 32, 5, 0, Math.PI * 2);
@@ -680,6 +702,7 @@ $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
   $('markerIconGrid').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
 });
 $('mColor').oninput = e => { markerColor = e.target.value; };
+$('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); };
 
 // ----------------- Vector Layers Pipeline -----------------
 const fc = list => ({
@@ -728,13 +751,13 @@ function addDrawStack() {
       }
     });
 
-    // Marker Pins
+    // Marker Pins (Dynamically sized via iconSize prop)
     map.addLayer({
       id: 'draw-marker', type: 'symbol', source: 'draw',
       filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
       layout: {
         'icon-image': ['get', 'iconKey'],
-        'icon-size': 0.8,
+        'icon-size': ['coalesce', ['get', 'iconSize'], 0.9],
         'icon-allow-overlap': true,
         'icon-anchor': 'bottom'
       },
@@ -763,7 +786,7 @@ function addDrawStack() {
     map.getSource('draw').setData(fc(features));
   }
 
-  // Live Construction Draft Preview Source with vertex snapping indicators
+  // Live Construction Draft Preview Source with target node halos
   if (!map.getSource('draft')) {
     map.addSource('draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
@@ -775,10 +798,10 @@ function addDrawStack() {
       id: 'draft-point', type: 'circle', source: 'draft',
       filter: ['==', ['geometry-type'], 'Point'],
       paint: { 
-        'circle-color': '#e8b84a', 
-        'circle-radius': ['case', ['get', 'isOrigin'], 7, 4], 
-        'circle-stroke-color': '#0a1628', 
-        'circle-stroke-width': 2 
+        'circle-color': ['case', ['get', 'isLastPoint'], '#316dca', '#e8b84a'],
+        'circle-radius': ['case', ['get', 'isLastPoint'], 10, ['case', ['get', 'isOrigin'], 8, 5]], 
+        'circle-stroke-color': '#ffffff', 
+        'circle-stroke-width': 2.5 
       }
     });
   }
@@ -789,10 +812,18 @@ const syncDraw = () => { if (map.getSource('draw')) map.getSource('draw').setDat
 function renderDraft() {
   if (!map.getSource('draft')) return;
   const f = [];
-  const pt = (c, isOrigin=false) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: { isOrigin } });
+  const pt = (c, isOrigin=false, isLastPoint=false) => ({ 
+    type: 'Feature', 
+    geometry: { type: 'Point', coordinates: c }, 
+    properties: { isOrigin, isLastPoint } 
+  });
   const ln = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
 
-  draft.forEach((p, i) => f.push(pt(p, i === 0 && activeTool === 'polygon')));
+  draft.forEach((p, i) => {
+    const isOrigin = i === 0 && activeTool === 'polygon';
+    const isLastPoint = i === draft.length - 1 && activeTool === 'route' && draft.length > 0;
+    f.push(pt(p, isOrigin, isLastPoint));
+  });
 
   if ((activeTool === 'polyline' || activeTool === 'route') && draft.length) {
     f.push(ln(cursorLL ? [...draft, cursorLL] : draft));
@@ -876,6 +907,7 @@ function addFeatureRecord(kind, geometry, customProps = {}) {
       fillColor: '#e8b84a',
       fillOpacity: 0.35,
       dashStyle: 'solid',
+      iconSize: markerIconSize,
       visible: 1,
       ...customProps
     }
@@ -910,11 +942,11 @@ document.querySelectorAll('.tool').forEach(btn => {
       if (t === 'marker') $('popup-marker-settings').classList.add('open');
       if (t === 'textbox') $('popup-text-settings').classList.add('open');
 
-      if (t === 'polyline') hint('Click points · Double-click / Enter: finish');
-      if (t === 'polygon') hint('Click to add vertices · Click origin or any point again to save');
+      if (t === 'polyline') hint('Click points · Click last point again to finish');
+      if (t === 'polygon') hint('Click to add vertices · Click origin or any point again to complete');
       if (t === 'rectangle') hint('Click corner 1, then click opposite corner');
       if (t === 'circle') hint('Click center, then outer edge');
-      if (t === 'route') hint('Click points A, B, C… Double-click last point to finish');
+      if (t === 'route') hint('Click points · Click the large blue endpoint to finish route');
     }
   };
 });
@@ -940,7 +972,7 @@ map.on('mousemove', e => {
 });
 
 map.on('click', e => {
-  // Always inspect/edit shapes when not drawing multi-point vertices
+  // Always inspect/edit shapes when not actively placing vertices
   if (!activeTool || (['marker', 'textbox'].includes(activeTool) === false && draft.length === 0 && !['rectangle', 'circle'].includes(activeTool))) {
     const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
     if (fs.length && fs[0].properties.id != null) {
@@ -957,6 +989,7 @@ map.on('click', e => {
     const feat = addFeatureRecord('marker', { type: 'Point', coordinates: ll }, {
       shape: markerShape,
       color: markerColor,
+      iconSize: markerIconSize,
       iconKey: getIconKey(markerShape, markerColor)
     });
     resetActiveTools();
@@ -973,15 +1006,25 @@ map.on('click', e => {
     closeFloatingCards();
     openShapeEditor(feat.id);
   } else if (activeTool === 'polyline') {
+    // Clicked last point again to finish
+    if (draft.length >= 2) {
+      const pScreen = map.project(ll);
+      const lastPtScreen = map.project(draft[draft.length - 1]);
+      if (Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 18) {
+        const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
+        resetActiveTools();
+        openShapeEditor(feat.id);
+        return;
+      }
+    }
     draft.push(ll);
   } else if (activeTool === 'polygon') {
-    // Best Practice: Click same/first point or snap threshold saves polygon
+    // Clicked same / origin point again saves polygon
     if (draft.length >= 3) {
       const pScreen = map.project(ll);
       for (const pt of draft) {
         const vScreen = map.project(pt);
-        const dist = Math.hypot(pScreen.x - vScreen.x, pScreen.y - vScreen.y);
-        if (dist < 15) { // Snapped to existing vertex or start point
+        if (Math.hypot(pScreen.x - vScreen.x, pScreen.y - vScreen.y) < 18) {
           const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
           resetActiveTools();
           openShapeEditor(feat.id);
@@ -1006,37 +1049,37 @@ map.on('click', e => {
       openShapeEditor(feat.id);
     }
   } else if (activeTool === 'route') {
+    // Clicked the prominent last point again to complete route
+    if (draft.length >= 2) {
+      const pScreen = map.project(ll);
+      const lastPtScreen = map.project(draft[draft.length - 1]);
+      if (Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 22) {
+        fetchMultiPointRoute(draft);
+        resetActiveTools();
+        return;
+      }
+    }
     draft.push(ll);
   }
   renderDraft();
 });
 
-map.on('dblclick', () => {
-  if (activeTool === 'polyline' && draft.length >= 2) {
-    draft.pop();
-    const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
-    resetActiveTools();
-    openShapeEditor(feat.id);
-  } else if (activeTool === 'polygon' && draft.length >= 3) {
-    draft.pop();
-    const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
-    resetActiveTools();
-    openShapeEditor(feat.id);
-  } else if (activeTool === 'route' && draft.length >= 2) {
-    draft.pop();
-    fetchMultiPointRoute(draft);
-    resetActiveTools();
-  }
-});
-
-map.on('contextmenu', () => {
-  if (!activeTool) return;
-  if (draft.length) { draft.pop(); renderDraft(); }
-});
-
 document.addEventListener('keydown', e => {
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-  if (e.key === 'Enter') map.fire('dblclick');
+  if (e.key === 'Enter') {
+    if (activeTool === 'polygon' && draft.length >= 3) {
+      const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
+      resetActiveTools();
+      openShapeEditor(feat.id);
+    } else if (activeTool === 'polyline' && draft.length >= 2) {
+      const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
+      resetActiveTools();
+      openShapeEditor(feat.id);
+    } else if (activeTool === 'route' && draft.length >= 2) {
+      fetchMultiPointRoute(draft);
+      resetActiveTools();
+    }
+  }
   if (e.key === 'Escape') {
     resetActiveTools();
     closeFloatingCards();
@@ -1090,6 +1133,10 @@ function openShapeEditor(id) {
   $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
   $('eDashStyle').value = f.props.dashStyle || 'solid';
 
+  const isMarker = f.kind === 'marker';
+  $('eMarkerSizeRow').style.display = isMarker ? 'flex' : 'none';
+  if (isMarker) $('eMarkerSize').value = f.props.iconSize || 0.9;
+
   const isText = f.kind === 'text';
   $('eTextRow').style.display = isText ? 'flex' : 'none';
   $('eFontSizeRow').style.display = isText ? 'flex' : 'none';
@@ -1121,10 +1168,8 @@ $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); 
 $('eOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.opacity = parseFloat(e.target.value); syncDraw(); } };
 $('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); } };
 $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); } };
-$('eDashStyle').onchange = e => {
-  const f = features.find(x => x.id === selectedId);
-  if (f) { f.props.dashStyle = e.target.value; syncDraw(); }
-};
+$('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); } };
+$('eDashStyle').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.dashStyle = e.target.value; syncDraw(); } };
 $('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); } };
 $('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); } };
 
@@ -1205,6 +1250,32 @@ function calcBounds(f) {
   if (minX === maxX && minY === maxY) return [[minX - 0.005, minY - 0.005], [maxX + 0.005, maxY + 0.005]];
   return [[minX, minY], [maxX, maxY]];
 }
+
+// ----------------- Boundary Selective / All Engine -----------------
+const setBoundMode = mode => {
+  $('bModeOff').classList.toggle('active', mode === 'off');
+  $('bModeAll').classList.toggle('active', mode === 'all');
+  $('bModeSelective').classList.toggle('active', mode === 'selective');
+
+  if (mode === 'off') {
+    ['bound_prov','bound_city','bound_brgy'].forEach(k => {
+      vis[k] = false;
+      const cb = $(`browser-panel`).querySelector(`input[data-g="${k}"]`);
+      if (cb) cb.checked = false;
+    });
+  } else if (mode === 'all') {
+    ['bound_prov','bound_city','bound_brgy'].forEach(k => {
+      vis[k] = true;
+      const cb = $(`browser-panel`).querySelector(`input[data-g="${k}"]`);
+      if (cb) cb.checked = true;
+    });
+  }
+  applyVis();
+};
+
+$('bModeOff').onclick = () => setBoundMode('off');
+$('bModeAll').onclick = () => setBoundMode('all');
+$('bModeSelective').onclick = () => setBoundMode('selective');
 
 // ----------------- Export Screenshot Engine -----------------
 $('btn-export').onclick = () => {
