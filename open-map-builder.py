@@ -3,10 +3,10 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION
+# 1. PAGE CONFIGURATION (no sidebar — all controls live in the map toolbar)
 # ------------------------------------------------------------------------
-st.set_page_config(page_title="Felt Map Studio", page_icon="🗺️",
-                   layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Open Map Builder", page_icon="🗺️",
+                   layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
     <style>
@@ -14,28 +14,13 @@ st.markdown("""
     header { visibility: hidden; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    [data-testid="stSidebar"] { background-color: #0d1117; border-right: 1px solid #21262d; }
-    [data-testid="stSidebar"] * { color: #f0f6fc; }
-    div.row-widget.stRadio > div {
-        background: #161b22; padding: 12px; border-radius: 8px; border: 1px solid #30363d;
-    }
+    [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"],
+    [data-testid="stCollapsedControl"] { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------
-# 2. SIDEBAR
-# ------------------------------------------------------------------------
-st.sidebar.markdown("### 🗺️ **Basemap Layer**")
-
-basemap_options = ["Midnight Blue", "White Gold", "Carto DB Light",
-                   "Carto DB Dark", "Satellite", "OSM"]
-selected_basemap = st.sidebar.radio("Select Layer", options=basemap_options, index=0)
-show_labels = st.sidebar.checkbox("🏷️ Show Labels", value=True)
-st.sidebar.markdown("---")
-st.sidebar.caption("Toolbar: draw shapes, **route A→B**, search, layers, live basemap swap. Edit mode = click a shape to recolor / resize / fade / delete.")
-
-# ------------------------------------------------------------------------
-# 3. THEME PALETTES & STYLE BUILDERS
+# 2. THEME PALETTES & STYLE BUILDERS
 # ------------------------------------------------------------------------
 CENTER = [121.0359, 14.5794]
 ZOOM = 14
@@ -82,7 +67,7 @@ def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=
         lyr["id"] = lid + "_casing"
     return lyr
 
-def vector_style(p, show_labels):
+def vector_style(p):
     sec = p["sec_opacity"]
     return {
         "version": 8,
@@ -124,7 +109,6 @@ def vector_style(p, show_labels):
             {"id": "label_place", "type": "symbol", "source": "omt", "source-layer": "place",
              "minzoom": 6,
              "layout": {
-                 "visibility": "visible" if show_labels else "none",
                  "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]],
                  "text-font": ["Noto Sans Regular"],
                  "text-size": ["interpolate", ["linear"], ["zoom"], 6, 10, 12, 14, 16, 18],
@@ -147,8 +131,8 @@ def raster_style(tile_urls, bg, maxzoom=20):
     }
 
 ALL_STYLES = {
-    "Midnight Blue": vector_style(THEMES["Midnight Blue"], True),
-    "White Gold": vector_style(THEMES["White Gold"], True),
+    "Midnight Blue": vector_style(THEMES["Midnight Blue"]),
+    "White Gold": vector_style(THEMES["White Gold"]),
     "Carto DB Light": raster_style(
         ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
          "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], "#f8f9fa"),
@@ -161,21 +145,8 @@ ALL_STYLES = {
         "#000000", 19),
 }
 
-if selected_basemap in THEMES:
-    p = THEMES[selected_basemap]
-    st.sidebar.markdown(
-        f"""
-        <div style="background-color: {p['overlay']}; padding: 12px; border-radius: 6px;
-                    border: 1px solid {p['muted']}33; border-left: 4px solid {p['rd_major']};">
-            <strong style="color: {p['text']};">{selected_basemap} Active</strong><br>
-            <span style="font-size: 12px; color: {p['muted']};">Vector-rendered. Zero gridlines.</span>
-        </div>
-        """, unsafe_allow_html=True)
-else:
-    st.sidebar.caption(f"Active basemap: **{selected_basemap}**")
-
 # ------------------------------------------------------------------------
-# 4. MAP RENDERER + TOOLBAR
+# 3. MAP + TOOLBAR RENDERER
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -200,15 +171,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .panelbox { position: absolute; top: 52px; left: 50%; transform: translateX(-50%);
               z-index: 3; background: #161b22f2; border: 1px solid #30363d;
               border-radius: 10px; padding: 10px; display: none; flex-direction: column;
-              gap: 6px; font: 12px sans-serif; color: #f0f6fc; min-width: 180px; }
+              gap: 6px; font: 12px sans-serif; color: #f0f6fc; min-width: 200px;
+              max-height: 70vh; overflow-y: auto; }
   .panelbox.open { display: flex; }
   .panelbox .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .panelbox input[type=range] { width: 100px; accent-color: #c99c37; }
   .panelbox button { background: #21262d; color: #f0f6fc; border: 1px solid #30363d;
                      border-radius: 6px; padding: 4px 8px; cursor: pointer; font: 11px sans-serif; }
-  #editor { left: auto; transform: none; right: 10px; }
+  #editor, #markerOpts { left: auto; transform: none; right: 10px; }
+  .ph { font: 11px sans-serif; color: #8b949e; text-transform: uppercase;
+        letter-spacing: .06em; margin-top: 4px; }
   #searchBox input { width: 100%; box-sizing: border-box; background: #0d1117;
                      color: #f0f6fc; border: 1px solid #30363d; border-radius: 6px; padding: 6px; }
+  .srow { display: flex; align-items: center; gap: 4px; }
+  .srow .sname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srow button { padding: 2px 6px !important; }
+  .shp { width: 24px; height: 24px; display: grid; place-items: center; cursor: pointer;
+         background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; }
+  .shp.active { background: #c99c37; color: #0a1628; border-color: #c99c37; }
+  .shprow { display: flex; gap: 4px; }
   #hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
           z-index: 2; background: #161b22cc; color: #d9b451; border: 1px solid #30363d;
           border-radius: 6px; padding: 4px 10px; font: 11px sans-serif; display: none; }
@@ -222,7 +203,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="attr">© OpenStreetMap contributors · OpenFreeMap · OSRM · Nominatim</div>
 
 <div id="toolbar">
-  <button id="db-toggle" title="Toggle layers"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg></button>
+  <button id="db-toggle" title="Manage layers & shapes"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg></button>
   <div class="tsep"></div>
   <button id="searchbtn" title="Search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg></button>
   <button class="tool" data-tool="marker" title="Place marker"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></button>
@@ -237,10 +218,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="clearbtn" title="Clear drawings"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg></button>
 </div>
 
-<div id="layersPanel" class="panelbox"></div>
+<div id="layersPanel" class="panelbox">
+  <div class="ph">Basemap layers</div>
+  <div id="bmGroups"></div>
+  <div class="ph">Your shapes (<span id="shapeCount">0</span>)</div>
+  <div id="shapesList"></div>
+</div>
 <div id="searchBox" class="panelbox"><input id="searchInput" placeholder="Search place… (Enter)"/></div>
 <div id="bmMenu" class="panelbox"></div>
+<div id="markerOpts" class="panelbox">
+  <div class="ph">Marker icon</div>
+  <div class="shprow" id="mkShapes"></div>
+  <div class="row"><span>Color</span><input type="color" id="mkColor" value="#c99c37"></div>
+</div>
 <div id="editor" class="panelbox">
+  <div class="ph">Edit shape</div>
+  <div class="shprow" id="eIcons" style="display:none"></div>
   <div class="row"><span>Color</span><input type="color" id="eColor"></div>
   <div class="row"><span>Width</span><input type="range" id="eWidth" min="1" max="12" step="1"></div>
   <div class="row"><span>Opacity</span><input type="range" id="eOp" min="0.05" max="1" step="0.05"></div>
@@ -262,6 +255,7 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-ri
 const DEF = { color: '#c99c37', width: 3, opacity: 0.9 };
 let features = [], fid = 0, activeTool = null, editMode = false;
 let draft = [], routeA = null, selectedId = null;
+let mkIcon = 'pin', mkColor = '#c99c37';
 const vis = { roads: true, rail: true, buildings: true, water: true, parks: true, labels: __LABELS_JS__ };
 const VIS_MAP = {
   roads: ['case_major_casing','case_minhi_casing','rd_path','rd_min_lo','rd_min_md','rd_min_hi','rd_major'],
@@ -269,12 +263,42 @@ const VIS_MAP = {
   parks: ['park','landcover'], labels: ['label_place']
 };
 const HINTS = {
-  marker: 'Click to place markers', polyline: 'Click vertices · double-click / Enter to finish',
-  polygon: 'Click vertices · double-click / Enter to close', rectangle: 'Click two corners',
+  marker: 'Click to place markers', polyline: 'Click vertices · Enter/double-click finishes · Backspace undo',
+  polygon: 'Click vertices · Enter/double-click closes · Backspace undo', rectangle: 'Click two corners',
   circle: 'Click center, then edge', route: 'Click point A, then point B'
 };
 const $ = id => document.getElementById(id);
 const hint = t => { $('hint').style.display = t ? 'block' : 'none'; $('hint').textContent = t || ''; };
+const SHAPES = ['pin','dot','square','star','triangle','diamond'];
+const SHAPE_SVG = {
+  pin: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 22s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="currentColor"/></svg>',
+  dot: '<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="7" fill="currentColor"/></svg>',
+  square: '<svg viewBox="0 0 24 24" width="13" height="13"><rect x="5" y="5" width="14" height="14" fill="currentColor"/></svg>',
+  star: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z" fill="currentColor"/></svg>',
+  triangle: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 4l9 16H3z" fill="currentColor"/></svg>',
+  diamond: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2l9 10-9 10-9-10z" fill="currentColor"/></svg>'
+};
+
+// ---------------- runtime icon factory (canvas -> sprite, no external assets) ----
+const iconCache = {};
+function makeIcon(shape, color) {
+  const key = shape + '|' + color;
+  if (iconCache[key]) { if (!map.hasImage(key)) map.addImage(key, iconCache[key]); return key; }
+  const s = 32, c = document.createElement('canvas'); c.width = s; c.height = s;
+  const x = c.getContext('2d');
+  x.translate(s/2, s/2); x.fillStyle = color; x.strokeStyle = '#0a1628'; x.lineWidth = 2;
+  x.beginPath();
+  if (shape === 'pin')          { x.moveTo(0, 14); x.bezierCurveTo(-11, 1, -9, -13, 0, -13); x.bezierCurveTo(9, -13, 11, 1, 0, 14); }
+  else if (shape === 'dot')     x.arc(0, 0, 10, 0, 7);
+  else if (shape === 'square')  x.rect(-9, -9, 18, 18);
+  else if (shape === 'star')    { for (let i = 0; i < 10; i++) { const r = i % 2 ? 5 : 11, a = Math.PI/5*i - Math.PI/2; x.lineTo(Math.cos(a)*r, Math.sin(a)*r); } }
+  else if (shape === 'triangle'){ x.moveTo(0, -11); x.lineTo(10, 9); x.lineTo(-10, 9); }
+  else                          { x.moveTo(0, -11); x.lineTo(10, 0); x.lineTo(0, 11); x.lineTo(-10, 0); }
+  x.closePath(); x.fill(); x.stroke();
+  const img = { width: s, height: s, data: x.getImageData(0, 0, s, s).data };
+  iconCache[key] = img; map.addImage(key, img);
+  return key;
+}
 
 // ---------------- draw stack ----------------
 const fc = list => ({ type: 'FeatureCollection',
@@ -282,40 +306,52 @@ const fc = list => ({ type: 'FeatureCollection',
     properties: Object.assign({ kind: f.kind }, f.props) })) });
 
 function addDrawStack() {
+  Object.keys(iconCache).forEach(k => { if (!map.hasImage(k)) map.addImage(k, iconCache[k]); });
   if (!map.getSource('draw')) {
     map.addSource('draw', { type: 'geojson', data: fc(features) });
+    const visF = ['==', ['get', 'visible'], true];
     map.addLayer({ id: 'draw-fill', type: 'fill', source: 'draw',
-      filter: ['==', ['geometry-type'], 'Polygon'],
+      filter: ['all', ['==', ['geometry-type'], 'Polygon'], visF],
       paint: { 'fill-color': ['get','color'], 'fill-opacity': ['*', ['get','opacity'], 0.25] } });
     map.addLayer({ id: 'draw-line', type: 'line', source: 'draw',
-      filter: ['==', ['geometry-type'], 'LineString'],
+      filter: ['all', ['==', ['geometry-type'], 'LineString'], visF],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': ['get','color'], 'line-width': ['get','width'], 'line-opacity': ['get','opacity'] } });
     map.addLayer({ id: 'draw-outline', type: 'line', source: 'draw',
-      filter: ['==', ['geometry-type'], 'Polygon'],
+      filter: ['all', ['==', ['geometry-type'], 'Polygon'], visF],
       paint: { 'line-color': ['get','color'], 'line-width': ['get','width'], 'line-opacity': ['get','opacity'] } });
-    map.addLayer({ id: 'draw-point', type: 'circle', source: 'draw',
-      filter: ['==', ['geometry-type'], 'Point'],
-      paint: { 'circle-color': ['get','color'], 'circle-radius': ['+', ['get','width'], 2],
-               'circle-opacity': ['get','opacity'], 'circle-stroke-color': '#0a1628', 'circle-stroke-width': 1 } });
+    map.addLayer({ id: 'draw-marker', type: 'symbol', source: 'draw',
+      filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get','kind'], 'marker'], visF],
+      layout: { 'icon-image': ['get','iconkey'], 'icon-size': ['/', ['get','width'], 5],
+                'icon-allow-overlap': true, 'icon-anchor': 'bottom' } });
   } else map.getSource('draw').setData(fc(features));
 
   if (!map.getSource('draft')) {
     map.addSource('draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'draft-fill', type: 'fill', source: 'draft',
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: { 'fill-color': '#d9b451', 'fill-opacity': 0.1 } });
     map.addLayer({ id: 'draft-line', type: 'line', source: 'draft',
       filter: ['==', ['geometry-type'], 'LineString'],
       paint: { 'line-color': '#d9b451', 'line-width': 2, 'line-dasharray': [2, 2] } });
     map.addLayer({ id: 'draft-point', type: 'circle', source: 'draft',
       filter: ['==', ['geometry-type'], 'Point'],
       paint: { 'circle-color': '#d9b451', 'circle-radius': 4, 'circle-stroke-color': '#0a1628', 'circle-stroke-width': 1 } });
-  } else renderDraft();
+  }
 }
-const syncDraw = () => { if (map.getSource('draw')) map.getSource('draw').setData(fc(features)); };
-function renderDraft() {
+function syncDraw() {
+  features.forEach(f => { if (f.kind === 'marker') f.props.iconkey = makeIcon(f.props.icon || 'pin', f.props.color); });
+  if (map.getSource('draw')) map.getSource('draw').setData(fc(features));
+  refreshShapes();
+}
+const P = c => ({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: {} });
+const L = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
+const POLY = g => ({ type: 'Feature', geometry: g, properties: {} });
+function renderDraft(extra) {
   if (!map.getSource('draft')) return;
-  const f = [];
-  draft.forEach(pt => f.push({ type: 'Feature', geometry: { type: 'Point', coordinates: pt }, properties: {} }));
-  if (draft.length >= 2) f.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: draft }, properties: {} });
+  const f = draft.map(P);
+  if (draft.length >= 2) f.push(L(draft));
+  if (extra) f.push(extra);
   map.getSource('draft').setData({ type: 'FeatureCollection', features: f });
 }
 const resetDraft = () => { draft = []; routeA = null; renderDraft(); };
@@ -327,7 +363,7 @@ function applyVis() {
 map.on('load', () => { addDrawStack(); applyVis(); });
 
 // ---------------- geometry helpers ----------------
-const addFeature = f => { f.props.id = ++fid; features.push(f); syncDraw(); };
+const addFeature = f => { f.props.id = ++fid; f.props.visible = true; features.push(f); syncDraw(); };
 function rectFrom(a, b) {
   return { kind: 'rect', props: { ...DEF }, geometry: { type: 'Polygon',
     coordinates: [[[a[0],a[1]],[a[0],b[1]],[b[0],b[1]],[b[0],a[1]],[a[0],a[1]]]] } };
@@ -346,25 +382,33 @@ function circleFrom(c, edge) {
   }
   return { kind: 'circle', props: { ...DEF }, geometry: { type: 'Polygon', coordinates: [coords] } };
 }
+function bboxOf(g) {
+  let b = [1e9, 1e9, -1e9, -1e9];
+  const scan = c => { if (typeof c[0] === 'number') { b[0]=Math.min(b[0],c[0]); b[1]=Math.min(b[1],c[1]); b[2]=Math.max(b[2],c[0]); b[3]=Math.max(b[3],c[1]); } else c.forEach(scan); };
+  scan(g.coordinates);
+  return b;
+}
+function zoomTo(f) {
+  if (f.geometry.type === 'Point') map.flyTo({ center: f.geometry.coordinates, zoom: 16 });
+  else { const b = bboxOf(f.geometry); map.fitBounds([[b[0],b[1]],[b[2],b[3]]], { padding: 80, maxZoom: 17 }); }
+}
 function fetchRoute(a, b) {
   hint('Routing A → B…');
   fetch(`https://router.project-osrm.org/route/v1/driving/${a[0]},${a[1]};${b[0]},${b[1]}?overview=full&geometries=geojson`)
     .then(r => r.json())
     .then(j => {
-      const geom = (j.routes && j.routes[0]) ? j.routes[0].geometry
-                   : { type: 'LineString', coordinates: [a, b] };
+      const geom = (j.routes && j.routes[0]) ? j.routes[0].geometry : { type: 'LineString', coordinates: [a, b] };
       addFeature({ kind: 'route', geometry: geom, props: { color: '#e8b84a', width: 4, opacity: 0.9 } });
       hint('');
     })
     .catch(() => {
-      // Workaround: OSRM unreachable -> straight-line fallback
       addFeature({ kind: 'route', geometry: { type: 'LineString', coordinates: [a, b] },
                    props: { color: '#e8b84a', width: 3, opacity: 0.8 } });
       hint('OSRM unreachable — straight line used');
     });
 }
 
-// ---------------- tools ----------------
+// ---------------- tools + live previews ----------------
 document.querySelectorAll('.tool').forEach(btn => btn.addEventListener('click', () => {
   const t = btn.dataset.tool;
   activeTool = (activeTool === t) ? null : t;
@@ -373,14 +417,34 @@ document.querySelectorAll('.tool').forEach(btn => btn.addEventListener('click', 
   document.querySelectorAll('.tool').forEach(b => b.classList.toggle('active', b.dataset.tool === activeTool));
   map.getCanvas().style.cursor = activeTool ? 'crosshair' : '';
   activeTool ? map.doubleClickZoom.disable() : map.doubleClickZoom.enable();
+  $('markerOpts').classList.toggle('open', activeTool === 'marker');
   hint(activeTool ? HINTS[activeTool] : '');
 }));
+
+// Cursor-following preview while drafting
+map.on('mousemove', e => {
+  if (editMode) {
+    const ids = ['draw-fill','draw-line','draw-outline','draw-marker'].filter(l => map.getLayer(l));
+    map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: ids }).length ? 'pointer' : '';
+    return;
+  }
+  if (!activeTool) return;
+  const ll = [e.lngLat.lng, e.lngLat.lat];
+  let extra = null;
+  if ((activeTool === 'polyline' || activeTool === 'polygon') && draft.length) extra = L([...draft, ll]);
+  else if (activeTool === 'rectangle' && draft.length === 1) extra = POLY(rectFrom(draft[0], ll).geometry);
+  else if (activeTool === 'circle' && draft.length === 1) extra = POLY(circleFrom(draft[0], ll).geometry);
+  else if (activeTool === 'route' && routeA) extra = L([routeA, ll]);
+  renderDraft(extra);
+});
 
 map.on('click', e => {
   if (editMode) { pickFeature(e); return; }
   if (!activeTool) return;
   const ll = [e.lngLat.lng, e.lngLat.lat];
-  if (activeTool === 'marker') addFeature({ kind: 'marker', geometry: { type: 'Point', coordinates: ll }, props: { ...DEF } });
+  if (activeTool === 'marker')
+    addFeature({ kind: 'marker', geometry: { type: 'Point', coordinates: ll },
+                 props: { color: mkColor, width: 5, opacity: 1, icon: mkIcon } });
   else if (activeTool === 'polyline' || activeTool === 'polygon') draft.push(ll);
   else if (activeTool === 'rectangle') { draft.push(ll); if (draft.length === 2) { addFeature(rectFrom(draft[0], draft[1])); resetDraft(); } }
   else if (activeTool === 'circle')    { draft.push(ll); if (draft.length === 2) { addFeature(circleFrom(draft[0], draft[1])); resetDraft(); } }
@@ -403,19 +467,30 @@ map.on('dblclick', () => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter') map.fire('dblclick');
-  if (e.key === 'Escape') { resetDraft(); closeEditor(); }
+  else if (e.key === 'Backspace' && draft.length) { e.preventDefault(); draft.pop(); renderDraft(); }
+  else if (e.key === 'Escape') { resetDraft(); closeEditor(); }
 });
 
-// ---------------- edit mode ----------------
+// ---------------- marker icon options ----------------
+$('mkShapes').innerHTML = SHAPES.map(s =>
+  `<button class="shp ${s === mkIcon ? 'active' : ''}" data-s="${s}" title="${s}">${SHAPE_SVG[s]}</button>`).join('');
+$('mkShapes').querySelectorAll('button').forEach(b => b.onclick = () => {
+  mkIcon = b.dataset.s;
+  $('mkShapes').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+};
+$('mkColor').oninput = e => mkColor = e.target.value;
+
+// ---------------- edit mode + editor ----------------
 $('editbtn').onclick = () => {
   editMode = !editMode; activeTool = null;
   document.querySelectorAll('.tool').forEach(b => b.classList.remove('active'));
+  $('markerOpts').classList.remove('open');
   $('editbtn').classList.toggle('active', editMode);
   map.getCanvas().style.cursor = editMode ? 'pointer' : '';
   hint(editMode ? 'Click a shape to edit · Esc to exit' : '');
 };
 function pickFeature(e) {
-  const ids = ['draw-fill','draw-line','draw-outline','draw-point'].filter(l => map.getLayer(l));
+  const ids = ['draw-fill','draw-line','draw-outline','draw-marker'].filter(l => map.getLayer(l));
   const fs = map.queryRenderedFeatures(e.point, { layers: ids });
   if (fs.length && fs[0].properties.id != null) openEditor(fs[0].properties.id);
   else closeEditor();
@@ -427,13 +502,27 @@ function openEditor(id) {
   $('eColor').value = f.props.color;
   $('eWidth').value = f.props.width;
   $('eOp').value = f.props.opacity;
+  const isMk = f.kind === 'marker';
+  $('eIcons').style.display = isMk ? 'flex' : 'none';
+  if (isMk) {
+    $('eIcons').innerHTML = SHAPES.map(s =>
+      `<button class="shp ${s === f.props.icon ? 'active' : ''}" data-s="${s}">${SHAPE_SVG[s]}</button>`).join('');
+    $('eIcons').querySelectorAll('button').forEach(b => b.onclick = () => {
+      f.props.icon = b.dataset.s; f.props.iconkey = makeIcon(f.props.icon, f.props.color);
+      $('eIcons').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+      syncDraw();
+    });
+  }
   $('editor').classList.add('open');
 }
 function closeEditor() { selectedId = null; $('editor').classList.remove('open'); }
-const editProp = (k, v) => {
+function editProp(k, v) {
   const f = features.find(x => x.props.id === selectedId);
-  if (f) { f.props[k] = v; syncDraw(); }
-};
+  if (!f) return;
+  f.props[k] = v;
+  if (k === 'color' && f.kind === 'marker') f.props.iconkey = makeIcon(f.props.icon, f.props.color);
+  syncDraw();
+}
 $('eColor').oninput = e => editProp('color', e.target.value);
 $('eWidth').oninput = e => editProp('width', parseFloat(e.target.value));
 $('eOp').oninput   = e => editProp('opacity', parseFloat(e.target.value));
@@ -441,33 +530,43 @@ $('eDelete').onclick = () => { features = features.filter(x => x.props.id !== se
 $('eClose').onclick = closeEditor;
 $('clearbtn').onclick = () => { features = []; resetDraft(); syncDraw(); closeEditor(); };
 
-// ---------------- layers panel ----------------
-$('db-toggle').onclick = () => {
-  const p = $('layersPanel');
-  if (!p.innerHTML) {
-    const names = { roads: 'Roads', rail: 'Rail', buildings: 'Buildings', water: 'Water', parks: 'Parks', labels: 'Labels' };
-    p.innerHTML = Object.keys(VIS_MAP).map(g =>
-      `<label class="row"><span>${names[g]}</span><input type="checkbox" data-g="${g}" ${vis[g] ? 'checked' : ''}></label>`).join('');
-    p.querySelectorAll('input').forEach(cb => cb.onchange = () => {
-      vis[cb.dataset.g] = cb.checked; applyVis();
-    });
-  }
-  p.classList.toggle('open');
+// ---------------- layers & shapes manager ----------------
+$('bmGroups').innerHTML = Object.keys(VIS_MAP).map(g => {
+  const names = { roads: 'Roads', rail: 'Rail', buildings: 'Buildings', water: 'Water', parks: 'Parks', labels: 'Labels' };
+  return `<label class="row"><span>${names[g]}</span><input type="checkbox" data-g="${g}" ${vis[g] ? 'checked' : ''}></label>`;
+}).join('');
+$('bmGroups').querySelectorAll('input').forEach(cb => cb.onchange = () => { vis[cb.dataset.g] = cb.checked; applyVis(); });
+
+function refreshShapes() {
+  $('shapeCount').textContent = features.length;
+  $('shapesList').innerHTML = features.length ? features.map(f => `
+    <div class="srow">
+      <button data-a="eye" data-id="${f.props.id}" title="show/hide">${f.props.visible ? '👁' : '—'}</button>
+      <span class="sname">${f.kind} #${f.props.id}</span>
+      <button data-a="zoom" data-id="${f.props.id}" title="zoom to">⌖</button>
+      <button data-a="edit" data-id="${f.props.id}" title="edit">✎</button>
+      <button data-a="del" data-id="${f.props.id}" title="delete">✕</button>
+    </div>`).join('') : '<div class="row"><span style="color:#8b949e">Nothing drawn yet</span></div>';
+}
+$('shapesList').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const f = features.find(x => x.props.id == b.dataset.id); if (!f) return;
+  if (b.dataset.a === 'eye')  { f.props.visible = !f.props.visible; syncDraw(); }
+  if (b.dataset.a === 'zoom') zoomTo(f);
+  if (b.dataset.a === 'edit') openEditor(f.props.id);
+  if (b.dataset.a === 'del')  { features = features.filter(x => x.props.id !== f.props.id); syncDraw(); }
 };
+$('db-toggle').onclick = () => { refreshShapes(); $('layersPanel').classList.toggle('open'); };
 
 // ---------------- search (Nominatim, keyless) ----------------
 $('searchbtn').onclick = () => { $('searchBox').classList.toggle('open'); $('searchInput').focus(); };
 $('searchInput').addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
-  const q = e.target.value.trim();
-  if (!q) return;
+  const q = e.target.value.trim(); if (!q) return;
   hint('Searching…');
   fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`)
     .then(r => r.json())
-    .then(j => {
-      if (j.length) { map.flyTo({ center: [parseFloat(j[0].lon), parseFloat(j[0].lat)], zoom: 15 }); hint(''); }
-      else hint('No results');
-    })
+    .then(j => { if (j.length) { map.flyTo({ center: [parseFloat(j[0].lon), parseFloat(j[0].lat)], zoom: 15 }); hint(''); } else hint('No results'); })
     .catch(() => hint('Search failed'));
 });
 
@@ -478,8 +577,7 @@ $('basemap-btn').onclick = () => {
     m.innerHTML = Object.keys(ALL_STYLES).map(n => `<button data-n="${n}">${n}</button>`).join('');
     m.querySelectorAll('button').forEach(b => b.onclick = () => {
       map.setStyle(ALL_STYLES[b.dataset.n]);
-      // setStyle wipes custom layers -> rebuild drawings + reapply visibility
-      map.once('idle', () => { addDrawStack(); applyVis(); });
+      map.once('idle', () => { addDrawStack(); applyVis(); syncDraw(); });
       m.classList.remove('open');
     });
   }
@@ -497,21 +595,14 @@ map.on('error', e => console.warn('map error:', e));
 </html>"""
 
 try:
-    init_style = (vector_style(THEMES[selected_basemap], show_labels)
-                  if selected_basemap in THEMES
-                  else ALL_STYLES[selected_basemap])
-    body_bg = THEMES[selected_basemap]["overlay"] if selected_basemap in THEMES else (
-        "#000000" if selected_basemap in ("Carto DB Dark", "Satellite") else "#f8f9fa")
-    muted = THEMES[selected_basemap]["muted"] if selected_basemap in THEMES else "#8b949e"
-
     html = (HTML_TEMPLATE
             .replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
-            .replace("__STYLE__", json.dumps(init_style))
+            .replace("__STYLE__", json.dumps(ALL_STYLES["Midnight Blue"]))
             .replace("__CENTER__", json.dumps(CENTER))
             .replace("__ZOOM__", str(ZOOM))
-            .replace("__BG__", body_bg)
-            .replace("__MUTED__", muted)
-            .replace("__LABELS_JS__", "true" if show_labels else "false"))
+            .replace("__BG__", "#0a1628")
+            .replace("__MUTED__", "#8b949e")
+            .replace("__LABELS_JS__", "true"))
     components.html(html, height=950, scrolling=False)
 except Exception as e:
     st.error(f"Map render failed: {e}")
