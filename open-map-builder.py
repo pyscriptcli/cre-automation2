@@ -3,7 +3,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION (no sidebar — all controls live in the map toolbar)
+# 1. PAGE CONFIGURATION (no sidebar)
 # ------------------------------------------------------------------------
 st.set_page_config(page_title="Felt Map Studio", page_icon="🗺️",
                    layout="wide", initial_sidebar_state="collapsed")
@@ -14,8 +14,6 @@ st.markdown("""
     header { visibility: hidden; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"],
-    [data-testid="stCollapsedControl"] { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -145,8 +143,10 @@ ALL_STYLES = {
         "#000000", 19),
 }
 
+INITIAL_BASEMAP = "Midnight Blue"
+
 # ------------------------------------------------------------------------
-# 3. MAP + TOOLBAR RENDERER
+# 3. MAP RENDERER + TOOLBAR + LAYER MANAGER + DRAWING ENGINE
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -171,25 +171,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .panelbox { position: absolute; top: 52px; left: 50%; transform: translateX(-50%);
               z-index: 3; background: #161b22f2; border: 1px solid #30363d;
               border-radius: 10px; padding: 10px; display: none; flex-direction: column;
-              gap: 6px; font: 12px sans-serif; color: #f0f6fc; min-width: 200px;
+              gap: 6px; font: 12px sans-serif; color: #f0f6fc; min-width: 190px;
               max-height: 70vh; overflow-y: auto; }
   .panelbox.open { display: flex; }
   .panelbox .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .panelbox .sec { font-size: 10px; letter-spacing: 1px; color: #8b949e; margin-top: 4px; }
   .panelbox input[type=range] { width: 100px; accent-color: #c99c37; }
   .panelbox button { background: #21262d; color: #f0f6fc; border: 1px solid #30363d;
                      border-radius: 6px; padding: 4px 8px; cursor: pointer; font: 11px sans-serif; }
-  #editor, #markerOpts { left: auto; transform: none; right: 10px; }
-  .ph { font: 11px sans-serif; color: #8b949e; text-transform: uppercase;
-        letter-spacing: .06em; margin-top: 4px; }
+  #editor, #layersPanel { left: auto; transform: none; right: 10px; }
   #searchBox input { width: 100%; box-sizing: border-box; background: #0d1117;
                      color: #f0f6fc; border: 1px solid #30363d; border-radius: 6px; padding: 6px; }
-  .srow { display: flex; align-items: center; gap: 4px; }
-  .srow .sname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .srow button { padding: 2px 6px !important; }
-  .shp { width: 24px; height: 24px; display: grid; place-items: center; cursor: pointer;
-         background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; }
-  .shp.active { background: #c99c37; color: #0a1628; border-color: #c99c37; }
-  .shprow { display: flex; gap: 4px; }
+  #iconPanel { top: 52px; }
+  #iconPanel button { width: 28px; height: 28px; display: grid; place-items: center; }
+  #iconPanel button.active { background: #c99c37; color: #0a1628; }
+  .listitem { display: flex; align-items: center; gap: 6px; }
+  .listitem .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .listitem button { padding: 2px 6px; }
   #hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
           z-index: 2; background: #161b22cc; color: #d9b451; border: 1px solid #30363d;
           border-radius: 6px; padding: 4px 10px; font: 11px sans-serif; display: none; }
@@ -203,7 +201,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="attr">© OpenStreetMap contributors · OpenFreeMap · OSRM · Nominatim</div>
 
 <div id="toolbar">
-  <button id="db-toggle" title="Manage layers & shapes"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg></button>
+  <button id="db-toggle" title="Manage layers"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg></button>
   <div class="tsep"></div>
   <button id="searchbtn" title="Search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg></button>
   <button class="tool" data-tool="marker" title="Place marker"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></button>
@@ -218,22 +216,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="clearbtn" title="Clear drawings"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg></button>
 </div>
 
-<div id="layersPanel" class="panelbox">
-  <div class="ph">Basemap layers</div>
-  <div id="bmGroups"></div>
-  <div class="ph">Your shapes (<span id="shapeCount">0</span>)</div>
-  <div id="shapesList"></div>
-</div>
+<div id="layersPanel" class="panelbox"></div>
 <div id="searchBox" class="panelbox"><input id="searchInput" placeholder="Search place… (Enter)"/></div>
 <div id="bmMenu" class="panelbox"></div>
-<div id="markerOpts" class="panelbox">
-  <div class="ph">Marker icon</div>
-  <div class="shprow" id="mkShapes"></div>
-  <div class="row"><span>Color</span><input type="color" id="mkColor" value="#c99c37"></div>
+<div id="iconPanel" class="panelbox">
+  <div class="sec">MARKER ICON</div>
+  <div class="row" id="iconRow"></div>
 </div>
 <div id="editor" class="panelbox">
-  <div class="ph">Edit shape</div>
-  <div class="shprow" id="eIcons" style="display:none"></div>
+  <div class="sec">EDIT SHAPE</div>
   <div class="row"><span>Color</span><input type="color" id="eColor"></div>
   <div class="row"><span>Width</span><input type="range" id="eWidth" min="1" max="12" step="1"></div>
   <div class="row"><span>Opacity</span><input type="range" id="eOp" min="0.05" max="1" step="0.05"></div>
@@ -243,70 +234,77 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="err"></div>
 
 <script>
-// Each block is isolated so one runtime failure can never kill the whole app.
-const $ = id => document.getElementById(id);
-const fail = msg => { const b = $('err'); b.style.display = 'block'; b.textContent = msg; };
-
-let map = null;
 try {
-  const ALL_STYLES = __ALL_STYLES__;
-  map = new maplibregl.Map({
-    container: 'map', style: __STYLE__, center: __CENTER__, zoom: __ZOOM__,
-    attributionControl: false, fadeDuration: 0
-  });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-  window.__ALL_STYLES__ = ALL_STYLES;
-} catch (e) { fail('Map init failed: ' + e.message); }
+const ALL_STYLES = __ALL_STYLES__;
+const map = new maplibregl.Map({
+  container: 'map', style: __STYLE__, center: __CENTER__, zoom: __ZOOM__,
+  attributionControl: false, fadeDuration: 0
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 
-if (map) (function () {
-try {
 // ---------------- state ----------------
 const DEF = { color: '#c99c37', width: 3, opacity: 0.9 };
 let features = [], fid = 0, activeTool = null, editMode = false;
-let draft = [], routeA = null, selectedId = null;
-let mkIcon = 'pin', mkColor = '#c99c37';
-const vis = { roads: true, rail: true, buildings: true, water: true, parks: true, labels: __LABELS_JS__ };
+let draft = [], routeA = null, selectedId = null, cursorLL = null;
+let markerShape = 'pin';
+const usedIcons = new Map();
+const vis = { main: true, secondary: true, buildings: true, water: true, labels: true };
 const VIS_MAP = {
-  roads: ['case_major_casing','case_minhi_casing','rd_path','rd_min_lo','rd_min_md','rd_min_hi','rd_major'],
-  rail: ['rail'], buildings: ['building'], water: ['water','waterway'],
-  parks: ['park','landcover'], labels: ['label_place']
+  main: ['case_major_casing', 'rd_major'],
+  secondary: ['case_minhi_casing', 'rd_min_hi', 'rd_min_md', 'rd_min_lo', 'rd_path'],
+  buildings: ['building'],
+  water: ['water', 'waterway'],
+  labels: ['label_place']
 };
 const HINTS = {
-  marker: 'Click to place markers', polyline: 'Click vertices · Enter/double-click finishes · Backspace undo',
-  polygon: 'Click vertices · Enter/double-click closes · Backspace undo', rectangle: 'Click two corners',
-  circle: 'Click center, then edge', route: 'Click point A, then point B'
+  marker: 'Click to place markers',
+  polyline: 'Click vertices · right-click undo · double-click/Enter finish',
+  polygon: 'Click vertices · right-click undo · double-click/Enter close',
+  rectangle: 'Click two corners · right-click cancels',
+  circle: 'Click center, then edge · right-click cancels',
+  route: 'Click point A, then point B'
 };
+const $ = id => document.getElementById(id);
 const hint = t => { $('hint').style.display = t ? 'block' : 'none'; $('hint').textContent = t || ''; };
-const SHAPES = ['pin','dot','square','star','triangle','diamond'];
-const SHAPE_SVG = {
-  pin: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 22s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" fill="currentColor"/></svg>',
-  dot: '<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="7" fill="currentColor"/></svg>',
-  square: '<svg viewBox="0 0 24 24" width="13" height="13"><rect x="5" y="5" width="14" height="14" fill="currentColor"/></svg>',
-  star: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z" fill="currentColor"/></svg>',
-  triangle: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 4l9 16H3z" fill="currentColor"/></svg>',
-  diamond: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2l9 10-9 10-9-10z" fill="currentColor"/></svg>'
-};
 
-// ---------------- runtime icon factory ----------------
-const iconCache = {};
-function makeIcon(shape, color) {
-  const key = shape + '|' + color;
-  if (iconCache[key]) { if (!map.hasImage(key)) map.addImage(key, iconCache[key]); return key; }
-  const s = 32, c = document.createElement('canvas'); c.width = s; c.height = s;
+// ---------------- marker icons (canvas-generated) ----------------
+function drawIcon(shape, color) {
+  const c = document.createElement('canvas'); c.width = c.height = 48;
   const x = c.getContext('2d');
-  x.translate(s/2, s/2); x.fillStyle = color; x.strokeStyle = '#0a1628'; x.lineWidth = 2;
+  x.strokeStyle = '#0a1628'; x.lineWidth = 3; x.fillStyle = color; x.lineJoin = 'round';
   x.beginPath();
-  if (shape === 'pin')          { x.moveTo(0, 14); x.bezierCurveTo(-11, 1, -9, -13, 0, -13); x.bezierCurveTo(9, -13, 11, 1, 0, 14); }
-  else if (shape === 'dot')     x.arc(0, 0, 10, 0, 7);
-  else if (shape === 'square')  x.rect(-9, -9, 18, 18);
-  else if (shape === 'star')    { for (let i = 0; i < 10; i++) { const r = i % 2 ? 5 : 11, a = Math.PI/5*i - Math.PI/2; x.lineTo(Math.cos(a)*r, Math.sin(a)*r); } }
-  else if (shape === 'triangle'){ x.moveTo(0, -11); x.lineTo(10, 9); x.lineTo(-10, 9); }
-  else                          { x.moveTo(0, -11); x.lineTo(10, 0); x.lineTo(0, 11); x.lineTo(-10, 0); }
-  x.closePath(); x.fill(); x.stroke();
-  const img = { width: s, height: s, data: x.getImageData(0, 0, s, s).data };
-  iconCache[key] = img; map.addImage(key, img);
+  if (shape === 'pin')        { x.arc(24, 18, 12, Math.PI, 0); x.lineTo(36, 20); x.lineTo(24, 44); x.lineTo(12, 20); x.closePath(); }
+  else if (shape === 'star')  { for (let i = 0; i < 10; i++) { const r = i % 2 ? 9 : 20, a = -Math.PI / 2 + i * Math.PI / 5; const px = 24 + r * Math.cos(a), py = 26 + r * Math.sin(a); i ? x.lineTo(px, py) : x.moveTo(px, py); } x.closePath(); }
+  else if (shape === 'circle'){ x.arc(24, 24, 16, 0, 7); }
+  else if (shape === 'square'){ x.rect(9, 9, 30, 30); }
+  else if (shape === 'flag')  { x.moveTo(14, 44); x.lineTo(14, 6); x.lineTo(36, 12); x.lineTo(14, 20); }
+  else if (shape === 'heart') { x.moveTo(24, 42); x.bezierCurveTo(4, 26, 10, 6, 24, 16); x.bezierCurveTo(38, 6, 44, 26, 24, 42); }
+  x.fill(); x.stroke();
+  return c;
+}
+function ensureIcon(shape, color) {
+  const key = shape + '|' + color;
+  if (!map.hasImage(key)) { try { map.addImage(key, drawIcon(shape, color)); } catch (e) {} }
+  usedIcons.set(key, { shape, color });
   return key;
 }
+const ICON_SVGS = {
+  pin: '<path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle>',
+  star: '<path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8-6.1-3.4-6.1 3.4 1.4-6.8L2.2 9.1l6.9-.8z"></path>',
+  circle: '<circle cx="12" cy="12" r="8"></circle>',
+  square: '<rect x="5" y="5" width="14" height="14"></rect>',
+  flag: '<path d="M6 21V4"></path><path d="M6 4l12 3-12 3"></path>',
+  heart: '<path d="M12 20s-7-4.6-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.4-7 10-7 10z"></path>'
+};
+$('iconRow').innerHTML = Object.keys(ICON_SVGS).map(s =>
+  `<button data-s="${s}" class="${s === markerShape ? 'active' : ''}" title="${s}">
+     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">${ICON_SVGS[s]}</svg>
+   </button>`).join('');
+$('iconRow').querySelectorAll('button').forEach(b => b.onclick = () => {
+  markerShape = b.dataset.s;
+  $('iconRow').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+});
 
 // ---------------- draw stack ----------------
 const fc = list => ({ type: 'FeatureCollection',
@@ -314,52 +312,58 @@ const fc = list => ({ type: 'FeatureCollection',
     properties: Object.assign({ kind: f.kind }, f.props) })) });
 
 function addDrawStack() {
-  Object.keys(iconCache).forEach(k => { if (!map.hasImage(k)) map.addImage(k, iconCache[k]); });
   if (!map.getSource('draw')) {
     map.addSource('draw', { type: 'geojson', data: fc(features) });
-    const visF = ['==', ['get', 'visible'], true];
     map.addLayer({ id: 'draw-fill', type: 'fill', source: 'draw',
-      filter: ['all', ['==', ['geometry-type'], 'Polygon'], visF],
-      paint: { 'fill-color': ['get','color'], 'fill-opacity': ['*', ['get','opacity'], 0.25] } });
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: { 'fill-color': ['get','color'], 'fill-opacity': ['*', ['get','opacity'], 0.25, ['get','visible']] } });
     map.addLayer({ id: 'draw-line', type: 'line', source: 'draw',
-      filter: ['all', ['==', ['geometry-type'], 'LineString'], visF],
+      filter: ['==', ['geometry-type'], 'LineString'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': ['get','color'], 'line-width': ['get','width'], 'line-opacity': ['get','opacity'] } });
+      paint: { 'line-color': ['get','color'], 'line-width': ['get','width'],
+               'line-opacity': ['*', ['get','opacity'], ['get','visible']] } });
     map.addLayer({ id: 'draw-outline', type: 'line', source: 'draw',
-      filter: ['all', ['==', ['geometry-type'], 'Polygon'], visF],
-      paint: { 'line-color': ['get','color'], 'line-width': ['get','width'], 'line-opacity': ['get','opacity'] } });
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: { 'line-color': ['get','color'], 'line-width': ['get','width'],
+               'line-opacity': ['*', ['get','opacity'], ['get','visible']] } });
     map.addLayer({ id: 'draw-marker', type: 'symbol', source: 'draw',
-      filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get','kind'], 'marker'], visF],
-      layout: { 'icon-image': ['get','iconkey'], 'icon-size': ['/', ['get','width'], 5],
-                'icon-allow-overlap': true, 'icon-anchor': 'bottom' } });
+      filter: ['==', ['geometry-type'], 'Point'],
+      layout: { 'icon-image': ['get','icon'], 'icon-size': ['/', ['get','width'], 6],
+                'icon-allow-overlap': true },
+      paint: { 'icon-opacity': ['get','visible'] } });
   } else map.getSource('draw').setData(fc(features));
 
   if (!map.getSource('draft')) {
     map.addSource('draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer({ id: 'draft-fill', type: 'fill', source: 'draft',
-      filter: ['==', ['geometry-type'], 'Polygon'],
-      paint: { 'fill-color': '#d9b451', 'fill-opacity': 0.1 } });
     map.addLayer({ id: 'draft-line', type: 'line', source: 'draft',
       filter: ['==', ['geometry-type'], 'LineString'],
       paint: { 'line-color': '#d9b451', 'line-width': 2, 'line-dasharray': [2, 2] } });
     map.addLayer({ id: 'draft-point', type: 'circle', source: 'draft',
       filter: ['==', ['geometry-type'], 'Point'],
-      paint: { 'circle-color': '#d9b451', 'circle-radius': 4, 'circle-stroke-color': '#0a1628', 'circle-stroke-width': 1 } });
-  }
+      paint: { 'circle-color': '#d9b451', 'circle-radius': 4,
+               'circle-stroke-color': '#0a1628', 'circle-stroke-width': 1 } });
+  } else renderDraft();
 }
-function syncDraw() {
-  features.forEach(f => { if (f.kind === 'marker') f.props.iconkey = makeIcon(f.props.icon || 'pin', f.props.color); });
-  if (map.getSource('draw')) map.getSource('draw').setData(fc(features));
-  refreshShapes();
-}
-const P = c => ({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: {} });
-const L = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
-const POLY = g => ({ type: 'Feature', geometry: g, properties: {} });
-function renderDraft(extra) {
+const syncDraw = () => { if (map.getSource('draw')) map.getSource('draw').setData(fc(features)); };
+
+// Live preview: dashed draft follows the cursor
+function renderDraft() {
   if (!map.getSource('draft')) return;
-  const f = draft.map(P);
-  if (draft.length >= 2) f.push(L(draft));
-  if (extra) f.push(extra);
+  const f = [];
+  const pt = c => ({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: {} });
+  const ln = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
+  draft.forEach(p => f.push(pt(p)));
+  if (activeTool === 'polyline' && draft.length)
+    f.push(ln(cursorLL ? [...draft, cursorLL] : draft));
+  if (activeTool === 'polygon' && draft.length) {
+    const pts = cursorLL ? [...draft, cursorLL] : draft;
+    if (pts.length > 1) f.push(ln([...pts, pts[0]]));
+  }
+  if (activeTool === 'rectangle' && draft.length === 1 && cursorLL)
+    f.push(ln(rectFrom(draft[0], cursorLL).geometry.coordinates[0]));
+  if (activeTool === 'circle' && draft.length === 1 && cursorLL)
+    f.push(ln(circleFrom(draft[0], cursorLL).geometry.coordinates[0]));
+  if (activeTool === 'route' && routeA && cursorLL) f.push(ln([routeA, cursorLL]));
   map.getSource('draft').setData({ type: 'FeatureCollection', features: f });
 }
 const resetDraft = () => { draft = []; routeA = null; renderDraft(); };
@@ -371,7 +375,7 @@ function applyVis() {
 map.on('load', () => { addDrawStack(); applyVis(); });
 
 // ---------------- geometry helpers ----------------
-const addFeature = f => { f.props.id = ++fid; f.props.visible = true; features.push(f); syncDraw(); };
+const addFeature = f => { f.props.id = ++fid; f.props.visible = 1; features.push(f); syncDraw(); refreshManager(); };
 function rectFrom(a, b) {
   return { kind: 'rect', props: { ...DEF }, geometry: { type: 'Polygon',
     coordinates: [[[a[0],a[1]],[a[0],b[1]],[b[0],b[1]],[b[0],a[1]],[a[0],a[1]]]] } };
@@ -390,22 +394,13 @@ function circleFrom(c, edge) {
   }
   return { kind: 'circle', props: { ...DEF }, geometry: { type: 'Polygon', coordinates: [coords] } };
 }
-function bboxOf(g) {
-  const b = [1e9, 1e9, -1e9, -1e9];
-  const scan = c => { if (typeof c[0] === 'number') { b[0]=Math.min(b[0],c[0]); b[1]=Math.min(b[1],c[1]); b[2]=Math.max(b[2],c[0]); b[3]=Math.max(b[3],c[1]); } else c.forEach(scan); };
-  scan(g.coordinates);
-  return b;
-}
-function zoomTo(f) {
-  if (f.geometry.type === 'Point') map.flyTo({ center: f.geometry.coordinates, zoom: 16 });
-  else { const b = bboxOf(f.geometry); map.fitBounds([[b[0],b[1]],[b[2],b[3]]], { padding: 80, maxZoom: 17 }); }
-}
 function fetchRoute(a, b) {
   hint('Routing A → B…');
   fetch(`https://router.project-osrm.org/route/v1/driving/${a[0]},${a[1]};${b[0]},${b[1]}?overview=full&geometries=geojson`)
     .then(r => r.json())
     .then(j => {
-      const geom = (j.routes && j.routes[0]) ? j.routes[0].geometry : { type: 'LineString', coordinates: [a, b] };
+      const geom = (j.routes && j.routes[0]) ? j.routes[0].geometry
+                   : { type: 'LineString', coordinates: [a, b] };
       addFeature({ kind: 'route', geometry: geom, props: { color: '#e8b84a', width: 4, opacity: 0.9 } });
       hint('');
     })
@@ -416,7 +411,7 @@ function fetchRoute(a, b) {
     });
 }
 
-// ---------------- tools + live previews ----------------
+// ---------------- tools ----------------
 document.querySelectorAll('.tool').forEach(btn => btn.addEventListener('click', () => {
   const t = btn.dataset.tool;
   activeTool = (activeTool === t) ? null : t;
@@ -424,34 +419,23 @@ document.querySelectorAll('.tool').forEach(btn => btn.addEventListener('click', 
   resetDraft(); closeEditor();
   document.querySelectorAll('.tool').forEach(b => b.classList.toggle('active', b.dataset.tool === activeTool));
   map.getCanvas().style.cursor = activeTool ? 'crosshair' : '';
-  if (activeTool) map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
-  $('markerOpts').classList.toggle('open', activeTool === 'marker');
+  activeTool ? map.doubleClickZoom.disable() : map.doubleClickZoom.enable();
+  $('iconPanel').classList.toggle('open', activeTool === 'marker');
   hint(activeTool ? HINTS[activeTool] : '');
 }));
 
 map.on('mousemove', e => {
-  if (editMode) {
-    const ids = ['draw-fill','draw-line','draw-outline','draw-marker'].filter(l => map.getLayer(l));
-    map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: ids }).length ? 'pointer' : '';
-    return;
-  }
-  if (!activeTool) return;
-  const ll = [e.lngLat.lng, e.lngLat.lat];
-  let extra = null;
-  if ((activeTool === 'polyline' || activeTool === 'polygon') && draft.length) extra = L([...draft, ll]);
-  else if (activeTool === 'rectangle' && draft.length === 1) extra = POLY(rectFrom(draft[0], ll).geometry);
-  else if (activeTool === 'circle' && draft.length === 1) extra = POLY(circleFrom(draft[0], ll).geometry);
-  else if (activeTool === 'route' && routeA) extra = L([routeA, ll]);
-  renderDraft(extra);
+  cursorLL = [e.lngLat.lng, e.lngLat.lat];
+  if (activeTool) renderDraft();
 });
-
 map.on('click', e => {
   if (editMode) { pickFeature(e); return; }
   if (!activeTool) return;
   const ll = [e.lngLat.lng, e.lngLat.lat];
-  if (activeTool === 'marker')
+  if (activeTool === 'marker') {
     addFeature({ kind: 'marker', geometry: { type: 'Point', coordinates: ll },
-                 props: { color: mkColor, width: 5, opacity: 1, icon: mkIcon } });
+                 props: { ...DEF, shape: markerShape, icon: ensureIcon(markerShape, DEF.color) } });
+  }
   else if (activeTool === 'polyline' || activeTool === 'polygon') draft.push(ll);
   else if (activeTool === 'rectangle') { draft.push(ll); if (draft.length === 2) { addFeature(rectFrom(draft[0], draft[1])); resetDraft(); } }
   else if (activeTool === 'circle')    { draft.push(ll); if (draft.length === 2) { addFeature(circleFrom(draft[0], draft[1])); resetDraft(); } }
@@ -472,28 +456,25 @@ map.on('dblclick', () => {
     resetDraft();
   }
 });
+// Right-click = undo last vertex while drafting
+map.on('contextmenu', () => {
+  if (!activeTool) return;
+  if (activeTool === 'route' && routeA) { routeA = null; draft = []; hint(HINTS.route); }
+  else if (draft.length) draft.pop();
+  renderDraft();
+});
 document.addEventListener('keydown', e => {
+  if (/INPUT|TEXTAREA/.test(e.target.tagName)) return;
   if (e.key === 'Enter') map.fire('dblclick');
-  else if (e.key === 'Backspace' && draft.length) { e.preventDefault(); draft.pop(); renderDraft(); }
-  else if (e.key === 'Escape') { resetDraft(); closeEditor(); }
+  if (e.key === 'Escape') { resetDraft(); closeEditor(); }
+  if (e.key === 'Backspace' && draft.length) { draft.pop(); renderDraft(); }
 });
 
-// ---------------- marker icon options ----------------
-$('mkShapes').innerHTML = SHAPES.map(s =>
-  `<button class="shp ${s === mkIcon ? 'active' : ''}" data-s="${s}" title="${s}">${SHAPE_SVG[s]}</button>`).join('');
-$('mkShapes').querySelectorAll('button').forEach(b => {
-  b.onclick = () => {
-    mkIcon = b.dataset.s;
-    $('mkShapes').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
-  };
-});
-$('mkColor').oninput = e => { mkColor = e.target.value; };
-
-// ---------------- edit mode + editor ----------------
+// ---------------- edit mode ----------------
 $('editbtn').onclick = () => {
   editMode = !editMode; activeTool = null;
   document.querySelectorAll('.tool').forEach(b => b.classList.remove('active'));
-  $('markerOpts').classList.remove('open');
+  $('iconPanel').classList.remove('open');
   $('editbtn').classList.toggle('active', editMode);
   map.getCanvas().style.cursor = editMode ? 'pointer' : '';
   hint(editMode ? 'Click a shape to edit · Esc to exit' : '');
@@ -511,76 +492,82 @@ function openEditor(id) {
   $('eColor').value = f.props.color;
   $('eWidth').value = f.props.width;
   $('eOp').value = f.props.opacity;
-  const isMk = f.kind === 'marker';
-  $('eIcons').style.display = isMk ? 'flex' : 'none';
-  if (isMk) {
-    $('eIcons').innerHTML = SHAPES.map(s =>
-      `<button class="shp ${s === f.props.icon ? 'active' : ''}" data-s="${s}">${SHAPE_SVG[s]}</button>`).join('');
-    $('eIcons').querySelectorAll('button').forEach(b => {
-      b.onclick = () => {
-        f.props.icon = b.dataset.s;
-        f.props.iconkey = makeIcon(f.props.icon, f.props.color);
-        $('eIcons').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
-        syncDraw();
-      };
-    });
-  }
   $('editor').classList.add('open');
 }
 function closeEditor() { selectedId = null; $('editor').classList.remove('open'); }
-function editProp(k, v) {
+const editProp = (k, v) => {
   const f = features.find(x => x.props.id === selectedId);
   if (!f) return;
   f.props[k] = v;
-  if (k === 'color' && f.kind === 'marker') f.props.iconkey = makeIcon(f.props.icon, f.props.color);
+  // Markers regenerate their icon in the new color
+  if (k === 'color' && f.kind === 'marker') f.props.icon = ensureIcon(f.props.shape, v);
   syncDraw();
-}
+};
 $('eColor').oninput = e => editProp('color', e.target.value);
 $('eWidth').oninput = e => editProp('width', parseFloat(e.target.value));
 $('eOp').oninput   = e => editProp('opacity', parseFloat(e.target.value));
-$('eDelete').onclick = () => { features = features.filter(x => x.props.id !== selectedId); syncDraw(); closeEditor(); };
+$('eDelete').onclick = () => { features = features.filter(x => x.props.id !== selectedId); syncDraw(); closeEditor(); refreshManager(); };
 $('eClose').onclick = closeEditor;
-$('clearbtn').onclick = () => { features = []; resetDraft(); syncDraw(); closeEditor(); };
+$('clearbtn').onclick = () => { features = []; resetDraft(); syncDraw(); closeEditor(); refreshManager(); };
 
-// ---------------- layers & shapes manager ----------------
-$('bmGroups').innerHTML = Object.keys(VIS_MAP).map(g => {
-  const names = { roads: 'Roads', rail: 'Rail', buildings: 'Buildings', water: 'Water', parks: 'Parks', labels: 'Labels' };
-  return `<label class="row"><span>${names[g]}</span><input type="checkbox" data-g="${g}" ${vis[g] ? 'checked' : ''}></label>`;
-}).join('');
-$('bmGroups').querySelectorAll('input').forEach(cb => {
-  cb.onchange = () => { vis[cb.dataset.g] = cb.checked; applyVis(); };
-});
-
-function refreshShapes() {
-  $('shapeCount').textContent = features.length;
-  $('shapesList').innerHTML = features.length ? features.map(f => `
-    <div class="srow">
-      <button data-a="eye" data-id="${f.props.id}" title="show/hide">${f.props.visible ? '👁' : '—'}</button>
-      <span class="sname">${f.kind} #${f.props.id}</span>
-      <button data-a="zoom" data-id="${f.props.id}" title="zoom to">⌖</button>
-      <button data-a="edit" data-id="${f.props.id}" title="edit">✎</button>
-      <button data-a="del" data-id="${f.props.id}" title="delete">✕</button>
-    </div>`).join('') : '<div class="row"><span style="color:#8b949e">Nothing drawn yet</span></div>';
+// ---------------- layer manager (data layers + user drawings) ----------------
+const DATA_NAMES = { main: 'Main Roads', secondary: 'Secondary Roads', buildings: 'Buildings', water: 'Water', labels: 'Labels' };
+function refreshManager() {
+  const p = $('layersPanel');
+  if (!p.classList.contains('open')) return;
+  let html = '<div class="sec">DATA LAYERS</div>';
+  for (const g in VIS_MAP) {
+    html += `<label class="row"><span>${DATA_NAMES[g]}</span><input type="checkbox" data-g="${g}" ${vis[g] ? 'checked' : ''}></label>`;
+  }
+  html += `<div class="sec">MY LAYERS (${features.length})</div>`;
+  if (!features.length) html += '<div style="color:#8b949e">Nothing drawn yet</div>';
+  features.slice().reverse().forEach(f => {
+    html += `<div class="listitem">
+      <button data-act="eye" data-id="${f.props.id}" title="Show/hide">${f.props.visible ? '👁' : '–'}</button>
+      <span class="nm">${f.kind} ${f.props.id}</span>
+      <button data-act="zoom" data-id="${f.props.id}" title="Zoom to">⤢</button>
+      <button data-act="del" data-id="${f.props.id}" title="Delete">✕</button>
+    </div>`;
+  });
+  p.innerHTML = html;
+  p.querySelectorAll('input[data-g]').forEach(cb => cb.onchange = () => { vis[cb.dataset.g] = cb.checked; applyVis(); });
+  p.querySelectorAll('button[data-act]').forEach(b => b.onclick = () => {
+    const id = parseInt(b.dataset.id, 10);
+    const f = features.find(x => x.props.id === id);
+    if (!f) return;
+    if (b.dataset.act === 'eye') { f.props.visible = f.props.visible ? 0 : 1; syncDraw(); refreshManager(); }
+    if (b.dataset.act === 'del') { features = features.filter(x => x.props.id !== id); syncDraw(); refreshManager(); }
+    if (b.dataset.act === 'zoom') { const bnd = boundsOf(f); if (bnd) map.fitBounds(bnd, { padding: 60, maxZoom: 17 }); }
+  });
 }
-$('shapesList').onclick = e => {
-  const b = e.target.closest('button'); if (!b) return;
-  const f = features.find(x => x.props.id == b.dataset.id); if (!f) return;
-  if (b.dataset.a === 'eye')  { f.props.visible = !f.props.visible; syncDraw(); }
-  if (b.dataset.a === 'zoom') zoomTo(f);
-  if (b.dataset.a === 'edit') openEditor(f.props.id);
-  if (b.dataset.a === 'del')  { features = features.filter(x => x.props.id !== f.props.id); syncDraw(); }
-};
-$('db-toggle').onclick = () => { refreshShapes(); $('layersPanel').classList.toggle('open'); };
+function boundsOf(f) {
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, ok = false;
+  const walk = c => {
+    if (typeof c[0] === 'number') { ok = true;
+      minX = Math.min(minX, c[0]); maxX = Math.max(maxX, c[0]);
+      minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]);
+    } else c.forEach(walk);
+  };
+  walk(f.geometry.coordinates);
+  if (!ok) return null;
+  if (minX === maxX && minY === maxY) { return [[minX - 0.005, minY - 0.005], [maxX + 0.005, maxY + 0.005]]; }
+  return [[minX, minY], [maxX, maxY]];
+}
+$('db-toggle').onclick = () => { const p = $('layersPanel'); p.classList.toggle('open'); refreshManager(); };
 
-// ---------------- search ----------------
+// ---------------- search (Nominatim, keyless) ----------------
 $('searchbtn').onclick = () => { $('searchBox').classList.toggle('open'); $('searchInput').focus(); };
 $('searchInput').addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
-  const q = e.target.value.trim(); if (!q) return;
+  const q = e.target.value.trim();
+  if (!q) return;
   hint('Searching…');
   fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`)
     .then(r => r.json())
-    .then(j => { if (j.length) { map.flyTo({ center: [parseFloat(j[0].lon), parseFloat(j[0].lat)], zoom: 15 }); hint(''); } else hint('No results'); })
+    .then(j => {
+      if (j.length) { map.flyTo({ center: [parseFloat(j[0].lon), parseFloat(j[0].lat)], zoom: 15 }); hint(''); }
+      else hint('No results');
+    })
     .catch(() => hint('Search failed'));
 });
 
@@ -588,34 +575,40 @@ $('searchInput').addEventListener('keydown', e => {
 $('basemap-btn').onclick = () => {
   const m = $('bmMenu');
   if (!m.innerHTML) {
-    m.innerHTML = Object.keys(window.__ALL_STYLES__).map(n => `<button data-n="${n}">${n}</button>`).join('');
-    m.querySelectorAll('button').forEach(b => {
-      b.onclick = () => {
-        map.setStyle(window.__ALL_STYLES__[b.dataset.n]);
-        map.once('idle', () => { addDrawStack(); applyVis(); syncDraw(); });
-        m.classList.remove('open');
-      };
+    m.innerHTML = Object.keys(ALL_STYLES).map(n => `<button data-n="${n}">${n}</button>`).join('');
+    m.querySelectorAll('button').forEach(b => b.onclick = () => {
+      map.setStyle(ALL_STYLES[b.dataset.n]);
+      // setStyle wipes layers + images -> rebuild everything on idle
+      map.once('idle', () => {
+        usedIcons.forEach((v, key) => { if (!map.hasImage(key)) { try { map.addImage(key, drawIcon(v.shape, v.color)); } catch (e) {} } });
+        addDrawStack(); applyVis();
+      });
+      m.classList.remove('open');
     });
   }
   m.classList.toggle('open');
 };
 
 map.on('error', e => console.warn('map error:', e));
-} catch (e) { fail('UI wiring failed: ' + e.message); }
-})();
+} catch (e) {
+  const box = document.getElementById('err');
+  box.style.display = 'block';
+  box.textContent = 'Map init failed: ' + e.message;
+}
 </script>
 </body>
 </html>"""
 
 try:
+    body_bg = THEMES[INITIAL_BASEMAP]["overlay"]
+    muted = THEMES[INITIAL_BASEMAP]["muted"]
     html = (HTML_TEMPLATE
             .replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
-            .replace("__STYLE__", json.dumps(ALL_STYLES["Midnight Blue"]))
+            .replace("__STYLE__", json.dumps(ALL_STYLES[INITIAL_BASEMAP]))
             .replace("__CENTER__", json.dumps(CENTER))
             .replace("__ZOOM__", str(ZOOM))
-            .replace("__BG__", "#0a1628")
-            .replace("__MUTED__", "#8b949e")
-            .replace("__LABELS_JS__", "true"))
+            .replace("__BG__", body_bg)
+            .replace("__MUTED__", muted))
     components.html(html, height=950, scrolling=False)
 except Exception as e:
     st.error(f"Map render failed: {e}")
