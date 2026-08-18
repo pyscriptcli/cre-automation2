@@ -528,6 +528,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 #popup-custom-map { width: 310px; }
 #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
 #popup-route-settings { width: 220px; }
+#popup-polygon3d-settings { width: 280px; }
 #popup-attribute-table { width: 600px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
 .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
@@ -687,6 +688,9 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="tb-sep"></div>
     <button class="tb-btn tool" data-tool="polygon" title="Draw Polygon">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path></svg>
+    </button>
+    <button class="tb-btn tool" data-tool="polygon3d" title="Draw 3D Polygon">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v10l-8 4-8-4V7z M12 3v14 M20 7l-8 4 M4 7l8 4"/></svg>
     </button>
     <button class="tb-btn tool" data-tool="rectangle" title="Draw Rectangle">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"></rect></svg>
@@ -889,6 +893,14 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </div>
 </div>
 
+<div id="popup-polygon3d-settings" class="float-card right-card">
+    <div style="font-weight:600; font-size:11px; color:#768390;">3D POLYGON SETTINGS</div>
+    <div class="f-row"> <span>Height (m)</span> <input type="number" id="p3dHeight" min="1" max="500" step="1" value="50" style="width:100px;"></div>
+    <div class="f-row"> <span>Color</span> <input type="color" id="p3dColor" value="#e8b84a"></div>
+    <div class="f-row"> <span>Opacity</span> <input type="range" id="p3dOpacity" min="0.1" max="1.0" step="0.1" value="0.7"></div>
+    <div class="f-row"> <span>Auto-Close</span> <input type="checkbox" id="p3dAutoClose" checked></div>
+</div>
+
 <div id="popup-shape-editor" class="float-card right-card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
         <span style="font-weight:700; color:#f0f6fc;" id="editShapeTitle">Edit Layer</span>
@@ -913,6 +925,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="f-row" id="eMarkerSizeRow" style="display:none;"> <span>Icon Size</span> <input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
     <div class="f-row" id="eTextRow" style="display:none;"> <span>Text</span> <input type="text" id="eTextVal" style="width:140px;"></div>
     <div class="f-row" id="eFontSizeRow" style="display:none;"> <span>Font Size</span> <input type="range" id="eFontSize" min="10" max="42" step="1"></div>
+    
     <!-- Route Specific Controls -->
     <div id="routeEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
         <div class="f-row"> <span>Route Mode</span>
@@ -925,6 +938,14 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <div class="f-row" style="margin-top:4px;"> <span>Stats</span> <span id="eRouteStats" style="font-size:11px; color:#adbac7;">-</span></div>
         <button id="eRecalcRoute" class="trade-btn" style="width:100%; margin-top:6px; font-size:10px;">Recalculate Route</button>
     </div>
+
+    <!-- 3D Polygon Specific Controls -->
+    <div id="p3dEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
+        <div class="f-row"> <span>Height (m)</span> <input type="number" id="eP3dHeight" min="1" max="500" step="1" style="width:100px;"></div>
+        <div class="f-row"> <span>Extrusion Color</span> <input type="color" id="eP3dColor"></div>
+        <div class="f-row"> <span>Opacity</span> <input type="range" id="eP3dOpacity" min="0.1" max="1.0" step="0.1"></div>
+    </div>
+
     <div style="display:flex; justify-content:space-between; margin-top:6px;">
         <button id="eDeleteBtn" style="color:#f85149; border:1px solid #da36334d; background:#da36331a; padding:6px 12px; border-radius:6px; cursor:pointer;">Delete</button>
         <button id="eDoneBtn" style="background:#316dca; color:#fff; border:none; padding:6px 16px; border-radius:6px; cursor:pointer;">Done</button>
@@ -1137,6 +1158,11 @@ let currentTableFeatureId = null;
 // Route State
 let currentRouteMode = 'driving';
 
+// 3D Polygon State
+let current3DPolyHeight = 50;
+let current3DPolyColor = '#e8b84a';
+let current3DPolyOpacity = 0.7;
+
 const vis = {
     label_city: true, label_brgy: true, label_street: true,
     poi_icons: true, poi_labels: true,
@@ -1206,7 +1232,7 @@ const undo = () => {
         syncDraw();
         renderMyLayers();
         isHistoryAction = true;
-        markDirty(); // This will push again, but we handle index carefully or just disable push during undo
+        markDirty(); 
         isHistoryAction = false;
         hint('Undo');
     }
@@ -1233,7 +1259,7 @@ historyStack.push(JSON.stringify({features, customGroups}));
 historyIndex = 0;
 
 const closeFloatingCards = () => {
-    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-route-settings','browser-panel','mylayers-panel','popup-attribute-table'].forEach(id => {
+    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-route-settings','popup-polygon3d-settings','browser-panel','mylayers-panel','popup-attribute-table'].forEach(id => {
         const el = $(id);
         if (el) el.classList.remove('open');
     });
@@ -1778,6 +1804,18 @@ function addDrawStack() {
             }
         });
 
+        // 3D Extrusion Layer
+        map.addLayer({
+            id: 'draw-3d-extrusion', type: 'fill-extrusion', source: 'draw',
+            filter: ['==', ['get', 'kind'], 'polygon3d'],
+            paint: {
+                'fill-extrusion-color': ['coalesce', ['get', 'extrusionColor'], '#e8b84a'],
+                'fill-extrusion-height': ['coalesce', ['get', 'height'], 50],
+                'fill-extrusion-base': 0,
+                'fill-extrusion-opacity': ['coalesce', ['get', 'fillOpacity'], 0.7]
+            }
+        });
+
         // Single-label-per-layer source
         map.addSource('label-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
@@ -1880,6 +1918,8 @@ function syncLabels() {
             if (!b) return;
             const cx = (b[0][0] + b[1][0]) / 2;
             const cy = (b[0][1] + b[1][1]) / 2;
+            
+            // For 3D polygons, adjust label position slightly up if needed, but usually center of base is fine for anchor
             if (pos === 'top') coords = [cx, b[1][1]];
             else if (pos === 'bottom') coords = [cx, b[0][1]];
             else if (pos === 'left') coords = [b[0][0], cy];
@@ -1928,7 +1968,7 @@ function syncVertexHandles() {
     const handleFeats = [];
     features.forEach(f => {
         if (f.props.visible === 0) return;
-        if (['polygon','rectangle','circle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+        if (['polygon','rectangle','circle','polygon3d'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
             const coords = f.geometry.coordinates[0];
             for (let i = 0; i < coords.length - 1; i++) {
                 handleFeats.push({
@@ -1976,14 +2016,14 @@ function renderDraft() {
     });
     const ln = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
     draft.forEach((p, i) => {
-        const isOrigin = i === 0 && activeTool === 'polygon';
+        const isOrigin = i === 0 && (activeTool === 'polygon' || activeTool === 'polygon3d');
         const isLastPoint = i === draft.length - 1 && activeTool === 'route' && draft.length > 0;
         f.push(pt(p, isOrigin, isLastPoint));
     });
     if ((activeTool === 'polyline' || activeTool === 'route') && draft.length) {
         f.push(ln(cursorLL ? [...draft, cursorLL] : draft));
     }
-    if (activeTool === 'polygon' && draft.length) {
+    if ((activeTool === 'polygon' || activeTool === 'polygon3d') && draft.length) {
         const pts = cursorLL ? [...draft, cursorLL] : draft;
         if (pts.length > 1) f.push(ln([...pts, pts[0]]));
     }
@@ -2148,8 +2188,9 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
 function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, explicitName = null) {
     const newId = ++fid;
     const isRoute = kind === 'route';
+    const is3D = kind === 'polygon3d';
     const defaultBorder = isRoute ? '#38bdf8' : '#e8b84a';
-    const assignedName = explicitName || `${kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
+    const assignedName = explicitName || `${kind === 'polygon3d' ? '3D Polygon' : kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
     const feat = {
         id: newId,
         name: assignedName,
@@ -2198,7 +2239,7 @@ function populateTradeAreaCheckboxes() {
 $('btnOpenTradeAreaPopup').onclick = () => {
     closeFloatingCards();
     $('trade-area-modal').style.display = 'flex';
-    const polyList = features.filter(f => ['polygon','rectangle','circle'].includes(f.kind));
+    const polyList = features.filter(f => ['polygon','rectangle','circle','polygon3d'].includes(f.kind));
     $('tradePolygonSelect').innerHTML = '<option value="">-- Choose --</option>' + polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
 };
 $('closeTradeAreaBtn').onclick = () => { $('trade-area-modal').style.display = 'none'; };
@@ -2446,7 +2487,7 @@ document.addEventListener('click', (e) => {
 // ----------------- Right-Click Context Menu -----------------
 map.on('contextmenu', e => {
     ctxLngLat = e.lngLat;
-    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
     ctxFeatureId = fs.length && fs[0].properties.id != null ? parseInt(fs[0].properties.id, 10) : null;
     
     const menu = $('map-context-menu');
@@ -2525,7 +2566,17 @@ function renderSearchResults(results) {
             const selected = searchResults[idx];
             searchInput.value = selected.display_name;
             searchResultsList.innerHTML = '';
-            map.flyTo({ center: [parseFloat(selected.lon), parseFloat(selected.lat)], zoom: 15 });
+            
+            // Temporary Marker & Pulse
+            const coords = [parseFloat(selected.lon), parseFloat(selected.lat)];
+            
+            // Add temporary marker logic could go here if we had a dedicated source, 
+            // but for simplicity we rely on the flyTo and pulse
+            
+            pulseFeature({geometry: {type: 'Point', coordinates: coords}});
+            
+            map.flyTo({ center: coords, zoom: 15, duration: 1500 });
+            
             hint('');
             $('popup-search').classList.remove('open');
         };
@@ -2563,6 +2614,10 @@ document.querySelectorAll('.tool').forEach(btn => {
             if (t === 'route') {
                 $('popup-route-settings').classList.add('open');
                 hint('Click points · Click the large blue endpoint to finish');
+            }
+            if (t === 'polygon3d') {
+                $('popup-polygon3d-settings').classList.add('open');
+                hint('Click vertices · Click origin to save · Set height in panel');
             }
             if (t === 'polyline') hint('Click points · Click last point again to finish');
             if (t === 'polygon') hint('Click vertices · Click origin or same point to save');
@@ -2612,7 +2667,7 @@ map.on('mousemove', e => {
     if (isDraggingVertex && draggedPolyId != null && draggedVertexIdx >= 0) {
         const f = features.find(x => x.id === draggedPolyId);
         if (f && f.geometry && f.geometry.coordinates) {
-            if (['polygon','rectangle','circle'].includes(f.kind) && f.geometry.coordinates[0]) {
+            if (['polygon','rectangle','circle','polygon3d'].includes(f.kind) && f.geometry.coordinates[0]) {
                 const coords = f.geometry.coordinates[0];
                 coords[draggedVertexIdx] = cursorLL;
                 if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
@@ -2635,7 +2690,7 @@ map.on('mousemove', e => {
 map.on('click', e => {
     if (!activeTool) {
         if (!editMode) {
-            const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+            const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
             if (fs.length && fs[0].properties.id != null) {
                 const id = parseInt(fs[0].properties.id, 10);
                 const f = features.find(x => x.id === id);
@@ -2698,14 +2753,22 @@ map.on('click', e => {
             }
         }
         draft.push(ll);
-    } else if (activeTool === 'polygon') {
+    } else if (activeTool === 'polygon' || activeTool === 'polygon3d') {
         if (draft.length >= 3) {
             const pScreen = map.project(ll);
             for (const pt of draft) {
                 const vScreen = map.project(pt);
                 if (Math.hypot(pScreen.x - vScreen.x, pScreen.y - vScreen.y) < 18) {
-                    const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
+                    const kind = activeTool;
+                    const props = {};
+                    if (kind === 'polygon3d') {
+                        props.height = parseFloat($('p3dHeight').value) || 50;
+                        props.extrusionColor = $('p3dColor').value;
+                        props.fillOpacity = parseFloat($('p3dOpacity').value);
+                    }
+                    const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
                     resetActiveTools();
+                    if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
                     openShapeEditor(feat.id);
                     return;
                 }
@@ -2745,9 +2808,17 @@ map.on('click', e => {
 document.addEventListener('keydown', e => {
     if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (e.key === 'Enter') {
-        if (activeTool === 'polygon' && draft.length >= 3) {
-            const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
+        if ((activeTool === 'polygon' || activeTool === 'polygon3d') && draft.length >= 3) {
+            const kind = activeTool;
+            const props = {};
+            if (kind === 'polygon3d') {
+                props.height = parseFloat($('p3dHeight').value) || 50;
+                props.extrusionColor = $('p3dColor').value;
+                props.fillOpacity = parseFloat($('p3dOpacity').value);
+            }
+            const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
             resetActiveTools();
+            if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
             openShapeEditor(feat.id);
         } else if (activeTool === 'polyline' && draft.length >= 2) {
             const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
@@ -2807,7 +2878,7 @@ map.on('mousedown', e => {
             map.dragPan.disable();
             return;
         }
-        const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+        const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
         if (fs.length && fs[0].properties.id != null) {
             isDragging = true;
             dragFeatureId = parseInt(fs[0].properties.id, 10);
@@ -2861,15 +2932,32 @@ function openShapeEditor(id) {
     $('eWidth').value = f.props.width || 3;
     $('eFillColor').value = f.props.fillColor || f.props.color || '#e8b84a';
     $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
+    
     const isPolygon = ['polygon', 'rectangle', 'circle'].includes(f.kind);
-    $('eFillColorRow').style.display = isPolygon ? 'flex' : 'none';
-    $('eFillOpRow').style.display = isPolygon ? 'flex' : 'none';
-    $('eLabelToggleRow').style.display = isPolygon ? 'flex' : 'none';
-    $('eLabelPosRow').style.display = isPolygon ? 'flex' : 'none';
-    if (isPolygon) {
+    const is3D = f.kind === 'polygon3d';
+    
+    $('eFillColorRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
+    $('eFillOpRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
+    $('eLabelToggleRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
+    $('eLabelPosRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
+    
+    if (isPolygon || is3D) {
         $('eShowLabel').checked = !!f.props.showLabel;
         $('eLabelPos').value = f.props.labelPos || 'center';
     }
+
+    // Hide standard fill controls for 3D, show 3D specific ones
+    if (is3D) {
+        $('eFillColorRow').style.display = 'none';
+        $('eFillOpRow').style.display = 'none';
+        $('p3dEditorControls').style.display = 'block';
+        $('eP3dHeight').value = f.props.height || 50;
+        $('eP3dColor').value = f.props.extrusionColor || '#e8b84a';
+        $('eP3dOpacity').value = f.props.fillOpacity || 0.7;
+    } else {
+        $('p3dEditorControls').style.display = 'none';
+    }
+
     const isMarker = f.kind === 'marker';
     $('eMarkerSizeRow').style.display = isMarker ? 'flex' : 'none';
     if (isMarker) $('eMarkerSize').value = f.props.iconSize || 0.9;
@@ -2914,6 +3002,32 @@ $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedI
 $('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); markDirty(); } };
 $('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); markDirty(); } };
+
+// 3D Editor Controls
+$('eP3dHeight').oninput = e => {
+    const f = features.find(x => x.id === selectedId);
+    if (f && f.kind === 'polygon3d') {
+        f.props.height = parseFloat(e.target.value);
+        syncDraw();
+        markDirty();
+    }
+};
+$('eP3dColor').oninput = e => {
+    const f = features.find(x => x.id === selectedId);
+    if (f && f.kind === 'polygon3d') {
+        f.props.extrusionColor = e.target.value;
+        syncDraw();
+        markDirty();
+    }
+};
+$('eP3dOpacity').oninput = e => {
+    const f = features.find(x => x.id === selectedId);
+    if (f && f.kind === 'polygon3d') {
+        f.props.fillOpacity = parseFloat(e.target.value);
+        syncDraw();
+        markDirty();
+    }
+};
 
 // Route Editor Controls
 $('eRouteMode').onchange = e => {
@@ -2978,6 +3092,8 @@ function renderLayerCardHtml(f) {
         subInfo = `Radius: ${f.props.radiusMeters > 1000 ? (f.props.radiusMeters/1000).toFixed(2)+' km' : Math.round(f.props.radiusMeters)+' m'}`;
     } else if (f.kind === 'route' && f.props.description) {
         subInfo = f.props.description;
+    } else if (f.kind === 'polygon3d') {
+        subInfo = `3D (${f.props.height || 50}m)`;
     }
     const isSelected = selectedLayerIds.has(f.id);
     const posOptions = ['center','top','bottom','left','right']
@@ -3022,7 +3138,7 @@ function renderLayerCardHtml(f) {
 function renderMyLayers() {
     const container = $('my-layers-list');
     $('layer-badge-count').textContent = features.length;
-    const polyList = features.filter(f => ['polygon', 'rectangle', 'circle'].includes(f.kind));
+    const polyList = features.filter(f => ['polygon', 'rectangle', 'circle', 'polygon3d'].includes(f.kind));
     $('tradePolygonSelect').innerHTML = '<option value="">-- Choose --</option>' + polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     if (!features.length && !Object.keys(customGroups).length) {
         container.innerHTML = '<div style="font-size:12px; color:#768390; padding:6px 0;">No drawings yet. Use the tools to create shapes.</div>';
@@ -3631,7 +3747,16 @@ function processGeoJSON(geojson) {
                 addFeatureRecord('polyline', geom, {});
             }
         } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-            addFeatureRecord('polygon', geom, {});
+            // Check if it's a 3D polygon
+            if (props.height || props.extrude) {
+                addFeatureRecord('polygon3d', geom, {
+                    height: props.height || 50,
+                    extrusionColor: props.extrusionColor || '#e8b84a',
+                    fillOpacity: props.fillOpacity || 0.7
+                });
+            } else {
+                addFeatureRecord('polygon', geom, {});
+            }
         }
     });
 }
