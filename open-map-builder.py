@@ -4,11 +4,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 import requests
 
-# ------------------------------------------------------------------------
+# ========================================================================
 # 1. PAGE CONFIGURATION & ROOT OVERRIDES
-# ------------------------------------------------------------------------
+# ========================================================================
 st.set_page_config(
-    page_title="Project Atlas",
+    page_title="Project Atlas | Spatial Intelligence",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -20,19 +20,31 @@ st.markdown(
         font-family: 'Century Gothic Custom';
         src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic'), sans-serif;
     }
-    * { font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif !important; }
-    [data-testid="stSidebar"], section[data-testid="stSidebar"],
-    header, #MainMenu, footer, [data-testid="stHeader"] { 
+    
+    /* Global font enforcement */
+    * { 
+        font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif !important; 
+    }
+    
+    /* Hide all default Streamlit chrome to create a pure full-screen SPA */
+    [data-testid="stSidebar"], 
+    section[data-testid="stSidebar"],
+    header, 
+    #MainMenu, 
+    footer, 
+    [data-testid="stHeader"] { 
         display: none !important; 
         height: 0 !important; 
         margin: 0 !important;
         padding: 0 !important;
     }
+    
     .stApp {
         margin: 0 !important;
         padding: 0 !important;
         background-color: #0a1628 !important;
     }
+    
     .block-container { 
         padding: 0rem !important; 
         margin: 0rem !important; 
@@ -42,6 +54,7 @@ st.markdown(
         max-height: 100vh !important;
         overflow: hidden !important; 
     }
+    
     iframe { 
         border: none !important;
         overflow: hidden !important; 
@@ -52,6 +65,7 @@ st.markdown(
         position: fixed !important;
         inset: 0 !important;
     }
+    
     html, body { 
         overflow: hidden !important; 
         margin: 0 !important; 
@@ -65,15 +79,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ------------------------------------------------------------------------
-# 2. SUPABASE REST INTEGRATION
-# ------------------------------------------------------------------------
+# ========================================================================
+# 2. SUPABASE REST INTEGRATION (BACKEND STATE MANAGEMENT)
+# ========================================================================
+# Replace with your environment variables or Streamlit secrets
 SUPABASE_URL = st.secrets.get("supabase", {}).get("url", "https://cyczyaswxkpdcremqnkn.supabase.co")
 SUPABASE_KEY = st.secrets.get("supabase", {}).get("key", "sb_publishable_pUppHGjwmT1mLlhWGZH6Og_4GcCLCPR")
 
 BASE_API_URL = SUPABASE_URL.replace("/rest/v1/", "").rstrip("/") + "/rest/v1"
 
 def get_headers():
+    """Generates the required headers for Supabase REST API authentication."""
     return {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -82,20 +98,25 @@ def get_headers():
     }
 
 def fetch_projects():
+    """Fetches all existing map workspaces from the Supabase database."""
     try:
         url = f"{BASE_API_URL}/map_projects?select=id,name,updated_at,basemap,zoom,center,features,custom_groups,layer_visibilities&order=updated_at.desc"
         res = requests.get(url, headers=get_headers(), timeout=6)
         if res.status_code == 200:
             return res.json()
         return []
-    except Exception:
+    except Exception as e:
+        print(f"Database connection error: {e}")
         return []
 
+# Initialize state list
 ALL_PROJECTS_LIST = fetch_projects()
 
-# ------------------------------------------------------------------------
-# 3. POI TAXONOMY & VECTOR BASEMAP THEMES
-# ------------------------------------------------------------------------
+# ========================================================================
+# 3. POI TAXONOMY & OVERPASS QUERY CONFIGURATIONS
+# ========================================================================
+# This dictionary maps UI categories to Overpass QL syntax. 
+# The application dynamically builds bounding box queries using these tags.
 POI_CONFIG = {
     "COMMERCIAL & OFFICES": [
         ['Corporate Office', '"building"~"office|commercial",i'], 
@@ -162,6 +183,10 @@ POI_CONFIG = {
     ]
 }
 
+# ========================================================================
+# 4. VECTOR BASEMAP THEME DEFINITIONS
+# ========================================================================
+# Centralized color palettes for Maplibre GL styling
 THEMES = {
     "Midnight Blue": {
         "overlay": "#0a1628", "text": "#d9b451", "land": "#0d1830",
@@ -196,11 +221,13 @@ THEMES = {
 }
 
 def w(*stops):
+    """Maplibre syntax helper for exponential zoom interpolation."""
     out = ["interpolate", ["exponential", 1.2], ["zoom"]]
     for z, val in stops: out += [z, val]
     return out
 
 def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=1.0):
+    """Generates a standardized line layer dictionary for roads."""
     lyr = {
         "id": lid, "type": "line", "source": "omt", "source-layer": "transportation",
         "filter": ["match", ["get", "class"], classes, True, False],
@@ -215,6 +242,7 @@ def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=
     return lyr
 
 def vector_style(p):
+    """Compiles the full Maplibre Style Specification object based on a theme palette."""
     sec = p["sec_opacity"]
     ter = p["ter_opacity"]
     return {
@@ -243,6 +271,8 @@ def vector_style(p):
             {"id": "bound_prov", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [2, 4], True, False], "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 2.2, "line-dasharray": [4, 2]}},
             {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 7, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.8, "line-dasharray": [2, 2], "line-opacity": 0.9}},
             {"id": "bound_brgy", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [9, 10], True, False], "minzoom": 11, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.2, "line-dasharray": [1, 2], "line-opacity": 0.8}},
+            
+            # Road network cascading logic
             road_layer(p, "case_express", ["motorway"], None, [(5, 1.5), (14, 5.5), (20, 24)], casing=True),
             road_layer(p, "case_major", ["trunk", "primary"], None, [(6, 1.0), (14, 3.8), (20, 18)], casing=True),
             road_layer(p, "case_secondary", ["secondary"], None, [(8, 0.8), (14, 2.8), (20, 15)], casing=True, opacity=sec),
@@ -254,7 +284,11 @@ def vector_style(p):
             road_layer(p, "rd_secondary", ["secondary"], p["rd_secondary"], [(8, 0.8), (14, 2.8), (20, 15)], opacity=sec),
             road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 3.8), (20, 18)]),
             road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 5.5), (20, 24)]),
+            
+            # Transportation lines
             {"id": "rd_rail", "type": "line", "source": "omt", "source-layer": "transportation", "filter": ["match", ["get", "class"], ["rail", "transit"], True, False], "minzoom": 10, "paint": {"line-color": p["rail"], "line-width": w((10, 1.2), (15, 2.5), (20, 4)), "line-dasharray": [3, 2]}},
+            
+            # Place Labels
             {"id": "label_city", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["city", "town"], True, False], "minzoom": 6, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((6, 12), (14, 18)), "text-transform": "uppercase", "text-letter-spacing": 0.1}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 2}},
             {"id": "label_brgy", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["suburb", "neighbourhood", "village", "quarter", "hamlet"], True, False], "minzoom": 11, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((11, 10), (16, 14)), "text-letter-spacing": 0.05}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
             {"id": "label_street", "type": "symbol", "source": "omt", "source-layer": "transportation_name", "minzoom": 13, "layout": {"symbol-placement": "line", "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((13, 9), (18, 13))}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
@@ -262,6 +296,7 @@ def vector_style(p):
     }
 
 def raster_style(tile_urls, bg, maxzoom=20):
+    """Generates a generic raster basemap specification."""
     return {
         "version": 8,
         "sources": {"r": {"type": "raster", "tiles": tile_urls, "tileSize": 256, "maxzoom": maxzoom}},
@@ -281,16 +316,19 @@ ALL_STYLES = {
     "Satellite": raster_style(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "#000000", 19),
 }
 
-# ------------------------------------------------------------------------
-# 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
-# ------------------------------------------------------------------------
+# ========================================================================
+# 5. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS JAVASCRIPT ENGINE)
+# ========================================================================
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Project Atlas Core</title>
+<!-- Maplibre Base -->
 <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
 <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet"/>
+<!-- Local Data Ingestion Dependencies -->
 <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
@@ -299,12 +337,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     font-family: 'Century Gothic Custom';
     src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic'), sans-serif;
   }
+  
   * { box-sizing: border-box; user-select: none; font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
   html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0a1628; }
+  
   #map { position: absolute; inset: 0; width: 100vw; height: 100vh; z-index: 1; }
 
-  /* Professional Custom Scrollbars */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  /* Minimalist Scrollbars */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
@@ -312,7 +352,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   select, select option { background-color: #0f172a !important; color: #f8fafc !important; }
   select option:hover, select option:checked { background-color: #2563eb !important; color: #ffffff !important; }
 
-  /* Top Centered Unified Toolbar Island */
+  /* ---------------- Top Centered Toolbar ---------------- */
   #top-toolbar-bar {
     position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
     background-color: rgba(9, 16, 24, 0.97);
@@ -320,6 +360,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     display: flex; align-items: center; gap: 4px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
     color: #f0f6fc;
   }
+  
   .tb-btn {
     width: 32px; height: 32px; display: grid; place-items: center;
     background: transparent; border: none; color: #adbac7; border-radius: 50%;
@@ -328,15 +369,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .tb-btn:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; }
   .tb-btn.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
   .tb-btn.primary-active { background: #316dca; color: #ffffff; }
+  
   .tb-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.12); margin: 0 4px; }
 
   #project-meta-cluster { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
   #project-name-display { font-weight: 700; color: #38bdf8; font-size: 12px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  
   .save-badge { font-size: 9px; padding: 2px 7px; border-radius: 12px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: #8b949e; border: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 4px; }
   .save-badge.saving { color: #d9b451; border-color: rgba(217, 180, 81, 0.4); }
   .save-badge.saved { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); }
 
-  /* Left Floating Panels */
+  /* ---------------- Floating Window Panels ---------------- */
   .left-panel {
     position: absolute; top: 68px; left: 16px; bottom: 16px; width: 360px; z-index: 9;
     background-color: rgba(9, 16, 24, 0.97);
@@ -348,11 +391,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
   .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #f0f6fc; }
+  
   .icon-action-btn { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); border-radius: 8px; cursor: pointer; color: #adbac7; transition: 0.2s; }
   .icon-action-btn:hover { background: rgba(255, 255, 255, 0.15); color: #f0f6fc; }
+  
   .panel-content { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
 
-  /* Accordions */
+  /* Data Browser Accordions */
   .acc-item { border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; transition: 0.2s; }
   .acc-item:hover { background: rgba(255,255,255,0.02); }
   .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 6px 4px; border-radius: 4px;}
@@ -366,8 +411,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 6px; cursor: pointer; }
   .dimension-mode-btn.active { background: #316dca; color: #ffffff; }
 
+  /* Boundaries Search Dropdown */
   .bound-select-row { display: flex; gap: 6px; margin-top: 4px; position: relative; }
-  .bound-select-row input[type=text] { flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.12); color: #f0f6fc; padding: 6px 8px; border-radius: 8px; font-size: 11px; }
+  .bound-select-row input[type=text] { flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.12); color: #f0f6fc; padding: 6px 8px; border-radius: 8px; font-size: 11px; outline: none;}
+  .bound-select-row input[type=text]:focus { border-color: #38bdf8; }
+  
   .autocomplete-list {
     position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
     background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
@@ -376,10 +424,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .autocomplete-item { padding: 8px 10px; cursor: pointer; font-size: 11px; color: #adbac7; border-bottom: 1px solid rgba(255,255,255,0.05); }
   .autocomplete-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
-  /* My Layers & Grouping Container */
+  /* ---------------- My Layers & Grouping Container ---------------- */
   .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
   .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
+  
+  /* Bulk Action Bar */
+  .bulk-action-bar { display: flex; align-items: center; gap: 6px; padding: 8px 4px; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 8px;}
+  .bulk-btn { font-size:10px; font-weight:600; background:rgba(255,255,255,0.05); color:#adbac7; border:1px solid rgba(255,255,255,0.1); padding:4px 8px; border-radius:6px; cursor:pointer;}
+  .bulk-btn:hover { background:rgba(255,255,255,0.1); color:#fff; }
+  
   .group-container { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; }
+  /* Highlight drop target */
+  .group-container.drag-over { border-color: #316dca; background: rgba(49, 109, 202, 0.2); }
+  
   .group-header { background: rgba(255, 255, 255, 0.05); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
   .group-title-input { background: transparent; border: none; font-weight: 700; color: #f0f6fc; font-size: 12px; width: 140px; }
   .group-title-input:focus { background: rgba(0, 0, 0, 0.5); outline: none; border-radius: 4px; padding: 2px 4px; }
@@ -389,7 +446,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .layer-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; cursor: grab; }
   .layer-card:active { cursor: grabbing; }
   
-  /* Fix layout issue for long boundary names based on user feedback */
   .layer-card-top { display: flex; align-items: center; gap: 4px; overflow: hidden; }
   .layer-name-input { flex: 1; min-width: 50px; border: 1px solid transparent; background: transparent; font-weight: 600; font-size: 12px; color: #f0f6fc; padding: 2px 4px; border-radius: 4px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
   .layer-name-input:focus { border-color: #316dca; background: rgba(0,0,0,0.4); outline: none; }
@@ -397,15 +453,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: 0.15s; flex-shrink: 0; }
   .card-btn:hover { color: #f0f6fc; background: rgba(255,255,255,0.1); }
 
-  /* Trade Area Controls */
-  .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
-  .trade-controls select { background: #0f172a; color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
-  .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; transition:0.2s;}
-  .trade-btn:hover { background: #2563eb; }
-  .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-  .poi-badge { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 5px 8px; border-radius: 6px; }
-
-  /* Floating Tool Options Popups */
+  /* ---------------- Floating Context Modals (Right Side) ---------------- */
   .float-card {
     position: absolute; top: 68px; z-index: 12;
     background-color: rgba(9, 16, 24, 0.97);
@@ -420,7 +468,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
   
-  /* Modern Square Color Box */
+  /* Modern Square Color Box Form Overrides */
   .float-card input[type=color] { 
     -webkit-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.15); 
@@ -434,23 +482,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .float-card input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
   .float-card input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
   
-  .float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
+  .float-card input[type=text], .float-card select { 
+      background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); 
+      border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; 
+  }
   .float-card input[type=text]:focus { border-color: #38bdf8; }
 
   #popup-search { width: 280px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
-  #popup-marker-settings { width: 250px; }
+  #popup-marker-settings { width: 270px; }
   #popup-text-settings { width: 260px; }
   #popup-shape-editor { width: 320px; }
   #popup-custom-map { width: 310px; }
+  #popup-export { width: 340px; }
 
-  /* Trade area centered popup */
+  /* Trade area popup centered */
   #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
+  .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; transition:0.2s;}
+  .trade-btn:hover { background: #2563eb; }
+  .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .poi-badge { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 5px 8px; border-radius: 6px; }
 
   .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
   .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
 
-  /* Tag Inspector Table */
+  /* MapLibre Info Popup Overrides */
   .maplibregl-popup-content {
     background: rgba(9, 16, 24, 0.97) !important; color: #f0f6fc !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important;
@@ -458,11 +515,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     font-size: 11px !important; max-width: 280px !important;
   }
   .maplibregl-popup-tip { border-top-color: rgba(9, 16, 24, 0.97) !important; }
+  
   .tag-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
   .tag-table th, .tag-table td { text-align: left; padding: 4px 6px; border: 1px solid rgba(255,255,255,0.08); font-size: 10px; }
-  .tag-table th { background: rgba(255,255,255,0.06); color: #38bdf8; }
-  .tag-table td { word-break: break-all; }
+  .tag-table th { background: rgba(255,255,255,0.06); color: #38bdf8; white-space: nowrap; }
+  .tag-table td { word-break: break-word; }
 
+  /* Alert Toast Notifications */
   #hint-toast {
     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 15;
     background-color: rgba(9, 16, 24, 0.97); color: #f0f6fc;
@@ -470,7 +529,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none; font-weight:600;
   }
 
-  /* Solid Glass Minimalist Launcher Overlay */
+  /* ---------------- Solid Glass Minimalist Workspace Launcher ---------------- */
   #launcher-modal-scrim {
     position: fixed; inset: 0; z-index: 9999;
     display: flex; align-items: center; justify-content: center;
@@ -521,6 +580,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .ios26-proj-item:hover {
     background: rgba(255, 255, 255, 0.1); border-color: rgba(56, 189, 248, 0.3);
   }
+  
   .ios26-action-btn {
     background: #316dca; color: #ffffff; border: none; border-radius: 14px;
     padding: 11px; font-weight: 700; font-size: 13px; cursor: pointer;
@@ -534,7 +594,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   }
   .file-input-label:hover { background: #255bb0; }
 
-  /* Search place UI Google Maps style */
+  /* ---------------- Google Maps-like Search Overlay ---------------- */
   .search-wrapper {
     display: flex; align-items: center; gap: 6px;
     background: #fff; border-radius: 24px; padding: 4px 12px;
@@ -556,16 +616,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .search-result-item:hover { background: #f1f3f4; }
   .search-result-icon { width: 20px; height: 20px; flex-shrink: 0; color: #5f6368; }
   
-  /* Frame customization for markers */
-  #frameSettingsRow { display: flex; flex-direction: column; gap: 6px; }
-  #frameSettingsRow select, #frameSettingsRow input { font-size: 11px; }
-  
 </style>
 </head>
 <body>
 
+<!-- MAIN MAP CONTAINER -->
 <div id="map"></div>
 
+<!-- TOP UNIFIED TOOLBAR -->
 <div id="top-toolbar-bar">
   <button class="tb-btn" id="btn-home-dialog" title="Select Workspace">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -635,7 +693,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </button>
 </div>
 
-<!-- Left floating panels -->
+<!-- ========================================================================
+     DATA BROWSER PANEL (LEFT)
+======================================================================== -->
 <div id="browser-panel" class="left-panel">
   <div class="panel-header">
     <div class="panel-title">
@@ -648,6 +708,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <div class="panel-content">
+    
+    <!-- Importer tool logic injected directly here per UI request -->
     <div style="margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
         <button id="btn-import" class="trade-btn" style="width:100%; display:flex; justify-content:center; align-items:center; gap:6px;">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
@@ -656,11 +718,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip" style="display:none;" />
     </div>
 
+    <!-- 2D / 3D Extrusion Switcher -->
     <div class="dimension-mode-bar">
       <button class="dimension-mode-btn active" id="btn2DMode">2D MAP</button>
       <button class="dimension-mode-btn" id="btn3DMode">3D BUILDINGS</button>
     </div>
 
+    <!-- Direct entry to Trade Area Analysis Tool -->
     <div class="acc-item" id="btnOpenTradeAreaPopup" style="cursor:pointer;">
       <div class="acc-header" style="justify-content:flex-start; gap:8px; color:#38bdf8;">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
@@ -732,6 +796,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 
+<!-- ========================================================================
+     MY LAYERS PANEL (LEFT)
+======================================================================== -->
 <div id="mylayers-panel" class="left-panel">
   <div class="panel-header">
     <div class="panel-title">
@@ -744,26 +811,33 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <div class="panel-content">
+    
+    <!-- Multi-select Bulk Actions Bar -->
+    <div class="bulk-action-bar">
+      <label style="display:flex; align-items:center; gap:4px; font-size:10px; color:#f0f6fc; cursor:pointer;">
+        <input type="checkbox" id="chkSelectAllLayers" style="accent-color:#316dca;" /> All
+      </label>
+      <div style="width:1px; height:12px; background:rgba(255,255,255,0.2); margin:0 4px;"></div>
+      <button class="bulk-btn" id="btnGroupSelected" title="Group Selected">Group</button>
+      <button class="bulk-btn" id="btnBulkVis" title="Toggle Visibility">Vis</button>
+      <button class="bulk-btn" id="btnBulkDelete" title="Delete Selected" style="color:#ff7b72; border-color:rgba(255,123,114,0.3);">Del</button>
+    </div>
+
     <div class="layers-heading">
       <span>Layer Groups</span>
       <div style="display:flex; align-items:center; gap:6px;">
         <button id="btnAddCustomGroup" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">+ GROUP</button>
-        <button id="btnGroupSelected" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">GROUP SELECTED</button>
         <span class="badge-count" id="layer-badge-count">0</span>
       </div>
     </div>
-
-    <!-- New: Select All / Hide / Delete controls -->
-    <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
-      <label style="font-size:11px; display:flex; align-items:center; gap:3px;"><input type="checkbox" id="selectAllLayersCheckbox" /> Select All</label>
-      <button id="btnHideSelected" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">HIDE</button>
-      <button id="btnDeleteSelected" style="background:#22272e; border:1px solid #2d333b; color:#ff7b72; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">DELETE</button>
-    </div>
-
+    
     <div id="my-layers-list"></div>
   </div>
 </div>
 
+<!-- ========================================================================
+     FLOATING CONTEXT MENUS (RIGHT)
+======================================================================== -->
 <div id="popup-search" class="float-card">
   <div class="search-wrapper">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
@@ -775,29 +849,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="popup-marker-settings" class="float-card right-card">
   <div style="font-weight:600; font-size:11px; color:#768390;">CHOOSE MARKER ICON</div>
   <div class="icon-grid" id="markerIconGrid"></div>
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-    <span style="font-size:11px;">Custom Image Pin:</span>
-    <label class="file-input-label" for="customMarkerFileInput">Upload (max 5MB)</label>
+  
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:8px;">CUSTOM IMAGE UPLOAD</div>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <span style="font-size:11px;">Upload Image:</span>
+    <label class="file-input-label" for="customMarkerFileInput">Select (max 5MB)</label>
     <input type="file" id="customMarkerFileInput" accept="image/*" style="display:none;" />
   </div>
+  
+  <div class="f-row" style="margin-top:4px;"><span>Image Frame</span>
+    <select id="imgFrameStyle" style="width:110px;">
+      <option value="none">None</option>
+      <option value="circle" selected>Circle</option>
+      <option value="square">Square</option>
+      <option value="rounded">Rounded</option>
+    </select>
+  </div>
+  <div class="f-row"><span>Frame Color</span><input type="color" id="imgFrameColor" value="#ffffff"></div>
+  <div class="f-row"><span>Frame Width</span><input type="range" id="imgFrameWidth" min="0" max="8" step="1" value="3"></div>
+  
+  <hr style="border-color:rgba(255,255,255,0.1); width:100%; margin:8px 0;"/>
+
   <div class="f-row"><span>Icon Color</span><input type="color" id="mColor" value="#003366"></div>
   <div class="f-row"><span>Icon Size</span><input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"></div>
-
-  <!-- Frame customization -->
-  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:4px;">FRAME OPTIONS</div>
-  <div id="frameSettingsRow">
-    <div class="f-row"><span>Frame Shape</span>
-      <select id="frameShape" style="width:120px;">
-        <option value="none">None</option>
-        <option value="circle" selected>Circle</option>
-        <option value="square">Square</option>
-        <option value="rounded">Rounded Rect</option>
-      </select>
-    </div>
-    <div class="f-row"><span>Frame Color</span><input type="color" id="frameColor" value="#ffffff"></div>
-    <div class="f-row"><span>Frame Width</span><input type="range" id="frameWidth" min="2" max="10" step="1" value="4"></div>
-    <div class="f-row"><span>Padding</span><input type="range" id="framePadding" min="0" max="10" step="1" value="3"></div>
-  </div>
 </div>
 
 <div id="popup-text-settings" class="float-card right-card">
@@ -896,7 +970,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Opacity</span><input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"></div>
 </div>
 
-<!-- Trade Area Analysis dedicated popup -->
+<!-- ========================================================================
+     TRADE AREA ANALYSIS POPUP (CENTER)
+======================================================================== -->
 <div id="popup-trade-area" class="float-card">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <span style="font-weight:700; color:#f0f6fc;">Trade Area Analysis</span>
@@ -930,6 +1006,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button id="btnRunOverpass" class="trade-btn">Run Custom Query</button>
 </div>
 
+<!-- ========================================================================
+     WORKSPACE LAUNCHER (MODAL SCRIM)
+======================================================================== -->
 <div id="launcher-modal-scrim" class="visible">
   <div class="ios26-card">
     <div class="ios26-header">
@@ -959,6 +1038,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 <div id="hint-toast"></div>
 
+<!-- ========================================================================
+     JAVASCRIPT ENGINE (MAPLIBRE + CONTROLLERS)
+======================================================================== -->
 <script>
 try {
 const ALL_STYLES = __ALL_STYLES__;
@@ -971,6 +1053,7 @@ let currentProjectId = "__PROJECT_ID__";
 let currentProjectName = "__PROJECT_NAME__";
 let currentStyleName = "__INITIAL_BASEMAP__";
 
+// Initialize Map
 const map = new maplibregl.Map({
   container: 'map',
   style: ALL_STYLES[currentStyleName] || ALL_STYLES["Midnight Blue"],
@@ -978,8 +1061,10 @@ const map = new maplibregl.Map({
   zoom: __ZOOM__,
   attributionControl: false,
   fadeDuration: 0,
-  preserveDrawingBuffer: true
+  preserveDrawingBuffer: true // Required for safe canvas exporting
 });
+
+// Disable default right-click menu as we use it for coordinate copying
 map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 
 // ----------------- Debounce Utility -----------------
@@ -1000,12 +1085,15 @@ let features = __INITIAL_FEATURES__;
 let fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
 let customGroups = __INITIAL_CUSTOM_GROUPS__ || { "Trade Area Scan": { collapsed: false, ids: [] } };
 
-let activeTool = null, editMode = false;
+let activeTool = null;
+let editMode = false; // Unified Drag and Vertex mode
 let draft = [], cursorLL = null, selectedId = null;
+
+// Custom Marker State
 let markerShape = 'pin', markerColor = '#003366', markerIconSize = 0.9;
-let frameShape = 'circle', frameColor = '#ffffff', frameWidth = 4, framePadding = 3;
 let customMarkerImageKey = null;
 let customMarkerDataUrl = null;
+
 let selectedLayerIds = new Set();
 let isDirty = false;
 
@@ -1013,14 +1101,7 @@ let isDirty = false;
 let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null;
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
 
-const textSettings = {
-  content: 'Custom Label',
-  font: 'Century Gothic Custom',
-  size: 16,
-  color: '#d9b451',
-  opacity: 1.0
-};
-
+// Global Visual Overrides
 const vis = {
   label_city: true, label_brgy: true, label_street: true,
   road_exp: true, road_main: true, road_sec: true, road_ter: true, rd_rail: true,
@@ -1047,7 +1128,12 @@ const VIS_MAP = {
 };
 
 const $ = id => document.getElementById(id);
-const hint = t => { $('hint-toast').style.display = t ? 'block' : 'none'; $('hint-toast').textContent = t || ''; };
+
+const hint = t => { 
+    const ht = $('hint-toast');
+    ht.style.display = t ? 'block' : 'none'; 
+    ht.textContent = t || ''; 
+};
 
 const setSaveBadgeStatus = status => {
   const badge = $('save-status-badge');
@@ -1137,10 +1223,10 @@ function renderProjectsList() {
         <span style="font-size:11px; color:rgba(255,255,255,0.5);">${p.basemap || 'Midnight Blue'} · ${p.features ? p.features.length : 0} layers</span>
       </div>
       <div style="display:flex; align-items:center; gap:6px;">
-        <button class="card-btn" onclick="renameProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" title="Rename">
+        <button class="card-btn" onclick="renameProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Rename">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
         </button>
-        <button class="card-btn" onclick="deleteProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" title="Delete" style="color:#ff7b72;">
+        <button class="card-btn" onclick="deleteProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Delete" style="color:#ff7b72;">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
@@ -1200,7 +1286,7 @@ window.renameProjectFromLauncher = async function(e, projectId, oldName) {
   renderProjectsList();
 
   try {
-    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
+    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
       method: 'PATCH',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -1221,7 +1307,7 @@ window.deleteProjectFromLauncher = async function(e, projectId, name) {
   renderProjectsList();
 
   try {
-    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
+    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
       method: 'DELETE',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -1248,7 +1334,7 @@ $('btn-create-project-submit').onclick = async () => {
   };
 
   try {
-    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects`, {
+    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects`, {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -1309,7 +1395,7 @@ async function saveProjectToSupabase(showToast = false) {
   };
 
   try {
-    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${currentProjectId}`, {
+    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${currentProjectId}`, {
       method: 'PATCH',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -1397,93 +1483,86 @@ function getIconKey(shape, color) {
   return key;
 }
 
-// New: Create custom marker with frame
-function createFramedMarkerImage(dataUrl, frameShape, frameColor, frameWidth, framePadding) {
+// Highly customizable Image framer
+function createCustomMarkerImage(dataUrl, frameType, frameColor, frameWidth) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const baseSize = 64;
-      const canvas = document.createElement('canvas');
-      canvas.width = baseSize; canvas.height = baseSize;
-      const ctx = canvas.getContext('2d');
+      const c = document.createElement('canvas');
+      c.width = baseSize; c.height = baseSize;
+      const ctx = c.getContext('2d');
       
-      // Clear
-      ctx.clearRect(0,0,baseSize,baseSize);
+      const fw = parseInt(frameWidth, 10);
+      const isFramed = frameType !== 'none';
+      const pad = isFramed ? fw : 0;
       
-      // Frame dimensions
-      const innerSize = baseSize - 2 * frameWidth - 2 * framePadding;
-      
-      // Draw frame according to shape
-      if (frameShape !== 'none') {
-        ctx.beginPath();
-        if (frameShape === 'circle') {
-          ctx.arc(32, 32, innerSize / 2 + frameWidth + framePadding, 0, Math.PI * 2);
-        } else if (frameShape === 'square') {
-          const start = 32 - (innerSize / 2 + frameWidth + framePadding);
-          ctx.rect(start, start, innerSize + 2 * frameWidth + 2 * framePadding, innerSize + 2 * frameWidth + 2 * framePadding);
-        } else if (frameShape === 'rounded') {
-          const start = 32 - (innerSize / 2 + frameWidth + framePadding);
-          const size = innerSize + 2 * frameWidth + 2 * framePadding;
-          const radius = 12;
-          ctx.roundRect(start, start, size, size, radius);
-        }
-        ctx.fillStyle = frameColor;
-        ctx.fill();
-      }
-      
-      // Draw image clipped inside frame
+      const drawFramePath = () => {
+          ctx.beginPath();
+          if (frameType === 'circle') {
+              ctx.arc(baseSize/2, baseSize/2, (baseSize/2) - 2, 0, Math.PI * 2);
+          } else if (frameType === 'square') {
+              ctx.rect(2, 2, baseSize-4, baseSize-4);
+          } else if (frameType === 'rounded') {
+              ctx.roundRect ? ctx.roundRect(2, 2, baseSize-4, baseSize-4, 12) : ctx.rect(2, 2, baseSize-4, baseSize-4);
+          }
+          ctx.closePath();
+      };
+
       ctx.save();
-      if (frameShape === 'circle') {
-        ctx.beginPath();
-        ctx.arc(32, 32, innerSize / 2, 0, Math.PI * 2);
-        ctx.clip();
-      } else if (frameShape === 'square') {
-        const start = 32 - innerSize / 2;
-        ctx.rect(start, start, innerSize, innerSize);
-        ctx.clip();
-      } else if (frameShape === 'rounded') {
-        const start = 32 - innerSize / 2;
-        const size = innerSize;
-        const radius = 8;
-        ctx.roundRect(start, start, size, size, radius);
-        ctx.clip();
-      } else {
-        // no clip
+      if (isFramed) {
+          drawFramePath();
+          ctx.fillStyle = frameColor;
+          ctx.fill();
       }
+
+      // Clip inner image area
+      ctx.beginPath();
+      if (frameType === 'circle') {
+          ctx.arc(baseSize/2, baseSize/2, (baseSize/2) - 2 - pad, 0, Math.PI * 2);
+      } else if (frameType === 'square') {
+          ctx.rect(2 + pad, 2 + pad, baseSize-4-(pad*2), baseSize-4-(pad*2));
+      } else if (frameType === 'rounded') {
+          const innerRad = Math.max(0, 12 - pad);
+          ctx.roundRect ? ctx.roundRect(2+pad, 2+pad, baseSize-4-(pad*2), baseSize-4-(pad*2), innerRad) : ctx.rect(2+pad, 2+pad, baseSize-4-(pad*2), baseSize-4-(pad*2));
+      } else {
+          ctx.rect(0,0,baseSize,baseSize);
+      }
+      ctx.clip();
       
-      // Draw image fitting inside
-      const scale = Math.max(innerSize / img.width, innerSize / img.height);
+      // Calculate cover dimensions
+      const scale = Math.max(baseSize / img.width, baseSize / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
-      const x = 32 - w / 2;
-      const y = 32 - h / 2;
+      const x = (baseSize - w) / 2;
+      const y = (baseSize - h) / 2;
+      
       ctx.drawImage(img, x, y, w, h);
       ctx.restore();
       
-      // Optional inner border
-      if (frameShape !== 'none' && frameWidth > 0) {
-        ctx.beginPath();
-        if (frameShape === 'circle') {
-          ctx.arc(32, 32, innerSize / 2, 0, Math.PI * 2);
-        } else if (frameShape === 'square') {
-          const start = 32 - innerSize / 2;
-          ctx.rect(start, start, innerSize, innerSize);
-        } else if (frameShape === 'rounded') {
-          const start = 32 - innerSize / 2;
-          const size = innerSize;
-          const radius = 8;
-          ctx.roundRect(start, start, size, size, radius);
-        }
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-      }
-      
-      resolve(canvas);
+      resolve(c);
     };
     img.onerror = reject;
     img.src = dataUrl;
   });
+}
+
+function processCustomMarker() {
+    if (!customMarkerDataUrl) return;
+    const fType = $('imgFrameStyle').value;
+    const fColor = $('imgFrameColor').value;
+    const fWidth = $('imgFrameWidth').value;
+    
+    createCustomMarkerImage(customMarkerDataUrl, fType, fColor, fWidth).then(canvas => {
+        const key = 'custom_marker_' + Date.now();
+        const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
+        try {
+          if (map.hasImage(key)) map.removeImage(key);
+          map.addImage(key, imgData, { pixelRatio: 2 });
+          customMarkerImageKey = key;
+          hint('Custom framed marker ready');
+        } catch(err) { hint('Failed to add custom image'); }
+    });
 }
 
 $('customMarkerFileInput').onchange = function(e) {
@@ -1496,25 +1575,15 @@ $('customMarkerFileInput').onchange = function(e) {
   const reader = new FileReader();
   reader.onload = async (ev) => {
     customMarkerDataUrl = ev.target.result;
-    // Use current frame settings to generate the framed icon
-    const canvas = await createFramedMarkerImage(customMarkerDataUrl, frameShape, frameColor, frameWidth, framePadding);
-    const key = 'custom_marker_' + Date.now();
-    const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
-    try {
-      if (map.hasImage(key)) map.removeImage(key);
-      map.addImage(key, imgData, { pixelRatio: 2 });
-      customMarkerImageKey = key;
-      hint('Custom marker with frame ready');
-    } catch(err) { hint('Failed to add custom image'); }
+    processCustomMarker();
   };
   reader.readAsDataURL(file);
 };
 
-// Update frame settings on change
-$('frameShape').onchange = () => { frameShape = $('frameShape').value; markDirty(); };
-$('frameColor').oninput = () => { frameColor = $('frameColor').value; markDirty(); };
-$('frameWidth').oninput = () => { frameWidth = parseInt($('frameWidth').value, 10); markDirty(); };
-$('framePadding').oninput = () => { framePadding = parseInt($('framePadding').value, 10); markDirty(); };
+$('imgFrameStyle').onchange = processCustomMarker;
+$('imgFrameColor').onchange = processCustomMarker;
+$('imgFrameWidth').oninput = debounce(processCustomMarker, 200);
+
 
 const ICON_SVGS = {
   pin: '<path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle>',
@@ -1533,7 +1602,7 @@ $('markerIconGrid').innerHTML = Object.keys(ICON_SVGS).map(s =>
 $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
   markerShape = b.dataset.s;
   $('markerIconGrid').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
-  customMarkerImageKey = null;
+  customMarkerImageKey = null; // Revert to standard vector icon
   markDirty();
 });
 $('mColor').oninput = e => { markerColor = e.target.value; markDirty(); };
@@ -1553,12 +1622,13 @@ function addDrawStack() {
   if (!map.getSource('draw')) {
     map.addSource('draw', { type: 'geojson', data: fc(features) });
 
+    // IMPORTANT BUG FIX: Use coalesce on visible to default to 1, otherwise missing properties vanish.
     map.addLayer({
       id: 'draw-fill', type: 'fill', source: 'draw',
       filter: ['==', ['geometry-type'], 'Polygon'],
       paint: {
         'fill-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
-        'fill-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.35], ['get', 'visible']]
+        'fill-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.35], ['coalesce', ['get', 'visible'], 1]]
       }
     });
 
@@ -1568,7 +1638,7 @@ function addDrawStack() {
       paint: {
         'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#e8b84a'],
         'line-width': ['coalesce', ['get', 'width'], 3],
-        'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['get', 'visible']]
+        'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['coalesce', ['get', 'visible'], 1]]
       }
     });
 
@@ -1579,10 +1649,11 @@ function addDrawStack() {
       paint: {
         'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#38bdf8'],
         'line-width': ['coalesce', ['get', 'width'], 4],
-        'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['get', 'visible']]
+        'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['coalesce', ['get', 'visible'], 1]]
       }
     });
 
+    // Markers scale interpolator fixed for optical illusion
     map.addLayer({
       id: 'draw-marker', type: 'symbol', source: 'draw',
       filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
@@ -1591,12 +1662,12 @@ function addDrawStack() {
         'icon-size': [
             '*', 
             ['coalesce', ['get', 'iconSize'], 0.9], 
-            ['interpolate', ['linear'], ['zoom'], 10, 0.6, 16, 1.0, 20, 1.5]
+            ['interpolate', ['linear'], ['zoom'], 10, 0.5, 16, 1.0, 20, 1.5]
         ],
         'icon-allow-overlap': true,
         'icon-anchor': 'bottom'
       },
-      paint: { 'icon-opacity': ['get', 'visible'] }
+      paint: { 'icon-opacity': ['coalesce', ['get', 'visible'], 1] }
     });
 
     map.addLayer({
@@ -1611,7 +1682,7 @@ function addDrawStack() {
       },
       paint: {
         'text-color': ['coalesce', ['get', 'color'], '#d9b451'],
-        'text-opacity': ['*', ['coalesce', ['get', 'opacity'], 1], ['get', 'visible']],
+        'text-opacity': ['*', ['coalesce', ['get', 'opacity'], 1], ['coalesce', ['get', 'visible'], 1]],
         'text-halo-color': '#0a1628',
         'text-halo-width': 2
       }
@@ -1633,7 +1704,7 @@ function addDrawStack() {
         'text-color': '#ffffff',
         'text-halo-color': '#0a1628',
         'text-halo-width': 2,
-        'text-opacity': ['get', 'visible']
+        'text-opacity': ['coalesce', ['get', 'visible'], 1]
       }
     });
 
@@ -1689,22 +1760,8 @@ function syncVertexHandles() {
   const handleFeats = [];
   features.forEach(f => {
     if (f.props.visible === 0) return;
-    // For circles we show only one handle at the radius point (first vertex after center)
-    if (f.kind === 'circle' && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
-      const coords = f.geometry.coordinates[0];
-      // Find the point at 90 degrees from center to indicate radius handle
-      if (f.props.center) {
-        const c = f.props.center;
-        const r = haversineDist(c, coords[0]);
-        const handleLng = c[0] + (r / (111320 * Math.cos(c[1]*Math.PI/180)));
-        const handleLat = c[1];
-        handleFeats.push({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [handleLng, handleLat] },
-          properties: { polyId: f.id, vIdx: 0 } // special vIdx for radius editing
-        });
-      }
-    } else if (['polygon','rectangle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+    
+    if (['polygon','rectangle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
       const coords = f.geometry.coordinates[0];
       for (let i = 0; i < coords.length - 1; i++) {
         handleFeats.push({
@@ -1714,6 +1771,16 @@ function syncVertexHandles() {
         });
       }
     }
+    
+    if (f.kind === 'circle' && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+      // For circles, only generate ONE vertex handle at the perimeter to edit radius.
+      handleFeats.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: f.geometry.coordinates[0][0] },
+          properties: { polyId: f.id, vIdx: 0 }
+      });
+    }
+
     if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry && f.geometry.coordinates) {
       const coords = f.geometry.coordinates;
       for (let i = 0; i < coords.length; i++) {
@@ -1784,6 +1851,59 @@ map.on('load', () => {
   renderMyLayers();
   renderProjectsList();
   populateTradeAreaCheckboxes();
+});
+
+// Cursor changes on hover for interactive elements
+map.on('mouseenter', 'draw-marker', () => map.getCanvas().style.cursor = 'pointer');
+map.on('mouseleave', 'draw-marker', () => map.getCanvas().style.cursor = '');
+map.on('mouseenter', 'draw-text', () => map.getCanvas().style.cursor = 'pointer');
+map.on('mouseleave', 'draw-text', () => map.getCanvas().style.cursor = '');
+map.on('mouseenter', 'vertex-points', () => map.getCanvas().style.cursor = 'pointer');
+map.on('mouseleave', 'vertex-points', () => map.getCanvas().style.cursor = '');
+
+// Copy Coordinates
+map.on('contextmenu', e => {
+    e.preventDefault();
+    const coords = `${e.lngLat.lng.toFixed(6)}, ${e.lngLat.lat.toFixed(6)}`;
+    navigator.clipboard.writeText(coords).then(() => {
+        hint('Coordinates copied to clipboard: ' + coords);
+        setTimeout(() => hint(''), 3000);
+    });
+});
+
+// Overpass POI Info Popup Handler
+map.on('click', 'draw-marker', e => {
+  if (editMode || activeTool) return;
+  if (!e.features.length) return;
+  const fProps = e.features[0].properties;
+  let tags = {};
+  
+  try { 
+      tags = typeof fProps.osmTags === 'string' ? JSON.parse(fProps.osmTags) : fProps.osmTags; 
+  } catch(err) {}
+  
+  if (tags && Object.keys(tags).length) {
+    let tableRows = '';
+    for (const k in tags) {
+      if(k === 'name' || k === 'type') continue; // skip common redundant keys
+      tableRows += `<tr><th>${k}</th><td>${tags[k]}</td></tr>`;
+    }
+    const html = `
+      <div style="font-weight:700; color:#38bdf8; margin-bottom:4px; font-size:12px; max-width:260px; overflow-wrap:break-word;">
+          ${fProps.name || 'POI Details'}
+      </div>
+      <div style="max-height: 200px; overflow-y: auto;">
+          <table class="tag-table">${tableRows}</table>
+      </div>
+    `;
+    new maplibregl.Popup()
+      .setLngLat(e.lngLat)
+      .setHTML(html)
+      .addTo(map);
+  } else {
+    // If it's just a user-drawn pin, open editor instead.
+    openShapeEditor(parseInt(fProps.id, 10));
+  }
 });
 
 // ----------------- 2D vs 3D Dimension Switcher -----------------
@@ -2100,7 +2220,7 @@ function renderBoundaryAutocomplete(results) {
     item.onclick = () => {
       const idx = parseInt(item.dataset.index, 10);
       const selected = boundaryResults[idx];
-      boundaryInput.value = selected.display_name;
+      boundaryInput.value = '';
       boundaryList.style.display = 'none';
       highlightBoundary(selected);
     };
@@ -2110,6 +2230,10 @@ function renderBoundaryAutocomplete(results) {
 function highlightBoundary(result) {
   if (!result.geojson) return;
   const geom = result.geojson;
+  
+  // Format Name: keep it simple (e.g. San Juan Boundary)
+  const shortName = result.name || result.display_name.split(',')[0];
+  
   addFeatureRecord('polygon', geom, {
     borderColor: '#ff1e1e',
     borderOpacity: 1.0,
@@ -2117,14 +2241,15 @@ function highlightBoundary(result) {
     fillColor: '#ff1e1e',
     fillOpacity: 0.15,
     showLabel: true
-  }, null, `${result.display_name} Boundary`);
+  }, null, `${shortName} Boundary`);
+  
   if (result.boundingbox) {
     map.fitBounds([
       [parseFloat(result.boundingbox[2]), parseFloat(result.boundingbox[0])],
       [parseFloat(result.boundingbox[3]), parseFloat(result.boundingbox[1])]
     ], { padding: 60 });
   }
-  hint(`${result.display_name} boundary added!`);
+  hint(`${shortName} boundary added!`);
 }
 
 document.addEventListener('click', (e) => {
@@ -2223,6 +2348,7 @@ map.on('mousemove', e => {
   cursorLL = [e.lngLat.lng, e.lngLat.lat];
   if (activeTool) renderDraft();
 
+  // Unified Shape Translation (Drag)
   if (isDragging && dragFeatureId) {
     const dx = cursorLL[0] - dragStartCoord[0];
     const dy = cursorLL[1] - dragStartCoord[1];
@@ -2235,7 +2361,7 @@ map.on('mousemove', e => {
     }
     f.geometry.coordinates = translateCoords(dragOriginalCoords);
     
-    // Update center if it's a circle
+    // Maintain logical center for circles on translation
     if (f.kind === 'circle' && f.props.center) {
         f.props.center = [f.props.center[0] + dx, f.props.center[1] + dy];
     }
@@ -2243,20 +2369,21 @@ map.on('mousemove', e => {
     markDirty();
   }
 
+  // Unified Vertex Editing (Scale/Reshape)
   if (isDraggingVertex && draggedPolyId != null && draggedVertexIdx >= 0) {
     const f = features.find(x => x.id === draggedPolyId);
     if (f && f.geometry && f.geometry.coordinates) {
-      // For circle: draggedVertexIdx === 0 means radius handle
-      if (f.kind === 'circle') {
+      if (['polygon','rectangle'].includes(f.kind) && f.geometry.coordinates[0]) {
+        const coords = f.geometry.coordinates[0];
+        coords[draggedVertexIdx] = cursorLL;
+        if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
+      } else if (f.kind === 'circle' && f.geometry.coordinates[0]) {
+        // Redraw circle dynamically from its logical center to the dragged edge
         if (f.props.center) {
           const { coords, r } = circleCoords(f.props.center, cursorLL);
           f.geometry.coordinates = coords;
           f.props.radiusMeters = r;
         }
-      } else if (['polygon','rectangle'].includes(f.kind) && f.geometry.coordinates[0]) {
-        const coords = f.geometry.coordinates[0];
-        coords[draggedVertexIdx] = cursorLL;
-        if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
       } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry.coordinates) {
         f.geometry.coordinates[draggedVertexIdx] = cursorLL;
       }
@@ -2267,30 +2394,23 @@ map.on('mousemove', e => {
 });
 
 map.on('click', e => {
-  // If not drawing, check if we clicked a feature to edit it
-  if (!activeTool && !isDragging && !isDraggingVertex) {
-    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
-    if (fs.length && fs[0].properties.id != null) {
-      const feat = features.find(x => x.id === parseInt(fs[0].properties.id, 10));
-      if (feat && feat.kind === 'marker' && feat.props.osmTags) {
-        // Show popup with OSM tags
-        const tags = feat.props.osmTags;
-        let tableHtml = '<table class="tag-table">';
-        tableHtml += '<tr><th>Key</th><th>Value</th></tr>';
-        for (const k in tags) {
-          tableHtml += `<tr><td>${k}</td><td>${tags[k]}</td></tr>`;
-        }
-        tableHtml += '</table>';
-        new maplibregl.Popup()
-          .setLngLat(feat.geometry.coordinates)
-          .setHTML(`<div style="font-weight:700;">${feat.name || 'POI'}</div>${tableHtml}`)
-          .addTo(map);
-      } else {
-        openShapeEditor(parseInt(fs[0].properties.id, 10));
+  // If in pure select mode and user clicks a rendered shape (and NOT a vertex) -> Open Editor
+  if (!activeTool && !isDragging && !isDraggingVertex && editMode) {
+      const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+      // If clicking inside a shape and not currently moving it
+      if (fs.length && fs[0].properties.id != null && !isDraggingVertex) {
+         openShapeEditor(parseInt(fs[0].properties.id, 10));
+         return;
       }
-      resetActiveTools();
-      return;
-    }
+  }
+  
+  if (!activeTool && !editMode) {
+      // General map exploration click: also allow editing layer if they click directly on it
+      const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+      if (fs.length && fs[0].properties.id != null) {
+        openShapeEditor(parseInt(fs[0].properties.id, 10));
+        return;
+      }
   }
 
   if (!activeTool) return;
@@ -2403,22 +2523,6 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ----------------- Right-Click Copy Coordinates -----------------
-map.on('contextmenu', e => {
-  const lngLat = e.lngLat;
-  const coordsStr = `${lngLat.lat.toFixed(6)}, ${lngLat.lng.toFixed(6)}`;
-  // Copy to clipboard
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(coordsStr).then(() => {
-      hint(`Copied coordinates: ${coordsStr}`);
-    }).catch(() => {
-      hint(`Coordinates: ${coordsStr}`);
-    });
-  } else {
-    hint(`Coordinates: ${coordsStr}`);
-  }
-});
-
 // ----------------- Edit Mode (Unified Drag Shape & Edit Vertices) -----------------
 $('btn-edit-mode').onclick = () => {
   editMode = !editMode;
@@ -2427,19 +2531,22 @@ $('btn-edit-mode').onclick = () => {
   document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
   closeFloatingCards();
   syncVertexHandles();
-  hint(editMode ? 'Edit Mode: Drag shapes or blue vertex points to modify' : '');
+  hint(editMode ? 'Edit Mode: Drag shapes to move, or drag blue dots to modify shape' : '');
 };
 
 map.on('mousedown', e => {
   if (editMode) {
+    // 1. Check if clicking a vertex point (highest priority edit action)
     const vHits = map.queryRenderedFeatures(e.point, { layers: ['vertex-points'] });
     if (vHits.length && vHits[0].properties.polyId != null) {
       isDraggingVertex = true;
       draggedPolyId = parseInt(vHits[0].properties.polyId, 10);
       draggedVertexIdx = parseInt(vHits[0].properties.vIdx, 10);
       map.dragPan.disable();
-      return;
+      return; // Stop event bubbling so we don't trigger shape drag
     }
+    
+    // 2. Check if clicking the shape body (to drag entire shape)
     const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
     if (fs.length && fs[0].properties.id != null) {
       isDragging = true;
@@ -2545,7 +2652,7 @@ $('eDeleteBtn').onclick = () => {
 $('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 
-// ----------------- My Layers with Grouping, Multi-select, Drag Reorder, Drop to Group -----------------
+// ----------------- My Layers with Grouping, Multi-select, Drag Reorder -----------------
 $('btnAddCustomGroup').onclick = () => {
   const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
   if (gName && gName.trim() && !customGroups[gName]) {
@@ -2569,35 +2676,38 @@ $('btnGroupSelected').onclick = () => {
   }
 };
 
-// New: Select All / Hide Selected / Delete Selected
-$('selectAllLayersCheckbox').onchange = (e) => {
-  if (e.target.checked) {
-    selectedLayerIds = new Set(features.map(f => f.id));
-  } else {
+$('chkSelectAllLayers').onchange = (e) => {
+    if (e.target.checked) {
+        features.forEach(f => selectedLayerIds.add(f.id));
+    } else {
+        selectedLayerIds.clear();
+    }
+    renderMyLayers();
+};
+
+$('btnBulkDelete').onclick = () => {
+    if(selectedLayerIds.size === 0) return hint('Select layers to delete');
+    if(!confirm(`Delete ${selectedLayerIds.size} layers permanently?`)) return;
+    features = features.filter(f => !selectedLayerIds.has(f.id));
+    for (const g in customGroups) {
+        customGroups[g].ids = customGroups[g].ids.filter(id => !selectedLayerIds.has(id));
+    }
     selectedLayerIds.clear();
-  }
-  // Update checkboxes
-  document.querySelectorAll('.layer-select-check').forEach(cb => {
-    cb.checked = selectedLayerIds.has(parseInt(cb.dataset.id, 10));
-  });
+    $('chkSelectAllLayers').checked = false;
+    syncDraw(); renderMyLayers(); markDirty();
 };
 
-$('btnHideSelected').onclick = () => {
-  if (selectedLayerIds.size === 0) { hint('No layers selected'); return; }
-  features.forEach(f => { if (selectedLayerIds.has(f.id)) f.props.visible = 0; });
-  syncDraw();
-  renderMyLayers();
-  markDirty();
-};
-
-$('btnDeleteSelected').onclick = () => {
-  if (selectedLayerIds.size === 0) { hint('No layers selected'); return; }
-  features = features.filter(f => !selectedLayerIds.has(f.id));
-  for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(id => !selectedLayerIds.has(id));
-  selectedLayerIds.clear();
-  syncDraw();
-  renderMyLayers();
-  markDirty();
+$('btnBulkVis').onclick = () => {
+    if(selectedLayerIds.size === 0) return hint('Select layers to toggle visibility');
+    // Check if any selected is currently visible
+    const anyVis = Array.from(selectedLayerIds).some(id => {
+        const f = features.find(x => x.id === id);
+        return f && f.props.visible;
+    });
+    features.forEach(f => {
+        if(selectedLayerIds.has(f.id)) f.props.visible = anyVis ? 0 : 1;
+    });
+    syncDraw(); renderMyLayers(); markDirty();
 };
 
 function renderLayerCardHtml(f) {
@@ -2607,10 +2717,14 @@ function renderLayerCardHtml(f) {
   }
   const isPoly = ['polygon', 'rectangle', 'circle'].includes(f.kind);
   const isSelected = selectedLayerIds.has(f.id);
+  const eyeIcon = f.props.visible === 0 
+        ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>'
+        : '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+
   return `
     <div class="layer-card" draggable="true" data-id="${f.id}">
       <div class="layer-card-top">
-        <input type="checkbox" class="layer-select-check" data-id="${f.id}" ${isSelected ? 'checked' : ''} />
+        <input type="checkbox" class="layer-select-check" data-id="${f.id}" ${isSelected ? 'checked' : ''} style="width:14px; height:14px; margin-right:4px;" />
         <input class="layer-name-input" data-id="${f.id}" value="${f.name}" title="Click to rename" />
         
         ${isPoly ? `
@@ -2623,7 +2737,7 @@ function renderLayerCardHtml(f) {
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
         </button>
         <button class="card-btn" data-act="eye" data-id="${f.id}" title="Toggle Visibility">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          ${eyeIcon}
         </button>
         <button class="card-btn" data-act="zoom" data-id="${f.id}" title="Zoom To">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -2632,7 +2746,7 @@ function renderLayerCardHtml(f) {
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
-      <div style="font-size:10px; color:#768390; padding:0 18px;">${subInfo}</div>
+      <div style="font-size:10px; color:#768390; padding:0 22px;">${subInfo}</div>
     </div>
   `;
 }
@@ -2652,14 +2766,13 @@ function renderMyLayers() {
   let html = '';
   const groupedIds = new Set();
 
-  // Render group containers with drop target for dragging layers into group
   for (const gName in customGroups) {
     const grp = customGroups[gName];
     const groupFeats = features.filter(f => grp.ids.includes(f.id));
     grp.ids.forEach(id => groupedIds.add(id));
 
     html += `
-      <div class="group-container" data-group="${gName}" style="position:relative;">
+      <div class="group-container" data-group="${gName}">
         <div class="group-header" data-group="${gName}">
           <div style="display:flex; align-items:center; gap:6px;">
             <span class="card-btn" data-act="groupToggleCollapse" data-group="${gName}">
@@ -2676,8 +2789,8 @@ function renderMyLayers() {
             </button>
           </div>
         </div>
-        <div class="group-items ${grp.collapsed ? 'hidden' : ''}" data-group="${gName}">
-          ${groupFeats.length ? groupFeats.map(f => renderLayerCardHtml(f)).join('') : '<div style="font-size:10px; color:#768390; padding:4px;">Drop layers here or empty group</div>'}
+        <div class="group-items ${grp.collapsed ? 'hidden' : ''}">
+          ${groupFeats.length ? groupFeats.map(f => renderLayerCardHtml(f)).join('') : '<div style="font-size:10px; color:#768390; padding:4px;">Empty group</div>'}
         </div>
       </div>
     `;
@@ -2691,7 +2804,7 @@ function renderMyLayers() {
 
   container.innerHTML = html;
 
-  // Attach drag/drop events
+  // Layer drag-and-drop ordering and grouping logic
   container.querySelectorAll('.layer-card').forEach(card => {
     card.addEventListener('dragstart', e => {
       e.dataTransfer.setData('text/plain', card.dataset.id);
@@ -2699,10 +2812,12 @@ function renderMyLayers() {
     });
     card.addEventListener('dragover', e => {
       e.preventDefault();
+      e.stopPropagation(); // prevent bubbling to group
       e.dataTransfer.dropEffect = 'move';
     });
     card.addEventListener('drop', e => {
       e.preventDefault();
+      e.stopPropagation(); // prevent bubbling to group
       const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
       const targetId = parseInt(card.dataset.id, 10);
       if (draggedId !== targetId) {
@@ -2711,36 +2826,36 @@ function renderMyLayers() {
     });
   });
 
-  // Allow dropping onto group containers
-  container.querySelectorAll('.group-container').forEach(groupEl => {
-    groupEl.addEventListener('dragover', e => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      groupEl.style.outline = '1px dashed #316dca';
-    });
-    groupEl.addEventListener('dragleave', () => {
-      groupEl.style.outline = 'none';
-    });
-    groupEl.addEventListener('drop', e => {
-      e.preventDefault();
-      groupEl.style.outline = 'none';
-      const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-      const gName = groupEl.dataset.group;
-      // Add dragged feature to this group if not already there
-      if (draggedId && customGroups[gName]) {
-        if (!customGroups[gName].ids.includes(draggedId)) {
-          customGroups[gName].ids.push(draggedId);
-          // Remove from other groups
-          for (const otherG in customGroups) {
-            if (otherG !== gName) {
-              customGroups[otherG].ids = customGroups[otherG].ids.filter(id => id !== draggedId);
-            }
-          }
-          renderMyLayers();
-          markDirty();
-        }
-      }
-    });
+  // Group container drop logic (drag layer into a group header)
+  container.querySelectorAll('.group-container').forEach(g => {
+     g.addEventListener('dragover', e => {
+         e.preventDefault();
+         g.classList.add('drag-over');
+     });
+     g.addEventListener('dragleave', e => {
+         g.classList.remove('drag-over');
+     });
+     g.addEventListener('drop', e => {
+         e.preventDefault();
+         g.classList.remove('drag-over');
+         const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+         const targetGroup = g.dataset.group;
+         
+         if (draggedId && targetGroup && customGroups[targetGroup]) {
+             // Remove from all existing groups first
+             for (const k in customGroups) {
+                 customGroups[k].ids = customGroups[k].ids.filter(id => id !== draggedId);
+             }
+             // Add to the new target group
+             if (!customGroups[targetGroup].ids.includes(draggedId)) {
+                 customGroups[targetGroup].ids.push(draggedId);
+                 // Open group automatically to show content
+                 customGroups[targetGroup].collapsed = false; 
+                 renderMyLayers();
+                 markDirty();
+             }
+         }
+     });
   });
 
   container.querySelectorAll('.layer-select-check').forEach(cb => {
@@ -2748,8 +2863,10 @@ function renderMyLayers() {
       const id = parseInt(e.target.dataset.id, 10);
       if (e.target.checked) selectedLayerIds.add(id);
       else selectedLayerIds.delete(id);
-      // Update select all checkbox state
-      $('selectAllLayersCheckbox').checked = selectedLayerIds.size === features.length;
+      
+      // Update Select All Checkbox
+      const allChecked = features.length > 0 && selectedLayerIds.size === features.length;
+      $('chkSelectAllLayers').checked = allChecked;
     });
   });
 
@@ -2791,7 +2908,7 @@ function renderMyLayers() {
       if (act === 'groupEye') {
         const g = b.dataset.group;
         const ids = customGroups[g].ids || [];
-        const anyVis = features.some(f => ids.includes(f.id) && f.props.visible);
+        const anyVis = features.some(f => ids.includes(f.id) && f.props.visible !== 0);
         features.forEach(f => { if (ids.includes(f.id)) f.props.visible = anyVis ? 0 : 1; });
         syncDraw(); renderMyLayers(); markDirty();
         return;
@@ -2851,25 +2968,34 @@ function calcBounds(f) {
   return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Layout Export Engine (Fixed) -----------------
+// ----------------- Layout Export Engine (Blob Bypass) -----------------
 $('btn-export-direct').onclick = () => {
-  hint('Exporting high-quality snapshot...');
-  const srcCanvas = map.getCanvas();
-  srcCanvas.toBlob(blob => {
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Project_Atlas_${Date.now()}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      hint('Export complete!');
-    } else {
-      hint('Export failed.');
+  hint('Exporting map layout to PNG...');
+  
+  // Try to safely extract the canvas to a blob to avoid CORS security DOM Exceptions
+  map.once('render', () => {
+    try {
+      const srcCanvas = map.getCanvas();
+      srcCanvas.toBlob(function(blob) {
+         if (!blob) {
+             hint('Canvas tainted. Cannot export.');
+             return;
+         }
+         const url = URL.createObjectURL(blob);
+         const a = document.createElement('a');
+         a.href = url;
+         a.download = `Project_Atlas_Export_${Date.now()}.png`;
+         document.body.appendChild(a);
+         a.click();
+         document.body.removeChild(a);
+         setTimeout(() => URL.revokeObjectURL(url), 1000);
+         hint('Export complete!');
+      }, 'image/png', 0.98);
+    } catch(e) {
+      hint('Export blocked by browser security restrictions.');
     }
-  }, 'image/png', 0.98);
+  });
+  map.triggerRepaint();
 };
 
 // ----------------- UI Panel Toggles -----------------
@@ -3020,10 +3146,11 @@ map.on('error', e => console.warn('Map Notice:', e));
 </body>
 </html>"""
 
-# ------------------------------------------------------------------------
-# 5. INITIAL STATE & COMPONENT MOUNTING
-# ------------------------------------------------------------------------
+# ========================================================================
+# 6. INITIAL STATE & COMPONENT MOUNTING
+# ========================================================================
 try:
+    # Set fallback defaults
     initial_theme = "Midnight Blue"
     initial_center = [120.9842, 14.5995]
     initial_zoom = 14
@@ -3032,6 +3159,7 @@ try:
     initial_features = []
     initial_custom_groups = {"Trade Area Scan": {"collapsed": False, "ids": []}}
 
+    # Load the latest project if one exists on the backend
     if ALL_PROJECTS_LIST:
         latest = ALL_PROJECTS_LIST[0]
         initial_id = str(latest.get("id", "local-temp"))
@@ -3042,6 +3170,7 @@ try:
         initial_features = latest.get("features", [])
         initial_custom_groups = latest.get("custom_groups", {"Trade Area Scan": {"collapsed": False, "ids": []}})
 
+    # Inject Python data directly into the HTML string before passing to the iframe
     html = (
         HTML_TEMPLATE.replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
         .replace("__POI_CONFIG__", json.dumps(POI_CONFIG))
@@ -3057,6 +3186,8 @@ try:
         .replace("__ZOOM__", str(initial_zoom))
         .replace("__BG__", THEMES.get(initial_theme, THEMES["Midnight Blue"])["overlay"])
     )
+    
+    # Mount the isolated component cleanly
     components.html(html, height=1000, scrolling=False)
 except Exception as e:
-    st.error(f"Failed to load application: {e}")
+    st.error(f"Failed to load Project Atlas application engine: {e}")
