@@ -23,7 +23,6 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
         "https://overpass.openstreetmap.fr/api/interpreter"
     ]
     
-    # Build Overpass QL query
     statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
     ql = f"[out:json][timeout:{timeout}];(\n{statements}\n);\nout center;"
     
@@ -41,7 +40,6 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
                 if not data or 'elements' not in data:
                     raise ValueError("Malformed JSON response")
                 
-                # Parse successful response
                 results = []
                 for el in data['elements']:
                     el_lat = el.get('lat') or (el.get('center', {}).get('lat'))
@@ -69,7 +67,6 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
                 time.sleep(delay + jitter)
                 delay *= 2
                 
-    # Fallback to OSMnx
     logging.info("All Overpass endpoints failed. Falling back to OSMnx...")
     try:
         import osmnx as ox
@@ -390,7 +387,7 @@ ALL_STYLES = {
 }
 
 # ------------------------------------------------------------------------
-# 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
+# 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS SPA ENGINE)
 # ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -437,6 +434,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .save-badge { font-size: 9px; padding: 2px 7px; border-radius: 12px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: #8b949e; border: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 4px; }
 .save-badge.saving { color: #d9b451; border-color: rgba(217, 180, 81, 0.4); }
 .save-badge.saved { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); }
+.save-badge.unsaved { color: #f85149; border-color: rgba(248, 81, 73, 0.4); }
 .left-panel {
     position: fixed; top: 68px; left: 16px; bottom: 16px; width: 360px; z-index: 999;
     background-color: rgba(9, 16, 24, 0.97);
@@ -519,17 +517,17 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 }
 .float-card input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
 .float-card input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
-.float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
-.float-card input[type=text]:focus { border-color: #38bdf8; }
-#popup-search { width: 280px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
+.float-card input[type=text], .float-card input[type=number], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
+.float-card input[type=text]:focus, .float-card input[type=number]:focus { border-color: #38bdf8; }
+#popup-search { width: 300px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
 #popup-marker-settings { width: 250px; }
 #popup-text-settings { width: 260px; }
-#popup-shape-editor { width: 320px; }
+#popup-shape-editor { width: 340px; }
 #popup-custom-map { width: 310px; }
 #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
-#popup-route-settings { width: 220px; }
+#popup-route-settings { width: 260px; }
 #popup-polygon3d-settings { width: 280px; }
-#popup-attribute-table { width: 600px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
+#popup-attribute-table { width: 600px; max-width: 90vw; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
 .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
 .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
@@ -550,19 +548,20 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 7px 18px;
     font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none; font-weight:600;
 }
-/* Right-click context menu */
+/* Icons-Only Context Menu */
 #map-context-menu {
-    position: absolute; z-index: 3000; display: none; min-width: 200px;
+    position: absolute; z-index: 3000; display: none;
     background: rgba(9, 16, 24, 0.98); border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 10px; padding: 4px; box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+    border-radius: 12px; padding: 4px; box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+    display: none; flex-direction: row; gap: 4px;
 }
-.ctx-item {
-    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-    font-size: 12px; color: #f0f6fc; cursor: pointer; border-radius: 6px;
+.ctx-btn {
+    width: 32px; height: 32px; display: grid; place-items: center;
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px; color: #adbac7; cursor: pointer; transition: 0.15s;
 }
-.ctx-item:hover { background: rgba(255, 255, 255, 0.1); }
-.ctx-item svg { width: 14px; height: 14px; color: #adbac7; flex-shrink: 0; }
-.ctx-coords { padding: 6px 10px 8px 10px; font-size: 10px; color: #768390; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px; }
+.ctx-btn:hover { background: rgba(255, 255, 255, 0.15); color: #ffffff; }
+.ctx-btn svg { width: 15px; height: 15px; }
 #launcher-modal-scrim {
     position: fixed; inset: 0; z-index: 9999;
     display: flex; align-items: center; justify-content: center;
@@ -635,21 +634,35 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 }
 .search-result-item:hover { background: #f1f3f4; }
 .search-result-icon { width: 20px; height: 20px; flex-shrink: 0; color: #5f6368; }
-#trade-area-modal .float-card {
-    position: relative; top: auto; left: auto; transform: none; right: auto;
-    max-height: 85vh; width: 500px; max-width: 90vw; padding: 16px;
+
+/* Attribute Table Modal CSS */
+.attr-table-wrap {
+    width: 100%; max-height: 52vh; overflow: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;
 }
-.trade-area-poi-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
-.trade-area-poi-row label { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; }
-.custom-query-collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; color: #f0f6fc; font-size: 12px; margin-top: 8px;}
-/* Attribute Table Styles */
-.attr-table-container { width: 100%; overflow-y: auto; max-height: 50vh; }
 .attr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.attr-table th { position: sticky; top: 0; background: #0f172a; color: #f0f6fc; padding: 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 10; }
-.attr-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
-.attr-table input[type="text"] { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #f0f6fc; padding: 4px; border-radius: 4px; }
-.attr-table input[type="text"]:focus { border-color: #38bdf8; outline: none; }
-.attr-img-preview { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+.attr-table th {
+    position: sticky; top: 0; background: #0f172a; color: #f0f6fc;
+    padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.12);
+    z-index: 10; font-size: 11px;
+}
+.attr-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
+.attr-table input[type="text"] {
+    width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1);
+    color: #f0f6fc; padding: 4px 6px; border-radius: 4px; font-size: 12px;
+}
+.attr-table input[type="text"]:focus { border-color: #38bdf8; outline: none; background: rgba(0,0,0,0.4); }
+.attr-img-cell {
+    width: 80px; height: 80px; max-width: 80px; max-height: 80px;
+    object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);
+    cursor: pointer; display: block;
+}
+.attr-img-placeholder {
+    width: 80px; height: 80px; border: 1px dashed rgba(255,255,255,0.2);
+    border-radius: 6px; display: grid; place-items: center; font-size: 10px;
+    color: #768390; cursor: pointer; transition: 0.15s;
+}
+.attr-img-placeholder:hover { border-color: #38bdf8; color: #38bdf8; }
 </style>
 </head>
 <body>
@@ -661,15 +674,15 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </button>
     <div id="project-meta-cluster">
         <span id="project-name-display" title="Click to rename workspace">Untitled Project 1</span>
-        <div class="save-badge" id="save-status-badge">
+        <div class="save-badge saved" id="save-status-badge">
             <span id="save-dot">●</span>
             <span id="save-text">Saved</span>
         </div>
     </div>
-    <button class="tb-btn" id="btn-undo" title="Undo (Ctrl+Z)" style="color:#adbac7;">
+    <button class="tb-btn" id="btn-undo" title="Undo (Ctrl+Z)">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
     </button>
-    <button class="tb-btn" id="btn-redo" title="Redo (Ctrl+Y)" style="color:#adbac7;">
+    <button class="tb-btn" id="btn-redo" title="Redo (Ctrl+Y)">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path></svg>
     </button>
     <button class="tb-btn" id="btn-save-project" title="Save Workspace (Ctrl+S)" style="color:#3fb950;">
@@ -690,7 +703,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path></svg>
     </button>
     <button class="tb-btn tool" data-tool="polygon3d" title="Draw 3D Polygon">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v10l-8 4-8-4V7z M12 3v14 M20 7l-8 4 M4 7l8 4"/></svg>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
     </button>
     <button class="tb-btn tool" data-tool="rectangle" title="Draw Rectangle">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"></rect></svg>
@@ -803,9 +816,10 @@ select option:hover, select option:checked { background-color: #2563eb !importan
                 <label class="layer-row"> <span>All Provinces</span> <input type="checkbox" data-g="bound_prov"></label>
                 <label class="layer-row"> <span>All Cities</span> <input type="checkbox" data-g="bound_city"></label>
                 <label class="layer-row"> <span>All Brgys</span> <input type="checkbox" data-g="bound_brgy"></label>
-                <div style="font-weight:600; font-size:11px; color:#f0f6fc; margin-top:4px;">Highlight City Boundary</div>
+                <div style="font-weight:600; font-size:11px; color:#f0f6fc; margin-top:4px;">Highlight City / Admin Boundary</div>
                 <div class="bound-select-row">
-                    <input type="text" id="boundarySearchInput" placeholder="Search for a boundary..." autocomplete="off"/>
+                    <input type="text" id="boundarySearchInput" placeholder="Search administrative boundary (e.g. Quezon City)..." autocomplete="off"/>
+                    <button class="trade-btn" id="btnSearchBoundaryNominatim" style="padding:4px 8px; font-size:10px;">Search</button>
                     <div class="autocomplete-list" id="boundaryAutocompleteList"></div>
                 </div>
             </div>
@@ -832,7 +846,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
                 <span class="badge-count" id="layer-badge-count">0</span>
             </div>
         </div>
-        <div style="font-size:10px; color:#768390;">Tip: drag a layer card onto a group header to add it to that group.</div>
+        <div style="font-size:10px; color:#768390;">Tip: drag a layer card onto a group header to organize it.</div>
         <div id="my-layers-list"></div>
     </div>
 </div>
@@ -875,45 +889,56 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 </div>
 
 <div id="popup-route-settings" class="float-card right-card">
-    <div style="font-weight:600; font-size:11px; color:#768390;">ROUTE SETTINGS</div>
+    <div style="font-weight:700; font-size:12px; color:#f0f6fc;">ROUTE CONFIGURATION</div>
     <div class="f-row"><span>Mode</span>
         <select id="rProfile" style="width:130px;">
-            <option value="driving">Car</option>
-            <option value="cycling">Motorcycle</option>
-            <option value="walking">Walk</option>
+            <option value="driving" selected>Driving (Car)</option>
+            <option value="walking">Walking</option>
+            <option value="cycling">Cycling</option>
         </select>
     </div>
-    <div class="f-row"><span>Style</span>
+    <div class="f-row"><span>Style Preset</span>
         <select id="rColor" style="width:130px;">
-            <option value="#38bdf8">Blue</option>
-            <option value="#3fb950">Green</option>
-            <option value="#f85149">Red</option>
-            <option value="#a371f7">Purple</option>
+            <option value="#38bdf8" selected>Blue (#38bdf8)</option>
+            <option value="#3fb950">Green (#3fb950)</option>
+            <option value="#f85149">Red (#f85149)</option>
+            <option value="#a371f7">Purple (#a371f7)</option>
         </select>
     </div>
+    <div class="f-row"><span>Auto-Finish 2 Pts</span> <input type="checkbox" id="rAutoFinish" checked></div>
+    <div style="font-size:11px; color:#768390; margin-top:2px;">Click 2+ points on map. Press Enter to calculate.</div>
 </div>
 
 <div id="popup-polygon3d-settings" class="float-card right-card">
-    <div style="font-weight:600; font-size:11px; color:#768390;">3D POLYGON SETTINGS</div>
-    <div class="f-row"> <span>Height (m)</span> <input type="number" id="p3dHeight" min="1" max="500" step="1" value="50" style="width:100px;"></div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="p3dColor" value="#e8b84a"></div>
-    <div class="f-row"> <span>Opacity</span> <input type="range" id="p3dOpacity" min="0.1" max="1.0" step="0.1" value="0.7"></div>
+    <div style="font-weight:700; font-size:12px; color:#f0f6fc;">3D POLYGON SETTINGS</div>
+    <div class="f-row"> <span>Height (1–500m)</span> <input type="number" id="p3dHeight" min="1" max="500" step="1" value="50" style="width:90px;"></div>
+    <div class="f-row"> <span>Extrusion Color</span> <input type="color" id="p3dColor" value="#e8b84a"></div>
+    <div class="f-row"> <span>Opacity (0.1–1.0)</span> <input type="range" id="p3dOpacity" min="0.1" max="1.0" step="0.05" value="0.7"></div>
     <div class="f-row"> <span>Auto-Close</span> <input type="checkbox" id="p3dAutoClose" checked></div>
 </div>
 
 <div id="popup-shape-editor" class="float-card right-card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:700; color:#f0f6fc;" id="editShapeTitle">Edit Layer</span>
+        <span style="font-weight:700; color:#f0f6fc;" id="editShapeTitle">Edit Feature</span>
         <button class="card-btn" id="closeEditorBtn">✕</button>
     </div>
-    <div class="f-row"> <span>Name</span> <input type="text" id="eName" style="width:140px;"></div>
+    <div class="f-row"> <span>Name</span> <input type="text" id="eName" style="width:150px;"></div>
+    
+    <!-- Standard 2D Outline/Fill controls -->
     <div class="f-row" id="eBorderColorRow"> <span>Border Color</span> <input type="color" id="eBorderColor"></div>
     <div class="f-row" id="eBorderOpRow"> <span>Border Opacity</span> <input type="range" id="eBorderOp" min="0" max="1" step="0.05"></div>
     <div class="f-row" id="eWidthRow"> <span>Border Width</span> <input type="range" id="eWidth" min="1" max="16" step="1"></div>
     <div class="f-row" id="eFillColorRow"> <span>Fill Color</span> <input type="color" id="eFillColor"></div>
     <div class="f-row" id="eFillOpRow"> <span>Fill Opacity</span> <input type="range" id="eFillOp" min="0" max="1" step="0.05"></div>
-    <div class="f-row" id="eLabelToggleRow" style="display:none;"> <span>Show Label</span> <input type="checkbox" id="eShowLabel"></div>
-    <div class="f-row" id="eLabelPosRow" style="display:none;"> <span>Label Position</span>
+    
+    <!-- Label mapping / position controls -->
+    <div class="f-row" id="eLabelToggleRow"> <span>Show Map Label</span> <input type="checkbox" id="eShowLabel"></div>
+    <div class="f-row" id="eLabelAttrRow"> <span>Label Attribute</span>
+        <select id="eLabelAttrSelect" style="width:130px;">
+            <option value="_name">Layer Name</option>
+        </select>
+    </div>
+    <div class="f-row" id="eLabelPosRow"> <span>Label Position</span>
         <select id="eLabelPos" style="width:110px;">
             <option value="center">Center</option>
             <option value="top">Above</option>
@@ -922,31 +947,34 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <option value="right">Right</option>
         </select>
     </div>
+    
+    <!-- 3D Specific Controls -->
+    <div id="p3dEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.08); margin-top:8px; padding-top:8px;">
+        <div class="f-row"> <span>Height (m)</span> <input type="number" id="eP3dHeight" min="1" max="500" step="1" style="width:90px;"></div>
+        <div class="f-row"> <span>Extrusion Color</span> <input type="color" id="eP3dColor"></div>
+        <div class="f-row"> <span>Opacity</span> <input type="range" id="eP3dOpacity" min="0.1" max="1.0" step="0.05"></div>
+    </div>
+
+    <!-- Route Specific Controls -->
+    <div id="routeEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.08); margin-top:8px; padding-top:8px;">
+        <div class="f-row"> <span>Route Mode</span>
+            <select id="eRouteMode" style="width:120px;">
+                <option value="driving">Driving</option>
+                <option value="walking">Walking</option>
+                <option value="cycling">Cycling</option>
+            </select>
+        </div>
+        <div class="f-row" style="margin-top:4px;"> <span>Stats</span> <span id="eRouteStats" style="font-size:11px; color:#38bdf8; font-weight:600;">-</span></div>
+        <div style="font-size:11px; font-weight:700; color:#768390; margin-top:6px;">Waypoints</div>
+        <div id="eRouteWaypointList" style="max-height:90px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
+        <button id="eRecalcRoute" class="trade-btn" style="width:100%; margin-top:8px; font-size:10px;">Recalculate Route</button>
+    </div>
+
     <div class="f-row" id="eMarkerSizeRow" style="display:none;"> <span>Icon Size</span> <input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
     <div class="f-row" id="eTextRow" style="display:none;"> <span>Text</span> <input type="text" id="eTextVal" style="width:140px;"></div>
     <div class="f-row" id="eFontSizeRow" style="display:none;"> <span>Font Size</span> <input type="range" id="eFontSize" min="10" max="42" step="1"></div>
     
-    <!-- Route Specific Controls -->
-    <div id="routeEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
-        <div class="f-row"> <span>Route Mode</span>
-            <select id="eRouteMode" style="width:110px;">
-                <option value="driving">Driving</option>
-                <option value="cycling">Cycling</option>
-                <option value="walking">Walking</option>
-            </select>
-        </div>
-        <div class="f-row" style="margin-top:4px;"> <span>Stats</span> <span id="eRouteStats" style="font-size:11px; color:#adbac7;">-</span></div>
-        <button id="eRecalcRoute" class="trade-btn" style="width:100%; margin-top:6px; font-size:10px;">Recalculate Route</button>
-    </div>
-
-    <!-- 3D Polygon Specific Controls -->
-    <div id="p3dEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
-        <div class="f-row"> <span>Height (m)</span> <input type="number" id="eP3dHeight" min="1" max="500" step="1" style="width:100px;"></div>
-        <div class="f-row"> <span>Extrusion Color</span> <input type="color" id="eP3dColor"></div>
-        <div class="f-row"> <span>Opacity</span> <input type="range" id="eP3dOpacity" min="0.1" max="1.0" step="0.1"></div>
-    </div>
-
-    <div style="display:flex; justify-content:space-between; margin-top:6px;">
+    <div style="display:flex; justify-content:space-between; margin-top:8px;">
         <button id="eDeleteBtn" style="color:#f85149; border:1px solid #da36334d; background:#da36331a; padding:6px 12px; border-radius:6px; cursor:pointer;">Delete</button>
         <button id="eDoneBtn" style="background:#316dca; color:#fff; border:none; padding:6px 16px; border-radius:6px; cursor:pointer;">Done</button>
     </div>
@@ -988,56 +1016,44 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 </div>
 
 <!-- Trade Area Analysis Modal -->
-<div id="trade-area-modal" class="modal-scrim" style="position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.6);">
+<div id="trade-area-modal" class="modal-scrim" style="position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.65);">
     <div class="float-card open" style="width:500px; max-width:90vw; max-height:85vh; padding:16px;">
-        <div class="panel-header">
+        <div class="panel-header" style="padding-top:0;">
             <div class="panel-title">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
                 <span>Trade Area Analysis</span>
             </div>
             <button class="card-btn" id="closeTradeAreaBtn">✕</button>
         </div>
-        <div class="f-row"> <span>Target Polygon</span>
-            <select id="tradePolygonSelect" style="width:170px;"> <option value="">-- Choose --</option></select>
+        <div class="f-row" style="margin-top:6px;"> <span>Target Polygon</span>
+            <select id="tradePolygonSelect" style="width:180px;"> <option value="">-- Choose --</option></select>
         </div>
-        <div style="font-weight:600; font-size:11px; color:#768390;">POI CATEGORIES</div>
-        <div id="poiCategoryCheckboxes" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
+        <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">POI TAXONOMY PRESETS</div>
+        <div id="poiCategoryCheckboxes" style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;"></div>
+        
+        <div style="margin-top:6px;">
+            <div style="font-weight:600; font-size:11px; color:#768390; margin-bottom:4px;">Custom POI Search (Tag or Amenity)</div>
+            <input type="text" id="customPoiSearchInput" placeholder='e.g. "amenity"="cafe" or "shop"="coffee"' style="width:100%; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px 8px; font-size:11px;"/>
         </div>
-        <div style="margin-top:8px;">
-            <div style="font-weight:600; font-size:11px; color:#768390; margin-bottom:4px;">Custom POI Search</div>
-            <input type="text" id="customPoiSearchInput" placeholder="e.g. amenity=restaurant" style="width:100%; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px; font-size:11px;"/>
-        </div>
-        <button class="trade-btn" id="btnScanTradeArea" style="margin-top:8px;">Scan POIs</button>
+        <button class="trade-btn" id="btnScanTradeArea" style="margin-top:8px;">Scan POIs Inside Area</button>
         <div id="tradeResults" class="poi-summary"></div>
-        <hr style="border-color:rgba(255,255,255,0.1); width:100%;"/>
-        <div class="custom-query-collapse-header" id="customQueryToggle">
-            <span>CUSTOM OVERPASS QUERY</span>
-            <span style="font-size:14px;">▸</span>
-        </div>
-        <div id="customQueryBody" style="display:none;">
-            <textarea id="overpassQueryInput" rows="5" style="background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px; font-size:12px; width:100%;"></textarea>
-            <div class="f-row"> <span>Result type</span>
-                <select id="overpassResultType" style="width:110px;">
-                    <option value="marker">Markers</option>
-                    <option value="polygon">Polygons</option>
-                </select>
-            </div>
-            <button id="btnRunOverpass" class="trade-btn">Run Custom Query</button>
-        </div>
     </div>
 </div>
 
 <!-- Attribute Table Modal -->
 <div id="popup-attribute-table" class="float-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <span style="font-weight:700; color:#f0f6fc;" id="attrTableTitle">Attributes</span>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+            <span style="font-weight:700; color:#f0f6fc;" id="attrTableTitle">Attribute Table</span>
+        </div>
         <button class="card-btn" id="closeAttrTableBtn">✕</button>
     </div>
-    <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <input type="text" id="attrTableSearch" placeholder="Find in table..." style="flex:1; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px; font-size:11px;"/>
-        <button id="btnAddAttrCol" class="trade-btn" style="padding:6px 10px; font-size:10px;">+ Add Column</button>
+    <div style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="attrTableSearch" placeholder="Find in table..." style="flex:1; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px 8px; font-size:11px;"/>
+        <button id="btnAddAttrCol" class="trade-btn" style="padding:6px 12px; font-size:11px; white-space:nowrap;">+ Add Column</button>
     </div>
-    <div class="attr-table-container">
+    <div class="attr-table-wrap">
         <table class="attr-table" id="attrTableGrid">
             <thead><tr id="attrTableHeader"></tr></thead>
             <tbody id="attrTableBody"></tbody>
@@ -1045,21 +1061,26 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </div>
 </div>
 
-<!-- Right-click context menu -->
+<!-- Icons-Only Context Menu -->
 <div id="map-context-menu">
-    <div class="ctx-coords" id="ctx-coords-label">0.000000, 0.000000</div>
-    <div class="ctx-item" id="ctx-copy">
+    <button class="ctx-btn" id="ctx-edit" title="Edit Feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+    </button>
+    <button class="ctx-btn" id="ctx-dup" title="Duplicate Feature">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-        Copy Coordinates
-    </div>
-    <div class="ctx-item" id="ctx-gmaps">
+    </button>
+    <button class="ctx-btn" id="ctx-del" title="Delete Feature" style="color:#ff7b72;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+    </button>
+    <button class="ctx-btn" id="ctx-copy" title="Copy Coordinates">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+    </button>
+    <button class="ctx-btn" id="ctx-gmaps" title="Open in Google Maps">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
-        Open in Google Maps
-    </div>
-    <div class="ctx-item" id="ctx-streetview">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-        Open in Street View
-    </div>
+    </button>
+    <button class="ctx-btn" id="ctx-streetview" title="Open in Street View">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle><line x1="21.17" y1="8" x2="12" y2="8"></line><line x1="3.95" y1="6.06" x2="8.54" y2="14"></line><line x1="10.88" y1="21.94" x2="15.46" y2="14"></line></svg>
+    </button>
 </div>
 
 <div id="launcher-modal-scrim" class="visible">
@@ -1130,35 +1151,27 @@ let customGroups = __INITIAL_CUSTOM_GROUPS__ || {"Trade Area Scan": {collapsed: 
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
 let markerShape = 'pin', markerColor = '#003366', markerIconSize = 0.9;
-let markerFrame = 'none';
 let customMarkerImageKey = null;
 let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
 let isDirty = false;
 
-// Undo/Redo State
+// History Stack (Undo/Redo)
 let historyStack = [];
 let historyIndex = -1;
 let isHistoryAction = false;
 
-// Vertex dragging state
+// Vertex Dragging & Editing State
 let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null;
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
 
-// Rotation state
-let isDraggingRotation = false, rotatingPolyId = null, rotCenter = null, rotStartAngle = 0, rotOriginalCoords = null;
-
-// Context menu state
+// Context Menu State
 let ctxLngLat = null;
 let ctxFeatureId = null;
 
-// Attribute Table State
+// Global State
 let currentTableFeatureId = null;
-
-// Route State
 let currentRouteMode = 'driving';
-
-// 3D Polygon State
 let current3DPolyHeight = 50;
 let current3DPolyColor = '#e8b84a';
 let current3DPolyOpacity = 0.7;
@@ -1203,38 +1216,36 @@ const setSaveBadgeStatus = status => {
     else text.textContent = 'Unsaved';
 };
 
+const pushHistory = () => {
+    if (isHistoryAction) return;
+    const stateStr = JSON.stringify({ features, customGroups });
+    if (historyIndex < historyStack.length - 1) {
+        historyStack = historyStack.slice(0, historyIndex + 1);
+    }
+    historyStack.push(stateStr);
+    if (historyStack.length > 40) historyStack.shift();
+    else historyIndex++;
+};
+
 const markDirty = () => {
     isDirty = true;
     setSaveBadgeStatus('unsaved');
-    if (!isHistoryAction) {
-        // Push to history
-        const currentState = JSON.stringify({features, customGroups});
-        if (historyIndex < historyStack.length - 1) {
-            historyStack = historyStack.slice(0, historyIndex + 1);
-        }
-        historyStack.push(currentState);
-        historyIndex++;
-        // Limit stack size
-        if (historyStack.length > 50) {
-            historyStack.shift();
-            historyIndex--;
-        }
-    }
+    pushHistory();
 };
 
 const undo = () => {
     if (historyIndex > 0) {
         historyIndex--;
         const state = JSON.parse(historyStack[historyIndex]);
-        features = state.features;
-        customGroups = state.customGroups;
+        isHistoryAction = true;
+        features = JSON.parse(JSON.stringify(state.features));
+        customGroups = JSON.parse(JSON.stringify(state.customGroups));
         fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
         syncDraw();
         renderMyLayers();
-        isHistoryAction = true;
-        markDirty(); 
         isHistoryAction = false;
-        hint('Undo');
+        setSaveBadgeStatus('unsaved');
+        hint('Undo action performed');
     }
 };
 
@@ -1242,20 +1253,20 @@ const redo = () => {
     if (historyIndex < historyStack.length - 1) {
         historyIndex++;
         const state = JSON.parse(historyStack[historyIndex]);
-        features = state.features;
-        customGroups = state.customGroups;
+        isHistoryAction = true;
+        features = JSON.parse(JSON.stringify(state.features));
+        customGroups = JSON.parse(JSON.stringify(state.customGroups));
         fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
         syncDraw();
         renderMyLayers();
-        isHistoryAction = true;
-        markDirty();
         isHistoryAction = false;
-        hint('Redo');
+        setSaveBadgeStatus('unsaved');
+        hint('Redo action performed');
     }
 };
 
-// Initialize history
-historyStack.push(JSON.stringify({features, customGroups}));
+// Initial History Seed
+historyStack.push(JSON.stringify({ features, customGroups }));
 historyIndex = 0;
 
 const closeFloatingCards = () => {
@@ -1277,7 +1288,6 @@ const resetActiveTools = () => {
     hint('');
 };
 
-// ----------------- Project Auto-Naming Calculation -----------------
 function getNextUntitledProjectName() {
     const untitledRegex = /^Untitled Project (\d+)$/i;
     let maxN = 0;
@@ -1291,7 +1301,7 @@ function getNextUntitledProjectName() {
     return `Untitled Project ${maxN + 1}`;
 }
 
-// ----------------- Launcher Modal UI -----------------
+// ----------------- Workspace Launcher -----------------
 function openHomeDialog() {
     closeFloatingCards();
     $('launcher-modal-scrim').classList.add('visible');
@@ -1370,8 +1380,7 @@ window.loadProjectDirectly = function(projectId) {
         renderMyLayers();
     });
     closeHomeDialog();
-    // Reset history for new project
-    historyStack = [JSON.stringify({features, customGroups})];
+    historyStack = [JSON.stringify({ features, customGroups })];
     historyIndex = 0;
 };
 
@@ -1402,7 +1411,7 @@ window.renameProjectFromLauncher = async function(e, projectId, oldName) {
 
 window.deleteProjectFromLauncher = async function(e, projectId, name) {
     e.stopPropagation();
-    if (!confirm(`Delete project "${name}" permanently?`)) return;
+    if (!confirm(`Delete workspace "${name}" permanently?`)) return;
     ALL_PROJECTS = ALL_PROJECTS.filter(x => x.id !== projectId);
     renderProjectsList();
     try {
@@ -1461,7 +1470,7 @@ $('btn-create-project-submit').onclick = async () => {
 };
 
 $('project-name-display').onclick = () => {
-    const newN = prompt('Rename project name:', currentProjectName);
+    const newN = prompt('Rename workspace:', currentProjectName);
     if (newN && newN.trim() && newN.trim() !== currentProjectName) {
         currentProjectName = newN.trim();
         $('project-name-display').textContent = currentProjectName;
@@ -1469,9 +1478,10 @@ $('project-name-display').onclick = () => {
     }
 };
 
-// ----------------- Supabase Sync & Autosave Engine -----------------
+// ----------------- Supabase Autosave Engine -----------------
 async function saveProjectToSupabase(showToast = false) {
     if (!currentProjectId || currentProjectId === "local-temp" || !SUPABASE_URL || !SUPABASE_KEY) {
+        if (showToast) hint('Saved locally');
         return;
     }
     setSaveBadgeStatus('saving');
@@ -1502,14 +1512,14 @@ async function saveProjectToSupabase(showToast = false) {
         if (res.ok) {
             isDirty = false;
             setSaveBadgeStatus('saved');
-            if (showToast) hint('Project Saved!');
+            if (showToast) hint('Workspace Saved!');
         } else {
             setSaveBadgeStatus('unsaved');
-            if (showToast) hint('Failed to save project');
+            if (showToast) hint('Failed to sync save');
         }
     } catch(e) {
         setSaveBadgeStatus('unsaved');
-        if (showToast) hint('Save request error');
+        if (showToast) hint('Save network error');
     }
 }
 
@@ -1533,10 +1543,11 @@ document.addEventListener('keydown', e => {
     }
     if (e.key === 'Escape') {
         $('map-context-menu').style.display = 'none';
+        if (activeTool) resetActiveTools();
     }
 });
 
-// ----------------- Marker Icon Pipeline (Standard & Custom) -----------------
+// ----------------- Marker Rendering Pipeline -----------------
 function renderIconCanvas(shape, color) {
     const c = document.createElement('canvas');
     c.width = 64; c.height = 64;
@@ -1599,109 +1610,32 @@ function getIconKey(shape, color) {
     return key;
 }
 
-function createCustomMarkerImage(dataUrl, frame) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const c = document.createElement('canvas');
-            const baseSize = 64;
-            c.width = baseSize;
-            c.height = baseSize;
-            const ctx = c.getContext('2d');
-            ctx.clearRect(0,0,baseSize,baseSize);
-            if (frame === '2d' || frame === '3d') {
-                const pad = 6;
-                const rectX = pad, rectY = pad, rectW = baseSize - pad*2, rectH = baseSize - pad*2;
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = 'rgba(0,0,0,0.4)';
-                ctx.shadowBlur = 8;
-                ctx.shadowOffsetX = frame === '3d' ? 4 : 2;
-                ctx.shadowOffsetY = frame === '3d' ? 4 : 2;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(rectX, rectY, rectW, rectH, 10); else ctx.rect(rectX, rectY, rectW, rectH);
-                ctx.fill();
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-                const innerPad = 12;
-                ctx.drawImage(img, innerPad, innerPad, baseSize - innerPad*2, baseSize - innerPad*2);
-            } else if (frame === 'pinphoto') {
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(32, 22, 14, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(32, 22, 12, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.save();
-                ctx.clip();
-                ctx.drawImage(img, 20, 10, 24, 24);
-                ctx.restore();
-                ctx.beginPath();
-                ctx.arc(32, 22, 14, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(20, 32);
-                ctx.lineTo(44, 32);
-                ctx.lineTo(32, 50);
-                ctx.closePath();
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
-            } else if (frame === 'boxarrow') {
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                const boxX = 10, boxY = 10, boxW = 44, boxH = 32;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(boxX, boxY, boxW, boxH, 6); else ctx.rect(boxX, boxY, boxW, boxH);
-                ctx.fill();
-                ctx.save();
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(boxX+3, boxY+3, boxW-6, boxH-6, 4); else ctx.rect(boxX+3, boxY+3, boxW-6, boxH-6);
-                ctx.clip();
-                ctx.drawImage(img, boxX+3, boxY+3, boxW-6, boxH-6);
-                ctx.restore();
-                ctx.beginPath();
-                ctx.moveTo(32, boxY + boxH);
-                ctx.lineTo(28, boxY + boxH + 10);
-                ctx.lineTo(36, boxY + boxH + 10);
-                ctx.closePath();
-                ctx.fill();
-            } else {
-                ctx.drawImage(img, 0, 0, baseSize, baseSize);
-            }
-            resolve(c);
-        };
-        img.onerror = reject;
-        img.src = dataUrl;
-    });
-}
-
 $('customMarkerFileInput').onchange = function(e) {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-        hint('Image must be ≤ 5 MB');
+        hint('Image must be <= 5MB');
         return;
     }
     const reader = new FileReader();
     reader.onload = async (ev) => {
         customMarkerDataUrl = ev.target.result;
-        const frame = $('markerFrameSelect') ? $('markerFrameSelect').value : 'none';
-        const canvas = await createCustomMarkerImage(customMarkerDataUrl, frame);
-        const key = 'custom_marker_' + Date.now();
-        const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
-        try {
-            if (map.hasImage(key)) map.removeImage(key);
-            map.addImage(key, imgData, { pixelRatio: 2 });
-            customMarkerImageKey = key;
-            hint('Custom marker ready');
-        } catch(err) { hint('Failed to add custom image'); }
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = 64; c.height = 64;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0, 64, 64);
+            const key = 'custom_marker_' + Date.now();
+            const imgData = ctx.getImageData(0,0,64,64);
+            try {
+                if (map.hasImage(key)) map.removeImage(key);
+                map.addImage(key, imgData, { pixelRatio: 2 });
+                customMarkerImageKey = key;
+                hint('Custom marker pin ready');
+            } catch(err) {}
+        };
+        img.src = customMarkerDataUrl;
     };
     reader.readAsDataURL(file);
 };
@@ -1725,37 +1659,47 @@ $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
     markerShape = b.dataset.s;
     $('markerIconGrid').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
     customMarkerImageKey = null;
-    markDirty();
 });
-$('mColor').oninput = e => { markerColor = e.target.value; markDirty(); };
-$('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); markDirty(); };
+$('mColor').oninput = e => { markerColor = e.target.value; };
+$('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); };
 
-// ----------------- Vector Layers Pipeline -----------------
-const fc = list => ({
-    type: 'FeatureCollection',
-    features: list.map(f => ({
-        type: 'Feature',
-        geometry: f.geometry,
-        properties: Object.assign({ id: f.id, name: f.name, kind: f.kind }, f.props)
-    }))
-});
+// ----------------- Vector Rendering Stack -----------------
+const fc = list => {
+    // 60FPS Performance Guard: Cap visible 3D polygons to 50
+    let p3dCount = 0;
+    const mapped = list.map(f => {
+        let isVis = f.props.visible !== 0 ? 1 : 0;
+        if (f.kind === 'polygon3d') {
+            p3dCount++;
+            if (p3dCount > 50) isVis = 0;
+        }
+        return {
+            type: 'Feature',
+            geometry: f.geometry,
+            properties: Object.assign({ id: f.id, name: f.name, kind: f.kind }, f.props, { visible: isVis })
+        };
+    });
+    return { type: 'FeatureCollection', features: mapped };
+};
 
 function addDrawStack() {
     if (!map.getSource('draw')) {
         map.addSource('draw', { type: 'geojson', data: fc(features) });
 
+        // 2D Polygon Fill
         map.addLayer({
             id: 'draw-fill', type: 'fill', source: 'draw',
-            filter: ['==', ['geometry-type'], 'Polygon'],
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
             paint: {
                 'fill-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
                 'fill-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.35], ['get', 'visible']]
             }
         });
 
+        // 2D Polygon Outlines
         map.addLayer({
             id: 'draw-outline', type: 'line', source: 'draw',
-            filter: ['==', ['geometry-type'], 'Polygon'],
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
             paint: {
                 'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#e8b84a'],
                 'line-width': ['coalesce', ['get', 'width'], 3],
@@ -1763,17 +1707,43 @@ function addDrawStack() {
             }
         });
 
+        // 3D Polygons Extrusion
+        map.addLayer({
+            id: 'draw-3d-extrusion', type: 'fill-extrusion', source: 'draw',
+            filter: ['==', ['get', 'kind'], 'polygon3d'],
+            paint: {
+                'fill-extrusion-color': ['coalesce', ['get', 'extrusionColor'], ['get', 'fillColor'], '#e8b84a'],
+                'fill-extrusion-height': ['coalesce', ['get', 'height'], 50],
+                'fill-extrusion-base': 0,
+                'fill-extrusion-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.7], ['get', 'visible']]
+            }
+        });
+
+        // 3D Roof Outline definition
+        map.addLayer({
+            id: 'draw-3d-roof', type: 'line', source: 'draw',
+            filter: ['==', ['get', 'kind'], 'polygon3d'],
+            paint: {
+                'line-color': '#ffffff',
+                'line-width': 1.2,
+                'line-opacity': ['*', 0.5, ['get', 'visible']]
+            }
+        });
+
+        // Polylines & Routes (with fallback dashed support)
         map.addLayer({
             id: 'draw-line', type: 'line', source: 'draw',
             filter: ['==', ['geometry-type'], 'LineString'],
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-                'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#38bdf8'],
+                'line-color': ['case', ['boolean', ['get', 'routingFailed'], false], '#f85149', ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#38bdf8']],
                 'line-width': ['coalesce', ['get', 'width'], 4],
-                'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['get', 'visible']]
+                'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['get', 'visible']],
+                'line-dasharray': ['case', ['boolean', ['get', 'routingFailed'], false], ['literal', [2, 2]], ['literal', [1, 0]]]
             }
         });
 
+        // Marker Pins
         map.addLayer({
             id: 'draw-marker', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
@@ -1786,6 +1756,7 @@ function addDrawStack() {
             paint: { 'icon-opacity': ['get', 'visible'] }
         });
 
+        // Text Labels
         map.addLayer({
             id: 'draw-text', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'text']],
@@ -1804,29 +1775,16 @@ function addDrawStack() {
             }
         });
 
-        // 3D Extrusion Layer
-        map.addLayer({
-            id: 'draw-3d-extrusion', type: 'fill-extrusion', source: 'draw',
-            filter: ['==', ['get', 'kind'], 'polygon3d'],
-            paint: {
-                'fill-extrusion-color': ['coalesce', ['get', 'extrusionColor'], '#e8b84a'],
-                'fill-extrusion-height': ['coalesce', ['get', 'height'], 50],
-                'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': ['coalesce', ['get', 'fillOpacity'], 0.7]
-            }
-        });
-
-        // Single-label-per-layer source
+        // Dynamic Map Labels (Poly / Route Centers)
         map.addSource('label-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
             id: 'draw-poly-labels', type: 'symbol', source: 'label-src',
             layout: {
                 'text-field': ['get', 'labelText'],
                 'text-font': ['Noto Sans Regular'],
-                'text-size': 13,
+                'text-size': 12,
                 'text-allow-overlap': true,
-                'text-anchor': 'center',
-                'text-justify': 'center'
+                'text-anchor': 'center'
             },
             paint: {
                 'text-color': '#ffffff',
@@ -1835,7 +1793,7 @@ function addDrawStack() {
             }
         });
 
-        // Pulse highlight source
+        // Pulse Highlight Layer
         map.addSource('pulse-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
             id: 'pulse-circle', type: 'circle', source: 'pulse-src',
@@ -1894,12 +1852,17 @@ function syncLabels() {
     if (!src) return;
     const feats = [];
     features.forEach(f => {
-        if (!f.props.showLabel || f.props.visible === 0 || !f.name) return;
+        if (!f.props.showLabel || f.props.visible === 0) return;
         
-        // Handle route labels specially
-        let labelText = f.name;
+        let displayStr = f.name;
+        if (f.props.labelAttribute && f.props.labelAttribute !== '_name') {
+            const attrKey = f.props.labelAttribute;
+            if (f.props.attributes && f.props.attributes[attrKey] !== undefined) {
+                displayStr = String(f.props.attributes[attrKey]);
+            }
+        }
         if (f.kind === 'route' && f.props.description) {
-            labelText = f.props.description;
+            displayStr = f.props.description;
         }
 
         const pos = f.props.labelPos || 'center';
@@ -1918,8 +1881,6 @@ function syncLabels() {
             if (!b) return;
             const cx = (b[0][0] + b[1][0]) / 2;
             const cy = (b[0][1] + b[1][1]) / 2;
-            
-            // For 3D polygons, adjust label position slightly up if needed, but usually center of base is fine for anchor
             if (pos === 'top') coords = [cx, b[1][1]];
             else if (pos === 'bottom') coords = [cx, b[0][1]];
             else if (pos === 'left') coords = [b[0][0], cy];
@@ -1929,21 +1890,23 @@ function syncLabels() {
         feats.push({
             type: 'Feature',
             geometry: { type: 'Point', coordinates: coords },
-            properties: { labelText: labelText }
+            properties: { labelText: displayStr }
         });
     });
     src.setData({ type: 'FeatureCollection', features: feats });
 }
 
-function pulseFeature(f) {
-    const b = calcBounds(f);
-    if (!b) return;
-    const c = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
+function pulseFeature(f, customCenter = null, duration = 1600) {
+    let c = customCenter;
+    if (!c) {
+        const b = calcBounds(f);
+        if (!b) return;
+        c = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
+    }
     const src = map.getSource('pulse-src');
     if (!src) return;
     src.setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: {} }] });
     const start = performance.now();
-    const dur = 1600;
     function frame(t) {
         const el = t - start;
         const prog = (el % 800) / 800;
@@ -1953,7 +1916,7 @@ function pulseFeature(f) {
             map.setPaintProperty('pulse-circle', 'circle-radius', r);
             map.setPaintProperty('pulse-circle', 'circle-opacity', op);
         }
-        if (el < dur) requestAnimationFrame(frame);
+        if (el < duration) requestAnimationFrame(frame);
         else src.setData({ type: 'FeatureCollection', features: [] });
     }
     requestAnimationFrame(frame);
@@ -1976,20 +1939,6 @@ function syncVertexHandles() {
                     geometry: { type: 'Point', coordinates: coords[i] },
                     properties: { polyId: f.id, vIdx: i }
                 });
-            }
-            // Add rotation handle if selected
-            if (f.id === selectedId) {
-                const b = calcBounds(f);
-                if (b) {
-                    const cx = (b[0][0] + b[1][0]) / 2;
-                    const cy = (b[0][1] + b[1][1]) / 2;
-                    const offset = (b[1][1] - b[0][1]) * 0.25 || 0.001;
-                    handleFeats.push({
-                        type: 'Feature',
-                        geometry: { type: 'Point', coordinates: [cx, b[1][1] + offset] },
-                        properties: { polyId: f.id, isRotHandle: true }
-                    });
-                }
             }
         }
         if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry && f.geometry.coordinates) {
@@ -2062,7 +2011,7 @@ map.on('load', () => {
     populateTradeAreaCheckboxes();
 });
 
-// ----------------- 2D vs 3D Dimension Switcher -----------------
+// ----------------- Dimension Switcher -----------------
 $('btn2DMode').onclick = () => {
     $('btn2DMode').classList.add('active');
     $('btn3DMode').classList.remove('active');
@@ -2084,7 +2033,7 @@ $('btn3DMode').onclick = () => {
     markDirty();
 };
 
-// ----------------- Geometry Utilities -----------------
+// ----------------- Geometry & Routing Helpers -----------------
 function haversineDist(a, b) {
     const R = 6371000, dLa = (b[1]-a[1]) * Math.PI/180, dLo = (b[0]-a[0]) * Math.PI/180;
     const s = Math.sin(dLa/2)**2 + Math.cos(a[1]*Math.PI/180) * Math.cos(b[1]*Math.PI/180) * Math.sin(dLo/2)**2;
@@ -2117,13 +2066,14 @@ function pointInPolygon(point, vs) {
 }
 
 let rerouteTimeout = null;
-function fetchMultiPointRoute(pts, updateId = null, mode = null) {
+async function fetchMultiPointRoute(pts, updateId = null, mode = null) {
     hint('Calculating route…');
-    const profile = mode || $('rProfile') ? $('rProfile').value : 'driving';
+    const profile = mode || (updateId ? (features.find(x => x.id === updateId)?.props?.routeMode || currentRouteMode) : ($('rProfile') ? $('rProfile').value : 'driving'));
+    currentRouteMode = profile;
     const coordStr = pts.map(p => `${p[0]},${p[1]}`).join(';');
-    fetch(`https://router.project-osrm.org/route/v1/${profile}/${coordStr}?overview=full&geometries=geojson`)
-    .then(r => r.json())
-    .then(j => {
+    try {
+        const res = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${coordStr}?overview=full&geometries=geojson`);
+        const j = await res.json();
         if (j.routes && j.routes[0]) {
             const route = j.routes[0];
             const geom = route.geometry;
@@ -2140,12 +2090,14 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
                     f.props.description = desc;
                     f.props.routeMode = profile;
                     f.props.metadata = { distance: dist, duration: dur };
+                    f.props.waypoints = pts;
+                    f.props.routingFailed = false;
                     syncDraw();
                     renderMyLayers();
                     markDirty();
-                    // Update editor stats if open
                     if (selectedId === updateId) {
                         $('eRouteStats').textContent = desc;
+                        renderRouteWaypointsList(f);
                     }
                 }
             } else {
@@ -2155,41 +2107,49 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
                     description: desc,
                     routeMode: profile,
                     metadata: { distance: dist, duration: dur },
+                    waypoints: pts,
+                    routingFailed: false,
                     showLabel: true
                 });
             }
+            hint('');
         } else {
             throw new Error("No route found");
         }
-        hint('');
-    })
-    .catch(() => {
+    } catch(err) {
+        // Fallback straight LineString
         if (updateId) {
-             const f = features.find(x => x.id === updateId);
-             if (f) {
-                 f.props.routingFailed = true;
-                 f.props.description = "Routing unavailable – straight line shown";
-                 syncDraw();
-                 markDirty();
-             }
+            const f = features.find(x => x.id === updateId);
+            if (f) {
+                f.geometry = { type: 'LineString', coordinates: pts };
+                f.props.routingFailed = true;
+                f.props.description = "Routing unavailable – straight line shown";
+                f.props.routeMode = profile;
+                f.props.waypoints = pts;
+                syncDraw();
+                markDirty();
+            }
         } else {
             const color = $('rColor') ? $('rColor').value : '#38bdf8';
             addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { 
                 color: color, borderColor: color, width: 3, borderOpacity: 0.8,
                 routingFailed: true,
                 description: "Routing unavailable – straight line shown",
-                routeMode: profile
+                routeMode: profile,
+                waypoints: pts,
+                showLabel: true
             });
         }
-        hint('Direct route fallback');
-    });
+        hint('Direct straight line fallback');
+    }
 }
 
 function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, explicitName = null) {
     const newId = ++fid;
     const isRoute = kind === 'route';
     const is3D = kind === 'polygon3d';
-    const defaultBorder = isRoute ? '#38bdf8' : '#e8b84a';
+    const defaultBorder = isRoute ? '#38bdf8' : (is3D ? '#e8b84a' : '#e8b84a');
+    const defaultFill = is3D ? current3DPolyColor : '#e8b84a';
     const assignedName = explicitName || `${kind === 'polygon3d' ? '3D Polygon' : kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
     const feat = {
         id: newId,
@@ -2201,13 +2161,18 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
             borderColor: defaultBorder,
             borderOpacity: 0.9,
             width: 3,
-            fillColor: '#e8b84a',
-            fillOpacity: 0.35,
+            fillColor: defaultFill,
+            fillOpacity: is3D ? current3DPolyOpacity : 0.35,
             showLabel: false,
             labelPos: 'center',
+            labelAttribute: '_name',
             iconSize: markerIconSize,
             visible: 1,
-            attributes: {}, // For attribute table
+            height: is3D ? current3DPolyHeight : 50,
+            extrusionColor: is3D ? current3DPolyColor : '#e8b84a',
+            routeMode: isRoute ? currentRouteMode : null,
+            metadata: {},
+            attributes: {},
             ...customProps
         }
     };
@@ -2227,9 +2192,9 @@ function populateTradeAreaCheckboxes() {
     let html = '';
     for (const category in POI_CONFIG) {
         html += `<div style="font-weight:600; font-size:11px; margin-top:4px;">${category}</div>`;
-        html += '<div class="trade-area-poi-row">';
-        POI_CONFIG[category].forEach(([label, tag], idx) => {
-            html += `<label> <input type="checkbox" class="poi-cat-check" data-cat="${category}" data-tag="${tag}" data-label="${label}" style="accent-color:#316dca;"> ${label}</label>`;
+        html += '<div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px;">';
+        POI_CONFIG[category].forEach(([label, tag]) => {
+            html += `<label style="display:inline-flex; align-items:center; gap:3px; font-size:11px; white-space:nowrap;"> <input type="checkbox" class="poi-cat-check" data-cat="${category}" data-tag="${tag}" data-label="${label}" style="accent-color:#316dca;"> ${label}</label>`;
         });
         html += '</div>';
     }
@@ -2251,7 +2216,7 @@ async function robustOverpassFetch(query, timeout = 90) {
         "https://overpass.openstreetmap.fr/api/interpreter"
     ];
     for (const endpoint of endpoints) {
-        let retries = 5;
+        let retries = 4;
         let delay = 1000;
         while (retries > 0) {
             try {
@@ -2270,7 +2235,7 @@ async function robustOverpassFetch(query, timeout = 90) {
             } catch (err) {
                 retries--;
                 if (retries === 0) break;
-                await new Promise(r => setTimeout(r, delay + Math.random() * 500));
+                await new Promise(r => setTimeout(r, delay + Math.random() * 400));
                 delay *= 2;
             }
         }
@@ -2282,7 +2247,7 @@ $('btnScanTradeArea').onclick = async () => {
     const polyId = parseInt($('tradePolygonSelect').value, 10);
     const targetPoly = features.find(f => f.id === polyId);
     if (!targetPoly) {
-        hint('Please select a target polygon first.');
+        hint('Select a target polygon boundary first');
         return;
     }
     
@@ -2291,14 +2256,13 @@ $('btnScanTradeArea').onclick = async () => {
         selectedTags.push(cb.dataset.tag);
     });
     
-    // Add custom POI search
     const customSearch = $('customPoiSearchInput').value.trim();
     if (customSearch) {
-        selectedTags.push(customSearch);
+        selectedTags.push(customSearch.includes('=') || customSearch.includes('~') ? customSearch : `"amenity"~"${customSearch}",i`);
     }
 
     if (!selectedTags.length) {
-        hint('Please select at least one POI category or enter a custom search.');
+        hint('Select at least one POI category or enter a custom tag');
         return;
     }
     const bnd = calcBounds(targetPoly);
@@ -2318,13 +2282,13 @@ $('btnScanTradeArea').onclick = async () => {
         }
     });
     const overpassQuery = `[out:json][timeout:25];(${queryParts});out center 100;`;
-    hint('Scanning POIs with robust fetch…');
-    $('tradeResults').innerHTML = '<div style="color:#d9b451;">Querying local spatial features…</div>';
+    hint('Scanning spatial features…');
+    $('tradeResults').innerHTML = '<div style="color:#d9b451;">Querying Overpass endpoints…</div>';
     if (!customGroups["Trade Area Scan"]) customGroups["Trade Area Scan"] = { collapsed: false, ids: [] };
     const data = await robustOverpassFetch(overpassQuery, 90);
     if (!data) {
-        $('tradeResults').innerHTML = '<div style="color:#ff7b72;">All Overpass endpoints failed after retries.</div>';
-        hint('Overpass query failed after retries.');
+        $('tradeResults').innerHTML = '<div style="color:#ff7b72;">All Overpass endpoints failed.</div>';
+        hint('Overpass query failed');
         return;
     }
     const results = data.elements || [];
@@ -2350,7 +2314,7 @@ $('btnScanTradeArea').onclick = async () => {
             color: '#003366',
             iconSize: 0.85,
             iconKey: getIconKey('pin', '#003366'),
-            osmTags: el.tags || { name: poiName, type: 'custom' }
+            osmTags: el.tags || { name: poiName }
         }, "Trade Area Scan", poiName);
     });
     let html = `<div style="font-weight:700; color:#f0f6fc; margin-bottom:4px;">Grouped ${filtered.length} POIs:</div>`;
@@ -2358,79 +2322,30 @@ $('btnScanTradeArea').onclick = async () => {
         html += `<div class="poi-badge"><span>${k}</span> <span style="font-weight:700; color:#38bdf8;">${counts[k]}</span></div>`;
     }
     $('tradeResults').innerHTML = html;
-    hint(`Added ${filtered.length} POIs to "Trade Area Scan" layer group!`);
+    hint(`Added ${filtered.length} POIs to "Trade Area Scan" group`);
 };
 
-// ----------------- Custom Overpass Query (collapsible) -----------------
-$('customQueryToggle').onclick = () => {
-    const body = $('customQueryBody');
-    const toggleIcon = $('customQueryToggle').querySelector('span:last-child');
-    if (body.style.display === 'none') {
-        body.style.display = 'block';
-        toggleIcon.textContent = '▾';
-    } else {
-        body.style.display = 'none';
-        toggleIcon.textContent = '▸';
-    }
-};
-
-$('btnRunOverpass').onclick = async () => {
-    const ql = $('overpassQueryInput').value.trim();
-    if (!ql) { hint('Please enter an Overpass QL query'); return; }
-    const resultType = $('overpassResultType').value;
-    hint('Running custom Overpass query…');
-    const data = await robustOverpassFetch(ql, 90);
-    if (!data) {
-        hint('Overpass query failed after retries.');
-        return;
-    }
-    const elements = data.elements || [];
-    if (!elements.length) { hint('Query returned no results'); return; }
-    elements.forEach(el => {
-        if (el.type === 'node') {
-            addFeatureRecord('marker', { type: 'Point', coordinates: [el.lon, el.lat] }, {
-                shape: 'pin',
-                color: '#003366',
-                iconSize: 0.9,
-                iconKey: getIconKey('pin', '#003366'),
-                osmTags: el.tags || {}
-            });
-        } else if (el.type === 'way' && el.geometry) {
-            if (resultType === 'marker') {
-                if (el.center) {
-                    addFeatureRecord('marker', { type: 'Point', coordinates: [el.center.lon, el.center.lat] }, {
-                        shape: 'pin',
-                        color: '#003366',
-                        iconSize: 0.9,
-                        iconKey: getIconKey('pin', '#003366'),
-                        osmTags: el.tags || {}
-                    });
-                }
-            } else if (resultType === 'polygon') {
-                const geom = el.geometry;
-                if (geom.type === 'Polygon') addFeatureRecord('polygon', geom, {});
-                else if (geom.type === 'LineString') addFeatureRecord('polyline', geom, {});
-            }
-        }
-    });
-    hint(`Added ${elements.length} features from custom query`);
-};
-
-// ----------------- Selective Boundary Autocomplete -----------------
+// ----------------- Selective Boundary Search (Nominatim) -----------------
 let boundaryResults = [];
 const boundaryInput = $('boundarySearchInput');
 const boundaryList = $('boundaryAutocompleteList');
-boundaryInput.addEventListener('input', debounce(async () => {
+
+async function triggerBoundarySearch() {
     const q = boundaryInput.value.trim();
-    if (q.length < 3) { boundaryList.style.display = 'none'; return; }
+    if (q.length < 2) return;
+    hint('Searching boundaries…');
     const url = `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&limit=5&q=${encodeURIComponent(q)}`;
     try {
         const res = await fetch(url);
         const data = await res.json();
         boundaryResults = data;
         renderBoundaryAutocomplete(data);
-    } catch(e) {}
-}, 400));
+        hint('');
+    } catch(e) { hint('Boundary search failed'); }
+}
+
+$('btnSearchBoundaryNominatim').onclick = triggerBoundarySearch;
+boundaryInput.addEventListener('keydown', e => { if (e.key === 'Enter') triggerBoundarySearch(); });
 
 function renderBoundaryAutocomplete(results) {
     if (!results || results.length === 0) {
@@ -2472,7 +2387,7 @@ function highlightBoundary(result) {
             [parseFloat(result.boundingbox[3]), parseFloat(result.boundingbox[1])]
         ], { padding: 60 });
     }
-    hint(`${result.display_name} boundary added!`);
+    hint(`${result.display_name} boundary added`);
 }
 
 document.addEventListener('click', (e) => {
@@ -2484,73 +2399,87 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ----------------- Right-Click Context Menu -----------------
+// ----------------- Context Menu (Icons-Only) -----------------
 map.on('contextmenu', e => {
     ctxLngLat = e.lngLat;
     const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
     ctxFeatureId = fs.length && fs[0].properties.id != null ? parseInt(fs[0].properties.id, 10) : null;
     
     const menu = $('map-context-menu');
-    $('ctx-coords-label').textContent = `${e.lngLat.lat.toFixed(6)}, ${e.lngLat.lng.toFixed(6)}`;
-    const maxX = window.innerWidth - 220;
-    const maxY = window.innerHeight - 120;
-    menu.style.left = Math.min(e.point.x, maxX) + 'px';
-    menu.style.top = Math.min(e.point.y, maxY) + 'px';
-    menu.style.display = 'block';
+    menu.style.left = Math.min(e.point.x, window.innerWidth - 220) + 'px';
+    menu.style.top = Math.min(e.point.y, window.innerHeight - 60) + 'px';
+    menu.style.display = 'flex';
 });
 
 map.on('movestart', () => { $('map-context-menu').style.display = 'none'; });
 
-$('ctx-copy').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxLngLat) {
-        const txt = `${ctxLngLat.lat.toFixed(6)}, ${ctxLngLat.lng.toFixed(6)}`;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(txt).then(() => hint('Copied: ' + txt)).catch(() => hint(txt));
-        } else {
-            hint(txt);
+$('ctx-edit').onclick = () => {
+    if (ctxFeatureId) openShapeEditor(ctxFeatureId);
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-dup').onclick = () => {
+    if (ctxFeatureId) {
+        const src = features.find(x => x.id === ctxFeatureId);
+        if (src) {
+            const cloneGeom = JSON.parse(JSON.stringify(src.geometry));
+            const cloneProps = JSON.parse(JSON.stringify(src.props));
+            addFeatureRecord(src.kind, cloneGeom, cloneProps, null, `${src.name} (Copy)`);
+            hint('Feature duplicated');
         }
     }
     $('map-context-menu').style.display = 'none';
 };
 
-$('ctx-gmaps').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxLngLat) {
-        window.open(`https://www.google.com/maps?q=${ctxLngLat.lat},${ctxLngLat.lng}`, '_blank');
+$('ctx-del').onclick = () => {
+    if (ctxFeatureId) {
+        features = features.filter(x => x.id !== ctxFeatureId);
+        for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(id => id !== ctxFeatureId);
+        syncDraw();
+        renderMyLayers();
+        markDirty();
+        hint('Feature deleted');
     }
     $('map-context-menu').style.display = 'none';
 };
 
-$('ctx-streetview').onclick = (e) => {
-    e.stopPropagation();
+$('ctx-copy').onclick = () => {
     if (ctxLngLat) {
-        window.open(`https://www.google.com/maps/@${ctxLngLat.lat},${ctxLngLat.lng},3a,75y,90t/data=!3m6!1e1!3m4!1s!2e0!7i13312!8i6656`, '_blank');
+        const txt = `${ctxLngLat.lat.toFixed(6)}, ${ctxLngLat.lng.toFixed(6)}`;
+        if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => hint('Copied: ' + txt)).catch(() => hint(txt));
+        else hint(txt);
     }
     $('map-context-menu').style.display = 'none';
 };
 
-// ----------------- Google Maps-like Search Place -----------------
+$('ctx-gmaps').onclick = () => {
+    if (ctxLngLat) window.open(`https://www.google.com/maps?q=${ctxLngLat.lat},${ctxLngLat.lng}`, '_blank');
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-streetview').onclick = () => {
+    if (ctxLngLat) window.open(`https://www.google.com/maps/@${ctxLngLat.lat},${ctxLngLat.lng},3a,75y,90t/data=!3m6!1e1!3m4!1s!2e0!7i13312!8i6656`, '_blank');
+    $('map-context-menu').style.display = 'none';
+};
+
+// ----------------- Location Search & Animated Marker -----------------
 const searchInput = $('searchInput');
 const searchResultsList = $('searchResultsList');
 let searchResults = [];
+
 searchInput.addEventListener('input', debounce(async () => {
     const q = searchInput.value.trim();
     if (q.length < 2) { searchResultsList.innerHTML = ''; return; }
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`;
     try {
         const res = await fetch(url);
-        const data = await res.json();
-        searchResults = data;
-        renderSearchResults(data);
+        searchResults = await res.json();
+        renderSearchResults(searchResults);
     } catch(e) {}
 }, 400));
 
 function renderSearchResults(results) {
-    if (!results || results.length === 0) {
-        searchResultsList.innerHTML = '';
-        return;
-    }
+    if (!results || results.length === 0) { searchResultsList.innerHTML = ''; return; }
     searchResultsList.innerHTML = results.map((r, idx) => `
         <div class="search-result-item" data-index="${idx}">
             <svg class="search-result-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
@@ -2566,18 +2495,11 @@ function renderSearchResults(results) {
             const selected = searchResults[idx];
             searchInput.value = selected.display_name;
             searchResultsList.innerHTML = '';
-            
-            // Temporary Marker & Pulse
             const coords = [parseFloat(selected.lon), parseFloat(selected.lat)];
             
-            // Add temporary marker logic could go here if we had a dedicated source, 
-            // but for simplicity we rely on the flyTo and pulse
-            
-            pulseFeature({geometry: {type: 'Point', coordinates: coords}});
-            
+            pulseFeature(null, coords, 1600);
             map.flyTo({ center: coords, zoom: 15, duration: 1500 });
             
-            hint('');
             $('popup-search').classList.remove('open');
         };
     });
@@ -2590,7 +2512,7 @@ $('btn-search').onclick = () => {
     if (willOpen) { p.classList.add('open'); searchInput.focus(); }
 };
 
-// ----------------- Tool Handlers & Drawing Engine -----------------
+// ----------------- Drawing Tools Engine -----------------
 document.querySelectorAll('.tool').forEach(btn => {
     btn.onclick = () => {
         const t = btn.dataset.tool;
@@ -2613,16 +2535,16 @@ document.querySelectorAll('.tool').forEach(btn => {
             if (t === 'textbox') $('popup-text-settings').classList.add('open');
             if (t === 'route') {
                 $('popup-route-settings').classList.add('open');
-                hint('Click points · Click the large blue endpoint to finish');
+                hint('Click points along route · Press Enter or click final point to finish');
             }
             if (t === 'polygon3d') {
                 $('popup-polygon3d-settings').classList.add('open');
-                hint('Click vertices · Click origin to save · Set height in panel');
+                hint('Click 3D vertices · Click origin or press Enter to extrude');
             }
-            if (t === 'polyline') hint('Click points · Click last point again to finish');
-            if (t === 'polygon') hint('Click vertices · Click origin or same point to save');
-            if (t === 'rectangle') hint('Click corner 1, then click opposite corner');
-            if (t === 'circle') hint('Click center, then outer edge');
+            if (t === 'polyline') hint('Click points · Press Enter or double-click to finish');
+            if (t === 'polygon') hint('Click vertices · Click origin to close polygon');
+            if (t === 'rectangle') hint('Click corner 1, then opposite corner');
+            if (t === 'circle') hint('Click center, then outer edge radius');
         }
     };
 });
@@ -2645,25 +2567,6 @@ map.on('mousemove', e => {
         markDirty();
     }
     
-    if (isDraggingRotation && rotatingPolyId != null) {
-        const f = features.find(x => x.id === rotatingPolyId);
-        if (f && rotCenter) {
-            const currentAngle = Math.atan2(cursorLL[1] - rotCenter[1], cursorLL[0] - rotCenter[0]);
-            const deltaAngle = currentAngle - rotStartAngle;
-            const cosA = Math.cos(deltaAngle), sinA = Math.sin(deltaAngle);
-            const orig = rotOriginalCoords[0];
-            const newCoords = orig.map(c => {
-                const dx = c[0] - rotCenter[0];
-                const dy = c[1] - rotCenter[1];
-                return [rotCenter[0] + dx * cosA - dy * sinA, rotCenter[1] + dx * sinA + dy * cosA];
-            });
-            newCoords.push(newCoords[0]);
-            f.geometry.coordinates = [newCoords];
-            syncDraw();
-            markDirty();
-        }
-    }
-
     if (isDraggingVertex && draggedPolyId != null && draggedVertexIdx >= 0) {
         const f = features.find(x => x.id === draggedPolyId);
         if (f && f.geometry && f.geometry.coordinates) {
@@ -2671,15 +2574,16 @@ map.on('mousemove', e => {
                 const coords = f.geometry.coordinates[0];
                 coords[draggedVertexIdx] = cursorLL;
                 if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
-            } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry.coordinates) {
+            } else if (f.kind === 'polyline' && f.geometry.coordinates) {
                 f.geometry.coordinates[draggedVertexIdx] = cursorLL;
-                // Debounced reroute for routes
-                if (f.kind === 'route') {
-                    clearTimeout(rerouteTimeout);
-                    rerouteTimeout = setTimeout(() => {
-                        fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
-                    }, 300);
+            } else if (f.kind === 'route') {
+                if (f.props.waypoints && f.props.waypoints[draggedVertexIdx]) {
+                    f.props.waypoints[draggedVertexIdx] = cursorLL;
                 }
+                clearTimeout(rerouteTimeout);
+                rerouteTimeout = setTimeout(() => {
+                    fetchMultiPointRoute(f.props.waypoints || f.geometry.coordinates, f.id, f.props.routeMode);
+                }, 300);
             }
             syncDraw();
             markDirty();
@@ -2715,13 +2619,9 @@ map.on('click', e => {
     }
     if (!activeTool) return;
     const ll = [e.lngLat.lng, e.lngLat.lat];
+    
     if (activeTool === 'marker') {
-        let iconKey;
-        if (customMarkerImageKey) {
-            iconKey = customMarkerImageKey;
-        } else {
-            iconKey = getIconKey(markerShape, markerColor);
-        }
+        const iconKey = customMarkerImageKey || getIconKey(markerShape, markerColor);
         const feat = addFeatureRecord('marker', { type: 'Point', coordinates: ll }, {
             shape: markerShape,
             color: markerColor,
@@ -2768,7 +2668,7 @@ map.on('click', e => {
                     }
                     const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
                     resetActiveTools();
-                    if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
+                    if (kind === 'polygon3d' && $('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
                     openShapeEditor(feat.id);
                     return;
                 }
@@ -2791,18 +2691,27 @@ map.on('click', e => {
             openShapeEditor(feat.id);
         }
     } else if (activeTool === 'route') {
-        if (draft.length >= 2) {
-            const pScreen = map.project(ll);
-            const lastPtScreen = map.project(draft[draft.length - 1]);
-            if (Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 22) {
-                fetchMultiPointRoute(draft);
-                resetActiveTools();
-                return;
-            }
-        }
         draft.push(ll);
+        if (draft.length === 2 && $('rAutoFinish') && $('rAutoFinish').checked) {
+            fetchMultiPointRoute(draft);
+            resetActiveTools();
+        }
     }
     renderDraft();
+});
+
+// Midpoint insertion on double-click in Edit Mode
+map.on('dblclick', e => {
+    if (editMode && selectedId) {
+        const f = features.find(x => x.id === selectedId);
+        if (f && f.kind === 'route' && f.props.waypoints) {
+            e.preventDefault();
+            const clickLL = [e.lngLat.lng, e.lngLat.lat];
+            f.props.waypoints.push(clickLL);
+            fetchMultiPointRoute(f.props.waypoints, f.id, f.props.routeMode);
+            hint('Waypoint inserted');
+        }
+    }
 });
 
 document.addEventListener('keydown', e => {
@@ -2818,7 +2727,6 @@ document.addEventListener('keydown', e => {
             }
             const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
             resetActiveTools();
-            if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
             openShapeEditor(feat.id);
         } else if (activeTool === 'polyline' && draft.length >= 2) {
             const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
@@ -2829,24 +2737,16 @@ document.addEventListener('keydown', e => {
             resetActiveTools();
         }
     }
-    if (e.key === 'Escape') {
-        resetActiveTools();
-        closeFloatingCards();
-        editMode = false;
-        $('btn-edit-mode').classList.remove('primary-active');
-        syncVertexHandles();
-    }
     if (e.key === 'Delete' && selectedId && editMode) {
-         // Delete selected waypoint if in route edit mode could be implemented here
-         // For now, standard delete removes feature
-         features = features.filter(x => x.id !== selectedId);
-         for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== selectedId);
-         selectedId = null;
-         syncDraw(); renderMyLayers(); markDirty();
+        features = features.filter(x => x.id !== selectedId);
+        for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== selectedId);
+        selectedId = null;
+        syncDraw(); renderMyLayers(); markDirty();
+        hint('Selected feature removed');
     }
 });
 
-// ----------------- Edit Mode -----------------
+// ----------------- Vertex & Feature Dragging -----------------
 $('btn-edit-mode').onclick = () => {
     editMode = !editMode;
     $('btn-edit-mode').classList.toggle('primary-active', editMode);
@@ -2854,28 +2754,19 @@ $('btn-edit-mode').onclick = () => {
     document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
     closeFloatingCards();
     syncVertexHandles();
-    hint(editMode ? 'Edit mode: drag shapes or vertices (blue dots)' : '');
+    map.getCanvas().style.cursor = editMode ? 'grab' : '';
+    hint(editMode ? 'Edit Mode: Drag vertices (blue handles) or drag whole shape' : '');
 };
 
 map.on('mousedown', e => {
     if (editMode) {
         const vHits = map.queryRenderedFeatures(e.point, { layers: ['vertex-points'] });
         if (vHits.length && vHits[0].properties.polyId != null) {
-            if (vHits[0].properties.isRotHandle) {
-                isDraggingRotation = true;
-                rotatingPolyId = parseInt(vHits[0].properties.polyId, 10);
-                const f = features.find(x => x.id === rotatingPolyId);
-                const b = calcBounds(f);
-                rotCenter = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
-                rotStartAngle = Math.atan2(cursorLL[1] - rotCenter[1], cursorLL[0] - rotCenter[0]);
-                rotOriginalCoords = JSON.parse(JSON.stringify(f.geometry.coordinates));
-                map.dragPan.disable();
-                return;
-            }
             isDraggingVertex = true;
             draggedPolyId = parseInt(vHits[0].properties.polyId, 10);
             draggedVertexIdx = parseInt(vHits[0].properties.vIdx, 10);
             map.dragPan.disable();
+            map.getCanvas().style.cursor = 'grabbing';
             return;
         }
         const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
@@ -2886,6 +2777,7 @@ map.on('mousedown', e => {
             const f = features.find(x => x.id === dragFeatureId);
             if (f) dragOriginalCoords = JSON.parse(JSON.stringify(f.geometry.coordinates));
             map.dragPan.disable();
+            map.getCanvas().style.cursor = 'grabbing';
         }
     }
 });
@@ -2895,90 +2787,113 @@ map.on('mouseup', () => {
         isDragging = false;
         dragFeatureId = null;
         map.dragPan.enable();
+        map.getCanvas().style.cursor = editMode ? 'grab' : '';
         markDirty();
     }
     if (isDraggingVertex) {
         if (draggedPolyId != null) {
             const f = features.find(x => x.id === draggedPolyId);
-            if (f && f.kind === 'route') {
-                // Trigger reroute immediately on drop
-                fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
+            if (f && f.kind === 'route' && f.props.waypoints) {
+                fetchMultiPointRoute(f.props.waypoints, f.id, f.props.routeMode);
             }
         }
         isDraggingVertex = false;
         draggedPolyId = null;
         draggedVertexIdx = -1;
         map.dragPan.enable();
-        markDirty();
-    }
-    if (isDraggingRotation) {
-        isDraggingRotation = false;
-        rotatingPolyId = null;
-        map.dragPan.enable();
+        map.getCanvas().style.cursor = editMode ? 'grab' : '';
         markDirty();
     }
 });
 
-// ----------------- Customizer / Shape Editor -----------------
+// ----------------- Shape Editor -----------------
 function openShapeEditor(id) {
     const f = features.find(x => x.id === id);
     if (!f) return;
     selectedId = id;
     closeFloatingCards();
-    $('editShapeTitle').textContent = `Edit ${f.name}`;
+    $('editShapeTitle').textContent = `Edit: ${f.name}`;
     $('eName').value = f.name;
-    $('eBorderColor').value = f.props.borderColor || f.props.color || '#e8b84a';
-    $('eBorderOp').value = f.props.borderOpacity != null ? f.props.borderOpacity : 0.9;
-    $('eWidth').value = f.props.width || 3;
-    $('eFillColor').value = f.props.fillColor || f.props.color || '#e8b84a';
-    $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
     
+    // Label dropdown population
+    const attrs = f.props.attributes || {};
+    let attrOpts = '<option value="_name">Layer Name</option>';
+    Object.keys(attrs).forEach(k => {
+        attrOpts += `<option value="${k}" ${f.props.labelAttribute === k ? 'selected' : ''}>${k}</option>`;
+    });
+    $('eLabelAttrSelect').innerHTML = attrOpts;
+    $('eShowLabel').checked = !!f.props.showLabel;
+    $('eLabelPos').value = f.props.labelPos || 'center';
+
     const isPolygon = ['polygon', 'rectangle', 'circle'].includes(f.kind);
     const is3D = f.kind === 'polygon3d';
-    
-    $('eFillColorRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
-    $('eFillOpRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
-    $('eLabelToggleRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
-    $('eLabelPosRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
-    
-    if (isPolygon || is3D) {
-        $('eShowLabel').checked = !!f.props.showLabel;
-        $('eLabelPos').value = f.props.labelPos || 'center';
-    }
+    const isRoute = f.kind === 'route';
+    const isMarker = f.kind === 'marker';
+    const isText = f.kind === 'text';
 
-    // Hide standard fill controls for 3D, show 3D specific ones
+    // Toggle 2D vs 3D controls
+    $('eBorderColorRow').style.display = is3D ? 'none' : 'flex';
+    $('eBorderOpRow').style.display = is3D ? 'none' : 'flex';
+    $('eWidthRow').style.display = is3D ? 'none' : 'flex';
+    $('eFillColorRow').style.display = isPolygon ? 'flex' : 'none';
+    $('eFillOpRow').style.display = isPolygon ? 'flex' : 'none';
+    
+    $('p3dEditorControls').style.display = is3D ? 'block' : 'none';
     if (is3D) {
-        $('eFillColorRow').style.display = 'none';
-        $('eFillOpRow').style.display = 'none';
-        $('p3dEditorControls').style.display = 'block';
         $('eP3dHeight').value = f.props.height || 50;
         $('eP3dColor').value = f.props.extrusionColor || '#e8b84a';
         $('eP3dOpacity').value = f.props.fillOpacity || 0.7;
-    } else {
-        $('p3dEditorControls').style.display = 'none';
     }
 
-    const isMarker = f.kind === 'marker';
+    $('routeEditorControls').style.display = isRoute ? 'block' : 'none';
+    if (isRoute) {
+        $('eRouteMode').value = f.props.routeMode || 'driving';
+        $('eRouteStats').textContent = f.props.description || '-';
+        renderRouteWaypointsList(f);
+    }
+
     $('eMarkerSizeRow').style.display = isMarker ? 'flex' : 'none';
     if (isMarker) $('eMarkerSize').value = f.props.iconSize || 0.9;
-    const isText = f.kind === 'text';
+
     $('eTextRow').style.display = isText ? 'flex' : 'none';
     $('eFontSizeRow').style.display = isText ? 'flex' : 'none';
     if (isText) {
         $('eTextVal').value = f.props.text || '';
         $('eFontSize').value = f.props.fontSize || 16;
     }
-    
-    // Route Specifics
-    const isRoute = f.kind === 'route';
-    $('routeEditorControls').style.display = isRoute ? 'block' : 'none';
-    if (isRoute) {
-        $('eRouteMode').value = f.props.routeMode || 'driving';
-        $('eRouteStats').textContent = f.props.description || '-';
-    }
+
+    $('eBorderColor').value = f.props.borderColor || f.props.color || '#e8b84a';
+    $('eBorderOp').value = f.props.borderOpacity != null ? f.props.borderOpacity : 0.9;
+    $('eWidth').value = f.props.width || 3;
+    $('eFillColor').value = f.props.fillColor || f.props.color || '#e8b84a';
+    $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
 
     $('popup-shape-editor').classList.add('open');
 }
+
+function renderRouteWaypointsList(f) {
+    const list = $('eRouteWaypointList');
+    if (!f.props.waypoints || !f.props.waypoints.length) {
+        list.innerHTML = '<span style="font-size:10px; color:#768390;">No intermediate waypoints</span>';
+        return;
+    }
+    list.innerHTML = f.props.waypoints.map((pt, idx) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); padding:3px 6px; border-radius:4px; font-size:10px;">
+            <span>Pt ${idx+1}: ${pt[1].toFixed(4)}, ${pt[0].toFixed(4)}</span>
+            <button class="card-btn" onclick="removeRouteWaypoint(${f.id}, ${idx})" style="color:#ff7b72;">✕</button>
+        </div>
+    `).join('');
+}
+
+window.removeRouteWaypoint = (routeId, idx) => {
+    const f = features.find(x => x.id === routeId);
+    if (f && f.props.waypoints && f.props.waypoints.length > 2) {
+        f.props.waypoints.splice(idx, 1);
+        fetchMultiPointRoute(f.props.waypoints, f.id, f.props.routeMode);
+    } else {
+        hint('A route must have at least 2 waypoints');
+    }
+};
 
 $('eName').oninput = e => {
     const f = features.find(x => x.id === selectedId);
@@ -2990,64 +2905,59 @@ $('eBorderColor').oninput = e => {
     f.props.borderColor = e.target.value;
     f.props.color = e.target.value;
     if (f.kind === 'marker' && !customMarkerImageKey) f.props.iconKey = getIconKey(f.props.shape || 'pin', e.target.value);
-    syncDraw();
-    markDirty();
+    syncDraw(); markDirty();
 };
 $('eBorderOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.borderOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.width = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); markDirty(); } };
 $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); markDirty(); } };
+$('eLabelAttrSelect').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelAttribute = e.target.value; syncDraw(); markDirty(); } };
 $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); markDirty(); } };
 $('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); markDirty(); } };
 $('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); markDirty(); } };
 
-// 3D Editor Controls
+// Live 3D Extrusion Editing
 $('eP3dHeight').oninput = e => {
     const f = features.find(x => x.id === selectedId);
     if (f && f.kind === 'polygon3d') {
-        f.props.height = parseFloat(e.target.value);
-        syncDraw();
-        markDirty();
+        f.props.height = parseFloat(e.target.value) || 1;
+        syncDraw(); markDirty();
     }
 };
 $('eP3dColor').oninput = e => {
     const f = features.find(x => x.id === selectedId);
     if (f && f.kind === 'polygon3d') {
         f.props.extrusionColor = e.target.value;
-        syncDraw();
-        markDirty();
+        syncDraw(); markDirty();
     }
 };
 $('eP3dOpacity').oninput = e => {
     const f = features.find(x => x.id === selectedId);
     if (f && f.kind === 'polygon3d') {
         f.props.fillOpacity = parseFloat(e.target.value);
-        syncDraw();
-        markDirty();
+        syncDraw(); markDirty();
     }
 };
 
-// Route Editor Controls
 $('eRouteMode').onchange = e => {
     const f = features.find(x => x.id === selectedId);
     if (f && f.kind === 'route') {
         f.props.routeMode = e.target.value;
-        fetchMultiPointRoute(f.geometry.coordinates, f.id, e.target.value);
+        fetchMultiPointRoute(f.props.waypoints || f.geometry.coordinates, f.id, e.target.value);
     }
 };
-
 $('eRecalcRoute').onclick = () => {
     const f = features.find(x => x.id === selectedId);
     if (f && f.kind === 'route') {
-        fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
+        fetchMultiPointRoute(f.props.waypoints || f.geometry.coordinates, f.id, f.props.routeMode);
     }
 };
 
 $('eDeleteBtn').onclick = () => {
     features = features.filter(x => x.id !== selectedId);
-    for (const g in customGroups) { customGroups[g].ids = customGroups[g].ids.filter(id => id !== selectedId); }
+    for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(id => id !== selectedId);
     syncDraw();
     renderMyLayers();
     $('popup-shape-editor').classList.remove('open');
@@ -3056,7 +2966,7 @@ $('eDeleteBtn').onclick = () => {
 $('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 
-// ----------------- My Layers with Grouping, Multi-select, Drag Reorder -----------------
+// ----------------- My Layers Panel -----------------
 $('btnAddCustomGroup').onclick = () => {
     const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
     if (gName && gName.trim() && !customGroups[gName]) {
@@ -3067,10 +2977,7 @@ $('btnAddCustomGroup').onclick = () => {
 };
 
 $('btnHideSelected').onclick = () => {
-    if (selectedLayerIds.size === 0) {
-        hint('Select at least one layer first');
-        return;
-    }
+    if (selectedLayerIds.size === 0) { hint('Select at least one layer card'); return; }
     const allHidden = Array.from(selectedLayerIds).every(id => {
         const f = features.find(x => x.id === id);
         return f && f.props.visible === 0;
@@ -3083,7 +2990,6 @@ $('btnHideSelected').onclick = () => {
     syncDraw();
     renderMyLayers();
     markDirty();
-    hint(allHidden ? 'Layers unhidden' : 'Layers hidden');
 };
 
 function renderLayerCardHtml(f) {
@@ -3141,7 +3047,7 @@ function renderMyLayers() {
     const polyList = features.filter(f => ['polygon', 'rectangle', 'circle', 'polygon3d'].includes(f.kind));
     $('tradePolygonSelect').innerHTML = '<option value="">-- Choose --</option>' + polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     if (!features.length && !Object.keys(customGroups).length) {
-        container.innerHTML = '<div style="font-size:12px; color:#768390; padding:6px 0;">No drawings yet. Use the tools to create shapes.</div>';
+        container.innerHTML = '<div style="font-size:12px; color:#768390; padding:6px 0;">No layers created.</div>';
         return;
     }
     let html = '';
@@ -3160,37 +3066,16 @@ function renderMyLayers() {
                         <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group"/>
                     </div>
                     <div style="display:flex; align-items:center; gap:2px;">
-                         <button class="card-btn" data-act="groupSelectAll" data-group="${gName}" title="Select All in Group">
+                        <button class="card-btn" data-act="groupSelectAll" data-group="${gName}" title="Select All in Group">
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
                         </button>
-                        <button class="card-btn" data-act="groupStyle" data-group="${gName}" title="Style Group">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                        </button>
-                        <button class="card-btn" data-act="groupEye" data-group="${gName}" title="Toggle Group">
+                        <button class="card-btn" data-act="groupEye" data-group="${gName}" title="Toggle Group Visibility">
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                         </button>
                         <button class="card-btn" data-act="groupDel" data-group="${gName}" title="Delete Group" style="color:#ff7b72;">
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         </button>
                     </div>
-                </div>
-                <div class="group-styling-panel" data-group="${gName}">
-                    <div style="font-size:10px; font-weight:700; color:#768390; margin-bottom:6px;">BULK APPLY TO MARKERS IN GROUP</div>
-                    <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Color</span> <input type="color" class="grp-style-color" value="#003366" style="width:24px; height:24px; border:none; background:transparent;"></div>
-                    <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Shape</span>
-                        <select class="grp-style-shape" style="flex:1; font-size:10px;">
-                            <option value="">-- No Change --</option>
-                            <option value="pin">Pin</option>
-                            <option value="star">Star</option>
-                            <option value="circle">Circle</option>
-                            <option value="square">Square</option>
-                            <option value="flag">Flag</option>
-                            <option value="heart">Heart</option>
-                            <option value="pinball">Pinball</option>
-                        </select>
-                    </div>
-                    <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Size</span> <input type="range" class="grp-style-size" min="0.4" max="2.0" step="0.1" value="0.9" style="flex:1;"></div>
-                    <button class="trade-btn grp-style-apply" style="font-size:10px; padding:4px;">Apply Styling</button>
                 </div>
                 <div class="group-items ${grp.collapsed ? 'hidden' : ''}">
                     ${groupFeats.length ? groupFeats.map(f => renderLayerCardHtml(f)).join('') : '<div style="font-size:10px; color:#768390; padding:4px;">Empty group — drag layers here</div>'}
@@ -3201,89 +3086,63 @@ function renderMyLayers() {
     const looseFeats = features.filter(f => !groupedIds.has(f.id));
     html += '<div id="ungrouped-zone">';
     if (looseFeats.length) {
-        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">Ungrouped Layers <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></button></div>';
+        html += `
+            <div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+                <span>Ungrouped Layers</span>
+                <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                </button>
+            </div>
+        `;
         html += looseFeats.slice().reverse().map(f => renderLayerCardHtml(f)).join('');
     }
     html += '</div>';
     container.innerHTML = html;
 
-    // Select All Ungrouped
     const btnSelAllUng = container.querySelector('#btnSelectAllUngrouped');
     if (btnSelAllUng) {
         btnSelAllUng.onclick = () => {
             looseFeats.forEach(f => selectedLayerIds.add(f.id));
-            renderMyLayers(); // Re-render to update checkboxes
+            renderMyLayers();
         };
     }
 
     container.querySelectorAll('.group-container').forEach(gc => {
         const gName = gc.dataset.group;
-        gc.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            gc.classList.add('drop-hover');
-        });
-        gc.addEventListener('dragleave', () => {
-            gc.classList.remove('drop-hover');
-        });
+        gc.addEventListener('dragover', e => { e.preventDefault(); gc.classList.add('drop-hover'); });
+        gc.addEventListener('dragleave', () => { gc.classList.remove('drop-hover'); });
         gc.addEventListener('drop', e => {
             e.preventDefault();
-            e.stopPropagation();
             gc.classList.remove('drop-hover');
             const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
             if (isNaN(draggedId)) return;
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-            }
-            if (!customGroups[gName].ids.includes(draggedId)) {
-                customGroups[gName].ids.push(draggedId);
-            }
+            for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
+            if (!customGroups[gName].ids.includes(draggedId)) customGroups[gName].ids.push(draggedId);
             renderMyLayers();
             markDirty();
-            hint(`Layer added to "${gName}"`);
         });
     });
-
-    const uz = container.querySelector('#ungrouped-zone');
-    if (uz) {
-        uz.addEventListener('dragover', e => {
-            e.preventDefault();
-            uz.classList.add('drop-hover');
-        });
-        uz.addEventListener('dragleave', () => {
-            uz.classList.remove('drop-hover');
-        });
-        uz.addEventListener('drop', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            uz.classList.remove('drop-hover');
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            if (isNaN(draggedId)) return;
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-            }
-            renderMyLayers();
-            markDirty();
-            hint('Layer moved to Ungrouped');
-        });
-    }
 
     container.querySelectorAll('.layer-card').forEach(card => {
         card.addEventListener('dragstart', e => {
             e.dataTransfer.setData('text/plain', card.dataset.id);
             e.dataTransfer.effectAllowed = 'move';
         });
-        card.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        });
+        card.addEventListener('dragover', e => { e.preventDefault(); });
         card.addEventListener('drop', e => {
             e.preventDefault();
-            e.stopPropagation();
             const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
             const targetId = parseInt(card.dataset.id, 10);
             if (draggedId !== targetId) {
-                reorderFeatures(draggedId, targetId);
+                const idxA = features.findIndex(f => f.id === draggedId);
+                const idxB = features.findIndex(f => f.id === targetId);
+                if (idxA !== -1 && idxB !== -1) {
+                    const [item] = features.splice(idxA, 1);
+                    features.splice(idxB, 0, item);
+                    syncDraw();
+                    renderMyLayers();
+                    markDirty();
+                }
             }
         });
     });
@@ -3296,7 +3155,6 @@ function renderMyLayers() {
         });
     });
     
-    // Group Select All
     container.querySelectorAll('[data-act="groupSelectAll"]').forEach(btn => {
         btn.onclick = () => {
             const gName = btn.dataset.group;
@@ -3342,12 +3200,6 @@ function renderMyLayers() {
                 renderMyLayers();
                 return;
             }
-            if (act === 'groupStyle') {
-                const g = b.dataset.group;
-                const panel = container.querySelector(`.group-styling-panel[data-group="${g}"]`);
-                if (panel) panel.classList.toggle('open');
-                return;
-            }
             if (act === 'groupEye') {
                 const g = b.dataset.group;
                 const ids = customGroups[g].ids || [];
@@ -3359,25 +3211,19 @@ function renderMyLayers() {
             if (act === 'groupDel') {
                 const g = b.dataset.group;
                 delete customGroups[g];
-                renderMyLayers();
-                markDirty();
+                renderMyLayers(); markDirty();
                 return;
             }
             const id = parseInt(b.dataset.id, 10);
             const f = features.find(x => x.id === id);
             if (!f) return;
-            if (act === 'table') {
-                openAttributeTable(id);
-                return;
-            }
+            if (act === 'table') { openAttributeTable(id); return; }
             if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); markDirty(); }
             if (act === 'labelPos') { f.props.labelPos = b.value; syncDraw(); markDirty(); }
             if (act === 'edit') openShapeEditor(id);
             if (act === 'eye') {
                 f.props.visible = f.props.visible ? 0 : 1;
-                syncDraw();
-                renderMyLayers();
-                markDirty();
+                syncDraw(); renderMyLayers(); markDirty();
             }
             if (act === 'del') {
                 features = features.filter(x => x.id !== id);
@@ -3394,43 +3240,6 @@ function renderMyLayers() {
             }
         };
     });
-
-    container.querySelectorAll('.grp-style-apply').forEach(btn => {
-        btn.onclick = () => {
-            const panel = btn.closest('.group-styling-panel');
-            const gName = panel.dataset.group;
-            const color = panel.querySelector('.grp-style-color').value;
-            const shape = panel.querySelector('.grp-style-shape').value;
-            const size = parseFloat(panel.querySelector('.grp-style-size').value);
-            const grp = customGroups[gName];
-            if (!grp) return;
-            grp.ids.forEach(id => {
-                const f = features.find(x => x.id === id);
-                if (f && f.kind === 'marker') {
-                    f.props.color = color;
-                    f.props.borderColor = color;
-                    if (shape) f.props.shape = shape;
-                    f.props.iconSize = size;
-                    f.props.iconKey = getIconKey(f.props.shape || 'pin', color);
-                }
-            });
-            syncDraw();
-            renderMyLayers();
-            markDirty();
-            hint(`Styling applied to "${gName}"`);
-        };
-    });
-}
-
-function reorderFeatures(draggedId, targetId) {
-    const draggedIndex = features.findIndex(f => f.id === draggedId);
-    const targetIndex = features.findIndex(f => f.id === targetId);
-    if (draggedIndex === -1 || targetIndex === -1) return;
-    const [draggedItem] = features.splice(draggedIndex, 1);
-    features.splice(targetIndex, 0, draggedItem);
-    syncDraw();
-    renderMyLayers();
-    markDirty();
 }
 
 function calcBounds(f) {
@@ -3448,7 +3257,7 @@ function calcBounds(f) {
     return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Attribute Table Logic -----------------
+// ----------------- Attribute Table Modal & Pipeline -----------------
 function openAttributeTable(featureId) {
     currentTableFeatureId = featureId;
     const f = features.find(x => x.id === featureId);
@@ -3456,10 +3265,7 @@ function openAttributeTable(featureId) {
     
     $('attrTableTitle').textContent = `Attributes: ${f.name}`;
     $('popup-attribute-table').classList.add('open');
-    
-    // Ensure attributes object exists
     if (!f.props.attributes) f.props.attributes = {};
-    
     renderAttributeTable(f);
 }
 
@@ -3468,32 +3274,29 @@ function renderAttributeTable(f) {
     const headerRow = $('attrTableHeader');
     const bodyRow = $('attrTableBody');
     
-    // Default columns
     let cols = ['name', 'description'];
-    // Add custom attribute keys
     Object.keys(attrs).forEach(k => {
         if (!cols.includes(k)) cols.push(k);
     });
     
-    // Render Header
-    headerRow.innerHTML = cols.map(c => `<th>${c.toUpperCase()}</th>`).join('') + '<th>ACTIONS</th>';
+    headerRow.innerHTML = cols.map(c => `<th>${c.toUpperCase()}</th>`).join('') + '<th style="width:40px;">ACTIONS</th>';
     
-    // Render Body
     let html = '<tr>';
     cols.forEach(c => {
         let val = '';
         if (c === 'name') val = f.name;
         else if (c === 'description') val = f.props.description || '';
-        else val = attrs[c] || '';
+        else val = attrs[c] !== undefined ? attrs[c] : '';
         
-        // Check if it's an image attribute (starts with data:image)
         if (typeof val === 'string' && val.startsWith('data:image')) {
-            html += `<td><img src="${val}" class="attr-img-preview" onclick="triggerAttrImageUpload('${c}')" oncontextmenu="clearAttrImage('${c}'); return false;"></td>`;
+            html += `<td><img src="${val}" class="attr-img-cell" onclick="triggerAttrImageUpload('${c}')" oncontextmenu="clearAttrImage(event, '${c}')" title="Click to upload. Right-click to clear."></td>`;
+        } else if (attrs[c] && typeof attrs[c] === 'object' && attrs[c].type === 'image') {
+            html += `<td><div class="attr-img-placeholder" onclick="triggerAttrImageUpload('${c}')">+ Image</div></td>`;
         } else {
-            html += `<td><input type="text" value="${val}" onchange="updateAttr('${c}', this.value)"></td>`;
+            html += `<td><input type="text" value="${val}" onblur="updateAttr('${c}', this.value)" onkeydown="if(event.key==='Enter') this.blur();"></td>`;
         }
     });
-    html += `<td><button class="card-btn" onclick="removeAttrColumn()" title="Remove Last Column" style="color:#ff7b72;">✕</button></td></tr>`;
+    html += `<td><button class="card-btn" onclick="removeAttrColumn()" title="Delete Last Attribute" style="color:#ff7b72;">✕</button></td></tr>`;
     bodyRow.innerHTML = html;
 }
 
@@ -3525,6 +3328,7 @@ window.triggerAttrImageUpload = (key) => {
                 if (f) {
                     f.props.attributes[key] = ev.target.result;
                     renderAttributeTable(f);
+                    syncDraw();
                     markDirty();
                 }
             };
@@ -3534,11 +3338,13 @@ window.triggerAttrImageUpload = (key) => {
     input.click();
 };
 
-window.clearAttrImage = (key) => {
+window.clearAttrImage = (e, key) => {
+    e.preventDefault();
     const f = features.find(x => x.id === currentTableFeatureId);
     if (f && f.props.attributes[key]) {
-        delete f.props.attributes[key];
+        f.props.attributes[key] = { type: 'image', value: null };
         renderAttributeTable(f);
+        syncDraw();
         markDirty();
     }
 };
@@ -3551,6 +3357,7 @@ window.removeAttrColumn = () => {
     if (keys.length > 0) {
         delete attrs[keys[keys.length - 1]];
         renderAttributeTable(f);
+        syncDraw();
         markDirty();
     }
 };
@@ -3558,35 +3365,39 @@ window.removeAttrColumn = () => {
 $('btnAddAttrCol').onclick = () => {
     const f = features.find(x => x.id === currentTableFeatureId);
     if (!f) return;
-    const name = prompt("Enter column name:");
-    if (name && !f.props.attributes[name]) {
-        f.props.attributes[name] = "";
-        renderAttributeTable(f);
-        markDirty();
+    const name = prompt("Enter attribute column name:");
+    if (!name || !name.trim()) return;
+    const colName = name.trim();
+    const typeChoice = prompt("Enter column type (text / image):", "text");
+    if (typeChoice && typeChoice.toLowerCase() === 'image') {
+        f.props.attributes[colName] = { type: 'image', value: null };
+    } else {
+        f.props.attributes[colName] = "";
     }
+    renderAttributeTable(f);
+    syncDraw();
+    markDirty();
 };
 
 $('attrTableSearch').oninput = e => {
     const term = e.target.value.toLowerCase();
-    const inputs = $('attrTableBody').querySelectorAll('input[type="text"]');
-    inputs.forEach(inp => {
-        const td = inp.closest('td');
-        if (inp.value.toLowerCase().includes(term)) {
-            td.style.display = '';
-        } else {
-            td.style.display = term ? 'none' : '';
-        }
+    const rows = $('attrTableBody').querySelectorAll('tr');
+    rows.forEach(tr => {
+        const txt = tr.textContent.toLowerCase();
+        tr.style.display = txt.includes(term) ? '' : 'none';
     });
 };
 
 $('closeAttrTableBtn').onclick = () => {
     $('popup-attribute-table').classList.remove('open');
     currentTableFeatureId = null;
+    markDirty();
+    syncDraw();
 };
 
-// ----------------- Direct Export Engine -----------------
+// ----------------- Direct PNG Snapshot Export -----------------
 $('btn-export-direct').onclick = () => {
-    hint('Exporting high-quality snapshot...');
+    hint('Generating map snapshot…');
     map.once('render', () => {
         try {
             const srcCanvas = map.getCanvas();
@@ -3596,15 +3407,13 @@ $('btn-export-direct').onclick = () => {
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            hint('Export complete!');
-        } catch(e) {
-            hint('Export failed.');
-        }
+            hint('Snapshot downloaded!');
+        } catch(e) { hint('Export failed'); }
     });
     map.triggerRepaint();
 };
 
-// ----------------- UI Panel Toggles -----------------
+// ----------------- Left Panels Toggle -----------------
 $('btn-browser-toggle').onclick = () => {
     const p = $('browser-panel');
     const willOpen = !p.classList.contains('open');
@@ -3680,10 +3489,8 @@ $('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFlo
 $('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
-// ----------------- Import -----------------
-$('btn-import').onclick = () => {
-    $('importFileInput').click();
-};
+// ----------------- Spatial Data Import -----------------
+$('btn-import').onclick = () => { $('importFileInput').click(); };
 $('importFileInput').onchange = async function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -3693,13 +3500,11 @@ $('importFileInput').onchange = async function(e) {
         if (ext === 'geojson' || ext === 'json') {
             const text = await file.text();
             const data = JSON.parse(text);
-            const geojson = data.type === 'FeatureCollection' ? data : { type: 'FeatureCollection', features: [data] };
-            processGeoJSON(geojson);
+            processGeoJSON(data.type === 'FeatureCollection' ? data : { type: 'FeatureCollection', features: [data] });
         } else if (ext === 'kml') {
             const text = await file.text();
             const kml = new DOMParser().parseFromString(text, 'application/xml');
-            const geojson = toGeoJSON.kml(kml);
-            processGeoJSON(geojson);
+            processGeoJSON(toGeoJSON.kml(kml));
         } else if (ext === 'kmz') {
             const arrayBuffer = await file.arrayBuffer();
             const zip = await JSZip.loadAsync(arrayBuffer);
@@ -3707,16 +3512,14 @@ $('importFileInput').onchange = async function(e) {
             if (!kmlFile) throw new Error('No KML found in KMZ');
             const kmlText = await zip.file(kmlFile).async('string');
             const kml = new DOMParser().parseFromString(kmlText, 'application/xml');
-            const geojson = toGeoJSON.kml(kml);
-            processGeoJSON(geojson);
+            processGeoJSON(toGeoJSON.kml(kml));
         } else if (ext === 'zip') {
             const arrayBuffer = await file.arrayBuffer();
-            const geojson = await shp(arrayBuffer);
-            processGeoJSON(geojson);
+            processGeoJSON(await shp(arrayBuffer));
         }
-        hint('Import successful');
+        hint('Spatial data imported successfully');
     } catch(err) {
-        hint('Import failed: ' + err.message);
+        hint('Import error: ' + err.message);
     }
 };
 
@@ -3732,40 +3535,40 @@ function processGeoJSON(geojson) {
                 color: '#003366',
                 iconSize: 0.9,
                 iconKey: getIconKey('pin', '#003366'),
-                osmTags: props
+                attributes: props
             });
         } else if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
-            // Check if it's a route
-            if (props.route_mode) {
+            if (props.route_mode || props.routeMode) {
                 addFeatureRecord('route', geom, {
-                    routeMode: props.route_mode,
+                    routeMode: props.route_mode || props.routeMode || 'driving',
                     description: props.description || '',
                     color: props.color || '#38bdf8',
-                    borderColor: props.color || '#38bdf8'
+                    borderColor: props.color || '#38bdf8',
+                    attributes: props
                 });
             } else {
-                addFeatureRecord('polyline', geom, {});
+                addFeatureRecord('polyline', geom, { attributes: props });
             }
         } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-            // Check if it's a 3D polygon
             if (props.height || props.extrude) {
                 addFeatureRecord('polygon3d', geom, {
-                    height: props.height || 50,
+                    height: parseFloat(props.height || props.extrude) || 50,
                     extrusionColor: props.extrusionColor || '#e8b84a',
-                    fillOpacity: props.fillOpacity || 0.7
+                    fillOpacity: props.fillOpacity || 0.7,
+                    attributes: props
                 });
             } else {
-                addFeatureRecord('polygon', geom, {});
+                addFeatureRecord('polygon', geom, { attributes: props });
             }
         }
     });
 }
 
 map.on('moveend', () => markDirty());
-map.on('error', e => console.warn('Map Notice:', e));
+map.on('error', e => console.warn('Map notice:', e));
 
 } catch (e) {
-    console.error('App init error:', e);
+    console.error('Atlas init error:', e);
 }
 </script>
 </body>
