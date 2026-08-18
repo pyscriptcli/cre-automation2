@@ -7,9 +7,6 @@ import logging
 import time
 import random
 
-------------------------------------------------------------------------
-# ROBUST OVERPASS API QUERY FUNCTION (PYTHON)
-------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 90) -> list:
