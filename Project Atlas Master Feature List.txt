@@ -1,0 +1,156 @@
+======================================================
+PROJECT ATLAS - MASTER FEATURE LIST
+======================================================
+
+UI/UX SPECIFICS
+Style: Match the existing "Century Gothic" font and dark theme (#0a1628 background, #316dca accents).
+Inputs: Table inputs should have transparent backgrounds, white text, and subtle borders (1px solid rgba(255,255,255,0.1)).
+Image Upload: Use a hidden <input type="file"> triggered by clicking the image placeholder in the table cell.
+Loading State: Show "Calculating route…" toast during OSRM fetch.
+Error Handling: If routing fails, show red dashed line + tooltip "Routing unavailable – straight line shown".
+Cursor: Crosshair when route tool active; grab cursor when dragging vertices.
+Keyboard: Enter finishes route; Escape cancels draft; Delete removes selected waypoint in edit mode.
+
+PYTHON / STREAMLIT BACKEND
+1. Page Config: Wide layout, collapsed sidebar, custom CSS injection (Century Gothic font, hidden Streamlit chrome).
+2. Supabase Integration: REST API client for fetching/saving projects (CRUD operations on `map_projects` table).
+3. POI Taxonomy: Hardcoded dictionary (`POI_CONFIG`) mapping categories (Commercial, Retail, etc.) to Overpass QL tags.
+4. Basemap Themes: Python dictionaries defining MapLibre styles (Midnight Blue, Monochrome, White Gold) + Raster fallbacks (Carto, OSM, Satellite).
+5. Helper Functions: `w()` for zoom interpolation, `road_layer()` for road styling logic, `vector_style()` generator.
+6. HTML Injection: Single-page architecture injecting the massive HTML/JS template into `st.components.v1.html`.
+7. State Initialization: Logic to load the most recent project from Supabase or default to "Untitled Project 1" if empty.
+8. Robust Overpass Fetcher (Python): `fetch_pois()` function with retry logic, exponential backoff, and OSMnx fallback (defined but primarily used as reference/fallback).
+9. add a undo and redo button beside save button
+10.  No Backend Changes Required: All routing logic remains client-side via JavaScript fetch() to keep the stack free and serverless.
+Persistence Support: Ensure route features saved to Supabase include a props.routeMode (driving/walking/cycling) and props.metadata (distance/duration) so they reload correctly with their calculated stats.
+
+
+TOP TOOLBAR (HTML/JS)
+1. Home Button: Opens the Project Launcher Modal.
+2. Project Meta Cluster: Displays current project name (click to rename) and Save Status Badge (Saving/Saved/Unsaved).
+3. Save Button: Manually triggers `saveProjectToSupabase()`.
+4. Data Browser Toggle: Opens/closes the left-side Data Browser panel.
+5. My Layers Toggle: Opens/closes the left-side Layer Management panel.
+6. Search Place: Opens the floating Google Maps-style search bar.
+7. Import Button: Triggers file input for KML/KMZ/GeoJSON/SHP import.
+8. Draw Tools: Polygon, Rectangle, Circle (radius), Polyline, Route (OSRM), Marker, Textbox.
+- Route Add modes like car, motorcycle, walk, add time and m/km as a description , add a function for the user to edit the points and reroute
+9. Edit Mode: Toggles vertex editing and shape dragging capabilities, and draw elements rotation
+10. Basemap Styling: Opens the vector/raster style customizer panel.
+11. Export Map: Triggers direct PNG export of the current canvas view.
+12. Route Tool Activation: Clicking the "Route" tool (data-tool="route") should open a small floating settings card #popup-route-settings instead of just activating drawing.
+Route Settings Card:
+Mode Selector: Dropdown or segmented buttons for Driving, Walking, Cycling. Default: Driving.
+Auto-Finish Toggle: Checkbox "Auto-finish on double-click".
+Style Presets: Quick color swatches for route lines (Blue, Green, Red, Purple).
+
+
+DATA BROWSER PANEL (LEFT)
+1. Dimension Switcher: Toggle between 2D Map and 3D Buildings (adjusts pitch/visibility).
+2. Trade Area Analysis: Accordion item that opens the dedicated Trade Area Modal.
+3. Labels Control: Checkboxes to toggle City, Barangay, and Street labels, POIs icon and label like in OSM
+4. Roads & Transit: Checkboxes to toggle Expressway, Main, Secondary, Tertiary roads, and Railways.
+5. Buildings Control: Checkboxes for 2D vs 3D building visibility.
+6. Water Control: Checkboxes for Water Bodies and Waterways.
+7. Boundaries Control: Checkboxes for Province/City/Barangay boundaries + Search input, Search button/enter, show nomatim search for the place, user select to highlight specific boundaries via Nominatim.
+8. In trade area analysis, add a custom POI search to enable user to search for specific amenety
+
+
+MY LAYERS PANEL (LEFT)
+1. Layer Groups Header: Buttons to Add Group, select all, Hide/Unhide Selected, and Badge Count.
+2. Layer List: Dynamic list of all drawn features.
+3. Group Containers: Collapsible containers for grouped layers with Rename, Eye (toggle), and Delete controls.
+4. Layer Cards: Draggable cards for each feature with Checkbox (select), Name Input, Edit, Eye, Zoom, and Delete buttons.
+5. Drag & Drop Logic: Reorder layers within list; Drag layer onto Group Header to assign to group; Drag to Ungrouped zone to remove from group.
+6. Label Controls (Per Layer): Inline checkbox to show label + Dropdown for label position (Center/Top/Bottom/Left/Right).
+7. Add a select all button in the ungrouped and grouped layers
+8. Table Trigger Button: Add a "Table" icon button (grid icon) to every layer-card in the "My Layers" panel, positioned between the "Edit" and "Eye" buttons.
+Tooltip: Hovering over this button should display "View/Edit Attributes".
+
+FLOATING POPUPS & MODALS
+1. Search Popup: Google Maps-style input with debounced Nominatim search and result list.
+2. Marker Settings: Icon grid (Pin, Star, Circle, Square, Flag, Heart, Pinball), Custom Image Upload (max 5MB), Color picker, Size slider.
+3. Text Settings: Content input, Font family select, Size slider, Color picker, Opacity slider.
+4. Shape Editor: Context-aware editor for selected features (Name, Border Color/Opacity/Width, Fill Color/Opacity, Label Toggle/Pos, Marker Size, Text props).
+5. Custom Map Style: Preset buttons + Granular controls for Background, Roads (Exp/Main/Sec/Ter), Rail, Boundaries, Buildings, Water colors and opacities.
+6. Trade Area Modal: 
+   - Target Polygon Selector.
+   - POI Category Checkboxes (multi-select).
+   - Scan POIs Button (triggers multi API fetch).
+   - Results Summary (Grouped counts).
+   - Custom Overpass Query textarea (collapsible) + Result Type selector + Run button.
+7. Project Launcher Modal: Segmented control (Existing vs New), List of existing projects (Load/Rename/Delete), Create New form.
+8. Context Menu (Right Click show icons only): Edit, Duplicate, Delete, Copy Coordinates, Open in Google Maps, open in streetview.
+9. Attribute Table Modal: Create a new floating card #popup-attribute-table (width: 600px, max-height: 70vh).
+Header: Displays "Attributes: [Feature Name]" with a Close (X) button.
+Toolbar: Contains a "Find in table" search input (filters rows by value) and a "+ Add Column" button.
+Table Grid: A scrollable HTML table with sticky headers.
+Columns: Dynamic columns based on feature attributes. Default columns: name (Text), description (Text).
+Rows: Single row per feature (1-1 of 1).
+Cell Types:
+Text: Standard <input type="text"> that auto-saves to feature state on blur or Enter.
+Image: A container showing a thumbnail preview (max 80x80px). Clicking it opens a file picker. Uploading replaces the Base64 string. Right-click option to "Clear Image".
+Add Row/Col Logic: "Add Column" prompts for column name and type (Text/Image). "Add Row" is disabled for single-feature tables but enabled if multi-select is active (future proofing).
+Integration: Clicking the Table icon in My Layers opens this modal pre-filled with the selected feature's attributes. Closing the modal triggers markDirty() and syncDraw() (if labels depend on attributes).
+
+MAP ENGINE & INTERACTION LOGIC (JAVASCRIPT)
+1. MapLibre Init: Initializes map with `preserveDrawingBuffer: true` for exports.
+2. State Machine: Tracks `features`, `customGroups`, `activeTool`, `editMode`, `draft` points, `selectedId`, `vis` states.
+3. Debounce Utility: Used for search inputs to prevent API spam.
+4. Auto-Naming: `getNextUntitledProjectName()` logic.
+5. Supabase Sync: `saveProjectToSupabase()` with 20s auto-save interval and Ctrl+S listener.
+6. Icon Pipeline: `renderIconCanvas()` generates SVG/Canvas icons for markers (including Pinball); `getIconKey()` manages MapLibre image cache.
+7. Custom Image Pipeline: `createCustomMarkerImage()` handles file reading, resizing, and framing (2D/3D/Pin/Box) for uploaded images.
+8. Vector Layers Pipeline: `addDrawStack()` initializes GeoJSON sources and MapLibre layers (Fill, Outline, Line, Marker, Text, Labels, Pulse, Draft, Vertex Handles).
+9. Sync Functions: `syncDraw()` updates main source; `syncVertexHandles()` updates edit handles; `syncLabels()` updates label source (ensures 1 label per feature).
+10. Pulse Animation: `pulseFeature()` creates a visual ripple effect when zooming to a feature.
+11. Geometry Utils: `haversineDist`, `rectCoords`, `circleCoords`, `pointInPolygon`, `calcBounds`.
+12. Routing: `fetchMultiPointRoute()` uses OSRM API for driving directions.
+13. Feature Factory: `addFeatureRecord()` standardizes feature creation and adds to state/groups.
+14. Trade Area Logic: `populateTradeAreaCheckboxes()`, `robustOverpassFetch()` (JS implementation with retries/endpoints), `btnScanTradeArea` handler.
+15. Boundary Search: Debounced Nominatim search for administrative boundaries with autocomplete UI.
+16. Drawing Engine: `map.on('click')` handlers for all tool types (Polygon closing logic, Circle radius calc, Route snapping).
+17. Edit Mode Logic: `map.on('mousedown')` detects vertex vs shape drag; `map.on('mousemove')` updates geometry; Rotation handle logic for polygons.
+18. Import System: `handleImportFiles()` parses GeoJSON, KML (via toGeoJSON), KMZ (via JSZip), SHP (via shpjs).
+19. Export Engine: `btn-export-direct` captures canvas to PNG.
+20. Event Listeners: Global keydown (Esc to cancel, Enter to finish draw), Context menu prevention/handling.
+21. When POIs scanned marker is clicked it should show the OSM data. 
+State Management: Add currentTableFeatureId to track which feature is being edited in the table modal.
+Reactive Binding: Changes in the table inputs must immediately update the features array in memory.
+Label Integration: If a feature has an attribute named label_text or similar, allow the user to map this attribute to the visible map label in the Shape Editor.
+Search Logic: The "Find in table" input should perform a case-insensitive filter across all text values in the current feature's attributes.
+22. State Extension: Add currentRouteMode to global state (default: 'driving').
+Label Integration: Route labels automatically display {distance} · {duration} using existing syncLabels() function. Position defaults to center of bounds.
+Pulse Animation: When zooming to a route feature, pulse animation centers on midpoint of route geometry.
+Import Compatibility: Imported GeoJSON LineStrings with properties.route_mode should be recognized as editable routes.
+
+
+DRAWING & INTERACTION LOGIC (JAVASCRIPT)
+Waypoint Management:
+Store waypoints in draft array as [lng, lat].
+Visual feedback: Draw dashed preview line between points using existing draft source.
+Finish Logic: Double-click OR click near last point (>22px threshold) triggers fetchMultiPointRoute().
+OSRM Integration (fetchMultiPointRoute):
+Endpoint: https://router.project-osrm.org/route/v1/{mode}/{coords}?overview=full&geometries=geojson&steps=true.
+Fallback: If OSRM fails (429/503), draw straight LineString between points and set props.routingFailed = true.
+Metadata Parsing: Extract routes[0].distance (meters) and routes[0].duration (seconds). Format as human-readable string (e.g., "12.4 km · 28 min").
+Feature Creation:
+Create feature with kind route.
+Auto-name: Route {id}.
+Store metadata in f.props.description for label display.
+Store f.props.routeMode for re-routing logic.
+EDIT MODE & REROUTING
+Vertex Handles: In Edit Mode, show blue draggable handles at every waypoint (existing syncVertexHandles logic applies).
+Dynamic Reroute:
+On mouseup after dragging a vertex handle: Capture new coordinate → Update draft/feature coords → Call fetchMultiPointRoute() with updated points.
+Debounce reroute calls by 300ms to prevent API spam during drag.
+Midpoint Insertion: Double-clicking a route segment (LineString) inserts a new waypoint at that exact location, forcing the route through that point.
+Mode Switching: Changing mode in Shape Editor triggers immediate reroute with new profile.
+SHAPE EDITOR POPUP (RIGHT PANEL)
+Route-Specific Controls: When editing a route kind feature:
+Mode Dropdown: Driving/Walking/Cycling selector.
+Stats Display: Read-only text showing current Distance & Duration.
+Recalculate Button: Manual trigger to refetch route (useful if API was temporarily down).
+Waypoint List: Collapsible list showing all waypoint coordinates with "Remove" button per point.
+Standard Styling: Reuse existing border color/width/opacity controls for route line styling.
+
