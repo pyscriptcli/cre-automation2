@@ -386,6 +386,16 @@ ALL_STYLES = {
     "Satellite": raster_style(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "#000000", 19),
 }
 
+# ----------------- Color Palette Hierarchy (Primary, Secondary, Tertiary) -----------------
+COLOR_PALETTES = [
+    # Primary Palette (Base & bold foundation)
+    {"name": "Primary", "colors": ["#1e40af", "#dc2626", "#16a34a", "#ca8a04", "#0a1628", "#ffffff"]},
+    # Secondary Palette (Vibrant & UI accents)
+    {"name": "Secondary", "colors": ["#38bdf8", "#3fb950", "#f85149", "#a371f7", "#fb923c", "#f43f5e"]},
+    # Tertiary Palette (Muted, earthy & neutral tones)
+    {"name": "Tertiary", "colors": ["#0d9488", "#e8b84a", "#8b5cf6", "#64748b", "#8e7258", "#334155"]}
+]
+
 # ------------------------------------------------------------------------
 # 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
 # ------------------------------------------------------------------------
@@ -638,18 +648,21 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .attr-img-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: block; }
 .attr-img-placeholder { width: 80px; height: 80px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 10px; color: #adbac7; cursor: pointer; text-align: center; }
 
-/* Color picker full control styles */
-.color-ctrl-cluster { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+/* Color picker full control styles (Primary, Secondary, Tertiary) */
+.color-ctrl-cluster { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.palette-group { display: flex; flex-direction: column; gap: 2px; }
+.palette-label { font-size: 9px; font-weight: 700; color: #768390; text-transform: uppercase; letter-spacing: 0.5px; }
 .swatch-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-.swatch { width: 16px; height: 16px; border-radius: 3px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); }
-.color-input-combo { display: flex; align-items: center; gap: 4px; }
+.swatch { width: 16px; height: 16px; border-radius: 3px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.1s; }
+.swatch:hover { transform: scale(1.15); }
+.color-input-combo { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 .color-input-combo input[type=color] {
     -webkit-appearance: none; border: 1px solid rgba(255, 255, 255, 0.15);
     width: 24px; height: 24px; border-radius: 4px; cursor: pointer; background: transparent; padding: 0;
 }
 .color-input-combo input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
 .color-input-combo input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
-.color-input-combo input[type=text] { width: 70px; font-family: monospace; font-size: 11px; padding: 3px 5px; }
+.color-input-combo input[type=text] { width: 75px; font-family: monospace; font-size: 11px; padding: 3px 5px; }
 .btn-eyedropper { width: 24px; height: 24px; display: grid; place-items: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #adbac7; cursor: pointer; padding: 0; }
 .btn-eyedropper:hover { color: #fff; background: rgba(255,255,255,0.2); }
 </style>
@@ -736,7 +749,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <div style="margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
             <button id="btn-import" class="trade-btn" style="width:100%; display:flex; justify-content:center; align-items:center; gap:6px;">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                Import Spatial Data (KML, KMZ, GeoJSON, SHP)
+                Import Spatial Data (KML, GeoJSON, SHP)
             </button>
             <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip" style="display:none;"/>
         </div>
@@ -1111,6 +1124,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 try {
 const ALL_STYLES = __ALL_STYLES__;
 const POI_CONFIG = __POI_CONFIG__;
+const COLOR_PALETTES = __COLOR_PALETTES__;
 const SUPABASE_URL = "__SUPABASE_URL__";
 const SUPABASE_KEY = "__SUPABASE_KEY__";
 let ALL_PROJECTS = __ALL_PROJECTS_JSON__;
@@ -1145,11 +1159,11 @@ function debounce(func, wait) {
 // ----------------- State Machine -----------------
 let features = __INITIAL_FEATURES__;
 let fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
-let customGroups = __INITIAL_CUSTOM_GROUPS__ || {"Trade Area Scan": {collapsed: false, ids: []}};
+let customGroups = __INITIAL_CUSTOM_GROGroups__ || {"Trade Area Scan": {collapsed: false, ids: []}};
 
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
-let markerShape = 'pin', markerColor = '#003366', markerIconSize = 0.9;
+let markerShape = 'pin', markerColor = '#1e40af', markerIconSize = 0.9;
 let customMarkerImageKey = null;
 let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
@@ -1177,18 +1191,27 @@ let currentTableFeatureId = null;
 let currentRouteMode = 'driving';
 let currentRouteColor = '#38bdf8';
 
-const COLOR_SWATCHES = ['#38bdf8', '#3fb950', '#f85149', '#a371f7', '#e8b84a', '#ffffff', '#003366', '#0a1628', '#ffaa00', '#f59e0b', '#768390'];
-
 function setupColorPicker(containerId, initialColor, onColorChange) {
     const el = document.getElementById(containerId);
     if (!el) return;
+    
+    let paletteRows = '';
+    COLOR_PALETTES.forEach(p => {
+        paletteRows += `
+            <div class="palette-group">
+                <span class="palette-label">${p.name}</span>
+                <div class="swatch-row">
+                    ${p.colors.map(hex => `<div class="swatch" data-color="${hex}" style="background:${hex};" title="${hex}"></div>`).join('')}
+                </div>
+            </div>
+        `;
+    });
+
     el.innerHTML = `
-        <div class="swatch-row">
-            ${COLOR_SWATCHES.map(hex => `<div class="swatch" data-color="${hex}" style="background:${hex};"></div>`).join('')}
-        </div>
-        <div class="color-input-combo" style="margin-top:4px;">
+        ${paletteRows}
+        <div class="color-input-combo">
             <input type="color" class="native-color" value="${initialColor}">
-            <input type="text" class="hex-text" value="${initialColor}">
+            <input type="text" class="hex-text" value="${initialColor}" placeholder="#hex">
             <button class="btn-eyedropper" title="Pick color from screen">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11l-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l2.83 2.83a2.12 2.12 0 0 0 3 0L19 11z"></path><path d="M5 19l-3 3"></path></svg>
             </button>
@@ -1418,7 +1441,7 @@ window.loadProjectDirectly = function(projectId) {
     features.forEach(f => {
         if (f.kind === 'marker') {
             const sh = f.props.shape || 'pin';
-            const col = f.props.color || '#003366';
+            const col = f.props.color || '#1e40af';
             f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
         }
     });
@@ -2029,7 +2052,7 @@ map.on('load', () => {
     features.forEach(f => {
         if (f.kind === 'marker') {
             const sh = f.props.shape || 'pin';
-            const col = f.props.color || '#003366';
+            const col = f.props.color || '#1e40af';
             f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
         }
     });
@@ -2040,7 +2063,7 @@ map.on('load', () => {
     populateTradeAreaCheckboxes();
     
     // Init Color Pickers
-    setupColorPicker('mColorCtrl', '#003366', col => { markerColor = col; markDirty(); });
+    setupColorPicker('mColorCtrl', '#1e40af', col => { markerColor = col; markDirty(); });
     setupColorPicker('tColorCtrl', '#d9b451', col => { $('tColorCtrl').dataset.val = col; markDirty(); });
     setupColorPicker('eBorderColorCtrl', '#38bdf8', col => {
         const f = features.find(x => x.id === selectedId);
@@ -2251,6 +2274,62 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
     return feat;
 }
 
+// ----------------- Feature Popup on Left-Click -----------------
+function showFeaturePopup(f, clickLngLat) {
+    let popupCoords = clickLngLat;
+    if (!popupCoords) {
+        const bnd = calcBounds(f);
+        if (bnd) popupCoords = [(bnd[0][0] + bnd[1][0]) / 2, (bnd[0][1] + bnd[1][1]) / 2];
+        else popupCoords = [120.9842, 14.5995];
+    }
+    
+    let primaryImageHtml = '';
+    let tableRowsHtml = '';
+
+    // Check if there is an image in attributes / attrRows
+    if (f.props.attrRows && f.props.attrRows.length > 0 && f.props.attrTypes) {
+        for (const row of f.props.attrRows) {
+            for (const col in f.props.attrTypes) {
+                if (f.props.attrTypes[col] === 'image' && row[col] && row[col].startsWith('data:image')) {
+                    primaryImageHtml = `<img src="${row[col]}" style="width:100%; max-height:160px; object-fit:cover; border-radius:8px; margin-bottom:8px; display:block; border:1px solid rgba(255,255,255,0.15);"/>`;
+                    break;
+                }
+            }
+            if (primaryImageHtml) break;
+        }
+    }
+
+    if (f.props.osmTags && Object.keys(f.props.osmTags).length > 0) {
+        for (const k in f.props.osmTags) {
+            tableRowsHtml += `<tr><th>${k}</th><td>${f.props.osmTags[k]}</td></tr>`;
+        }
+    } else if (f.props.attributes && Object.keys(f.props.attributes).length > 0) {
+        for (const k in f.props.attributes) {
+            const val = f.props.attributes[k];
+            if (val && typeof val === 'string' && val.startsWith('data:image')) continue;
+            tableRowsHtml += `<tr><th>${k}</th><td>${val || '-'}</td></tr>`;
+        }
+    }
+
+    if (!tableRowsHtml) {
+        tableRowsHtml = `<tr><th>name</th><td>${f.name}</td></tr><tr><th>type</th><td>${f.kind}</td></tr>`;
+        if (f.props.description) tableRowsHtml += `<tr><th>description</th><td>${f.props.description}</td></tr>`;
+    }
+
+    const html = `
+        <div style="font-weight:700; margin-bottom:6px; color:#38bdf8; font-size:13px;">${f.name}</div>
+        ${primaryImageHtml}
+        <table class="tag-table">
+            ${tableRowsHtml}
+        </table>
+    `;
+
+    new maplibregl.Popup({ maxWidth: '320px' })
+        .setLngLat(popupCoords)
+        .setHTML(html)
+        .addTo(map);
+}
+
 // ----------------- Trade Area POI Scanner -----------------
 function populateTradeAreaCheckboxes() {
     const container = $('poiCategoryCheckboxes');
@@ -2377,9 +2456,9 @@ $('btnScanTradeArea').onclick = async () => {
         const lon = el.lon || (el.center && el.center.lon);
         addFeatureRecord('marker', { type: 'Point', coordinates: [lon, lat] }, {
             shape: 'pin',
-            color: '#003366',
+            color: '#1e40af',
             iconSize: 0.85,
-            iconKey: getIconKey('pin', '#003366'),
+            iconKey: getIconKey('pin', '#1e40af'),
             osmTags: el.tags || { name: poiName, type: 'custom' }
         }, "Trade Area Scan", poiName);
     });
@@ -2417,18 +2496,18 @@ $('btnRunOverpass').onclick = async () => {
         if (el.type === 'node') {
             addFeatureRecord('marker', { type: 'Point', coordinates: [el.lon, el.lat] }, {
                 shape: 'pin',
-                color: '#003366',
+                color: '#1e40af',
                 iconSize: 0.9,
-                iconKey: getIconKey('pin', '#003366'),
+                iconKey: getIconKey('pin', '#1e40af'),
                 osmTags: el.tags || {}
             });
         } else if (el.type === 'way' && el.geometry) {
             if (resultType === 'marker' && el.center) {
                 addFeatureRecord('marker', { type: 'Point', coordinates: [el.center.lon, el.center.lat] }, {
                     shape: 'pin',
-                    color: '#003366',
+                    color: '#1e40af',
                     iconSize: 0.9,
-                    iconKey: getIconKey('pin', '#003366'),
+                    iconKey: getIconKey('pin', '#1e40af'),
                     osmTags: el.tags || {}
                 });
             } else if (resultType === 'polygon') {
@@ -2544,6 +2623,7 @@ $('ctx-edit').onclick = (e) => {
         selectedId = ctxFeatureId;
         openShapeEditor(ctxFeatureId);
         syncVertexHandles();
+        hint('Edit Mode active: Drag, edit vertices, or rotate via gold handle');
     }
     $('map-context-menu').style.display = 'none';
 };
@@ -2782,20 +2862,8 @@ map.on('click', e => {
             if (fs.length && fs[0].properties.id != null) {
                 const id = parseInt(fs[0].properties.id, 10);
                 const f = features.find(x => x.id === id);
-                if (f && f.kind === 'marker' && f.props.osmTags && Object.keys(f.props.osmTags).length > 0) {
-                    let html = `<div style="font-weight:700; margin-bottom:6px; color:#38bdf8;">${f.name}</div><table class="tag-table">`;
-                    for (const k in f.props.osmTags) {
-                        html += `<tr><th>${k}</th><td>${f.props.osmTags[k]}</td></tr>`;
-                    }
-                    html += `</table>`;
-                    new maplibregl.Popup({ maxWidth: '300px' })
-                        .setLngLat(f.geometry.coordinates)
-                        .setHTML(html)
-                        .addTo(map);
-                    return;
-                } else {
-                    openAttributeTable(id);
-                    resetActiveTools();
+                if (f) {
+                    showFeaturePopup(f, [e.lngLat.lng, e.lngLat.lat]);
                     return;
                 }
             }
@@ -2813,7 +2881,7 @@ map.on('click', e => {
         });
         resetActiveTools();
         closeFloatingCards();
-        openAttributeTable(feat.id);
+        showFeaturePopup(feat, ll);
     } else if (activeTool === 'textbox') {
         const tColor = $('tColorCtrl').dataset.val || '#d9b451';
         const feat = addFeatureRecord('text', { type: 'Point', coordinates: ll }, {
@@ -2824,7 +2892,7 @@ map.on('click', e => {
         });
         resetActiveTools();
         closeFloatingCards();
-        openAttributeTable(feat.id);
+        showFeaturePopup(feat, ll);
     } else if (activeTool === 'polyline') {
         if (draft.length >= 2) {
             const pScreen = map.project(ll);
@@ -2832,7 +2900,7 @@ map.on('click', e => {
             if (Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 18) {
                 const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
                 resetActiveTools();
-                openAttributeTable(feat.id);
+                showFeaturePopup(feat, ll);
                 return;
             }
         }
@@ -2845,7 +2913,7 @@ map.on('click', e => {
                 if (Math.hypot(pScreen.x - vScreen.x, pScreen.y - vScreen.y) < 18) {
                     const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
                     resetActiveTools();
-                    openAttributeTable(feat.id);
+                    showFeaturePopup(feat, ll);
                     return;
                 }
             }
@@ -2856,7 +2924,7 @@ map.on('click', e => {
         if (draft.length === 2) {
             const feat = addFeatureRecord('rectangle', { type: 'Polygon', coordinates: rectCoords(draft[0], draft[1]) });
             resetActiveTools();
-            openAttributeTable(feat.id);
+            showFeaturePopup(feat, ll);
         }
     } else if (activeTool === 'circle') {
         draft.push(ll);
@@ -2864,7 +2932,7 @@ map.on('click', e => {
             const { coords, r } = circleCoords(draft[0], draft[1]);
             const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { centerCoord: draft[0], radiusMeters: r });
             resetActiveTools();
-            openAttributeTable(feat.id);
+            showFeaturePopup(feat, ll);
         }
     } else if (activeTool === 'route') {
         if (draft.length >= 2) {
@@ -3215,7 +3283,7 @@ function renderMyLayers() {
                 </div>
                 <div class="group-styling-panel" data-group="${gName}">
                     <div style="font-size:10px; font-weight:700; color:#768390; margin-bottom:6px;">BULK APPLY TO MARKERS IN GROUP</div>
-                    <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Color</span> <input type="color" class="grp-style-color" value="#003366" style="width:24px; height:24px; border:none; background:transparent;"></div>
+                    <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Color</span> <input type="color" class="grp-style-color" value="#1e40af" style="width:24px; height:24px; border:none; background:transparent;"></div>
                     <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Shape</span>
                         <select class="grp-style-shape" style="flex:1; font-size:10px;">
                             <option value="">-- No Change --</option>
@@ -3814,9 +3882,9 @@ function processGeoJSON(geojson) {
         if (geom.type === 'Point') {
             addFeatureRecord('marker', geom, {
                 shape: 'pin',
-                color: '#003366',
+                color: '#1e40af',
                 iconSize: 0.9,
-                iconKey: getIconKey('pin', '#003366'),
+                iconKey: getIconKey('pin', '#1e40af'),
                 osmTags: props
             });
         } else if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
@@ -3872,6 +3940,7 @@ try:
     html = (
         HTML_TEMPLATE.replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
         .replace("__POI_CONFIG__", json.dumps(POI_CONFIG))
+        .replace("__COLOR_PALETTES__", json.dumps(COLOR_PALETTES))
         .replace("__SUPABASE_URL__", SUPABASE_URL)
         .replace("__SUPABASE_KEY__", SUPABASE_KEY)
         .replace("__ALL_PROJECTS_JSON__", json.dumps(ALL_PROJECTS_LIST))
