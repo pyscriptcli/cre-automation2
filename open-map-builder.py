@@ -23,7 +23,6 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
         "https://overpass.openstreetmap.fr/api/interpreter"
     ]
     
-    # Build Overpass QL query
     statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
     ql = f"[out:json][timeout:{timeout}];(\n{statements}\n);\nout center;"
     
@@ -41,7 +40,6 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
                 if not data or 'elements' not in data:
                     raise ValueError("Malformed JSON response")
                 
-                # Parse successful response
                 results = []
                 for el in data['elements']:
                     el_lat = el.get('lat') or (el.get('center', {}).get('lat'))
@@ -69,7 +67,6 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
                 time.sleep(delay + jitter)
                 delay *= 2
                 
-    # Fallback to OSMnx
     logging.info("All Overpass endpoints failed. Falling back to OSMnx...")
     try:
         import osmnx as ox
@@ -519,8 +516,8 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 }
 .float-card input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
 .float-card input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
-.float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
-.float-card input[type=text]:focus { border-color: #38bdf8; }
+.float-card input[type=text], .float-card input[type=number], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
+.float-card input[type=text]:focus, .float-card input[type=number]:focus { border-color: #38bdf8; }
 #popup-search { width: 280px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
 #popup-marker-settings { width: 250px; }
 #popup-text-settings { width: 260px; }
@@ -529,7 +526,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
 #popup-route-settings { width: 220px; }
 #popup-polygon3d-settings { width: 280px; }
-#popup-attribute-table { width: 600px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
 .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
 .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
@@ -541,8 +537,8 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 }
 .maplibregl-popup-tip { border-top-color: rgba(9, 16, 24, 0.97) !important; }
 .tag-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-.tag-table th, .tag-table td { text-align: left; padding: 4px 6px; border: 1px solid rgba(255,255,255,0.08); font-size: 10px; }
-.tag-table th { background: rgba(255,255,255,0.06); color: #38bdf8; }
+.tag-table th, .tag-table td { text-align: left; padding: 4px 6px; border: 1px solid rgba(255,255,255,0.1); font-size: 11px; background: transparent; color:#fff;}
+.tag-table th { background: rgba(255,255,255,0.06); color: #38bdf8; font-weight:600;}
 .tag-table td { word-break: break-all; }
 #hint-toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1001;
@@ -642,14 +638,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .trade-area-poi-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .trade-area-poi-row label { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; }
 .custom-query-collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; color: #f0f6fc; font-size: 12px; margin-top: 8px;}
-/* Attribute Table Styles */
-.attr-table-container { width: 100%; overflow-y: auto; max-height: 50vh; }
-.attr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.attr-table th { position: sticky; top: 0; background: #0f172a; color: #f0f6fc; padding: 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 10; }
-.attr-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
-.attr-table input[type="text"] { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #f0f6fc; padding: 4px; border-radius: 4px; }
-.attr-table input[type="text"]:focus { border-color: #38bdf8; outline: none; }
-.attr-img-preview { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
 </style>
 </head>
 <body>
@@ -666,11 +654,11 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <span id="save-text">Saved</span>
         </div>
     </div>
-    <button class="tb-btn" id="btn-undo" title="Undo (Ctrl+Z)" style="color:#adbac7;">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+    <button class="tb-btn" id="btn-undo" title="Undo (Ctrl+Z)">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M3 13a9 9 0 0 1 15-6 9 9 0 0 1 3 9"></path></svg>
     </button>
-    <button class="tb-btn" id="btn-redo" title="Redo (Ctrl+Y)" style="color:#adbac7;">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path></svg>
+    <button class="tb-btn" id="btn-redo" title="Redo (Ctrl+Y)">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"></path><path d="M21 13a9 9 0 0 0-15-6 9 9 0 0 0-3 9"></path></svg>
     </button>
     <button class="tb-btn" id="btn-save-project" title="Save Workspace (Ctrl+S)" style="color:#3fb950;">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
@@ -883,22 +871,21 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <option value="walking">Walk</option>
         </select>
     </div>
-    <div class="f-row"><span>Style</span>
-        <select id="rColor" style="width:130px;">
-            <option value="#38bdf8">Blue</option>
-            <option value="#3fb950">Green</option>
-            <option value="#f85149">Red</option>
-            <option value="#a371f7">Purple</option>
-        </select>
+    <div class="f-row"><span>Auto-finish</span> <input type="checkbox" id="routeAutoFinish" checked></div>
+    <div style="display:flex; gap:4px; margin-top:4px;">
+        <button class="preset-color" style="background:#38bdf8; width:20px; height:20px; border:none; border-radius:4px;" data-c="#38bdf8"></button>
+        <button class="preset-color" style="background:#3fb950; width:20px; height:20px; border:none; border-radius:4px;" data-c="#3fb950"></button>
+        <button class="preset-color" style="background:#f85149; width:20px; height:20px; border:none; border-radius:4px;" data-c="#f85149"></button>
+        <button class="preset-color" style="background:#d9b451; width:20px; height:20px; border:none; border-radius:4px;" data-c="#d9b451"></button>
     </div>
 </div>
 
 <div id="popup-polygon3d-settings" class="float-card right-card">
     <div style="font-weight:600; font-size:11px; color:#768390;">3D POLYGON SETTINGS</div>
-    <div class="f-row"> <span>Height (m)</span> <input type="number" id="p3dHeight" min="1" max="500" step="1" value="50" style="width:100px;"></div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="p3dColor" value="#e8b84a"></div>
-    <div class="f-row"> <span>Opacity</span> <input type="range" id="p3dOpacity" min="0.1" max="1.0" step="0.1" value="0.7"></div>
-    <div class="f-row"> <span>Auto-Close</span> <input type="checkbox" id="p3dAutoClose" checked></div>
+    <div class="f-row"> <span>Extrusion Height (m)</span> <input type="number" id="p3dHeight" min="1" max="500" step="1" value="50" style="width:80px;"></div>
+    <div class="f-row"> <span>Face Color</span> <input type="color" id="p3dColor" value="#e8b84a"></div>
+    <div class="f-row"> <span>Opacity</span> <input type="range" id="p3dOp" min="0.1" max="1" step="0.1" value="0.7"></div>
+    <label class="layer-row"> <input type="checkbox" id="p3dAutoClose" checked> Close popup after draw</label>
 </div>
 
 <div id="popup-shape-editor" class="float-card right-card">
@@ -907,6 +894,31 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <button class="card-btn" id="closeEditorBtn">✕</button>
     </div>
     <div class="f-row"> <span>Name</span> <input type="text" id="eName" style="width:140px;"></div>
+    
+    <!-- Route Specific Controls -->
+    <div id="eRouteControlsRow" style="display:none; flex-direction:column; gap:6px; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
+        <div class="f-row"> <span>Mode</span>
+            <select id="eRouteProfile" style="width:110px;">
+                <option value="driving">Car</option>
+                <option value="cycling">Motorcycle</option>
+                <option value="walking">Walk</option>
+            </select>
+        </div>
+        <div class="f-row" style="font-size:11px; color:#38bdf8;">
+            <span>Stats:</span><span id="eRouteStats">--</span>
+        </div>
+        <button id="eRecalculateRouteBtn" class="trade-btn" style="padding:4px;">Recalculate Route</button>
+        <div style="font-size:10px; font-weight:600; color:#768390; margin-top:4px;">WAYPOINTS</div>
+        <div id="eRouteWaypoints" style="display:flex; flex-direction:column; gap:4px; max-height:80px; overflow-y:auto;"></div>
+    </div>
+    
+    <!-- 3D Specific Controls -->
+    <div id="e3DControlsRow" style="display:none; flex-direction:column; gap:6px; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
+        <div class="f-row"> <span>Extrusion Height (m)</span> <input type="number" id="eExtrusionHeight" min="1" max="500" step="1" style="width:80px;"></div>
+        <div class="f-row"> <span>Face Color</span> <input type="color" id="eExtrusionColor"></div>
+        <div class="f-row"> <span>Fill Opacity</span> <input type="range" id="eExtrusionOp" min="0" max="1" step="0.05"></div>
+    </div>
+    
     <div class="f-row" id="eBorderColorRow"> <span>Border Color</span> <input type="color" id="eBorderColor"></div>
     <div class="f-row" id="eBorderOpRow"> <span>Border Opacity</span> <input type="range" id="eBorderOp" min="0" max="1" step="0.05"></div>
     <div class="f-row" id="eWidthRow"> <span>Border Width</span> <input type="range" id="eWidth" min="1" max="16" step="1"></div>
@@ -925,30 +937,25 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="f-row" id="eMarkerSizeRow" style="display:none;"> <span>Icon Size</span> <input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
     <div class="f-row" id="eTextRow" style="display:none;"> <span>Text</span> <input type="text" id="eTextVal" style="width:140px;"></div>
     <div class="f-row" id="eFontSizeRow" style="display:none;"> <span>Font Size</span> <input type="range" id="eFontSize" min="10" max="42" step="1"></div>
-    
-    <!-- Route Specific Controls -->
-    <div id="routeEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
-        <div class="f-row"> <span>Route Mode</span>
-            <select id="eRouteMode" style="width:110px;">
-                <option value="driving">Driving</option>
-                <option value="cycling">Cycling</option>
-                <option value="walking">Walking</option>
-            </select>
-        </div>
-        <div class="f-row" style="margin-top:4px;"> <span>Stats</span> <span id="eRouteStats" style="font-size:11px; color:#adbac7;">-</span></div>
-        <button id="eRecalcRoute" class="trade-btn" style="width:100%; margin-top:6px; font-size:10px;">Recalculate Route</button>
-    </div>
-
-    <!-- 3D Polygon Specific Controls -->
-    <div id="p3dEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
-        <div class="f-row"> <span>Height (m)</span> <input type="number" id="eP3dHeight" min="1" max="500" step="1" style="width:100px;"></div>
-        <div class="f-row"> <span>Extrusion Color</span> <input type="color" id="eP3dColor"></div>
-        <div class="f-row"> <span>Opacity</span> <input type="range" id="eP3dOpacity" min="0.1" max="1.0" step="0.1"></div>
-    </div>
-
     <div style="display:flex; justify-content:space-between; margin-top:6px;">
         <button id="eDeleteBtn" style="color:#f85149; border:1px solid #da36334d; background:#da36331a; padding:6px 12px; border-radius:6px; cursor:pointer;">Delete</button>
         <button id="eDoneBtn" style="background:#316dca; color:#fff; border:none; padding:6px 16px; border-radius:6px; cursor:pointer;">Done</button>
+    </div>
+</div>
+
+<div id="popup-attribute-table" class="float-card" style="width: 600px; max-height: 70vh; left: 50%; transform: translateX(-50%); top: 100px;">
+    <div class="panel-header" style="padding: 0 0 10px 0;">
+        <div class="panel-title" id="attr-table-title">Attributes</div>
+        <button class="card-btn" id="closeAttrTableBtn">✕</button>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
+        <input type="text" id="attr-table-search" placeholder="Find in table..." style="width: 200px;">
+        <button class="trade-btn" id="btn-add-col">+ Add Column</button>
+    </div>
+    <div style="overflow-x: auto; overflow-y: auto;">
+        <table id="attr-table-grid" class="tag-table" style="width: 100%;">
+            <!-- Dynamically populated -->
+        </table>
     </div>
 </div>
 
@@ -1003,11 +1010,12 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <div style="font-weight:600; font-size:11px; color:#768390;">POI CATEGORIES</div>
         <div id="poiCategoryCheckboxes" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
         </div>
-        <div style="margin-top:8px;">
-            <div style="font-weight:600; font-size:11px; color:#768390; margin-bottom:4px;">Custom POI Search</div>
-            <input type="text" id="customPoiSearchInput" placeholder="e.g. amenity=restaurant" style="width:100%; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px; font-size:11px;"/>
+        <div style="font-weight:600; font-size:11px; margin-top:8px;">CUSTOM POI (OSM TAG)</div>
+        <div class="f-row">
+            <input type="text" id="customPoiTagInput" placeholder='e.g. amenity=hospital'>
+            <button class="trade-btn" id="btnAddCustomPoi">Add</button>
         </div>
-        <button class="trade-btn" id="btnScanTradeArea" style="margin-top:8px;">Scan POIs</button>
+        <button class="trade-btn" id="btnScanTradeArea" style="margin-top: 8px;">Scan POIs</button>
         <div id="tradeResults" class="poi-summary"></div>
         <hr style="border-color:rgba(255,255,255,0.1); width:100%;"/>
         <div class="custom-query-collapse-header" id="customQueryToggle">
@@ -1024,24 +1032,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             </div>
             <button id="btnRunOverpass" class="trade-btn">Run Custom Query</button>
         </div>
-    </div>
-</div>
-
-<!-- Attribute Table Modal -->
-<div id="popup-attribute-table" class="float-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <span style="font-weight:700; color:#f0f6fc;" id="attrTableTitle">Attributes</span>
-        <button class="card-btn" id="closeAttrTableBtn">✕</button>
-    </div>
-    <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <input type="text" id="attrTableSearch" placeholder="Find in table..." style="flex:1; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px; font-size:11px;"/>
-        <button id="btnAddAttrCol" class="trade-btn" style="padding:6px 10px; font-size:10px;">+ Add Column</button>
-    </div>
-    <div class="attr-table-container">
-        <table class="attr-table" id="attrTableGrid">
-            <thead><tr id="attrTableHeader"></tr></thead>
-            <tbody id="attrTableBody"></tbody>
-        </table>
     </div>
 </div>
 
@@ -1136,32 +1126,27 @@ let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
 let isDirty = false;
 
-// Undo/Redo State
+// History for Undo/Redo
 let historyStack = [];
-let historyIndex = -1;
-let isHistoryAction = false;
+let historyPointer = -1;
+
+function commitState() {
+    if (historyPointer < historyStack.length - 1) {
+        historyStack = historyStack.slice(0, historyPointer + 1);
+    }
+    const snapshot = JSON.stringify({ features, customGroups });
+    historyStack.push(snapshot);
+    if (historyStack.length > 50) historyStack.shift();
+    else historyPointer++;
+    markDirty();
+}
 
 // Vertex dragging state
 let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null;
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
-
-// Rotation state
 let isDraggingRotation = false, rotatingPolyId = null, rotCenter = null, rotStartAngle = 0, rotOriginalCoords = null;
-
-// Context menu state
 let ctxLngLat = null;
-let ctxFeatureId = null;
-
-// Attribute Table State
 let currentTableFeatureId = null;
-
-// Route State
-let currentRouteMode = 'driving';
-
-// 3D Polygon State
-let current3DPolyHeight = 50;
-let current3DPolyColor = '#e8b84a';
-let current3DPolyOpacity = 0.7;
 
 const vis = {
     label_city: true, label_brgy: true, label_street: true,
@@ -1172,23 +1157,12 @@ const vis = {
 };
 
 const VIS_MAP = {
-    label_city: ['label_city'],
-    label_brgy: ['label_brgy'],
-    label_street: ['label_street'],
-    poi_icons: ['draw-marker'],
-    poi_labels: ['draw-poly-labels', 'draw-text'],
-    road_exp: ['case_express_casing', 'rd_express'],
-    road_main: ['case_major_casing', 'rd_major'],
-    road_sec: ['case_secondary_casing', 'rd_secondary'],
-    road_ter: ['case_tertiary_casing', 'rd_tertiary', 'rd_min_md', 'rd_min_lo', 'rd_path'],
-    rd_rail: ['rd_rail'],
-    bound_prov: ['bound_prov'],
-    bound_city: ['bound_city'],
-    bound_brgy: ['bound_brgy'],
-    building2d: ['building-2d'],
-    building3d: ['building-3d'],
-    water: ['water'],
-    waterway: ['waterway']
+    label_city: ['label_city'], label_brgy: ['label_brgy'], label_street: ['label_street'],
+    poi_icons: ['draw-marker'], poi_labels: ['draw-poly-labels', 'draw-text'],
+    road_exp: ['case_express_casing', 'rd_express'], road_main: ['case_major_casing', 'rd_major'],
+    road_sec: ['case_secondary_casing', 'rd_secondary'], road_ter: ['case_tertiary_casing', 'rd_tertiary', 'rd_min_md', 'rd_min_lo', 'rd_path'],
+    rd_rail: ['rd_rail'], bound_prov: ['bound_prov'], bound_city: ['bound_city'], bound_brgy: ['bound_brgy'],
+    building2d: ['building-2d'], building3d: ['building-3d'], water: ['water'], waterway: ['waterway']
 };
 
 const $ = id => document.getElementById(id);
@@ -1206,60 +1180,10 @@ const setSaveBadgeStatus = status => {
 const markDirty = () => {
     isDirty = true;
     setSaveBadgeStatus('unsaved');
-    if (!isHistoryAction) {
-        // Push to history
-        const currentState = JSON.stringify({features, customGroups});
-        if (historyIndex < historyStack.length - 1) {
-            historyStack = historyStack.slice(0, historyIndex + 1);
-        }
-        historyStack.push(currentState);
-        historyIndex++;
-        // Limit stack size
-        if (historyStack.length > 50) {
-            historyStack.shift();
-            historyIndex--;
-        }
-    }
 };
-
-const undo = () => {
-    if (historyIndex > 0) {
-        historyIndex--;
-        const state = JSON.parse(historyStack[historyIndex]);
-        features = state.features;
-        customGroups = state.customGroups;
-        fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
-        syncDraw();
-        renderMyLayers();
-        isHistoryAction = true;
-        markDirty(); 
-        isHistoryAction = false;
-        hint('Undo');
-    }
-};
-
-const redo = () => {
-    if (historyIndex < historyStack.length - 1) {
-        historyIndex++;
-        const state = JSON.parse(historyStack[historyIndex]);
-        features = state.features;
-        customGroups = state.customGroups;
-        fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
-        syncDraw();
-        renderMyLayers();
-        isHistoryAction = true;
-        markDirty();
-        isHistoryAction = false;
-        hint('Redo');
-    }
-};
-
-// Initialize history
-historyStack.push(JSON.stringify({features, customGroups}));
-historyIndex = 0;
 
 const closeFloatingCards = () => {
-    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-route-settings','popup-polygon3d-settings','browser-panel','mylayers-panel','popup-attribute-table'].forEach(id => {
+    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','browser-panel','mylayers-panel','popup-attribute-table','popup-polygon3d-settings'].forEach(id => {
         const el = $(id);
         if (el) el.classList.remove('open');
     });
@@ -1277,7 +1201,7 @@ const resetActiveTools = () => {
     hint('');
 };
 
-// ----------------- Project Auto-Naming Calculation -----------------
+// ----------------- Project Auto-Naming & Launcher -----------------
 function getNextUntitledProjectName() {
     const untitledRegex = /^Untitled Project (\d+)$/i;
     let maxN = 0;
@@ -1291,31 +1215,23 @@ function getNextUntitledProjectName() {
     return `Untitled Project ${maxN + 1}`;
 }
 
-// ----------------- Launcher Modal UI -----------------
 function openHomeDialog() {
     closeFloatingCards();
     $('launcher-modal-scrim').classList.add('visible');
     $('new-proj-name').value = getNextUntitledProjectName();
     renderProjectsList();
 }
-function closeHomeDialog() {
-    $('launcher-modal-scrim').classList.remove('visible');
-}
+function closeHomeDialog() { $('launcher-modal-scrim').classList.remove('visible'); }
 $('btn-home-dialog').onclick = openHomeDialog;
 
 $('seg-btn-existing').onclick = () => {
-    $('seg-btn-existing').classList.add('active');
-    $('seg-btn-new').classList.remove('active');
-    $('seg-content-existing').style.display = 'flex';
-    $('seg-content-new').style.display = 'none';
+    $('seg-btn-existing').classList.add('active'); $('seg-btn-new').classList.remove('active');
+    $('seg-content-existing').style.display = 'flex'; $('seg-content-new').style.display = 'none';
 };
 $('seg-btn-new').onclick = () => {
-    $('seg-btn-new').classList.add('active');
-    $('seg-btn-existing').classList.remove('active');
-    $('seg-content-new').style.display = 'flex';
-    $('seg-content-existing').style.display = 'none';
-    $('new-proj-name').value = getNextUntitledProjectName();
-    $('new-proj-name').focus();
+    $('seg-btn-new').classList.add('active'); $('seg-btn-existing').classList.remove('active');
+    $('seg-content-new').style.display = 'flex'; $('seg-content-existing').style.display = 'none';
+    $('new-proj-name').value = getNextUntitledProjectName(); $('new-proj-name').focus();
 };
 
 function renderProjectsList() {
@@ -1365,14 +1281,10 @@ window.loadProjectDirectly = function(projectId) {
         }
     });
     map.once('idle', () => {
-        addDrawStack();
-        applyVis();
-        renderMyLayers();
+        addDrawStack(); applyVis(); renderMyLayers();
     });
+    historyStack = []; historyPointer = -1; commitState();
     closeHomeDialog();
-    // Reset history for new project
-    historyStack = [JSON.stringify({features, customGroups})];
-    historyIndex = 0;
 };
 
 window.renameProjectFromLauncher = async function(e, projectId, oldName) {
@@ -1389,12 +1301,7 @@ window.renameProjectFromLauncher = async function(e, projectId, oldName) {
     try {
         await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
             method: 'PATCH',
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal'
-            },
+            headers: getHeaders(),
             body: JSON.stringify({ name: newName.trim(), updated_at: new Date().toISOString() })
         });
     } catch(err) {}
@@ -1407,39 +1314,25 @@ window.deleteProjectFromLauncher = async function(e, projectId, name) {
     renderProjectsList();
     try {
         await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
-            method: 'DELETE',
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`
-            }
+            method: 'DELETE', headers: getHeaders()
         });
     } catch(err) {}
 };
+
+function getHeaders() {
+    return { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+}
 
 $('btn-create-project-submit').onclick = async () => {
     const pName = $('new-proj-name').value.trim() || getNextUntitledProjectName();
     const centerLL = [120.9842, 14.5995];
     const payload = {
-        name: pName,
-        basemap: "Midnight Blue",
-        center: centerLL,
-        zoom: 14,
-        pitch: 0,
-        bearing: 0,
-        features: [],
-        custom_groups: {"Trade Area Scan": {collapsed: false, ids: []}},
-        layer_visibilities: {}
+        name: pName, basemap: "Midnight Blue", center: centerLL, zoom: 14, pitch: 0, bearing: 0,
+        features: [], custom_groups: {"Trade Area Scan": {collapsed: false, ids: []}}, layer_visibilities: {}
     };
     try {
         const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects`, {
-            method: 'POST',
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-            },
-            body: JSON.stringify(payload)
+            method: 'POST', headers: getHeaders(), body: JSON.stringify(payload)
         });
         if (res.ok) {
             const created = await res.json();
@@ -1447,17 +1340,13 @@ $('btn-create-project-submit').onclick = async () => {
             ALL_PROJECTS.unshift(proj);
             loadProjectDirectly(proj.id);
         } else {
-            currentProjectId = "local-temp";
-            currentProjectName = pName;
+            currentProjectId = "local-temp"; currentProjectName = pName;
             $('project-name-display').textContent = pName;
-            features = [];
-            customGroups = {"Trade Area Scan": {collapsed: false, ids: []}};
-            map.setCenter(centerLL);
-            closeHomeDialog();
+            features = []; customGroups = {"Trade Area Scan": {collapsed: false, ids: []}};
+            historyStack = []; historyPointer = -1; commitState();
+            map.setCenter(centerLL); closeHomeDialog();
         }
-    } catch(e) {
-        closeHomeDialog();
-    }
+    } catch(e) { closeHomeDialog(); }
 };
 
 $('project-name-display').onclick = () => {
@@ -1469,96 +1358,84 @@ $('project-name-display').onclick = () => {
     }
 };
 
+// Undo/Redo Buttons
+$('btn-undo').onclick = () => {
+    if (historyPointer > 0) {
+        historyPointer--;
+        const state = JSON.parse(historyStack[historyPointer]);
+        features = state.features; customGroups = state.customGroups;
+        syncDraw(); renderMyLayers(); markDirty();
+    }
+};
+$('btn-redo').onclick = () => {
+    if (historyPointer < historyStack.length - 1) {
+        historyPointer++;
+        const state = JSON.parse(historyStack[historyPointer]);
+        features = state.features; customGroups = state.customGroups;
+        syncDraw(); renderMyLayers(); markDirty();
+    }
+};
+
 // ----------------- Supabase Sync & Autosave Engine -----------------
 async function saveProjectToSupabase(showToast = false) {
-    if (!currentProjectId || currentProjectId === "local-temp" || !SUPABASE_URL || !SUPABASE_KEY) {
-        return;
-    }
+    if (!currentProjectId || currentProjectId === "local-temp" || !SUPABASE_URL || !SUPABASE_KEY) return;
     setSaveBadgeStatus('saving');
     const c = map.getCenter();
     const payload = {
-        updated_at: new Date().toISOString(),
-        name: currentProjectName,
-        center: [c.lng, c.lat],
-        zoom: map.getZoom(),
-        pitch: map.getPitch(),
-        bearing: map.getBearing(),
-        basemap: currentStyleName,
-        features: features,
-        custom_groups: customGroups,
-        layer_visibilities: vis
+        updated_at: new Date().toISOString(), name: currentProjectName, center: [c.lng, c.lat],
+        zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing(),
+        basemap: currentStyleName, features: features, custom_groups: customGroups, layer_visibilities: vis
     };
     try {
         const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${currentProjectId}`, {
-            method: 'PATCH',
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify(payload)
+            method: 'PATCH', headers: getHeaders(), body: JSON.stringify(payload)
         });
         if (res.ok) {
-            isDirty = false;
-            setSaveBadgeStatus('saved');
+            isDirty = false; setSaveBadgeStatus('saved');
             if (showToast) hint('Project Saved!');
         } else {
             setSaveBadgeStatus('unsaved');
             if (showToast) hint('Failed to save project');
         }
-    } catch(e) {
-        setSaveBadgeStatus('unsaved');
-        if (showToast) hint('Save request error');
-    }
+    } catch(e) { setSaveBadgeStatus('unsaved'); if (showToast) hint('Save request error'); }
 }
 
 setInterval(() => { if (isDirty) saveProjectToSupabase(false); }, 20000);
 $('btn-save-project').onclick = () => saveProjectToSupabase(true);
-$('btn-undo').onclick = undo;
-$('btn-redo').onclick = redo;
 
 document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        saveProjectToSupabase(true);
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault();
-        undo();
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
-        e.preventDefault();
-        redo();
-    }
-    if (e.key === 'Escape') {
-        $('map-context-menu').style.display = 'none';
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveProjectToSupabase(true); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); $('btn-undo').click(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); $('btn-redo').click(); }
+    if (e.key === 'Escape') { $('map-context-menu').style.display = 'none'; resetActiveTools(); closeFloatingCards(); editMode=false; $('btn-edit-mode').classList.remove('primary-active'); syncVertexHandles(); }
+    
+    // Delete Key logic for edit mode
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+        if (editMode && selectedLayerIds.size > 0 && !isDraggingVertex) {
+            features = features.filter(f => !selectedLayerIds.has(f.id));
+            for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(id => !selectedLayerIds.has(id));
+            selectedLayerIds.clear();
+            syncDraw(); renderMyLayers(); commitState();
+            hint('Deleted selected features');
+        }
     }
 });
 
 // ----------------- Marker Icon Pipeline (Standard & Custom) -----------------
 function renderIconCanvas(shape, color) {
-    const c = document.createElement('canvas');
-    c.width = 64; c.height = 64;
-    const ctx = c.getContext('2d');
-    ctx.clearRect(0,0,64,64);
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
-    ctx.fillStyle = color;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
+    const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    const ctx = c.getContext('2d'); ctx.clearRect(0,0,64,64);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.fillStyle = color; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.beginPath();
     if (shape === 'pin') {
-        ctx.arc(32, 24, 16, Math.PI * 0.8, Math.PI * 0.2, false);
-        ctx.lineTo(32, 58);
-        ctx.closePath();
+        ctx.arc(32, 24, 16, Math.PI * 0.8, Math.PI * 0.2, false); ctx.lineTo(32, 58); ctx.closePath();
     } else if (shape === 'star') {
         for (let i = 0; i < 10; i++) {
             const r = i % 2 ? 12 : 26, a = -Math.PI / 2 + i * Math.PI / 5;
             const px = 32 + r * Math.cos(a), py = 32 + r * Math.sin(a);
             i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-        }
-        ctx.closePath();
+        } ctx.closePath();
     } else if (shape === 'circle') {
         ctx.arc(32, 32, 22, 0, Math.PI * 2);
     } else if (shape === 'square') {
@@ -1566,26 +1443,13 @@ function renderIconCanvas(shape, color) {
     } else if (shape === 'flag') {
         ctx.moveTo(18, 58); ctx.lineTo(18, 10); ctx.lineTo(48, 22); ctx.lineTo(18, 34);
     } else if (shape === 'heart') {
-        ctx.moveTo(32, 54);
-        ctx.bezierCurveTo(6, 34, 14, 10, 32, 22);
-        ctx.bezierCurveTo(50, 10, 58, 34, 32, 54);
+        ctx.moveTo(32, 54); ctx.bezierCurveTo(6, 34, 14, 10, 32, 22); ctx.bezierCurveTo(50, 10, 58, 34, 32, 54);
     } else if (shape === 'pinball') {
-        ctx.arc(32, 26, 16, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(28, 42); ctx.lineTo(36, 42); ctx.lineTo(32, 56); ctx.closePath();
-        ctx.fill(); ctx.stroke();
-        ctx.beginPath();
-        ctx.fillStyle = '#ffffff';
-        ctx.arc(32, 26, 6, 0, Math.PI * 2);
-        ctx.fill();
-        return c;
+        ctx.arc(32, 26, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(28, 42); ctx.lineTo(36, 42); ctx.lineTo(32, 56); ctx.closePath();
+        ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.arc(32, 26, 6, 0, Math.PI * 2); ctx.fill(); return c;
     }
-    ctx.fill(); ctx.stroke();
-    ctx.beginPath();
-    ctx.fillStyle = '#ffffff';
-    ctx.arc(32, shape === 'pin' ? 24 : 32, 5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.arc(32, shape === 'pin' ? 24 : 32, 5, 0, Math.PI * 2); ctx.fill();
     return c;
 }
 
@@ -1599,111 +1463,24 @@ function getIconKey(shape, color) {
     return key;
 }
 
-function createCustomMarkerImage(dataUrl, frame) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const c = document.createElement('canvas');
-            const baseSize = 64;
-            c.width = baseSize;
-            c.height = baseSize;
-            const ctx = c.getContext('2d');
-            ctx.clearRect(0,0,baseSize,baseSize);
-            if (frame === '2d' || frame === '3d') {
-                const pad = 6;
-                const rectX = pad, rectY = pad, rectW = baseSize - pad*2, rectH = baseSize - pad*2;
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = 'rgba(0,0,0,0.4)';
-                ctx.shadowBlur = 8;
-                ctx.shadowOffsetX = frame === '3d' ? 4 : 2;
-                ctx.shadowOffsetY = frame === '3d' ? 4 : 2;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(rectX, rectY, rectW, rectH, 10); else ctx.rect(rectX, rectY, rectW, rectH);
-                ctx.fill();
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-                const innerPad = 12;
-                ctx.drawImage(img, innerPad, innerPad, baseSize - innerPad*2, baseSize - innerPad*2);
-            } else if (frame === 'pinphoto') {
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(32, 22, 14, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(32, 22, 12, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.save();
-                ctx.clip();
-                ctx.drawImage(img, 20, 10, 24, 24);
-                ctx.restore();
-                ctx.beginPath();
-                ctx.arc(32, 22, 14, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(20, 32);
-                ctx.lineTo(44, 32);
-                ctx.lineTo(32, 50);
-                ctx.closePath();
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
-            } else if (frame === 'boxarrow') {
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                const boxX = 10, boxY = 10, boxW = 44, boxH = 32;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(boxX, boxY, boxW, boxH, 6); else ctx.rect(boxX, boxY, boxW, boxH);
-                ctx.fill();
-                ctx.save();
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(boxX+3, boxY+3, boxW-6, boxH-6, 4); else ctx.rect(boxX+3, boxY+3, boxW-6, boxH-6);
-                ctx.clip();
-                ctx.drawImage(img, boxX+3, boxY+3, boxW-6, boxH-6);
-                ctx.restore();
-                ctx.beginPath();
-                ctx.moveTo(32, boxY + boxH);
-                ctx.lineTo(28, boxY + boxH + 10);
-                ctx.lineTo(36, boxY + boxH + 10);
-                ctx.closePath();
-                ctx.fill();
-            } else {
-                ctx.drawImage(img, 0, 0, baseSize, baseSize);
-            }
-            resolve(c);
-        };
-        img.onerror = reject;
-        img.src = dataUrl;
-    });
-}
-
 $('customMarkerFileInput').onchange = function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-        hint('Image must be ≤ 5 MB');
-        return;
-    }
+    const file = e.target.files[0]; if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { hint('Image must be ≤ 5 MB'); return; }
     const reader = new FileReader();
     reader.onload = async (ev) => {
         customMarkerDataUrl = ev.target.result;
-        const frame = $('markerFrameSelect') ? $('markerFrameSelect').value : 'none';
-        const canvas = await createCustomMarkerImage(customMarkerDataUrl, frame);
-        const key = 'custom_marker_' + Date.now();
-        const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
-        try {
-            if (map.hasImage(key)) map.removeImage(key);
-            map.addImage(key, imgData, { pixelRatio: 2 });
-            customMarkerImageKey = key;
-            hint('Custom marker ready');
-        } catch(err) { hint('Failed to add custom image'); }
-    };
-    reader.readAsDataURL(file);
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+            const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 64, 64);
+            const key = 'custom_marker_' + Date.now();
+            try {
+                if (map.hasImage(key)) map.removeImage(key);
+                map.addImage(key, ctx.getImageData(0,0,64,64), { pixelRatio: 2 });
+                customMarkerImageKey = key; hint('Custom marker ready');
+            } catch(err) { hint('Failed to add custom image'); }
+        }; img.src = customMarkerDataUrl;
+    }; reader.readAsDataURL(file);
 };
 
 const ICON_SVGS = {
@@ -1724,8 +1501,7 @@ $('markerIconGrid').innerHTML = Object.keys(ICON_SVGS).map(s =>
 $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
     markerShape = b.dataset.s;
     $('markerIconGrid').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
-    customMarkerImageKey = null;
-    markDirty();
+    customMarkerImageKey = null; markDirty();
 });
 $('mColor').oninput = e => { markerColor = e.target.value; markDirty(); };
 $('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); markDirty(); };
@@ -1734,9 +1510,7 @@ $('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); markDir
 const fc = list => ({
     type: 'FeatureCollection',
     features: list.map(f => ({
-        type: 'Feature',
-        geometry: f.geometry,
-        properties: Object.assign({ id: f.id, name: f.name, kind: f.kind }, f.props)
+        type: 'Feature', geometry: f.geometry, properties: Object.assign({ id: f.id, name: f.name, kind: f.kind }, f.props)
     }))
 });
 
@@ -1746,7 +1520,7 @@ function addDrawStack() {
 
         map.addLayer({
             id: 'draw-fill', type: 'fill', source: 'draw',
-            filter: ['==', ['geometry-type'], 'Polygon'],
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
             paint: {
                 'fill-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
                 'fill-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.35], ['get', 'visible']]
@@ -1754,8 +1528,25 @@ function addDrawStack() {
         });
 
         map.addLayer({
+            id: 'draw-3d-extrusion', type: 'fill-extrusion', source: 'draw',
+            filter: ['==', ['get', 'kind'], 'polygon3d'],
+            paint: {
+                'fill-extrusion-color': ['coalesce', ['get', 'extrusionColor'], '#e8b84a'],
+                'fill-extrusion-height': ['coalesce', ['get', 'height'], 50],
+                'fill-extrusion-base': 0,
+                'fill-extrusion-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.7], ['get', 'visible']]
+            }
+        });
+        
+        map.addLayer({
+            id: 'draw-3d-roof', type: 'line', source: 'draw',
+            filter: ['==', ['get', 'kind'], 'polygon3d'],
+            paint: { 'line-color': '#ffffff', 'line-width': 1, 'line-opacity': ['*', 0.5, ['get', 'visible']] }
+        });
+
+        map.addLayer({
             id: 'draw-outline', type: 'line', source: 'draw',
-            filter: ['==', ['geometry-type'], 'Polygon'],
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
             paint: {
                 'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#e8b84a'],
                 'line-width': ['coalesce', ['get', 'width'], 3],
@@ -1765,7 +1556,7 @@ function addDrawStack() {
 
         map.addLayer({
             id: 'draw-line', type: 'line', source: 'draw',
-            filter: ['==', ['geometry-type'], 'LineString'],
+            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'routingFailed'], true]],
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
                 'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#38bdf8'],
@@ -1775,13 +1566,18 @@ function addDrawStack() {
         });
 
         map.addLayer({
+            id: 'draw-line-error', type: 'line', source: 'draw',
+            filter: ['all', ['==', ['geometry-type'], 'LineString'], ['==', ['get', 'routingFailed'], true]],
+            paint: { 'line-color': '#ff7b72', 'line-width': 4, 'line-dasharray': [2, 2], 'line-opacity': ['get', 'visible'] }
+        });
+
+        map.addLayer({
             id: 'draw-marker', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
             layout: {
                 'icon-image': ['get', 'iconKey'],
                 'icon-size': ['coalesce', ['get', 'iconSize'], 0.9],
-                'icon-allow-overlap': true,
-                'icon-anchor': 'bottom'
+                'icon-allow-overlap': true, 'icon-anchor': 'bottom'
             },
             paint: { 'icon-opacity': ['get', 'visible'] }
         });
@@ -1790,62 +1586,37 @@ function addDrawStack() {
             id: 'draw-text', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'text']],
             layout: {
-                'text-field': ['get', 'text'],
-                'text-font': ['Noto Sans Regular'],
+                'text-field': ['get', 'text'], 'text-font': ['Noto Sans Regular'],
                 'text-size': ['coalesce', ['get', 'fontSize'], 16],
-                'text-allow-overlap': true,
-                'text-anchor': 'center'
+                'text-allow-overlap': true, 'text-anchor': 'center'
             },
             paint: {
                 'text-color': ['coalesce', ['get', 'color'], '#d9b451'],
                 'text-opacity': ['*', ['coalesce', ['get', 'opacity'], 1], ['get', 'visible']],
-                'text-halo-color': '#0a1628',
-                'text-halo-width': 2
+                'text-halo-color': '#0a1628', 'text-halo-width': 2
             }
         });
 
-        // 3D Extrusion Layer
-        map.addLayer({
-            id: 'draw-3d-extrusion', type: 'fill-extrusion', source: 'draw',
-            filter: ['==', ['get', 'kind'], 'polygon3d'],
-            paint: {
-                'fill-extrusion-color': ['coalesce', ['get', 'extrusionColor'], '#e8b84a'],
-                'fill-extrusion-height': ['coalesce', ['get', 'height'], 50],
-                'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': ['coalesce', ['get', 'fillOpacity'], 0.7]
-            }
-        });
-
-        // Single-label-per-layer source
         map.addSource('label-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
             id: 'draw-poly-labels', type: 'symbol', source: 'label-src',
             layout: {
-                'text-field': ['get', 'labelText'],
-                'text-font': ['Noto Sans Regular'],
-                'text-size': 13,
-                'text-allow-overlap': true,
-                'text-anchor': 'center',
-                'text-justify': 'center'
+                'text-field': ['get', 'labelText'], 'text-font': ['Noto Sans Regular'],
+                'text-size': 13, 'text-allow-overlap': true, 'text-anchor': 'center', 'text-justify': 'center'
             },
-            paint: {
-                'text-color': '#ffffff',
-                'text-halo-color': '#0a1628',
-                'text-halo-width': 2
-            }
+            paint: { 'text-color': '#ffffff', 'text-halo-color': '#0a1628', 'text-halo-width': 2 }
         });
 
-        // Pulse highlight source
         map.addSource('pulse-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
             id: 'pulse-circle', type: 'circle', source: 'pulse-src',
-            paint: {
-                'circle-color': '#38bdf8',
-                'circle-radius': 10,
-                'circle-opacity': 0.85,
-                'circle-stroke-color': '#ffffff',
-                'circle-stroke-width': 2
-            }
+            paint: { 'circle-color': '#38bdf8', 'circle-radius': 10, 'circle-opacity': 0.85, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 }
+        });
+
+        map.addSource('search-temp', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({
+            id: 'search-temp-marker', type: 'symbol', source: 'search-temp',
+            layout: { 'icon-image': getIconKey('pin', '#38bdf8'), 'icon-size': 1.2, 'icon-anchor': 'bottom', 'icon-allow-overlap': true }
         });
     } else {
         map.getSource('draw').setData(fc(features));
@@ -1873,82 +1644,63 @@ function addDrawStack() {
         map.addSource('vertex-handles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
             id: 'vertex-points', type: 'circle', source: 'vertex-handles',
-            paint: {
-                'circle-color': '#38bdf8',
-                'circle-radius': 6,
-                'circle-stroke-color': '#ffffff',
-                'circle-stroke-width': 2
-            }
+            paint: { 'circle-color': '#38bdf8', 'circle-radius': 6, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 }
         });
     }
 }
 
 const syncDraw = () => {
+    // 3D Poly Limit
+    const poly3ds = features.filter(f => f.kind === 'polygon3d' && f.props.visible !== 0);
+    if (poly3ds.length > 50) {
+        poly3ds.slice(0, poly3ds.length - 50).forEach(f => f.props.visible = 0);
+        hint("Max 50 visible 3D polygons reached. Older hidden.");
+    }
     if (map.getSource('draw')) map.getSource('draw').setData(fc(features));
-    syncVertexHandles();
-    syncLabels();
+    syncVertexHandles(); syncLabels();
 };
 
 function syncLabels() {
-    const src = map.getSource('label-src');
-    if (!src) return;
+    const src = map.getSource('label-src'); if (!src) return;
     const feats = [];
     features.forEach(f => {
         if (!f.props.showLabel || f.props.visible === 0 || !f.name) return;
-        
-        // Handle route labels specially
-        let labelText = f.name;
-        if (f.kind === 'route' && f.props.description) {
-            labelText = f.props.description;
-        }
-
         const pos = f.props.labelPos || 'center';
         let coords = null;
         if (f.geometry.type === 'Point') {
-            const x = f.geometry.coordinates[0];
-            const y = f.geometry.coordinates[1];
-            const d = 0.0009;
-            if (pos === 'top') coords = [x, y + d];
-            else if (pos === 'bottom') coords = [x, y - d];
-            else if (pos === 'left') coords = [x - d, y];
-            else if (pos === 'right') coords = [x + d, y];
+            const x = f.geometry.coordinates[0], y = f.geometry.coordinates[1], d = 0.0009;
+            if (pos === 'top') coords = [x, y + d]; else if (pos === 'bottom') coords = [x, y - d];
+            else if (pos === 'left') coords = [x - d, y]; else if (pos === 'right') coords = [x + d, y];
             else coords = [x, y];
         } else {
-            const b = calcBounds(f);
-            if (!b) return;
-            const cx = (b[0][0] + b[1][0]) / 2;
-            const cy = (b[0][1] + b[1][1]) / 2;
-            
-            // For 3D polygons, adjust label position slightly up if needed, but usually center of base is fine for anchor
-            if (pos === 'top') coords = [cx, b[1][1]];
-            else if (pos === 'bottom') coords = [cx, b[0][1]];
-            else if (pos === 'left') coords = [b[0][0], cy];
-            else if (pos === 'right') coords = [b[1][0], cy];
-            else coords = [cx, cy];
+            const b = calcBounds(f); if (!b) return;
+            const cx = (b[0][0] + b[1][0]) / 2, cy = (b[0][1] + b[1][1]) / 2;
+            if (f.kind === 'polygon3d') {
+                // Approximate base centroid for 3D label
+                coords = [cx, cy];
+            } else {
+                if (pos === 'top') coords = [cx, b[1][1]]; else if (pos === 'bottom') coords = [cx, b[0][1]];
+                else if (pos === 'left') coords = [b[0][0], cy]; else if (pos === 'right') coords = [b[1][0], cy];
+                else coords = [cx, cy];
+            }
         }
         feats.push({
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: coords },
-            properties: { labelText: labelText }
+            type: 'Feature', geometry: { type: 'Point', coordinates: coords },
+            properties: { labelText: f.props.description ? `${f.name}\n${f.props.description}` : f.name }
         });
     });
     src.setData({ type: 'FeatureCollection', features: feats });
 }
 
 function pulseFeature(f) {
-    const b = calcBounds(f);
-    if (!b) return;
+    const b = calcBounds(f); if (!b) return;
     const c = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
-    const src = map.getSource('pulse-src');
-    if (!src) return;
+    const src = map.getSource('pulse-src'); if (!src) return;
     src.setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: {} }] });
-    const start = performance.now();
-    const dur = 1600;
+    const start = performance.now(), dur = 1600;
     function frame(t) {
-        const el = t - start;
-        const prog = (el % 800) / 800;
-        const r = 8 + prog * 55;
-        const op = 0.9 * (1 - prog);
+        const el = t - start; const prog = (el % 800) / 800;
+        const r = 8 + prog * 55; const op = 0.9 * (1 - prog);
         if (map.getLayer('pulse-circle')) {
             map.setPaintProperty('pulse-circle', 'circle-radius', r);
             map.setPaintProperty('pulse-circle', 'circle-opacity', op);
@@ -1961,10 +1713,7 @@ function pulseFeature(f) {
 
 function syncVertexHandles() {
     if (!map.getSource('vertex-handles')) return;
-    if (!editMode) {
-        map.getSource('vertex-handles').setData({ type: 'FeatureCollection', features: [] });
-        return;
-    }
+    if (!editMode) { map.getSource('vertex-handles').setData({ type: 'FeatureCollection', features: [] }); return; }
     const handleFeats = [];
     features.forEach(f => {
         if (f.props.visible === 0) return;
@@ -1972,21 +1721,16 @@ function syncVertexHandles() {
             const coords = f.geometry.coordinates[0];
             for (let i = 0; i < coords.length - 1; i++) {
                 handleFeats.push({
-                    type: 'Feature',
-                    geometry: { type: 'Point', coordinates: coords[i] },
+                    type: 'Feature', geometry: { type: 'Point', coordinates: coords[i] },
                     properties: { polyId: f.id, vIdx: i }
                 });
             }
-            // Add rotation handle if selected
-            if (f.id === selectedId) {
+            if (f.id === selectedId && f.kind !== 'polygon3d') {
                 const b = calcBounds(f);
                 if (b) {
-                    const cx = (b[0][0] + b[1][0]) / 2;
-                    const cy = (b[0][1] + b[1][1]) / 2;
-                    const offset = (b[1][1] - b[0][1]) * 0.25 || 0.001;
+                    const cx = (b[0][0] + b[1][0]) / 2, offset = (b[1][1] - b[0][1]) * 0.25 || 0.001;
                     handleFeats.push({
-                        type: 'Feature',
-                        geometry: { type: 'Point', coordinates: [cx, b[1][1] + offset] },
+                        type: 'Feature', geometry: { type: 'Point', coordinates: [cx, b[1][1] + offset] },
                         properties: { polyId: f.id, isRotHandle: true }
                     });
                 }
@@ -1996,8 +1740,7 @@ function syncVertexHandles() {
             const coords = f.geometry.coordinates;
             for (let i = 0; i < coords.length; i++) {
                 handleFeats.push({
-                    type: 'Feature',
-                    geometry: { type: 'Point', coordinates: coords[i] },
+                    type: 'Feature', geometry: { type: 'Point', coordinates: coords[i] },
                     properties: { polyId: f.id, vIdx: i }
                 });
             }
@@ -2010,9 +1753,7 @@ function renderDraft() {
     if (!map.getSource('draft')) return;
     const f = [];
     const pt = (c, isOrigin=false, isLastPoint=false) => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: c },
-        properties: { isOrigin, isLastPoint }
+        type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: { isOrigin, isLastPoint }
     });
     const ln = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
     draft.forEach((p, i) => {
@@ -2031,10 +1772,8 @@ function renderDraft() {
         f.push(ln(rectCoords(draft[0], cursorLL)[0]));
     }
     if (activeTool === 'circle' && draft.length === 1 && cursorLL) {
-        const { coords, r } = circleCoords(draft[0], cursorLL);
-        f.push(ln(coords[0]));
-        const distText = r > 1000 ? `${(r/1000).toFixed(2)} km` : `${Math.round(r)} m`;
-        hint(`Radius: ${distText} · Click to finalize`);
+        const { coords, r } = circleCoords(draft[0], cursorLL); f.push(ln(coords[0]));
+        hint(`Radius: ${r > 1000 ? (r/1000).toFixed(2)+' km' : Math.round(r)+' m'} · Click to finalize`);
     }
     map.getSource('draft').setData({ type: 'FeatureCollection', features: f });
 }
@@ -2050,38 +1789,24 @@ function applyVis() {
 map.on('load', () => {
     features.forEach(f => {
         if (f.kind === 'marker') {
-            const sh = f.props.shape || 'pin';
-            const col = f.props.color || '#003366';
+            const sh = f.props.shape || 'pin'; const col = f.props.color || '#003366';
             f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
         }
     });
-    addDrawStack();
-    applyVis();
-    renderMyLayers();
-    renderProjectsList();
-    populateTradeAreaCheckboxes();
+    addDrawStack(); applyVis(); renderMyLayers(); renderProjectsList(); populateTradeAreaCheckboxes();
+    if(historyStack.length===0) commitState();
 });
 
 // ----------------- 2D vs 3D Dimension Switcher -----------------
 $('btn2DMode').onclick = () => {
-    $('btn2DMode').classList.add('active');
-    $('btn3DMode').classList.remove('active');
-    map.setLayoutProperty('building-2d', 'visibility', 'visible');
-    map.setLayoutProperty('building-3d', 'visibility', 'none');
-    vis.building2d = true;
-    vis.building3d = false;
-    map.easeTo({ pitch: 0 });
-    markDirty();
+    $('btn2DMode').classList.add('active'); $('btn3DMode').classList.remove('active');
+    map.setLayoutProperty('building-2d', 'visibility', 'visible'); map.setLayoutProperty('building-3d', 'visibility', 'none');
+    vis.building2d = true; vis.building3d = false; map.easeTo({ pitch: 0 }); markDirty();
 };
 $('btn3DMode').onclick = () => {
-    $('btn3DMode').classList.add('active');
-    $('btn2DMode').classList.remove('active');
-    map.setLayoutProperty('building-2d', 'visibility', 'none');
-    map.setLayoutProperty('building-3d', 'visibility', 'visible');
-    vis.building2d = false;
-    vis.building3d = true;
-    map.easeTo({ pitch: 55, bearing: -15 });
-    markDirty();
+    $('btn3DMode').classList.add('active'); $('btn2DMode').classList.remove('active');
+    map.setLayoutProperty('building-2d', 'visibility', 'none'); map.setLayoutProperty('building-3d', 'visibility', 'visible');
+    vis.building2d = false; vis.building3d = true; map.easeTo({ pitch: 55, bearing: -15 }); markDirty();
 };
 
 // ----------------- Geometry Utilities -----------------
@@ -2090,38 +1815,31 @@ function haversineDist(a, b) {
     const s = Math.sin(dLa/2)**2 + Math.cos(a[1]*Math.PI/180) * Math.cos(b[1]*Math.PI/180) * Math.sin(dLo/2)**2;
     return 2 * R * Math.asin(Math.sqrt(s));
 }
-function rectCoords(a, b) {
-    return [[[a[0],a[1]],[a[0],b[1]],[b[0],b[1]],[b[0],a[1]],[a[0],a[1]]]];
-}
+function rectCoords(a, b) { return [[[a[0],a[1]],[a[0],b[1]],[b[0],b[1]],[b[0],a[1]],[a[0],a[1]]]]; }
 function circleCoords(c, edge) {
     const r = haversineDist(c, edge), coords = [];
     for (let i = 0; i <= 64; i++) {
         const a = (i / 64) * 2 * Math.PI;
-        coords.push([
-            c[0] + (r / (111320 * Math.cos(c[1]*Math.PI/180))) * Math.cos(a),
-            c[1] + (r / 111320) * Math.sin(a)
-        ]);
-    }
-    return { coords: [coords], r };
+        coords.push([ c[0] + (r / (111320 * Math.cos(c[1]*Math.PI/180))) * Math.cos(a), c[1] + (r / 111320) * Math.sin(a) ]);
+    } return { coords: [coords], r };
 }
 function pointInPolygon(point, vs) {
-    const x = point[0], y = point[1];
-    let inside = false;
+    const x = point[0], y = point[1]; let inside = false;
     for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-        const xi = vs[i][0], yi = vs[i][1];
-        const xj = vs[j][0], yj = vs[j][1];
+        const xi = vs[i][0], yi = vs[i][1], xj = vs[j][0], yj = vs[j][1];
         const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
         if (intersect) inside = !inside;
-    }
-    return inside;
+    } return inside;
 }
 
-let rerouteTimeout = null;
-function fetchMultiPointRoute(pts, updateId = null, mode = null) {
+function fetchMultiPointRoute(pts, updateId = null) {
     hint('Calculating route…');
-    const profile = mode || $('rProfile') ? $('rProfile').value : 'driving';
+    const profile = $('rProfile') ? $('rProfile').value : 'driving';
+    const eProfile = $('eRouteProfile');
+    const activeProfile = updateId ? (eProfile ? eProfile.value : profile) : profile;
     const coordStr = pts.map(p => `${p[0]},${p[1]}`).join(';');
-    fetch(`https://router.project-osrm.org/route/v1/${profile}/${coordStr}?overview=full&geometries=geojson`)
+    
+    fetch(`https://router.project-osrm.org/route/v1/${activeProfile}/${coordStr}?overview=full&geometries=geojson`)
     .then(r => r.json())
     .then(j => {
         if (j.routes && j.routes[0]) {
@@ -2138,93 +1856,69 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
                 if (f) {
                     f.geometry = geom;
                     f.props.description = desc;
-                    f.props.routeMode = profile;
-                    f.props.metadata = { distance: dist, duration: dur };
-                    syncDraw();
-                    renderMyLayers();
-                    markDirty();
-                    // Update editor stats if open
-                    if (selectedId === updateId) {
-                        $('eRouteStats').textContent = desc;
-                    }
+                    f.props.routeMode = activeProfile;
+                    f.props.routingFailed = false;
+                    f.props.originalPoints = pts;
+                    syncDraw(); renderMyLayers(); commitState();
+                    if(selectedId === updateId) openShapeEditor(updateId);
                 }
             } else {
-                const color = $('rColor') ? $('rColor').value : '#38bdf8';
                 addFeatureRecord('route', geom, { 
-                    color: color, borderColor: color, width: 4, borderOpacity: 0.9,
-                    description: desc,
-                    routeMode: profile,
-                    metadata: { distance: dist, duration: dur },
-                    showLabel: true
+                    color: '#38bdf8', borderColor: '#38bdf8', width: 4, borderOpacity: 0.9,
+                    description: desc, routeMode: activeProfile, showLabel: true,
+                    routingFailed: false, originalPoints: pts
                 });
             }
+            hint('');
         } else {
-            throw new Error("No route found");
+            handleRouteFail(pts, updateId, activeProfile);
         }
-        hint('');
     })
-    .catch(() => {
-        if (updateId) {
-             const f = features.find(x => x.id === updateId);
-             if (f) {
-                 f.props.routingFailed = true;
-                 f.props.description = "Routing unavailable – straight line shown";
-                 syncDraw();
-                 markDirty();
-             }
-        } else {
-            const color = $('rColor') ? $('rColor').value : '#38bdf8';
-            addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { 
-                color: color, borderColor: color, width: 3, borderOpacity: 0.8,
-                routingFailed: true,
-                description: "Routing unavailable – straight line shown",
-                routeMode: profile
-            });
+    .catch(() => { handleRouteFail(pts, updateId, activeProfile); });
+}
+
+function handleRouteFail(pts, updateId, profile) {
+    if (updateId) {
+        const f = features.find(x => x.id === updateId);
+        if (f) {
+            f.geometry = { type: 'LineString', coordinates: pts };
+            f.props.routingFailed = true;
+            f.props.originalPoints = pts;
+            f.props.description = "Routing unavailable – straight line shown";
+            syncDraw(); renderMyLayers(); commitState();
         }
-        hint('Direct route fallback');
-    });
+    } else {
+        addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { 
+            color: '#ff7b72', borderColor: '#ff7b72', width: 4, borderOpacity: 0.9, routingFailed: true,
+            description: "Routing unavailable – straight line shown", routeMode: profile, showLabel: true,
+            originalPoints: pts
+        });
+    }
+    hint('Routing unavailable – straight line shown');
 }
 
 function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, explicitName = null) {
     const newId = ++fid;
     const isRoute = kind === 'route';
-    const is3D = kind === 'polygon3d';
     const defaultBorder = isRoute ? '#38bdf8' : '#e8b84a';
     const assignedName = explicitName || `${kind === 'polygon3d' ? '3D Polygon' : kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
     const feat = {
-        id: newId,
-        name: assignedName,
-        kind: kind,
-        geometry: geometry,
+        id: newId, name: assignedName, kind: kind, geometry: geometry,
         props: {
-            color: defaultBorder,
-            borderColor: defaultBorder,
-            borderOpacity: 0.9,
-            width: 3,
-            fillColor: '#e8b84a',
-            fillOpacity: 0.35,
-            showLabel: false,
-            labelPos: 'center',
-            iconSize: markerIconSize,
-            visible: 1,
-            attributes: {}, // For attribute table
-            ...customProps
+            color: defaultBorder, borderColor: defaultBorder, borderOpacity: 0.9, width: 3,
+            fillColor: '#e8b84a', fillOpacity: 0.35, showLabel: false, labelPos: 'center',
+            iconSize: markerIconSize, visible: 1, ...customProps
         }
     };
     features.push(feat);
-    if (targetGroup && customGroups[targetGroup]) {
-        customGroups[targetGroup].ids.push(newId);
-    }
-    syncDraw();
-    renderMyLayers();
-    markDirty();
+    if (targetGroup && customGroups[targetGroup]) customGroups[targetGroup].ids.push(newId);
+    syncDraw(); renderMyLayers(); commitState();
     return feat;
 }
 
 // ----------------- Trade Area POI Scanner -----------------
 function populateTradeAreaCheckboxes() {
-    const container = $('poiCategoryCheckboxes');
-    let html = '';
+    const container = $('poiCategoryCheckboxes'); let html = '';
     for (const category in POI_CONFIG) {
         html += `<div style="font-weight:600; font-size:11px; margin-top:4px;">${category}</div>`;
         html += '<div class="trade-area-poi-row">';
@@ -2232,27 +1926,29 @@ function populateTradeAreaCheckboxes() {
             html += `<label> <input type="checkbox" class="poi-cat-check" data-cat="${category}" data-tag="${tag}" data-label="${label}" style="accent-color:#316dca;"> ${label}</label>`;
         });
         html += '</div>';
-    }
-    container.innerHTML = html;
+    } container.innerHTML = html;
 }
 
 $('btnOpenTradeAreaPopup').onclick = () => {
-    closeFloatingCards();
-    $('trade-area-modal').style.display = 'flex';
-    const polyList = features.filter(f => ['polygon','rectangle','circle','polygon3d'].includes(f.kind));
+    closeFloatingCards(); $('trade-area-modal').style.display = 'flex';
+    const polyList = features.filter(f => ['polygon','rectangle','circle'].includes(f.kind));
     $('tradePolygonSelect').innerHTML = '<option value="">-- Choose --</option>' + polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
 };
 $('closeTradeAreaBtn').onclick = () => { $('trade-area-modal').style.display = 'none'; };
 
+$('btnAddCustomPoi').onclick = () => {
+    const val = $('customPoiTagInput').value.trim();
+    if(val) {
+        const container = $('poiCategoryCheckboxes');
+        container.innerHTML += `<div class="trade-area-poi-row"><label> <input type="checkbox" class="poi-cat-check" data-tag="${val}" data-label="${val}" checked style="accent-color:#316dca;"> ${val}</label></div>`;
+        $('customPoiTagInput').value = '';
+    }
+};
+
 async function robustOverpassFetch(query, timeout = 90) {
-    const endpoints = [
-        "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://overpass.openstreetmap.fr/api/interpreter"
-    ];
+    const endpoints = [ "https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.openstreetmap.fr/api/interpreter" ];
     for (const endpoint of endpoints) {
-        let retries = 5;
-        let delay = 1000;
+        let retries = 5, delay = 1000;
         while (retries > 0) {
             try {
                 const controller = new AbortController();
@@ -2260,61 +1956,39 @@ async function robustOverpassFetch(query, timeout = 90) {
                 const url = `${endpoint}?data=${encodeURIComponent(query)}`;
                 const res = await fetch(url, { signal: controller.signal });
                 clearTimeout(id);
-                if (res.status === 429 || res.status === 503 || res.status === 504) {
-                    throw new Error(`HTTP ${res.status}`);
-                }
+                if (res.status === 429 || res.status === 503 || res.status === 504) throw new Error(`HTTP ${res.status}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 if (!data || !data.elements) throw new Error("Malformed JSON");
                 return data;
             } catch (err) {
-                retries--;
-                if (retries === 0) break;
+                retries--; if (retries === 0) break;
                 await new Promise(r => setTimeout(r, delay + Math.random() * 500));
                 delay *= 2;
             }
         }
-    }
-    return null;
+    } return null;
 }
 
 $('btnScanTradeArea').onclick = async () => {
     const polyId = parseInt($('tradePolygonSelect').value, 10);
     const targetPoly = features.find(f => f.id === polyId);
-    if (!targetPoly) {
-        hint('Please select a target polygon first.');
-        return;
-    }
-    
-    let selectedTags = [];
-    document.querySelectorAll('.poi-cat-check:checked').forEach(cb => {
-        selectedTags.push(cb.dataset.tag);
-    });
-    
-    // Add custom POI search
-    const customSearch = $('customPoiSearchInput').value.trim();
-    if (customSearch) {
-        selectedTags.push(customSearch);
-    }
-
-    if (!selectedTags.length) {
-        hint('Please select at least one POI category or enter a custom search.');
-        return;
-    }
-    const bnd = calcBounds(targetPoly);
-    const bbox = `${bnd[0][1]},${bnd[0][0]},${bnd[1][1]},${bnd[1][0]}`;
+    if (!targetPoly) { hint('Please select a target polygon first.'); return; }
+    const selectedTags = [];
+    document.querySelectorAll('.poi-cat-check:checked').forEach(cb => selectedTags.push(cb.dataset.tag));
+    if (!selectedTags.length) { hint('Please select at least one POI category.'); return; }
+    const bnd = calcBounds(targetPoly); const bbox = `${bnd[0][1]},${bnd[0][0]},${bnd[1][1]},${bnd[1][0]}`;
     let queryParts = '';
     selectedTags.forEach(rawTag => {
         if (rawTag.includes('~')) {
-            const parts = rawTag.split('~');
-            const k = parts[0].replace(/"/g, '');
-            const v = parts[1].replace(/"/g, '').replace(',i', '');
+            const parts = rawTag.split('~'); const k = parts[0].replace(/"/g, ''), v = parts[1].replace(/"/g, '').replace(',i', '');
             queryParts += `node["${k}"~"${v}",i](${bbox});way["${k}"~"${v}",i](${bbox});`;
         } else if (rawTag.includes('=')) {
-            const parts = rawTag.split('=');
-            const k = parts[0].replace(/"/g, '');
-            const v = parts[1].replace(/"/g, '');
+            const parts = rawTag.split('='); const k = parts[0].replace(/"/g, ''), v = parts[1].replace(/"/g, '');
             queryParts += `node["${k}"="${v}"](${bbox});way["${k}"="${v}"](${bbox});`;
+        } else {
+            const k = rawTag.replace(/"/g, '');
+            queryParts += `node["${k}"](${bbox});way["${k}"](${bbox});`;
         }
     });
     const overpassQuery = `[out:json][timeout:25];(${queryParts});out center 100;`;
@@ -2322,56 +1996,33 @@ $('btnScanTradeArea').onclick = async () => {
     $('tradeResults').innerHTML = '<div style="color:#d9b451;">Querying local spatial features…</div>';
     if (!customGroups["Trade Area Scan"]) customGroups["Trade Area Scan"] = { collapsed: false, ids: [] };
     const data = await robustOverpassFetch(overpassQuery, 90);
-    if (!data) {
-        $('tradeResults').innerHTML = '<div style="color:#ff7b72;">All Overpass endpoints failed after retries.</div>';
-        hint('Overpass query failed after retries.');
-        return;
-    }
-    const results = data.elements || [];
-    const polyCoords = targetPoly.geometry.coordinates[0];
+    if (!data) { $('tradeResults').innerHTML = '<div style="color:#ff7b72;">All Overpass endpoints failed.</div>'; hint('Query failed.'); return; }
+    const results = data.elements || []; const polyCoords = targetPoly.geometry.coordinates[0];
     const filtered = results.filter(el => {
-        const lat = el.lat || (el.center && el.center.lat);
-        const lon = el.lon || (el.center && el.center.lon);
+        const lat = el.lat || (el.center && el.center.lat), lon = el.lon || (el.center && el.center.lon);
         return lat && lon && pointInPolygon([lon, lat], polyCoords);
     });
-    if (!filtered.length) {
-        $('tradeResults').innerHTML = '<div style="color:#8b949e;">No matching POIs inside this polygon.</div>';
-        hint('Scan complete: 0 POIs inside area.');
-        return;
-    }
+    if (!filtered.length) { $('tradeResults').innerHTML = '<div style="color:#8b949e;">No matching POIs inside this polygon.</div>'; hint('Scan complete: 0 POIs.'); return; }
     const counts = {};
     filtered.forEach(el => {
         const poiName = (el.tags && (el.tags.name || el.tags.amenity || el.tags.shop || el.tags.building)) || 'POI';
         counts[poiName] = (counts[poiName] || 0) + 1;
-        const lat = el.lat || (el.center && el.center.lat);
-        const lon = el.lon || (el.center && el.center.lon);
+        const lat = el.lat || (el.center && el.center.lat), lon = el.lon || (el.center && el.center.lon);
         addFeatureRecord('marker', { type: 'Point', coordinates: [lon, lat] }, {
-            shape: 'pin',
-            color: '#003366',
-            iconSize: 0.85,
-            iconKey: getIconKey('pin', '#003366'),
+            shape: 'pin', color: '#003366', iconSize: 0.85, iconKey: getIconKey('pin', '#003366'),
             osmTags: el.tags || { name: poiName, type: 'custom' }
         }, "Trade Area Scan", poiName);
     });
     let html = `<div style="font-weight:700; color:#f0f6fc; margin-bottom:4px;">Grouped ${filtered.length} POIs:</div>`;
-    for (const k in counts) {
-        html += `<div class="poi-badge"><span>${k}</span> <span style="font-weight:700; color:#38bdf8;">${counts[k]}</span></div>`;
-    }
+    for (const k in counts) html += `<div class="poi-badge"><span>${k}</span> <span style="font-weight:700; color:#38bdf8;">${counts[k]}</span></div>`;
     $('tradeResults').innerHTML = html;
     hint(`Added ${filtered.length} POIs to "Trade Area Scan" layer group!`);
 };
 
-// ----------------- Custom Overpass Query (collapsible) -----------------
 $('customQueryToggle').onclick = () => {
-    const body = $('customQueryBody');
-    const toggleIcon = $('customQueryToggle').querySelector('span:last-child');
-    if (body.style.display === 'none') {
-        body.style.display = 'block';
-        toggleIcon.textContent = '▾';
-    } else {
-        body.style.display = 'none';
-        toggleIcon.textContent = '▸';
-    }
+    const body = $('customQueryBody'), toggleIcon = $('customQueryToggle').querySelector('span:last-child');
+    if (body.style.display === 'none') { body.style.display = 'block'; toggleIcon.textContent = '▾'; } 
+    else { body.style.display = 'none'; toggleIcon.textContent = '▸'; }
 };
 
 $('btnRunOverpass').onclick = async () => {
@@ -2380,247 +2031,147 @@ $('btnRunOverpass').onclick = async () => {
     const resultType = $('overpassResultType').value;
     hint('Running custom Overpass query…');
     const data = await robustOverpassFetch(ql, 90);
-    if (!data) {
-        hint('Overpass query failed after retries.');
-        return;
-    }
+    if (!data) { hint('Overpass query failed.'); return; }
     const elements = data.elements || [];
     if (!elements.length) { hint('Query returned no results'); return; }
     elements.forEach(el => {
         if (el.type === 'node') {
             addFeatureRecord('marker', { type: 'Point', coordinates: [el.lon, el.lat] }, {
-                shape: 'pin',
-                color: '#003366',
-                iconSize: 0.9,
-                iconKey: getIconKey('pin', '#003366'),
-                osmTags: el.tags || {}
+                shape: 'pin', color: '#003366', iconSize: 0.9, iconKey: getIconKey('pin', '#003366'), osmTags: el.tags || {}
             });
         } else if (el.type === 'way' && el.geometry) {
             if (resultType === 'marker') {
-                if (el.center) {
-                    addFeatureRecord('marker', { type: 'Point', coordinates: [el.center.lon, el.center.lat] }, {
-                        shape: 'pin',
-                        color: '#003366',
-                        iconSize: 0.9,
-                        iconKey: getIconKey('pin', '#003366'),
-                        osmTags: el.tags || {}
-                    });
-                }
+                if (el.center) addFeatureRecord('marker', { type: 'Point', coordinates: [el.center.lon, el.center.lat] }, {
+                    shape: 'pin', color: '#003366', iconSize: 0.9, iconKey: getIconKey('pin', '#003366'), osmTags: el.tags || {}
+                });
             } else if (resultType === 'polygon') {
                 const geom = el.geometry;
                 if (geom.type === 'Polygon') addFeatureRecord('polygon', geom, {});
                 else if (geom.type === 'LineString') addFeatureRecord('polyline', geom, {});
             }
         }
-    });
-    hint(`Added ${elements.length} features from custom query`);
+    }); hint(`Added ${elements.length} features from custom query`);
 };
 
 // ----------------- Selective Boundary Autocomplete -----------------
 let boundaryResults = [];
-const boundaryInput = $('boundarySearchInput');
-const boundaryList = $('boundaryAutocompleteList');
+const boundaryInput = $('boundarySearchInput'), boundaryList = $('boundaryAutocompleteList');
 boundaryInput.addEventListener('input', debounce(async () => {
     const q = boundaryInput.value.trim();
     if (q.length < 3) { boundaryList.style.display = 'none'; return; }
-    const url = `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&limit=5&q=${encodeURIComponent(q)}`;
     try {
-        const res = await fetch(url);
-        const data = await res.json();
-        boundaryResults = data;
-        renderBoundaryAutocomplete(data);
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&limit=5&q=${encodeURIComponent(q)}`);
+        const data = await res.json(); boundaryResults = data; renderBoundaryAutocomplete(data);
     } catch(e) {}
 }, 400));
 
 function renderBoundaryAutocomplete(results) {
-    if (!results || results.length === 0) {
-        boundaryList.style.display = 'none';
-        return;
-    }
+    if (!results || results.length === 0) { boundaryList.style.display = 'none'; return; }
     boundaryList.innerHTML = results.map((r, idx) => `
         <div class="autocomplete-item" data-index="${idx}">
             <div style="font-weight:600;">${r.display_name}</div>
             <div style="font-size:10px; color:#8b949e;">${r.type}</div>
-        </div>
-    `).join('');
+        </div>`).join('');
     boundaryList.style.display = 'block';
     boundaryList.querySelectorAll('.autocomplete-item').forEach(item => {
         item.onclick = () => {
-            const idx = parseInt(item.dataset.index, 10);
-            const selected = boundaryResults[idx];
-            boundaryInput.value = selected.display_name;
-            boundaryList.style.display = 'none';
-            highlightBoundary(selected);
+            const selected = boundaryResults[parseInt(item.dataset.index, 10)];
+            boundaryInput.value = selected.display_name; boundaryList.style.display = 'none'; highlightBoundary(selected);
         };
     });
 }
 
 function highlightBoundary(result) {
     if (!result.geojson) return;
-    const geom = result.geojson;
-    addFeatureRecord('polygon', geom, {
-        borderColor: '#ff1e1e',
-        borderOpacity: 1.0,
-        width: 3,
-        fillColor: '#ff1e1e',
-        fillOpacity: 0.15,
-        showLabel: true
-    }, null, `${result.display_name} Boundary`);
+    addFeatureRecord('polygon', result.geojson, { borderColor: '#ff1e1e', borderOpacity: 1.0, width: 3, fillColor: '#ff1e1e', fillOpacity: 0.15, showLabel: true }, null, `${result.display_name} Boundary`);
     if (result.boundingbox) {
-        map.fitBounds([
-            [parseFloat(result.boundingbox[2]), parseFloat(result.boundingbox[0])],
-            [parseFloat(result.boundingbox[3]), parseFloat(result.boundingbox[1])]
-        ], { padding: 60 });
-    }
-    hint(`${result.display_name} boundary added!`);
+        map.fitBounds([ [parseFloat(result.boundingbox[2]), parseFloat(result.boundingbox[0])], [parseFloat(result.boundingbox[3]), parseFloat(result.boundingbox[1])] ], { padding: 60 });
+    } hint(`${result.display_name} boundary added!`);
 }
 
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('.bound-select-row')) {
-        boundaryList.style.display = 'none';
-    }
-    if (!e.target.closest('#map-context-menu')) {
-        $('map-context-menu').style.display = 'none';
-    }
+    if (!e.target.closest('.bound-select-row')) boundaryList.style.display = 'none';
+    if (!e.target.closest('#map-context-menu')) $('map-context-menu').style.display = 'none';
 });
 
 // ----------------- Right-Click Context Menu -----------------
 map.on('contextmenu', e => {
-    ctxLngLat = e.lngLat;
-    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
-    ctxFeatureId = fs.length && fs[0].properties.id != null ? parseInt(fs[0].properties.id, 10) : null;
-    
-    const menu = $('map-context-menu');
+    ctxLngLat = e.lngLat; const menu = $('map-context-menu');
     $('ctx-coords-label').textContent = `${e.lngLat.lat.toFixed(6)}, ${e.lngLat.lng.toFixed(6)}`;
-    const maxX = window.innerWidth - 220;
-    const maxY = window.innerHeight - 120;
-    menu.style.left = Math.min(e.point.x, maxX) + 'px';
-    menu.style.top = Math.min(e.point.y, maxY) + 'px';
+    menu.style.left = Math.min(e.point.x, window.innerWidth - 220) + 'px';
+    menu.style.top = Math.min(e.point.y, window.innerHeight - 120) + 'px';
     menu.style.display = 'block';
 });
-
 map.on('movestart', () => { $('map-context-menu').style.display = 'none'; });
 
 $('ctx-copy').onclick = (e) => {
     e.stopPropagation();
     if (ctxLngLat) {
         const txt = `${ctxLngLat.lat.toFixed(6)}, ${ctxLngLat.lng.toFixed(6)}`;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(txt).then(() => hint('Copied: ' + txt)).catch(() => hint(txt));
-        } else {
-            hint(txt);
-        }
-    }
-    $('map-context-menu').style.display = 'none';
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => hint('Copied: ' + txt)).catch(() => hint(txt));
+        else hint(txt);
+    } $('map-context-menu').style.display = 'none';
 };
-
-$('ctx-gmaps').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxLngLat) {
-        window.open(`https://www.google.com/maps?q=${ctxLngLat.lat},${ctxLngLat.lng}`, '_blank');
-    }
-    $('map-context-menu').style.display = 'none';
-};
-
-$('ctx-streetview').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxLngLat) {
-        window.open(`https://www.google.com/maps/@${ctxLngLat.lat},${ctxLngLat.lng},3a,75y,90t/data=!3m6!1e1!3m4!1s!2e0!7i13312!8i6656`, '_blank');
-    }
-    $('map-context-menu').style.display = 'none';
-};
+$('ctx-gmaps').onclick = (e) => { e.stopPropagation(); if (ctxLngLat) window.open(`https://www.google.com/maps?q=${ctxLngLat.lat},${ctxLngLat.lng}`, '_blank'); $('map-context-menu').style.display = 'none'; };
+$('ctx-streetview').onclick = (e) => { e.stopPropagation(); if (ctxLngLat) window.open(`https://www.google.com/maps/@${ctxLngLat.lat},${ctxLngLat.lng},3a,75y,90t/data=!3m6!1e1!3m4!1s!2e0!7i13312!8i6656`, '_blank'); $('map-context-menu').style.display = 'none'; };
 
 // ----------------- Google Maps-like Search Place -----------------
-const searchInput = $('searchInput');
-const searchResultsList = $('searchResultsList');
-let searchResults = [];
+const searchInput = $('searchInput'), searchResultsList = $('searchResultsList'); let searchResults = [];
 searchInput.addEventListener('input', debounce(async () => {
     const q = searchInput.value.trim();
     if (q.length < 2) { searchResultsList.innerHTML = ''; return; }
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`;
     try {
-        const res = await fetch(url);
-        const data = await res.json();
-        searchResults = data;
-        renderSearchResults(data);
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`);
+        const data = await res.json(); searchResults = data; renderSearchResults(data);
     } catch(e) {}
 }, 400));
 
 function renderSearchResults(results) {
-    if (!results || results.length === 0) {
-        searchResultsList.innerHTML = '';
-        return;
-    }
+    if (!results || results.length === 0) { searchResultsList.innerHTML = ''; return; }
     searchResultsList.innerHTML = results.map((r, idx) => `
         <div class="search-result-item" data-index="${idx}">
             <svg class="search-result-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
-            <div>
-                <div style="font-weight:600;">${r.name || r.display_name}</div>
-                <div style="font-size:11px; color:#5f6368;">${r.display_name}</div>
-            </div>
-        </div>
-    `).join('');
+            <div><div style="font-weight:600;">${r.name || r.display_name}</div><div style="font-size:11px; color:#5f6368;">${r.display_name}</div></div>
+        </div>`).join('');
     searchResultsList.querySelectorAll('.search-result-item').forEach(item => {
         item.onclick = () => {
-            const idx = parseInt(item.dataset.index, 10);
-            const selected = searchResults[idx];
-            searchInput.value = selected.display_name;
-            searchResultsList.innerHTML = '';
+            const selected = searchResults[parseInt(item.dataset.index, 10)];
+            searchInput.value = selected.display_name; searchResultsList.innerHTML = '';
             
-            // Temporary Marker & Pulse
-            const coords = [parseFloat(selected.lon), parseFloat(selected.lat)];
+            // Temporary Search Marker and Pulse
+            const lon = parseFloat(selected.lon), lat = parseFloat(selected.lat);
+            map.getSource('search-temp').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lat] } }] });
+            pulseFeature({ geometry: { coordinates: [lon, lat] }});
             
-            // Add temporary marker logic could go here if we had a dedicated source, 
-            // but for simplicity we rely on the flyTo and pulse
+            map.flyTo({ center: [lon, lat], zoom: 15, duration: 1500 });
+            setTimeout(() => { if(map.getSource('search-temp')) map.getSource('search-temp').setData({ type: 'FeatureCollection', features: [] }); }, 5000);
             
-            pulseFeature({geometry: {type: 'Point', coordinates: coords}});
-            
-            map.flyTo({ center: coords, zoom: 15, duration: 1500 });
-            
-            hint('');
-            $('popup-search').classList.remove('open');
+            hint(''); $('popup-search').classList.remove('open');
         };
     });
 }
-
-$('btn-search').onclick = () => {
-    const p = $('popup-search');
-    const willOpen = !p.classList.contains('open');
-    closeFloatingCards();
-    if (willOpen) { p.classList.add('open'); searchInput.focus(); }
-};
+$('btn-search').onclick = () => { const p = $('popup-search'); const willOpen = !p.classList.contains('open'); closeFloatingCards(); if (willOpen) { p.classList.add('open'); searchInput.focus(); } };
 
 // ----------------- Tool Handlers & Drawing Engine -----------------
 document.querySelectorAll('.tool').forEach(btn => {
     btn.onclick = () => {
         const t = btn.dataset.tool;
-        if (activeTool === t) {
-            resetActiveTools();
-            closeFloatingCards();
-        } else {
+        if (activeTool === t) { resetActiveTools(); closeFloatingCards(); } 
+        else {
             document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
-            $('btn-edit-mode').classList.remove('primary-active');
-            editMode = false;
-            syncVertexHandles();
-            closeFloatingCards();
-            activeTool = t;
-            btn.classList.add('primary-active');
-            draft = [];
-            renderDraft();
-            map.getCanvas().style.cursor = 'crosshair';
-            map.doubleClickZoom.disable();
+            $('btn-edit-mode').classList.remove('primary-active'); editMode = false; syncVertexHandles();
+            closeFloatingCards(); activeTool = t; btn.classList.add('primary-active');
+            draft = []; renderDraft(); map.getCanvas().style.cursor = 'crosshair'; map.doubleClickZoom.disable();
+            
             if (t === 'marker') $('popup-marker-settings').classList.add('open');
             if (t === 'textbox') $('popup-text-settings').classList.add('open');
+            if (t === 'polygon3d') $('popup-polygon3d-settings').classList.add('open');
             if (t === 'route') {
                 $('popup-route-settings').classList.add('open');
-                hint('Click points · Click the large blue endpoint to finish');
+                hint('Click points · Double click or click end point to finish');
             }
-            if (t === 'polygon3d') {
-                $('popup-polygon3d-settings').classList.add('open');
-                hint('Click vertices · Click origin to save · Set height in panel');
-            }
-            if (t === 'polyline') hint('Click points · Click last point again to finish');
-            if (t === 'polygon') hint('Click vertices · Click origin or same point to save');
+            if (t === 'polyline') hint('Click points · Double click to finish');
+            if (t === 'polygon' || t === 'polygon3d') hint('Click vertices · Click origin to save');
             if (t === 'rectangle') hint('Click corner 1, then click opposite corner');
             if (t === 'circle') hint('Click center, then outer edge');
         }
@@ -2632,8 +2183,7 @@ map.on('mousemove', e => {
     if (activeTool) renderDraft();
     
     if (isDragging && dragFeatureId) {
-        const dx = cursorLL[0] - dragStartCoord[0];
-        const dy = cursorLL[1] - dragStartCoord[1];
+        const dx = cursorLL[0] - dragStartCoord[0], dy = cursorLL[1] - dragStartCoord[1];
         const f = features.find(x => x.id === dragFeatureId);
         if (!f) return;
         const translateCoords = coords => {
@@ -2642,7 +2192,6 @@ map.on('mousemove', e => {
         };
         f.geometry.coordinates = translateCoords(dragOriginalCoords);
         syncDraw();
-        markDirty();
     }
     
     if (isDraggingRotation && rotatingPolyId != null) {
@@ -2653,14 +2202,12 @@ map.on('mousemove', e => {
             const cosA = Math.cos(deltaAngle), sinA = Math.sin(deltaAngle);
             const orig = rotOriginalCoords[0];
             const newCoords = orig.map(c => {
-                const dx = c[0] - rotCenter[0];
-                const dy = c[1] - rotCenter[1];
+                const dx = c[0] - rotCenter[0], dy = c[1] - rotCenter[1];
                 return [rotCenter[0] + dx * cosA - dy * sinA, rotCenter[1] + dx * sinA + dy * cosA];
             });
             newCoords.push(newCoords[0]);
             f.geometry.coordinates = [newCoords];
             syncDraw();
-            markDirty();
         }
     }
 
@@ -2672,17 +2219,15 @@ map.on('mousemove', e => {
                 coords[draggedVertexIdx] = cursorLL;
                 if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
             } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry.coordinates) {
-                f.geometry.coordinates[draggedVertexIdx] = cursorLL;
-                // Debounced reroute for routes
-                if (f.kind === 'route') {
-                    clearTimeout(rerouteTimeout);
-                    rerouteTimeout = setTimeout(() => {
-                        fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
-                    }, 300);
+                if (f.kind === 'route' && f.props.originalPoints) {
+                    f.props.originalPoints[draggedVertexIdx] = cursorLL;
+                    // Provide temporary linear visualization
+                    f.geometry.coordinates = f.props.originalPoints;
+                } else {
+                    f.geometry.coordinates[draggedVertexIdx] = cursorLL;
                 }
             }
             syncDraw();
-            markDirty();
         }
     }
 });
@@ -2694,64 +2239,28 @@ map.on('click', e => {
             if (fs.length && fs[0].properties.id != null) {
                 const id = parseInt(fs[0].properties.id, 10);
                 const f = features.find(x => x.id === id);
-                if (f && f.kind === 'marker' && f.props.osmTags && Object.keys(f.props.osmTags).length > 0) {
+                if (f && f.kind === 'marker' && f.props.osmTags && Object.keys(f.props.osmTags).length > 0 && Object.keys(f.props.osmTags).some(k=>k!=='name')) {
                     let html = `<div style="font-weight:700; margin-bottom:6px; color:#38bdf8;">${f.name}</div><table class="tag-table">`;
-                    for (const k in f.props.osmTags) {
-                        html += `<tr><th>${k}</th><td>${f.props.osmTags[k]}</td></tr>`;
-                    }
+                    for (const k in f.props.osmTags) html += `<tr><th>${k}</th><td>${f.props.osmTags[k]}</td></tr>`;
                     html += `</table>`;
-                    new maplibregl.Popup({ maxWidth: '300px' })
-                        .setLngLat(f.geometry.coordinates)
-                        .setHTML(html)
-                        .addTo(map);
+                    new maplibregl.Popup({ maxWidth: '300px' }).setLngLat(f.geometry.coordinates).setHTML(html).addTo(map);
                     return;
                 } else {
-                    openShapeEditor(id);
-                    resetActiveTools();
-                    return;
+                    openShapeEditor(id); resetActiveTools(); return;
                 }
             }
         }
     }
     if (!activeTool) return;
     const ll = [e.lngLat.lng, e.lngLat.lat];
+    
     if (activeTool === 'marker') {
-        let iconKey;
-        if (customMarkerImageKey) {
-            iconKey = customMarkerImageKey;
-        } else {
-            iconKey = getIconKey(markerShape, markerColor);
-        }
-        const feat = addFeatureRecord('marker', { type: 'Point', coordinates: ll }, {
-            shape: markerShape,
-            color: markerColor,
-            iconSize: markerIconSize,
-            iconKey: iconKey
-        });
-        resetActiveTools();
-        closeFloatingCards();
-        openShapeEditor(feat.id);
+        const feat = addFeatureRecord('marker', { type: 'Point', coordinates: ll }, { shape: markerShape, color: markerColor, iconSize: markerIconSize, iconKey: customMarkerImageKey || getIconKey(markerShape, markerColor) });
+        resetActiveTools(); closeFloatingCards(); openShapeEditor(feat.id);
     } else if (activeTool === 'textbox') {
-        const feat = addFeatureRecord('text', { type: 'Point', coordinates: ll }, {
-            text: $('tContent').value || 'Label',
-            fontSize: parseInt($('tSize').value, 10),
-            color: $('tColor').value,
-            opacity: parseFloat($('tOp').value)
-        });
-        resetActiveTools();
-        closeFloatingCards();
-        openShapeEditor(feat.id);
+        const feat = addFeatureRecord('text', { type: 'Point', coordinates: ll }, { text: $('tContent').value || 'Label', fontSize: parseInt($('tSize').value, 10), color: $('tColor').value, opacity: parseFloat($('tOp').value) });
+        resetActiveTools(); closeFloatingCards(); openShapeEditor(feat.id);
     } else if (activeTool === 'polyline') {
-        if (draft.length >= 2) {
-            const pScreen = map.project(ll);
-            const lastPtScreen = map.project(draft[draft.length - 1]);
-            if (Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 18) {
-                const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
-                resetActiveTools();
-                openShapeEditor(feat.id);
-                return;
-            }
-        }
         draft.push(ll);
     } else if (activeTool === 'polygon' || activeTool === 'polygon3d') {
         if (draft.length >= 3) {
@@ -2759,101 +2268,55 @@ map.on('click', e => {
             for (const pt of draft) {
                 const vScreen = map.project(pt);
                 if (Math.hypot(pScreen.x - vScreen.x, pScreen.y - vScreen.y) < 18) {
-                    const kind = activeTool;
-                    const props = {};
-                    if (kind === 'polygon3d') {
-                        props.height = parseFloat($('p3dHeight').value) || 50;
-                        props.extrusionColor = $('p3dColor').value;
-                        props.fillOpacity = parseFloat($('p3dOpacity').value);
-                    }
-                    const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
-                    resetActiveTools();
-                    if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
-                    openShapeEditor(feat.id);
-                    return;
+                    if (activeTool === 'polygon3d') {
+                        const feat = addFeatureRecord('polygon3d', { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, {
+                            height: parseInt($('p3dHeight').value,10)||50, extrusionColor: $('p3dColor').value||'#e8b84a', fillOpacity: parseFloat($('p3dOp').value)||0.7
+                        });
+                        resetActiveTools(); if($('p3dAutoClose').checked) closeFloatingCards(); else openShapeEditor(feat.id);
+                    } else {
+                        const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
+                        resetActiveTools(); openShapeEditor(feat.id);
+                    } return;
                 }
             }
-        }
-        draft.push(ll);
+        } draft.push(ll);
     } else if (activeTool === 'rectangle') {
         draft.push(ll);
         if (draft.length === 2) {
             const feat = addFeatureRecord('rectangle', { type: 'Polygon', coordinates: rectCoords(draft[0], draft[1]) });
-            resetActiveTools();
-            openShapeEditor(feat.id);
+            resetActiveTools(); openShapeEditor(feat.id);
         }
     } else if (activeTool === 'circle') {
         draft.push(ll);
         if (draft.length === 2) {
             const { coords, r } = circleCoords(draft[0], draft[1]);
             const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { radiusMeters: r });
-            resetActiveTools();
-            openShapeEditor(feat.id);
+            resetActiveTools(); openShapeEditor(feat.id);
         }
     } else if (activeTool === 'route') {
         if (draft.length >= 2) {
-            const pScreen = map.project(ll);
-            const lastPtScreen = map.project(draft[draft.length - 1]);
-            if (Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 22) {
-                fetchMultiPointRoute(draft);
-                resetActiveTools();
-                return;
+            const pScreen = map.project(ll), lastPtScreen = map.project(draft[draft.length - 1]);
+            if ($('routeAutoFinish').checked && Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 22) {
+                fetchMultiPointRoute(draft); resetActiveTools(); return;
             }
-        }
-        draft.push(ll);
-    }
-    renderDraft();
+        } draft.push(ll);
+    } renderDraft();
 });
 
-document.addEventListener('keydown', e => {
-    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-    if (e.key === 'Enter') {
-        if ((activeTool === 'polygon' || activeTool === 'polygon3d') && draft.length >= 3) {
-            const kind = activeTool;
-            const props = {};
-            if (kind === 'polygon3d') {
-                props.height = parseFloat($('p3dHeight').value) || 50;
-                props.extrusionColor = $('p3dColor').value;
-                props.fillOpacity = parseFloat($('p3dOpacity').value);
-            }
-            const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
-            resetActiveTools();
-            if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
-            openShapeEditor(feat.id);
-        } else if (activeTool === 'polyline' && draft.length >= 2) {
-            const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
-            resetActiveTools();
-            openShapeEditor(feat.id);
-        } else if (activeTool === 'route' && draft.length >= 2) {
-            fetchMultiPointRoute(draft);
-            resetActiveTools();
-        }
-    }
-    if (e.key === 'Escape') {
-        resetActiveTools();
-        closeFloatingCards();
-        editMode = false;
-        $('btn-edit-mode').classList.remove('primary-active');
-        syncVertexHandles();
-    }
-    if (e.key === 'Delete' && selectedId && editMode) {
-         // Delete selected waypoint if in route edit mode could be implemented here
-         // For now, standard delete removes feature
-         features = features.filter(x => x.id !== selectedId);
-         for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== selectedId);
-         selectedId = null;
-         syncDraw(); renderMyLayers(); markDirty();
+map.on('dblclick', e => {
+    if (activeTool === 'route' && draft.length >= 2) {
+        fetchMultiPointRoute(draft); resetActiveTools();
+    } else if (activeTool === 'polyline' && draft.length >= 2) {
+        const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
+        resetActiveTools(); openShapeEditor(feat.id);
     }
 });
 
 // ----------------- Edit Mode -----------------
 $('btn-edit-mode').onclick = () => {
-    editMode = !editMode;
-    $('btn-edit-mode').classList.toggle('primary-active', editMode);
-    activeTool = null;
-    document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
-    closeFloatingCards();
-    syncVertexHandles();
+    editMode = !editMode; $('btn-edit-mode').classList.toggle('primary-active', editMode);
+    activeTool = null; document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
+    closeFloatingCards(); syncVertexHandles();
     hint(editMode ? 'Edit mode: drag shapes or vertices (blue dots)' : '');
 };
 
@@ -2862,26 +2325,20 @@ map.on('mousedown', e => {
         const vHits = map.queryRenderedFeatures(e.point, { layers: ['vertex-points'] });
         if (vHits.length && vHits[0].properties.polyId != null) {
             if (vHits[0].properties.isRotHandle) {
-                isDraggingRotation = true;
-                rotatingPolyId = parseInt(vHits[0].properties.polyId, 10);
+                isDraggingRotation = true; rotatingPolyId = parseInt(vHits[0].properties.polyId, 10);
                 const f = features.find(x => x.id === rotatingPolyId);
-                const b = calcBounds(f);
-                rotCenter = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
+                const b = calcBounds(f); rotCenter = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
                 rotStartAngle = Math.atan2(cursorLL[1] - rotCenter[1], cursorLL[0] - rotCenter[0]);
                 rotOriginalCoords = JSON.parse(JSON.stringify(f.geometry.coordinates));
-                map.dragPan.disable();
-                return;
+                map.dragPan.disable(); return;
             }
-            isDraggingVertex = true;
-            draggedPolyId = parseInt(vHits[0].properties.polyId, 10);
+            isDraggingVertex = true; draggedPolyId = parseInt(vHits[0].properties.polyId, 10);
             draggedVertexIdx = parseInt(vHits[0].properties.vIdx, 10);
-            map.dragPan.disable();
-            return;
+            map.dragPan.disable(); return;
         }
         const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
         if (fs.length && fs[0].properties.id != null) {
-            isDragging = true;
-            dragFeatureId = parseInt(fs[0].properties.id, 10);
+            isDragging = true; dragFeatureId = parseInt(fs[0].properties.id, 10);
             dragStartCoord = [e.lngLat.lng, e.lngLat.lat];
             const f = features.find(x => x.id === dragFeatureId);
             if (f) dragOriginalCoords = JSON.parse(JSON.stringify(f.geometry.coordinates));
@@ -2891,42 +2348,50 @@ map.on('mousedown', e => {
 });
 
 map.on('mouseup', () => {
-    if (isDragging) {
-        isDragging = false;
-        dragFeatureId = null;
-        map.dragPan.enable();
-        markDirty();
-    }
+    if (isDragging) { isDragging = false; dragFeatureId = null; map.dragPan.enable(); commitState(); }
     if (isDraggingVertex) {
         if (draggedPolyId != null) {
             const f = features.find(x => x.id === draggedPolyId);
-            if (f && f.kind === 'route') {
-                // Trigger reroute immediately on drop
-                fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
-            }
+            if (f && f.kind === 'route') fetchMultiPointRoute(f.props.originalPoints || f.geometry.coordinates, f.id);
         }
-        isDraggingVertex = false;
-        draggedPolyId = null;
-        draggedVertexIdx = -1;
-        map.dragPan.enable();
-        markDirty();
+        isDraggingVertex = false; draggedPolyId = null; draggedVertexIdx = -1; map.dragPan.enable(); commitState();
     }
-    if (isDraggingRotation) {
-        isDraggingRotation = false;
-        rotatingPolyId = null;
-        map.dragPan.enable();
-        markDirty();
-    }
+    if (isDraggingRotation) { isDraggingRotation = false; rotatingPolyId = null; map.dragPan.enable(); commitState(); }
 });
 
 // ----------------- Customizer / Shape Editor -----------------
 function openShapeEditor(id) {
-    const f = features.find(x => x.id === id);
-    if (!f) return;
-    selectedId = id;
-    closeFloatingCards();
-    $('editShapeTitle').textContent = `Edit ${f.name}`;
-    $('eName').value = f.name;
+    const f = features.find(x => x.id === id); if (!f) return;
+    selectedId = id; closeFloatingCards();
+    $('editShapeTitle').textContent = `Edit ${f.name}`; $('eName').value = f.name;
+    
+    // 3D Specific
+    const is3D = f.kind === 'polygon3d';
+    $('e3DControlsRow').style.display = is3D ? 'flex' : 'none';
+    if(is3D) {
+        $('eExtrusionHeight').value = f.props.height || 50;
+        $('eExtrusionColor').value = f.props.extrusionColor || '#e8b84a';
+        $('eExtrusionOp').value = f.props.fillOpacity !== undefined ? f.props.fillOpacity : 0.7;
+    }
+    
+    // Route Specific
+    const isRoute = f.kind === 'route';
+    $('eRouteControlsRow').style.display = isRoute ? 'flex' : 'none';
+    if (isRoute) {
+        $('eRouteProfile').value = f.props.routeMode || 'driving';
+        $('eRouteStats').textContent = f.props.description || '--';
+        
+        const pts = f.props.originalPoints || (f.geometry.coordinates && f.geometry.coordinates.length > 0 ? f.geometry.coordinates : []);
+        let wpHTML = '';
+        pts.forEach((pt, idx) => {
+            wpHTML += `<div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:2px 4px; border-radius:4px;">
+                <span style="font-size:10px; color:#adbac7;">P${idx+1}: ${pt[0].toFixed(4)}, ${pt[1].toFixed(4)}</span>
+                <button class="card-btn" onclick="removeRouteWaypoint(${f.id}, ${idx})" style="color:#f85149; padding:2px;">✕</button>
+            </div>`;
+        });
+        $('eRouteWaypoints').innerHTML = wpHTML;
+    }
+
     $('eBorderColor').value = f.props.borderColor || f.props.color || '#e8b84a';
     $('eBorderOp').value = f.props.borderOpacity != null ? f.props.borderOpacity : 0.9;
     $('eWidth').value = f.props.width || 3;
@@ -2934,171 +2399,165 @@ function openShapeEditor(id) {
     $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
     
     const isPolygon = ['polygon', 'rectangle', 'circle'].includes(f.kind);
-    const is3D = f.kind === 'polygon3d';
-    
-    $('eFillColorRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
-    $('eFillOpRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
-    $('eLabelToggleRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
+    $('eFillColorRow').style.display = isPolygon ? 'flex' : 'none';
+    $('eFillOpRow').style.display = isPolygon ? 'flex' : 'none';
+    $('eLabelToggleRow').style.display = (isPolygon || is3D || isRoute) ? 'flex' : 'none';
     $('eLabelPosRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
     
-    if (isPolygon || is3D) {
+    if (isPolygon || is3D || isRoute) {
         $('eShowLabel').checked = !!f.props.showLabel;
         $('eLabelPos').value = f.props.labelPos || 'center';
     }
-
-    // Hide standard fill controls for 3D, show 3D specific ones
-    if (is3D) {
-        $('eFillColorRow').style.display = 'none';
-        $('eFillOpRow').style.display = 'none';
-        $('p3dEditorControls').style.display = 'block';
-        $('eP3dHeight').value = f.props.height || 50;
-        $('eP3dColor').value = f.props.extrusionColor || '#e8b84a';
-        $('eP3dOpacity').value = f.props.fillOpacity || 0.7;
-    } else {
-        $('p3dEditorControls').style.display = 'none';
-    }
-
+    
     const isMarker = f.kind === 'marker';
     $('eMarkerSizeRow').style.display = isMarker ? 'flex' : 'none';
     if (isMarker) $('eMarkerSize').value = f.props.iconSize || 0.9;
+    
     const isText = f.kind === 'text';
     $('eTextRow').style.display = isText ? 'flex' : 'none';
     $('eFontSizeRow').style.display = isText ? 'flex' : 'none';
-    if (isText) {
-        $('eTextVal').value = f.props.text || '';
-        $('eFontSize').value = f.props.fontSize || 16;
-    }
+    if (isText) { $('eTextVal').value = f.props.text || ''; $('eFontSize').value = f.props.fontSize || 16; }
     
-    // Route Specifics
-    const isRoute = f.kind === 'route';
-    $('routeEditorControls').style.display = isRoute ? 'block' : 'none';
-    if (isRoute) {
-        $('eRouteMode').value = f.props.routeMode || 'driving';
-        $('eRouteStats').textContent = f.props.description || '-';
-    }
-
     $('popup-shape-editor').classList.add('open');
 }
 
-$('eName').oninput = e => {
-    const f = features.find(x => x.id === selectedId);
-    if (f) { f.name = e.target.value; syncDraw(); renderMyLayers(); markDirty(); }
-};
-$('eBorderColor').oninput = e => {
-    const f = features.find(x => x.id === selectedId);
-    if (!f) return;
-    f.props.borderColor = e.target.value;
-    f.props.color = e.target.value;
-    if (f.kind === 'marker' && !customMarkerImageKey) f.props.iconKey = getIconKey(f.props.shape || 'pin', e.target.value);
-    syncDraw();
-    markDirty();
-};
-$('eBorderOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.borderOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
-$('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.width = parseFloat(e.target.value); syncDraw(); markDirty(); } };
-$('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); markDirty(); } };
-$('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
-$('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); markDirty(); } };
-$('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); markDirty(); } };
-$('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); markDirty(); } };
-$('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); markDirty(); } };
-$('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); markDirty(); } };
-
-// 3D Editor Controls
-$('eP3dHeight').oninput = e => {
-    const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'polygon3d') {
-        f.props.height = parseFloat(e.target.value);
-        syncDraw();
-        markDirty();
-    }
-};
-$('eP3dColor').oninput = e => {
-    const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'polygon3d') {
-        f.props.extrusionColor = e.target.value;
-        syncDraw();
-        markDirty();
-    }
-};
-$('eP3dOpacity').oninput = e => {
-    const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'polygon3d') {
-        f.props.fillOpacity = parseFloat(e.target.value);
-        syncDraw();
-        markDirty();
+window.removeRouteWaypoint = function(fId, wpIdx) {
+    const f = features.find(x => x.id === fId);
+    if(f && f.props.originalPoints) {
+        f.props.originalPoints.splice(wpIdx, 1);
+        fetchMultiPointRoute(f.props.originalPoints, f.id);
     }
 };
 
-// Route Editor Controls
-$('eRouteMode').onchange = e => {
-    const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'route') {
-        f.props.routeMode = e.target.value;
-        fetchMultiPointRoute(f.geometry.coordinates, f.id, e.target.value);
-    }
-};
+$('eName').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.name = e.target.value; syncDraw(); renderMyLayers(); } };
+$('eBorderColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.borderColor = e.target.value; f.props.color = e.target.value; if (f.kind === 'marker' && !customMarkerImageKey) f.props.iconKey = getIconKey(f.props.shape || 'pin', e.target.value); syncDraw(); } };
+$('eBorderOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.borderOpacity = parseFloat(e.target.value); syncDraw(); } };
+$('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.width = parseFloat(e.target.value); syncDraw(); } };
+$('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); } };
+$('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); } };
 
-$('eRecalcRoute').onclick = () => {
-    const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'route') {
-        fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
-    }
-};
+// 3D
+$('eExtrusionHeight').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.height = parseFloat(e.target.value); syncDraw(); } };
+$('eExtrusionColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.extrusionColor = e.target.value; syncDraw(); } };
+$('eExtrusionOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); } };
+
+// Routing Actions
+$('eRouteProfile').onchange = e => { const f = features.find(x => x.id === selectedId); if(f) fetchMultiPointRoute(f.props.originalPoints || f.geometry.coordinates, f.id); };
+$('eRecalculateRouteBtn').onclick = () => { const f = features.find(x => x.id === selectedId); if(f) fetchMultiPointRoute(f.props.originalPoints || f.geometry.coordinates, f.id); };
+
+$('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); } };
+$('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); } };
+$('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); } };
+$('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); } };
+$('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); } };
+
+$('eName').onchange = () => commitState();
+$('eBorderColor').onchange = () => commitState();
+$('eExtrusionColor').onchange = () => commitState();
+$('eExtrusionHeight').onchange = () => commitState();
 
 $('eDeleteBtn').onclick = () => {
     features = features.filter(x => x.id !== selectedId);
-    for (const g in customGroups) { customGroups[g].ids = customGroups[g].ids.filter(id => id !== selectedId); }
-    syncDraw();
-    renderMyLayers();
+    for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(id => id !== selectedId);
+    selectedLayerIds.delete(selectedId);
+    syncDraw(); renderMyLayers(); commitState();
     $('popup-shape-editor').classList.remove('open');
-    markDirty();
 };
 $('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
+
+
+// ----------------- Attributes Table Modal -----------------
+function openAttributeTable(id) {
+    currentTableFeatureId = id;
+    const f = features.find(x => x.id === id); if(!f) return;
+    $('attr-table-title').textContent = `Attributes: ${f.name}`;
+    renderAttributeTable();
+    closeFloatingCards();
+    $('popup-attribute-table').classList.add('open');
+}
+
+$('closeAttrTableBtn').onclick = () => { 
+    $('popup-attribute-table').classList.remove('open'); 
+    syncDraw(); renderMyLayers(); commitState(); 
+};
+
+function renderAttributeTable() {
+    const f = features.find(x => x.id === currentTableFeatureId); if(!f) return;
+    const grid = $('attr-table-grid');
+    if(f.props.description === undefined) f.props.description = "";
+    
+    // Auto map label
+    if(f.props.label_text) f.props.description = f.props.label_text; 
+    
+    let cols = Object.keys(f.props).filter(k => typeof f.props[k] === 'string' || typeof f.props[k] === 'number');
+    const filterTxt = $('attr-table-search').value.toLowerCase();
+    
+    let html = `<tr>`;
+    cols.forEach(c => html += `<th>${c}</th>`);
+    html += `</tr><tr>`;
+    
+    let match = false;
+    let rowHtml = "";
+    cols.forEach(c => {
+        const val = f.props[c] || '';
+        if(val.toString().toLowerCase().includes(filterTxt)) match = true;
+        
+        if(val.toString().startsWith('data:image')) {
+            rowHtml += `<td><img src="${val}" style="max-width:80px; max-height:80px; cursor:pointer;" onclick="triggerTableImage('${c}')"/></td>`;
+        } else {
+            rowHtml += `<td><input type="text" value="${val}" style="width:100%; background:transparent; border:1px solid rgba(255,255,255,0.1); color:#fff; font-size:11px;" onchange="updateTableProp('${c}', this.value)" /></td>`;
+        }
+    });
+    
+    if(filterTxt === '' || match) html += rowHtml + `</tr>`;
+    else html += `<tr style="display:none;">${rowHtml}</tr>`;
+    
+    grid.innerHTML = html;
+}
+
+$('attr-table-search').addEventListener('input', renderAttributeTable);
+
+$('btn-add-col').onclick = () => {
+    const f = features.find(x => x.id === currentTableFeatureId); if(!f) return;
+    const colName = prompt("Enter new column name:");
+    if(colName && colName.trim() && f.props[colName] === undefined) {
+        f.props[colName] = "";
+        renderAttributeTable();
+        commitState();
+    }
+};
+
+window.updateTableProp = function(key, val) {
+    const f = features.find(x => x.id === currentTableFeatureId);
+    if(f) { f.props[key] = val; syncDraw(); }
+};
 
 // ----------------- My Layers with Grouping, Multi-select, Drag Reorder -----------------
 $('btnAddCustomGroup').onclick = () => {
     const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
     if (gName && gName.trim() && !customGroups[gName]) {
-        customGroups[gName.trim()] = { collapsed: false, ids: [] };
-        renderMyLayers();
-        markDirty();
+        customGroups[gName.trim()] = { collapsed: false, ids: [] }; renderMyLayers(); commitState();
     }
 };
 
 $('btnHideSelected').onclick = () => {
-    if (selectedLayerIds.size === 0) {
-        hint('Select at least one layer first');
-        return;
-    }
+    if (selectedLayerIds.size === 0) { hint('Select at least one layer first'); return; }
     const allHidden = Array.from(selectedLayerIds).every(id => {
-        const f = features.find(x => x.id === id);
-        return f && f.props.visible === 0;
+        const f = features.find(x => x.id === id); return f && f.props.visible === 0;
     });
     const newVis = allHidden ? 1 : 0;
-    selectedLayerIds.forEach(id => {
-        const f = features.find(x => x.id === id);
-        if (f) f.props.visible = newVis;
-    });
-    syncDraw();
-    renderMyLayers();
-    markDirty();
-    hint(allHidden ? 'Layers unhidden' : 'Layers hidden');
+    selectedLayerIds.forEach(id => { const f = features.find(x => x.id === id); if (f) f.props.visible = newVis; });
+    syncDraw(); renderMyLayers(); commitState(); hint(allHidden ? 'Layers unhidden' : 'Layers hidden');
 };
 
 function renderLayerCardHtml(f) {
-    let subInfo = f.kind;
-    if (f.kind === 'circle' && f.props.radiusMeters) {
-        subInfo = `Radius: ${f.props.radiusMeters > 1000 ? (f.props.radiusMeters/1000).toFixed(2)+' km' : Math.round(f.props.radiusMeters)+' m'}`;
-    } else if (f.kind === 'route' && f.props.description) {
-        subInfo = f.props.description;
-    } else if (f.kind === 'polygon3d') {
-        subInfo = `3D (${f.props.height || 50}m)`;
-    }
+    let subInfo = f.kind === 'polygon3d' ? '3D Polygon' : f.kind;
+    if (f.kind === 'circle' && f.props.radiusMeters) subInfo = `Radius: ${f.props.radiusMeters > 1000 ? (f.props.radiusMeters/1000).toFixed(2)+' km' : Math.round(f.props.radiusMeters)+' m'}`;
+    else if (f.kind === 'route' && f.props.description) subInfo = f.props.description;
+    
     const isSelected = selectedLayerIds.has(f.id);
-    const posOptions = ['center','top','bottom','left','right']
-        .map(p => `<option value="${p}" ${(f.props.labelPos || 'center') === p ? 'selected' : ''}>${p}</option>`)
-        .join('');
+    const posOptions = ['center','top','bottom','left','right'].map(p => `<option value="${p}" ${(f.props.labelPos || 'center') === p ? 'selected' : ''}>${p}</option>`).join('');
     return `
         <div class="layer-card" draggable="true" data-id="${f.id}">
             <div class="layer-card-top">
@@ -3136,19 +2595,16 @@ function renderLayerCardHtml(f) {
 }
 
 function renderMyLayers() {
-    const container = $('my-layers-list');
-    $('layer-badge-count').textContent = features.length;
-    const polyList = features.filter(f => ['polygon', 'rectangle', 'circle', 'polygon3d'].includes(f.kind));
+    const container = $('my-layers-list'); $('layer-badge-count').textContent = features.length;
+    const polyList = features.filter(f => ['polygon', 'rectangle', 'circle'].includes(f.kind));
     $('tradePolygonSelect').innerHTML = '<option value="">-- Choose --</option>' + polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     if (!features.length && !Object.keys(customGroups).length) {
         container.innerHTML = '<div style="font-size:12px; color:#768390; padding:6px 0;">No drawings yet. Use the tools to create shapes.</div>';
         return;
     }
-    let html = '';
-    const groupedIds = new Set();
+    let html = ''; const groupedIds = new Set();
     for (const gName in customGroups) {
-        const grp = customGroups[gName];
-        const groupFeats = features.filter(f => grp.ids.includes(f.id));
+        const grp = customGroups[gName]; const groupFeats = features.filter(f => grp.ids.includes(f.id));
         grp.ids.forEach(id => groupedIds.add(id));
         html += `
             <div class="group-container" data-group="${gName}">
@@ -3160,9 +2616,7 @@ function renderMyLayers() {
                         <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group"/>
                     </div>
                     <div style="display:flex; align-items:center; gap:2px;">
-                         <button class="card-btn" data-act="groupSelectAll" data-group="${gName}" title="Select All in Group">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-                        </button>
+                        <button class="card-btn" data-act="groupSelectAll" data-group="${gName}" title="Select All in Group" style="font-size:12px; padding:0 4px;">☑</button>
                         <button class="card-btn" data-act="groupStyle" data-group="${gName}" title="Style Group">
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                         </button>
@@ -3180,12 +2634,9 @@ function renderMyLayers() {
                     <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Shape</span>
                         <select class="grp-style-shape" style="flex:1; font-size:10px;">
                             <option value="">-- No Change --</option>
-                            <option value="pin">Pin</option>
-                            <option value="star">Star</option>
-                            <option value="circle">Circle</option>
-                            <option value="square">Square</option>
-                            <option value="flag">Flag</option>
-                            <option value="heart">Heart</option>
+                            <option value="pin">Pin</option> <option value="star">Star</option>
+                            <option value="circle">Circle</option> <option value="square">Square</option>
+                            <option value="flag">Flag</option> <option value="heart">Heart</option>
                             <option value="pinball">Pinball</option>
                         </select>
                     </div>
@@ -3201,131 +2652,67 @@ function renderMyLayers() {
     const looseFeats = features.filter(f => !groupedIds.has(f.id));
     html += '<div id="ungrouped-zone">';
     if (looseFeats.length) {
-        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">Ungrouped Layers <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></button></div>';
+        html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">';
+        html += '<span style="font-size:11px; font-weight:700; color:#adbac7;">Ungrouped Layers</span>';
+        html += '<button class="card-btn" data-act="ungroupedSelectAll" title="Select All Ungrouped" style="font-size:12px; padding:0 4px;">☑</button>';
+        html += '</div>';
         html += looseFeats.slice().reverse().map(f => renderLayerCardHtml(f)).join('');
     }
-    html += '</div>';
-    container.innerHTML = html;
-
-    // Select All Ungrouped
-    const btnSelAllUng = container.querySelector('#btnSelectAllUngrouped');
-    if (btnSelAllUng) {
-        btnSelAllUng.onclick = () => {
-            looseFeats.forEach(f => selectedLayerIds.add(f.id));
-            renderMyLayers(); // Re-render to update checkboxes
-        };
-    }
+    html += '</div>'; container.innerHTML = html;
 
     container.querySelectorAll('.group-container').forEach(gc => {
         const gName = gc.dataset.group;
-        gc.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            gc.classList.add('drop-hover');
-        });
-        gc.addEventListener('dragleave', () => {
-            gc.classList.remove('drop-hover');
-        });
+        gc.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; gc.classList.add('drop-hover'); });
+        gc.addEventListener('dragleave', () => { gc.classList.remove('drop-hover'); });
         gc.addEventListener('drop', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            gc.classList.remove('drop-hover');
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            if (isNaN(draggedId)) return;
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-            }
-            if (!customGroups[gName].ids.includes(draggedId)) {
-                customGroups[gName].ids.push(draggedId);
-            }
-            renderMyLayers();
-            markDirty();
-            hint(`Layer added to "${gName}"`);
+            e.preventDefault(); e.stopPropagation(); gc.classList.remove('drop-hover');
+            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10); if (isNaN(draggedId)) return;
+            for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
+            if (!customGroups[gName].ids.includes(draggedId)) customGroups[gName].ids.push(draggedId);
+            renderMyLayers(); commitState(); hint(`Layer added to "${gName}"`);
         });
     });
 
     const uz = container.querySelector('#ungrouped-zone');
     if (uz) {
-        uz.addEventListener('dragover', e => {
-            e.preventDefault();
-            uz.classList.add('drop-hover');
-        });
-        uz.addEventListener('dragleave', () => {
-            uz.classList.remove('drop-hover');
-        });
+        uz.addEventListener('dragover', e => { e.preventDefault(); uz.classList.add('drop-hover'); });
+        uz.addEventListener('dragleave', () => { uz.classList.remove('drop-hover'); });
         uz.addEventListener('drop', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            uz.classList.remove('drop-hover');
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            if (isNaN(draggedId)) return;
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-            }
-            renderMyLayers();
-            markDirty();
-            hint('Layer moved to Ungrouped');
+            e.preventDefault(); e.stopPropagation(); uz.classList.remove('drop-hover');
+            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10); if (isNaN(draggedId)) return;
+            for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
+            renderMyLayers(); commitState(); hint('Layer moved to Ungrouped');
         });
     }
 
     container.querySelectorAll('.layer-card').forEach(card => {
-        card.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/plain', card.dataset.id);
-            e.dataTransfer.effectAllowed = 'move';
-        });
-        card.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        });
+        card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', card.dataset.id); e.dataTransfer.effectAllowed = 'move'; });
+        card.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
         card.addEventListener('drop', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            const targetId = parseInt(card.dataset.id, 10);
-            if (draggedId !== targetId) {
-                reorderFeatures(draggedId, targetId);
-            }
+            e.preventDefault(); e.stopPropagation();
+            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10), targetId = parseInt(card.dataset.id, 10);
+            if (draggedId !== targetId) reorderFeatures(draggedId, targetId);
         });
     });
 
     container.querySelectorAll('.layer-select-check').forEach(cb => {
         cb.addEventListener('change', e => {
             const id = parseInt(e.target.dataset.id, 10);
-            if (e.target.checked) selectedLayerIds.add(id);
-            else selectedLayerIds.delete(id);
+            if (e.target.checked) selectedLayerIds.add(id); else selectedLayerIds.delete(id);
         });
-    });
-    
-    // Group Select All
-    container.querySelectorAll('[data-act="groupSelectAll"]').forEach(btn => {
-        btn.onclick = () => {
-            const gName = btn.dataset.group;
-            const grp = customGroups[gName];
-            if (grp) {
-                grp.ids.forEach(id => selectedLayerIds.add(id));
-                renderMyLayers();
-            }
-        };
     });
 
     container.querySelectorAll('.group-title-input').forEach(inp => {
         inp.onchange = e => {
-            const oldN = e.target.dataset.oldname;
-            const newN = e.target.value.trim();
-            if (newN && newN !== oldN) {
-                customGroups[newN] = customGroups[oldN];
-                delete customGroups[oldN];
-                renderMyLayers();
-                markDirty();
-            }
+            const oldN = e.target.dataset.oldname, newN = e.target.value.trim();
+            if (newN && newN !== oldN) { customGroups[newN] = customGroups[oldN]; delete customGroups[oldN]; renderMyLayers(); commitState(); }
         };
     });
 
     container.querySelectorAll('.layer-name-input').forEach(inp => {
         inp.onchange = e => {
-            const id = parseInt(e.target.dataset.id, 10);
-            const f = features.find(x => x.id === id);
-            if (f) { f.name = e.target.value; syncDraw(); markDirty(); }
+            const id = parseInt(e.target.dataset.id, 10), f = features.find(x => x.id === id);
+            if (f) { f.name = e.target.value; syncDraw(); commitState(); }
         };
     });
 
@@ -3336,61 +2723,39 @@ function renderMyLayers() {
             if (b.tagName === 'SPAN' && e.type !== 'click') return;
             if (b.tagName === 'SELECT' && e.type !== 'change') return;
             const act = b.dataset.act;
-            if (act === 'groupToggleCollapse') {
-                const g = b.dataset.group;
-                customGroups[g].collapsed = !customGroups[g].collapsed;
-                renderMyLayers();
-                return;
-            }
-            if (act === 'groupStyle') {
-                const g = b.dataset.group;
-                const panel = container.querySelector(`.group-styling-panel[data-group="${g}"]`);
-                if (panel) panel.classList.toggle('open');
-                return;
-            }
+            
+            if (act === 'groupToggleCollapse') { const g = b.dataset.group; customGroups[g].collapsed = !customGroups[g].collapsed; renderMyLayers(); return; }
+            if (act === 'groupStyle') { const g = b.dataset.group; const panel = container.querySelector(`.group-styling-panel[data-group="${g}"]`); if (panel) panel.classList.toggle('open'); return; }
             if (act === 'groupEye') {
-                const g = b.dataset.group;
-                const ids = customGroups[g].ids || [];
+                const g = b.dataset.group, ids = customGroups[g].ids || [];
                 const anyVis = features.some(f => ids.includes(f.id) && f.props.visible);
                 features.forEach(f => { if (ids.includes(f.id)) f.props.visible = anyVis ? 0 : 1; });
-                syncDraw(); renderMyLayers(); markDirty();
-                return;
+                syncDraw(); renderMyLayers(); commitState(); return;
             }
-            if (act === 'groupDel') {
-                const g = b.dataset.group;
-                delete customGroups[g];
-                renderMyLayers();
-                markDirty();
-                return;
+            if (act === 'groupDel') { const g = b.dataset.group; delete customGroups[g]; renderMyLayers(); commitState(); return; }
+            if (act === 'groupSelectAll') {
+                const g = b.dataset.group; const ids = customGroups[g].ids || [];
+                ids.forEach(id => selectedLayerIds.add(id)); renderMyLayers(); return;
             }
-            const id = parseInt(b.dataset.id, 10);
-            const f = features.find(x => x.id === id);
-            if (!f) return;
-            if (act === 'table') {
-                openAttributeTable(id);
-                return;
+            if (act === 'ungroupedSelectAll') {
+                const grouped = new Set(); for(const g in customGroups) customGroups[g].ids.forEach(i => grouped.add(i));
+                features.forEach(f => { if(!grouped.has(f.id)) selectedLayerIds.add(f.id); }); renderMyLayers(); return;
             }
-            if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); markDirty(); }
-            if (act === 'labelPos') { f.props.labelPos = b.value; syncDraw(); markDirty(); }
+            
+            const id = parseInt(b.dataset.id, 10), f = features.find(x => x.id === id); if (!f) return;
+            if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); commitState(); }
+            if (act === 'labelPos') { f.props.labelPos = b.value; syncDraw(); commitState(); }
             if (act === 'edit') openShapeEditor(id);
-            if (act === 'eye') {
-                f.props.visible = f.props.visible ? 0 : 1;
-                syncDraw();
-                renderMyLayers();
-                markDirty();
-            }
+            if (act === 'table') openAttributeTable(id);
+            if (act === 'eye') { f.props.visible = f.props.visible ? 0 : 1; syncDraw(); renderMyLayers(); commitState(); }
             if (act === 'del') {
                 features = features.filter(x => x.id !== id);
                 for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== id);
-                selectedLayerIds.delete(id);
-                syncDraw(); renderMyLayers(); markDirty();
+                selectedLayerIds.delete(id); syncDraw(); renderMyLayers(); commitState();
             }
             if (act === 'zoom') {
                 const bnd = calcBounds(f);
-                if (bnd) {
-                    map.fitBounds(bnd, { padding: 60, maxZoom: 18 });
-                    pulseFeature(f);
-                }
+                if (bnd) { map.fitBounds(bnd, { padding: 60, maxZoom: 18 }); pulseFeature(f); }
             }
         };
     });
@@ -3398,268 +2763,60 @@ function renderMyLayers() {
     container.querySelectorAll('.grp-style-apply').forEach(btn => {
         btn.onclick = () => {
             const panel = btn.closest('.group-styling-panel');
-            const gName = panel.dataset.group;
-            const color = panel.querySelector('.grp-style-color').value;
-            const shape = panel.querySelector('.grp-style-shape').value;
-            const size = parseFloat(panel.querySelector('.grp-style-size').value);
-            const grp = customGroups[gName];
-            if (!grp) return;
+            const gName = panel.dataset.group, color = panel.querySelector('.grp-style-color').value, shape = panel.querySelector('.grp-style-shape').value, size = parseFloat(panel.querySelector('.grp-style-size').value);
+            const grp = customGroups[gName]; if (!grp) return;
             grp.ids.forEach(id => {
                 const f = features.find(x => x.id === id);
                 if (f && f.kind === 'marker') {
-                    f.props.color = color;
-                    f.props.borderColor = color;
+                    f.props.color = color; f.props.borderColor = color;
                     if (shape) f.props.shape = shape;
-                    f.props.iconSize = size;
-                    f.props.iconKey = getIconKey(f.props.shape || 'pin', color);
+                    f.props.iconSize = size; f.props.iconKey = getIconKey(f.props.shape || 'pin', color);
                 }
-            });
-            syncDraw();
-            renderMyLayers();
-            markDirty();
-            hint(`Styling applied to "${gName}"`);
+            }); syncDraw(); renderMyLayers(); commitState(); hint(`Styling applied to "${gName}"`);
         };
     });
 }
 
 function reorderFeatures(draggedId, targetId) {
-    const draggedIndex = features.findIndex(f => f.id === draggedId);
-    const targetIndex = features.findIndex(f => f.id === targetId);
+    const draggedIndex = features.findIndex(f => f.id === draggedId), targetIndex = features.findIndex(f => f.id === targetId);
     if (draggedIndex === -1 || targetIndex === -1) return;
-    const [draggedItem] = features.splice(draggedIndex, 1);
-    features.splice(targetIndex, 0, draggedItem);
-    syncDraw();
-    renderMyLayers();
-    markDirty();
+    const [draggedItem] = features.splice(draggedIndex, 1); features.splice(targetIndex, 0, draggedItem);
+    syncDraw(); renderMyLayers(); commitState();
 }
 
 function calcBounds(f) {
     let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, ok = false;
     const walk = c => {
-        if (typeof c[0] === 'number') {
-            ok = true;
-            minX = Math.min(minX, c[0]); maxX = Math.max(maxX, c[0]);
-            minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]);
-        } else c.forEach(walk);
-    };
-    walk(f.geometry.coordinates);
+        if (typeof c[0] === 'number') { ok = true; minX = Math.min(minX, c[0]); maxX = Math.max(maxX, c[0]); minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]); } 
+        else c.forEach(walk);
+    }; walk(f.geometry.coordinates);
     if (!ok) return null;
     if (minX === maxX && minY === maxY) return [[minX - 0.005, minY - 0.005], [maxX + 0.005, maxY + 0.005]];
     return [[minX, minY], [maxX, maxY]];
 }
-
-// ----------------- Attribute Table Logic -----------------
-function openAttributeTable(featureId) {
-    currentTableFeatureId = featureId;
-    const f = features.find(x => x.id === featureId);
-    if (!f) return;
-    
-    $('attrTableTitle').textContent = `Attributes: ${f.name}`;
-    $('popup-attribute-table').classList.add('open');
-    
-    // Ensure attributes object exists
-    if (!f.props.attributes) f.props.attributes = {};
-    
-    renderAttributeTable(f);
-}
-
-function renderAttributeTable(f) {
-    const attrs = f.props.attributes || {};
-    const headerRow = $('attrTableHeader');
-    const bodyRow = $('attrTableBody');
-    
-    // Default columns
-    let cols = ['name', 'description'];
-    // Add custom attribute keys
-    Object.keys(attrs).forEach(k => {
-        if (!cols.includes(k)) cols.push(k);
-    });
-    
-    // Render Header
-    headerRow.innerHTML = cols.map(c => `<th>${c.toUpperCase()}</th>`).join('') + '<th>ACTIONS</th>';
-    
-    // Render Body
-    let html = '<tr>';
-    cols.forEach(c => {
-        let val = '';
-        if (c === 'name') val = f.name;
-        else if (c === 'description') val = f.props.description || '';
-        else val = attrs[c] || '';
-        
-        // Check if it's an image attribute (starts with data:image)
-        if (typeof val === 'string' && val.startsWith('data:image')) {
-            html += `<td><img src="${val}" class="attr-img-preview" onclick="triggerAttrImageUpload('${c}')" oncontextmenu="clearAttrImage('${c}'); return false;"></td>`;
-        } else {
-            html += `<td><input type="text" value="${val}" onchange="updateAttr('${c}', this.value)"></td>`;
-        }
-    });
-    html += `<td><button class="card-btn" onclick="removeAttrColumn()" title="Remove Last Column" style="color:#ff7b72;">✕</button></td></tr>`;
-    bodyRow.innerHTML = html;
-}
-
-window.updateAttr = (key, value) => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (!f) return;
-    if (key === 'name') {
-        f.name = value;
-        renderMyLayers();
-    } else if (key === 'description') {
-        f.props.description = value;
-    } else {
-        f.props.attributes[key] = value;
-    }
-    syncDraw();
-    markDirty();
-};
-
-window.triggerAttrImageUpload = (key) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = e => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = ev => {
-                const f = features.find(x => x.id === currentTableFeatureId);
-                if (f) {
-                    f.props.attributes[key] = ev.target.result;
-                    renderAttributeTable(f);
-                    markDirty();
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-    input.click();
-};
-
-window.clearAttrImage = (key) => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (f && f.props.attributes[key]) {
-        delete f.props.attributes[key];
-        renderAttributeTable(f);
-        markDirty();
-    }
-};
-
-window.removeAttrColumn = () => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (!f) return;
-    const attrs = f.props.attributes;
-    const keys = Object.keys(attrs);
-    if (keys.length > 0) {
-        delete attrs[keys[keys.length - 1]];
-        renderAttributeTable(f);
-        markDirty();
-    }
-};
-
-$('btnAddAttrCol').onclick = () => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (!f) return;
-    const name = prompt("Enter column name:");
-    if (name && !f.props.attributes[name]) {
-        f.props.attributes[name] = "";
-        renderAttributeTable(f);
-        markDirty();
-    }
-};
-
-$('attrTableSearch').oninput = e => {
-    const term = e.target.value.toLowerCase();
-    const inputs = $('attrTableBody').querySelectorAll('input[type="text"]');
-    inputs.forEach(inp => {
-        const td = inp.closest('td');
-        if (inp.value.toLowerCase().includes(term)) {
-            td.style.display = '';
-        } else {
-            td.style.display = term ? 'none' : '';
-        }
-    });
-};
-
-$('closeAttrTableBtn').onclick = () => {
-    $('popup-attribute-table').classList.remove('open');
-    currentTableFeatureId = null;
-};
 
 // ----------------- Direct Export Engine -----------------
 $('btn-export-direct').onclick = () => {
     hint('Exporting high-quality snapshot...');
     map.once('render', () => {
         try {
-            const srcCanvas = map.getCanvas();
-            const a = document.createElement('a');
-            a.download = `Project_Atlas_${Date.now()}.png`;
-            a.href = srcCanvas.toDataURL('image/png', 0.98);
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            hint('Export complete!');
-        } catch(e) {
-            hint('Export failed.');
-        }
-    });
-    map.triggerRepaint();
+            const srcCanvas = map.getCanvas(), a = document.createElement('a'); a.download = `Project_Atlas_${Date.now()}.png`;
+            a.href = srcCanvas.toDataURL('image/png', 0.98); document.body.appendChild(a); a.click(); document.body.removeChild(a); hint('Export complete!');
+        } catch(e) { hint('Export failed.'); }
+    }); map.triggerRepaint();
 };
 
 // ----------------- UI Panel Toggles -----------------
-$('btn-browser-toggle').onclick = () => {
-    const p = $('browser-panel');
-    const willOpen = !p.classList.contains('open');
-    closeFloatingCards();
-    if (willOpen) p.classList.add('open');
-};
+$('btn-browser-toggle').onclick = () => { const p = $('browser-panel'); const willOpen = !p.classList.contains('open'); closeFloatingCards(); if (willOpen) p.classList.add('open'); };
 $('btn-close-browser').onclick = () => { $('browser-panel').classList.remove('open'); };
-
-$('btn-mylayers-toggle').onclick = () => {
-    const p = $('mylayers-panel');
-    const willOpen = !p.classList.contains('open');
-    closeFloatingCards();
-    if (willOpen) p.classList.add('open');
-};
+$('btn-mylayers-toggle').onclick = () => { const p = $('mylayers-panel'); const willOpen = !p.classList.contains('open'); closeFloatingCards(); if (willOpen) p.classList.add('open'); };
 $('btn-close-mylayers').onclick = () => { $('mylayers-panel').classList.remove('open'); };
-
-document.querySelectorAll('.acc-header').forEach(h => {
-    h.onclick = () => {
-        const body = $(h.dataset.target);
-        if (body) {
-            body.classList.toggle('hidden');
-            const chev = h.querySelector('span:last-child');
-            if (chev) chev.textContent = body.classList.contains('hidden') ? '▸' : '▾';
-        }
-    };
-});
-
-document.querySelectorAll('#browser-panel input[data-g]').forEach(cb => {
-    cb.onchange = () => {
-        vis[cb.dataset.g] = cb.checked;
-        applyVis();
-        markDirty();
-    };
-});
-
-$('btn-custom-map').onclick = () => {
-    const p = $('popup-custom-map');
-    const willOpen = !p.classList.contains('open');
-    closeFloatingCards();
-    if (willOpen) p.classList.add('open');
-};
+document.querySelectorAll('.acc-header').forEach(h => { h.onclick = () => { const body = $(h.dataset.target); if (body) { body.classList.toggle('hidden'); const chev = h.querySelector('span:last-child'); if (chev) chev.textContent = body.classList.contains('hidden') ? '▸' : '▾'; } }; });
+document.querySelectorAll('#browser-panel input[data-g]').forEach(cb => { cb.onchange = () => { vis[cb.dataset.g] = cb.checked; applyVis(); markDirty(); }; });
+$('btn-custom-map').onclick = () => { const p = $('popup-custom-map'); const willOpen = !p.classList.contains('open'); closeFloatingCards(); if (willOpen) p.classList.add('open'); };
 $('closeCustomMapBtn').onclick = () => { $('popup-custom-map').classList.remove('open'); };
-
-$('presetBtnList').innerHTML = Object.keys(ALL_STYLES).map(n =>
-    `<button style="border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#adbac7; border-radius:6px; padding:5px 8px; font-size:11px; cursor:pointer;" data-n="${n}">${n}</button>`
-).join('');
-
-$('presetBtnList').querySelectorAll('button').forEach(b => {
-    b.onclick = () => {
-        currentStyleName = b.dataset.n;
-        map.setStyle(ALL_STYLES[currentStyleName]);
-        map.once('idle', () => { addDrawStack(); applyVis(); });
-        markDirty();
-    };
-});
+$('presetBtnList').innerHTML = Object.keys(ALL_STYLES).map(n => `<button style="border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#adbac7; border-radius:6px; padding:5px 8px; font-size:11px; cursor:pointer;" data-n="${n}">${n}</button>`).join('');
+$('presetBtnList').querySelectorAll('button').forEach(b => { b.onclick = () => { currentStyleName = b.dataset.n; map.setStyle(ALL_STYLES[currentStyleName]); map.once('idle', () => { addDrawStack(); applyVis(); }); markDirty(); }; });
 
 const setMapPaint = (id, prop, val) => { if (map.getLayer(id)) map.setPaintProperty(id, prop, val); };
 $('cBgColor').oninput = e => { setMapPaint('bg', 'background-color', e.target.value); markDirty(); };
@@ -3680,93 +2837,57 @@ $('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFlo
 $('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
+document.querySelectorAll('.preset-color').forEach(b => {
+    b.onclick = () => {
+        const c = b.dataset.c;
+        const f = features.find(x => x.id === selectedId);
+        if(f && f.kind === 'route') { f.props.borderColor = c; f.props.color = c; syncDraw(); commitState(); }
+    };
+});
+
 // ----------------- Import -----------------
-$('btn-import').onclick = () => {
-    $('importFileInput').click();
-};
+$('btn-import').onclick = () => { $('importFileInput').click(); };
 $('importFileInput').onchange = async function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const ext = file.name.split('.').pop().toLowerCase();
-    hint(`Importing ${file.name}…`);
+    const file = e.target.files[0]; if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase(); hint(`Importing ${file.name}…`);
     try {
         if (ext === 'geojson' || ext === 'json') {
-            const text = await file.text();
-            const data = JSON.parse(text);
-            const geojson = data.type === 'FeatureCollection' ? data : { type: 'FeatureCollection', features: [data] };
-            processGeoJSON(geojson);
+            const text = await file.text(), data = JSON.parse(text);
+            processGeoJSON(data.type === 'FeatureCollection' ? data : { type: 'FeatureCollection', features: [data] });
         } else if (ext === 'kml') {
-            const text = await file.text();
-            const kml = new DOMParser().parseFromString(text, 'application/xml');
-            const geojson = toGeoJSON.kml(kml);
-            processGeoJSON(geojson);
+            const text = await file.text(), kml = new DOMParser().parseFromString(text, 'application/xml');
+            processGeoJSON(toGeoJSON.kml(kml));
         } else if (ext === 'kmz') {
-            const arrayBuffer = await file.arrayBuffer();
-            const zip = await JSZip.loadAsync(arrayBuffer);
+            const arrayBuffer = await file.arrayBuffer(), zip = await JSZip.loadAsync(arrayBuffer);
             const kmlFile = Object.keys(zip.files).find(name => name.endsWith('.kml'));
             if (!kmlFile) throw new Error('No KML found in KMZ');
-            const kmlText = await zip.file(kmlFile).async('string');
-            const kml = new DOMParser().parseFromString(kmlText, 'application/xml');
-            const geojson = toGeoJSON.kml(kml);
-            processGeoJSON(geojson);
+            const kmlText = await zip.file(kmlFile).async('string'), kml = new DOMParser().parseFromString(kmlText, 'application/xml');
+            processGeoJSON(toGeoJSON.kml(kml));
         } else if (ext === 'zip') {
-            const arrayBuffer = await file.arrayBuffer();
-            const geojson = await shp(arrayBuffer);
-            processGeoJSON(geojson);
-        }
-        hint('Import successful');
-    } catch(err) {
-        hint('Import failed: ' + err.message);
-    }
+            const arrayBuffer = await file.arrayBuffer(); processGeoJSON(await shp(arrayBuffer));
+        } hint('Import successful'); commitState();
+    } catch(err) { hint('Import failed: ' + err.message); }
 };
 
 function processGeoJSON(geojson) {
     const feats = geojson.features || [];
     feats.forEach(f => {
-        if (!f.geometry) return;
-        const geom = f.geometry;
-        const props = f.properties || {};
+        if (!f.geometry) return; const geom = f.geometry;
         if (geom.type === 'Point') {
-            addFeatureRecord('marker', geom, {
-                shape: 'pin',
-                color: '#003366',
-                iconSize: 0.9,
-                iconKey: getIconKey('pin', '#003366'),
-                osmTags: props
-            });
+            addFeatureRecord('marker', geom, { shape: 'pin', color: '#003366', iconSize: 0.9, iconKey: getIconKey('pin', '#003366'), osmTags: f.properties || {} });
         } else if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
-            // Check if it's a route
-            if (props.route_mode) {
-                addFeatureRecord('route', geom, {
-                    routeMode: props.route_mode,
-                    description: props.description || '',
-                    color: props.color || '#38bdf8',
-                    borderColor: props.color || '#38bdf8'
-                });
-            } else {
-                addFeatureRecord('polyline', geom, {});
-            }
+            if(f.properties && f.properties.route_mode) addFeatureRecord('route', geom, {routeMode: f.properties.route_mode, description: f.properties.description});
+            else addFeatureRecord('polyline', geom, {});
         } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-            // Check if it's a 3D polygon
-            if (props.height || props.extrude) {
-                addFeatureRecord('polygon3d', geom, {
-                    height: props.height || 50,
-                    extrusionColor: props.extrusionColor || '#e8b84a',
-                    fillOpacity: props.fillOpacity || 0.7
-                });
-            } else {
-                addFeatureRecord('polygon', geom, {});
-            }
+            if(f.properties && (f.properties.height || f.properties.extrude)) addFeatureRecord('polygon3d', geom, {height: f.properties.height||50});
+            else addFeatureRecord('polygon', geom, {});
         }
     });
 }
 
-map.on('moveend', () => markDirty());
 map.on('error', e => console.warn('Map Notice:', e));
 
-} catch (e) {
-    console.error('App init error:', e);
-}
+} catch (e) { console.error('App init error:', e); }
 </script>
 </body>
 </html>"""
