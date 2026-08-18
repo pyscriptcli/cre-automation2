@@ -10,6 +10,10 @@ Loading State: Show "Calculating route…" toast during OSRM fetch.
 Error Handling: If routing fails, show red dashed line + tooltip "Routing unavailable – straight line shown".
 Cursor: Crosshair when route tool active; grab cursor when dragging vertices.
 Keyboard: Enter finishes route; Escape cancels draft; Delete removes selected waypoint in edit mode.
+Cursor: Crosshair when 3D polygon tool active; grab cursor when dragging vertices.
+Hint Toast: "Click vertices · Click origin to save · Set height in panel" during draw.
+Keyboard: Enter finishes 3D polygon; Escape cancels draft.
+Performance: Limit max 3D polygons to 50 visible simultaneously (toggle visibility beyond limit) to maintain 60FPS.
 
 PYTHON / STREAMLIT BACKEND
 1. Page Config: Wide layout, collapsed sidebar, custom CSS injection (Century Gothic font, hidden Streamlit chrome).
@@ -23,6 +27,8 @@ PYTHON / STREAMLIT BACKEND
 9. add a undo and redo button beside save button
 10.  No Backend Changes Required: All routing logic remains client-side via JavaScript fetch() to keep the stack free and serverless.
 Persistence Support: Ensure route features saved to Supabase include a props.routeMode (driving/walking/cycling) and props.metadata (distance/duration) so they reload correctly with their calculated stats.
+11. No Backend Changes Required: All search animations and 3D geometry logic remain client-side via JavaScript.
+State Persistence: Ensure 3D polygon features saved to Supabase include props.height (meters) and props.extrusionColor so they reload with correct elevation.
 
 
 TOP TOOLBAR (HTML/JS)
@@ -43,6 +49,15 @@ Route Settings Card:
 Mode Selector: Dropdown or segmented buttons for Driving, Walking, Cycling. Default: Driving.
 Auto-Finish Toggle: Checkbox "Auto-finish on double-click".
 Style Presets: Quick color swatches for route lines (Blue, Green, Red, Purple).
+13. 3D Polygon Tool: Add new tool button data-tool="polygon3d" between existing polygon and rectangle tools.
+Icon: Extruded cube SVG (<path d="M12 3l8 4v10l-8 4-8-4V7z M12 3v14 M20 7l-8 4 M4 7l8 4"/>).
+Tooltip: "Draw 3D Polygon".
+3D Settings Popup: Create #popup-polygon3d-settings floating card (width: 280px).
+Height Input: Number input (min: 1, max: 500, step: 1, default: 50) labeled "Extrusion Height (m)".
+Color Picker: Color input for extrusion face color (default: #e8b84a).
+Opacity Slider: Range 0.1–1.0 (default: 0.7) for fill opacity.
+Auto-Close Toggle: Checkbox "Close popup after draw" (checked by default).
+
 
 
 DATA BROWSER PANEL (LEFT)
@@ -57,7 +72,7 @@ DATA BROWSER PANEL (LEFT)
 
 
 MY LAYERS PANEL (LEFT)
-1. Layer Groups Header: Buttons to Add Group, select all, Hide/Unhide Selected, and Badge Count.
+1. Layer Groups Header: Buttons to Add Group, select all/unselect all, Hide/Unhide Selected, and Badge Count.
 2. Layer List: Dynamic list of all drawn features.
 3. Group Containers: Collapsible containers for grouped layers with Rename, Eye (toggle), and Delete controls.
 4. Layer Cards: Draggable cards for each feature with Checkbox (select), Name Input, Edit, Eye, Zoom, and Delete buttons.
@@ -82,7 +97,7 @@ FLOATING POPUPS & MODALS
 7. Project Launcher Modal: Segmented control (Existing vs New), List of existing projects (Load/Rename/Delete), Create New form.
 8. Context Menu (Right Click show icons only): Edit, Duplicate, Delete, Copy Coordinates, Open in Google Maps, open in streetview.
 9. Attribute Table Modal: Create a new floating card #popup-attribute-table (width: 600px, max-height: 70vh).
-Header: Displays "Attributes: [Feature Name]" with a Close (X) button.
+Header: Displays "Attributes: [Feature Name]" with a Close (X) button. (add feature to add column and add row and change the data type for each column, if there is an image make an option to make it a thumbnail in the popup)
 Toolbar: Contains a "Find in table" search input (filters rows by value) and a "+ Add Column" button.
 Table Grid: A scrollable HTML table with sticky headers.
 Columns: Dynamic columns based on feature attributes. Default columns: name (Text), description (Text).
@@ -123,6 +138,11 @@ Search Logic: The "Find in table" input should perform a case-insensitive filter
 Label Integration: Route labels automatically display {distance} · {duration} using existing syncLabels() function. Position defaults to center of bounds.
 Pulse Animation: When zooming to a route feature, pulse animation centers on midpoint of route geometry.
 Import Compatibility: Imported GeoJSON LineStrings with properties.route_mode should be recognized as editable routes.
+23. State Extension: Add current3DPolyHeight (default: 50), current3DPolyColor (default: #e8b84a), current3DPolyOpacity (default: 0.7) to global state.
+Label Integration: 3D polygon labels display at roof centroid (base centroid + height offset in screen space). Use existing syncLabels() with adjusted anchor.
+Bounds Calculation: calcBounds() for 3D polygons ignores height (uses base footprint only) for fitBounds/zoom operations.
+Import Compatibility: Imported GeoJSON Polygons with properties.height or properties.extrude automatically recognized as polygon3d kind during processGeoJSON().
+
 
 
 DRAWING & INTERACTION LOGIC (JAVASCRIPT)
@@ -153,4 +173,32 @@ Stats Display: Read-only text showing current Distance & Duration.
 Recalculate Button: Manual trigger to refetch route (useful if API was temporarily down).
 Waypoint List: Collapsible list showing all waypoint coordinates with "Remove" button per point.
 Standard Styling: Reuse existing border color/width/opacity controls for route line styling.
+3D Polygon Draw Logic: Reuse existing polygon vertex-click logic but store additional props:
+On finalize: Create feature with kind polygon3d.
+Store f.props.height, f.props.extrusionColor, f.props.fillOpacity from settings popup.
+Default name: 3D Polygon {id}.
+MapLibre 3D Layer Pipeline: Extend addDrawStack() to handle polygon3d kind:
+Fill-Extrusion Layer: Add layer draw-3d-extrusion with filter ['==', ['get', 'kind'], 'polygon3d'].
+Paint: fill-extrusion-color: ['get', 'extrusionColor'], fill-extrusion-height: ['get', 'height'], fill-extrusion-base: 0, fill-extrusion-opacity: ['get', 'fillOpacity'].
+Roof Outline Layer: Add draw-3d-roof line layer on top of extrusion for edge definition (color: white, width: 1px, opacity: 0.5).
+Z-Ordering: Ensure 3D layers render above 2D fills but below labels/pulse.
+Edit Mode Compatibility: 3D polygons use same vertex handles as 2D polygons. Dragging vertices updates base geometry; height/color edited via Shape Editor.
+
+
+SHAPE EDITOR POPUP (RIGHT PANEL)
+3D-Specific Controls: When editing polygon3d kind:
+Show height number input (synced with f.props.height).
+Show extrusionColor color picker.
+Show fillOpacity slider.
+Hide standard fillColor/fillOpacity rows (replaced by extrusion props).
+Live Preview: Changing height/color in editor triggers immediate syncDraw() update to 3D layer paint properties.
+
+
+
+SEARCH POPUP & INTERACTION LOGIC (JAVASCRIPT)
+Search Result Selection: Update renderSearchResults() click handler in Nominatim search.
+Temporary Marker: Before flying to location, add a temporary marker to a dedicated search-temp source at [lon, lat] with shape pin, color #38bdf8, size 1.2. Auto-remove after 5 seconds or on next search.
+Pulse Animation: Trigger existing pulseFeature() function centered on search result coordinates immediately upon selection. Duration: 1600ms.
+FlyTo Integration: Chain animation: Pulse starts → map.flyTo({center, zoom: 15, duration: 1500}) → Temporary marker fades out after fly completes.
+Visual Feedback: Add subtle scale-up animation to temporary marker during pulse (scale 1.0 → 1.3 → 1.0 over 800ms).
 
