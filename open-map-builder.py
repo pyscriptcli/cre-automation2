@@ -23,7 +23,6 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
         "https://overpass.openstreetmap.fr/api/interpreter"
     ]
     
-    # Build Overpass QL query
     statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
     ql = f"[out:json][timeout:{timeout}];(\n{statements}\n);\nout center;"
     
@@ -41,7 +40,6 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
                 if not data or 'elements' not in data:
                     raise ValueError("Malformed JSON response")
                 
-                # Parse successful response
                 results = []
                 for el in data['elements']:
                     el_lat = el.get('lat') or (el.get('center', {}).get('lat'))
@@ -69,7 +67,6 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
                 time.sleep(delay + jitter)
                 delay *= 2
                 
-    # Fallback to OSMnx
     logging.info("All Overpass endpoints failed. Falling back to OSMnx...")
     try:
         import osmnx as ox
@@ -437,7 +434,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .save-badge { font-size: 9px; padding: 2px 7px; border-radius: 12px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: #8b949e; border: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 4px; }
 .save-badge.saving { color: #d9b451; border-color: rgba(217, 180, 81, 0.4); }
 .save-badge.saved { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); }
-.save-badge.unsaved { color: #f85149; border-color: rgba(248, 81, 73, 0.4); }
 .left-panel {
     position: fixed; top: 68px; left: 16px; bottom: 16px; width: 360px; z-index: 999;
     background-color: rgba(9, 16, 24, 0.97);
@@ -513,23 +509,15 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .right-card { right: 16px; left: auto; transform: none; width: 320px; }
 .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
-.float-card input[type=color] {
-    -webkit-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    width: 22px; height: 22px; border-radius: 4px; cursor: pointer; background: transparent; padding: 0;
-}
-.float-card input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
-.float-card input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
-.float-card input[type=text], .float-card select, .float-card input[type=number] { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
-.float-card input[type=text]:focus, .float-card select:focus, .float-card input[type=number]:focus { border-color: #38bdf8; }
+.float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
+.float-card input[type=text]:focus { border-color: #38bdf8; }
 #popup-search { width: 340px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
 #popup-marker-settings { width: 250px; }
 #popup-text-settings { width: 260px; }
-#popup-shape-editor { width: 320px; }
+#popup-shape-editor { width: 330px; }
 #popup-custom-map { width: 310px; }
 #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
 #popup-route-settings { width: 260px; }
-#popup-polygon3d-settings { width: 280px; }
 #popup-attribute-table { width: 600px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
 .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
@@ -551,7 +539,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 7px 18px;
     font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none; font-weight:600;
 }
-/* Right-click context menu */
 #map-context-menu {
     position: absolute; z-index: 3000; display: none; min-width: 200px;
     background: rgba(9, 16, 24, 0.98); border: 1px solid rgba(255, 255, 255, 0.15);
@@ -622,31 +609,48 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 .search-wrapper input {
-    flex: 1; border: none; outline: none; font-size: 13px; color: #202124;
+    flex: 1; border: none; outline: none; font-size: 14px; color: #202124;
     background: transparent; padding: 6px 0;
 }
-.search-wrapper svg { stroke: #5f6368; width: 18px; height: 18px; }
+.search-wrapper svg { stroke: #5f6368; width: 20px; height: 20px; }
 .search-results {
     background: #fff; border-radius: 8px; margin-top: 4px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.3); overflow: hidden;
 }
 .search-result-item {
-    padding: 10px 14px; cursor: pointer; font-size: 12px; color: #202124;
+    padding: 10px 14px; cursor: pointer; font-size: 13px; color: #202124;
     display: flex; align-items: center; gap: 10px;
 }
 .search-result-item:hover { background: #f1f3f4; }
-.search-result-icon { width: 18px; height: 18px; flex-shrink: 0; color: #5f6368; }
-.color-swatch-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
-.color-swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.15s; }
-.color-swatch:hover, .color-swatch.active { border-color: #ffffff; transform: scale(1.1); }
+.search-result-icon { width: 20px; height: 20px; flex-shrink: 0; color: #5f6368; }
+.trade-area-poi-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.trade-area-poi-row label { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; }
+.custom-query-collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; color: #f0f6fc; font-size: 12px; margin-top: 8px;}
+
 /* Attribute Table Styles */
 .attr-table-container { width: 100%; overflow-x: auto; overflow-y: auto; max-height: 50vh; }
-.attr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.attr-table th { position: sticky; top: 0; background: #0f172a; color: #f0f6fc; padding: 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 10; white-space: nowrap; }
+.attr-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
+.attr-table th { position: sticky; top: 0; background: #0f172a; color: #f0f6fc; padding: 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 10; font-size: 11px; }
 .attr-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
-.attr-table input[type="text"] { width: 100%; min-width: 100px; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #f0f6fc; padding: 4px; border-radius: 4px; }
+.attr-table input[type="text"] { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #f0f6fc; padding: 4px 6px; border-radius: 4px; }
 .attr-table input[type="text"]:focus { border-color: #38bdf8; outline: none; }
-.attr-img-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; display: block; }
+.attr-img-preview { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: block; }
+.attr-img-placeholder { width: 70px; height: 70px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 10px; color: #adbac7; cursor: pointer; text-align: center; }
+
+/* Color picker full control styles */
+.color-ctrl-cluster { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.swatch-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.swatch { width: 16px; height: 16px; border-radius: 3px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); }
+.color-input-combo { display: flex; align-items: center; gap: 4px; }
+.color-input-combo input[type=color] {
+    -webkit-appearance: none; border: 1px solid rgba(255, 255, 255, 0.15);
+    width: 24px; height: 24px; border-radius: 4px; cursor: pointer; background: transparent; padding: 0;
+}
+.color-input-combo input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
+.color-input-combo input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
+.color-input-combo input[type=text] { width: 70px; font-family: monospace; font-size: 11px; padding: 3px 5px; }
+.btn-eyedropper { width: 24px; height: 24px; display: grid; place-items: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #adbac7; cursor: pointer; padding: 0; }
+.btn-eyedropper:hover { color: #fff; background: rgba(255,255,255,0.2); }
 </style>
 </head>
 <body>
@@ -686,9 +690,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <button class="tb-btn tool" data-tool="polygon" title="Draw Polygon">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path></svg>
     </button>
-    <button class="tb-btn tool" data-tool="polygon3d" title="Draw 3D Polygon">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v10l-8 4-8-4V7z M12 3v14 M20 7l-8 4 M4 7l8 4"/></svg>
-    </button>
     <button class="tb-btn tool" data-tool="rectangle" title="Draw Rectangle">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"></rect></svg>
     </button>
@@ -708,7 +709,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
     </button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" id="btn-edit-mode" title="Select, Drag & Edit Vertices">
+    <button class="tb-btn" id="btn-edit-mode" title="Select, Drag, Rotate & Edit Vertices">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
     </button>
     <div class="tb-sep"></div>
@@ -756,7 +757,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             </div>
             <div class="acc-body hidden" id="body-labels">
                 <label class="layer-row"> <span>City</span> <input type="checkbox" data-g="label_city" checked></label>
-                <label class="layer-row"> <span>Brgy</span> <input type="checkbox" data-g="label_brgy" checked></label>
+                <label class="layer-row"> <span>Barangay</span> <input type="checkbox" data-g="label_brgy" checked></label>
                 <label class="layer-row"> <span>Street</span> <input type="checkbox" data-g="label_street" checked></label>
                 <label class="layer-row"> <span>POI Icons</span> <input type="checkbox" data-g="poi_icons" checked></label>
                 <label class="layer-row"> <span>POI Labels</span> <input type="checkbox" data-g="poi_labels" checked></label>
@@ -799,10 +800,10 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <div class="acc-body hidden" id="body-boundaries">
                 <label class="layer-row"> <span>All Provinces</span> <input type="checkbox" data-g="bound_prov"></label>
                 <label class="layer-row"> <span>All Cities</span> <input type="checkbox" data-g="bound_city"></label>
-                <label class="layer-row"> <span>All Brgys</span> <input type="checkbox" data-g="bound_brgy"></label>
-                <div style="font-weight:600; font-size:11px; color:#f0f6fc; margin-top:4px;">Highlight City Boundary</div>
+                <label class="layer-row"> <span>All Barangays</span> <input type="checkbox" data-g="bound_brgy"></label>
+                <div style="font-weight:600; font-size:11px; color:#f0f6fc; margin-top:4px;">Highlight Administrative Boundary</div>
                 <div class="bound-select-row">
-                    <input type="text" id="boundarySearchInput" placeholder="Search for a boundary..." autocomplete="off"/>
+                    <input type="text" id="boundarySearchInput" placeholder="Search province, city, barangay..." autocomplete="off"/>
                     <div class="autocomplete-list" id="boundaryAutocompleteList"></div>
                 </div>
             </div>
@@ -823,18 +824,21 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="panel-content">
         <div class="layers-heading">
             <span>Layer Groups</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-                <button id="btnAddCustomGroup" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">+ GROUP</button>
-                <button id="btnHideSelected" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">Hide/Unhide</button>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <button class="icon-action-btn" id="btnSelectAllGlobal" title="Select / Deselect All Layers">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                </button>
+                <button id="btnAddCustomGroup" class="trade-btn" style="padding:2px 6px; font-size:10px;">+ GROUP</button>
+                <button id="btnHideSelected" class="trade-btn" style="padding:2px 6px; font-size:10px; background:#22272e; border:1px solid #2d333b; color:#adbac7;">Hide/Unhide</button>
                 <span class="badge-count" id="layer-badge-count">0</span>
             </div>
         </div>
-        <div style="font-size:10px; color:#768390;">Tip: drag a layer card onto a group header to add it to that group.</div>
+        <div style="font-size:10px; color:#768390;">Drag cards to reorder or drop onto group headers.</div>
         <div id="my-layers-list"></div>
     </div>
 </div>
 
-<!-- Right side tool popups -->
+<!-- Floating popups & modals -->
 <div id="popup-search" class="float-card">
     <div class="search-wrapper">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
@@ -851,7 +855,10 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <label class="file-input-label" for="customMarkerFileInput">Upload (max 5MB)</label>
         <input type="file" id="customMarkerFileInput" accept="image/*" style="display:none;"/>
     </div>
-    <div class="f-row"> <span>Icon Color</span> <input type="color" id="mColor" value="#003366"></div>
+    <div class="f-row" style="flex-direction:column; align-items:stretch;">
+        <span style="font-size:11px; margin-bottom:2px;">Icon Color</span>
+        <div id="mColorCtrl" class="color-ctrl-cluster"></div>
+    </div>
     <div class="f-row"> <span>Icon Size</span> <input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"></div>
 </div>
 
@@ -867,55 +874,68 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         </select>
     </div>
     <div class="f-row"> <span>Font Size</span> <input type="range" id="tSize" min="10" max="42" step="1" value="16"></div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="tColor" value="#d9b451"></div>
+    <div class="f-row" style="flex-direction:column; align-items:stretch;">
+        <span style="font-size:11px; margin-bottom:2px;">Color</span>
+        <div id="tColorCtrl" class="color-ctrl-cluster"></div>
+    </div>
     <div class="f-row"> <span>Opacity</span> <input type="range" id="tOp" min="0.1" max="1" step="0.05" value="1"></div>
 </div>
 
 <div id="popup-route-settings" class="float-card right-card">
-    <div style="font-weight:600; font-size:11px; color:#768390;">ROUTE SETTINGS</div>
-    <div class="f-row"><span>Mode</span>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:700; color:#f0f6fc;">Route (OSRM)</span>
+        <button class="card-btn" id="closeRouteSettingsBtn">✕</button>
+    </div>
+    <div class="f-row"><span>Mode Selector</span>
         <select id="rProfile" style="width:130px;">
             <option value="driving" selected>Driving</option>
             <option value="walking">Walking</option>
             <option value="cycling">Cycling</option>
         </select>
     </div>
-    <div class="f-row">
-        <span>Auto-finish on double click</span>
-        <input type="checkbox" id="rAutoFinish" checked style="accent-color:#316dca; cursor:pointer;">
+    <div class="f-row"><span>Auto-Finish Toggle</span>
+        <label style="display:flex; align-items:center; gap:4px; font-size:11px; cursor:pointer;">
+            <input type="checkbox" id="rAutoFinish" checked style="accent-color:#316dca;"/> On double-click
+        </label>
     </div>
-    <div class="f-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
-        <span>Style Preset:</span>
-        <div class="color-swatch-row">
-            <div class="color-swatch active" data-color="#38bdf8" style="background:#38bdf8;" title="Blue"></div>
-            <div class="color-swatch" data-color="#3fb950" style="background:#3fb950;" title="Green"></div>
-            <div class="color-swatch" data-color="#f85149" style="background:#f85149;" title="Red"></div>
-            <div class="color-swatch" data-color="#a371f7" style="background:#a371f7;" title="Purple"></div>
-            <input type="color" id="rCustomColor" value="#38bdf8" style="margin-left:4px;">
-        </div>
+    <div style="font-weight:600; font-size:11px; color:#768390; margin-top:2px;">STYLE PRESETS</div>
+    <div style="display:flex; gap:6px; margin-top:2px;">
+        <button class="swatch" data-rcol="#38bdf8" style="background:#38bdf8; width:28px; height:24px; border-radius:4px;"></button>
+        <button class="swatch" data-rcol="#3fb950" style="background:#3fb950; width:28px; height:24px; border-radius:4px;"></button>
+        <button class="swatch" data-rcol="#f85149" style="background:#f85149; width:28px; height:24px; border-radius:4px;"></button>
+        <button class="swatch" data-rcol="#a371f7" style="background:#a371f7; width:28px; height:24px; border-radius:4px;"></button>
     </div>
-</div>
-
-<div id="popup-polygon3d-settings" class="float-card right-card">
-    <div style="font-weight:600; font-size:11px; color:#768390;">3D POLYGON SETTINGS</div>
-    <div class="f-row"> <span>Height (1-500m)</span> <input type="number" id="p3dHeight" min="1" max="500" step="1" value="50" style="width:90px;"></div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="p3dColor" value="#e8b84a"></div>
-    <div class="f-row"> <span>Opacity</span> <input type="range" id="p3dOpacity" min="0.1" max="1.0" step="0.05" value="0.7"></div>
-    <div class="f-row"> <span>Close popup after draw</span> <input type="checkbox" id="p3dAutoClose" checked style="accent-color:#316dca; cursor:pointer;"></div>
+    <button id="btnStartRouteDraw" class="trade-btn" style="margin-top:6px; font-size:11px;">Start Drawing Route</button>
 </div>
 
 <div id="popup-shape-editor" class="float-card right-card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:700; color:#f0f6fc;" id="editShapeTitle">Edit Layer</span>
+        <span style="font-weight:700; color:#f0f6fc;" id="editShapeTitle">Edit Feature</span>
         <button class="card-btn" id="closeEditorBtn">✕</button>
     </div>
     <div class="f-row"> <span>Name</span> <input type="text" id="eName" style="width:140px;"></div>
-    <div class="f-row" id="eBorderColorRow"> <span>Border Color</span> <input type="color" id="eBorderColor"></div>
+    <div class="f-row" id="eRotationRow">
+        <span style="display:flex; align-items:center; gap:4px;">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            Rotation (°)
+        </span>
+        <div style="display:flex; align-items:center; gap:4px;">
+            <input type="number" id="eRotationVal" min="0" max="360" step="5" value="0" style="width:65px; padding:4px;">
+            <button class="icon-action-btn" id="btnRotateQuarter" title="Rotate 90°">⟳</button>
+        </div>
+    </div>
+    <div id="eBorderColorRowContainer" class="f-row" style="flex-direction:column; align-items:stretch;">
+        <span style="font-size:11px; margin-bottom:2px;">Border Color</span>
+        <div id="eBorderColorCtrl" class="color-ctrl-cluster"></div>
+    </div>
     <div class="f-row" id="eBorderOpRow"> <span>Border Opacity</span> <input type="range" id="eBorderOp" min="0" max="1" step="0.05"></div>
     <div class="f-row" id="eWidthRow"> <span>Border Width</span> <input type="range" id="eWidth" min="1" max="16" step="1"></div>
-    <div class="f-row" id="eFillColorRow"> <span>Fill Color</span> <input type="color" id="eFillColor"></div>
+    <div id="eFillColorRowContainer" class="f-row" style="flex-direction:column; align-items:stretch;">
+        <span style="font-size:11px; margin-bottom:2px;">Fill Color</span>
+        <div id="eFillColorCtrl" class="color-ctrl-cluster"></div>
+    </div>
     <div class="f-row" id="eFillOpRow"> <span>Fill Opacity</span> <input type="range" id="eFillOp" min="0" max="1" step="0.05"></div>
-    <div class="f-row" id="eLabelToggleRow" style="display:none;"> <span>Show Label</span> <input type="checkbox" id="eShowLabel" style="accent-color:#316dca;"></div>
+    <div class="f-row" id="eLabelToggleRow" style="display:none;"> <span>Show Label</span> <input type="checkbox" id="eShowLabel"></div>
     <div class="f-row" id="eLabelPosRow" style="display:none;"> <span>Label Position</span>
         <select id="eLabelPos" style="width:110px;">
             <option value="center">Center</option>
@@ -930,28 +950,21 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="f-row" id="eFontSizeRow" style="display:none;"> <span>Font Size</span> <input type="range" id="eFontSize" min="10" max="42" step="1"></div>
     
     <!-- Route Specific Controls -->
-    <div id="routeEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
-        <div class="f-row"> <span>Mode</span>
+    <div id="routeEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:8px; padding-top:8px;">
+        <div class="f-row"> <span>Route Mode</span>
             <select id="eRouteMode" style="width:110px;">
                 <option value="driving">Driving</option>
                 <option value="walking">Walking</option>
                 <option value="cycling">Cycling</option>
             </select>
         </div>
-        <div class="f-row" style="margin-top:4px;"> <span>Stats</span> <span id="eRouteStats" style="font-size:11px; color:#38bdf8; font-weight:600;">-</span></div>
+        <div class="f-row" style="margin-top:4px;"> <span>Stats</span> <span id="eRouteStats" style="font-size:11px; font-weight:700; color:#38bdf8;">-</span></div>
+        <div style="font-weight:600; font-size:10px; color:#768390; margin-top:6px;">WAYPOINTS</div>
+        <div id="eWaypointList" style="max-height:90px; overflow-y:auto; display:flex; flex-direction:column; gap:3px; margin-top:2px;"></div>
         <button id="eRecalcRoute" class="trade-btn" style="width:100%; margin-top:6px; font-size:10px;">Recalculate Route</button>
-        <div style="font-size:10px; color:#768390; margin-top:6px; font-weight:700;">WAYPOINTS</div>
-        <div id="eRouteWaypointsList" style="max-height:90px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
     </div>
 
-    <!-- 3D Polygon Specific Controls -->
-    <div id="p3dEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
-        <div class="f-row"> <span>Height (m)</span> <input type="number" id="eP3dHeight" min="1" max="500" step="1" style="width:90px;"></div>
-        <div class="f-row"> <span>Extrusion Color</span> <input type="color" id="eP3dColor"></div>
-        <div class="f-row"> <span>Fill Opacity</span> <input type="range" id="eP3dOpacity" min="0.1" max="1.0" step="0.05"></div>
-    </div>
-
-    <div style="display:flex; justify-content:space-between; margin-top:6px;">
+    <div style="display:flex; justify-content:space-between; margin-top:8px;">
         <button id="eDeleteBtn" style="color:#f85149; border:1px solid #da36334d; background:#da36331a; padding:6px 12px; border-radius:6px; cursor:pointer;">Delete</button>
         <button id="eDoneBtn" style="background:#316dca; color:#fff; border:none; padding:6px 16px; border-radius:6px; cursor:pointer;">Done</button>
     </div>
@@ -965,30 +978,30 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:4px;">BASEMAP PRESETS</div>
     <div style="display:flex; flex-wrap:wrap; gap:4px;" id="presetBtnList"></div>
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BACKGROUND</div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="cBgColor" value="#0a1628"></div>
+    <div id="cBgColorCtrl" class="color-ctrl-cluster"></div>
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">EXPRESS WAYS</div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="cExpColor" value="#ffaa00"></div>
+    <div id="cExpColorCtrl" class="color-ctrl-cluster"></div>
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">MAIN ROADS</div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="cMainColor" value="#e8b84a"></div>
+    <div id="cMainColorCtrl" class="color-ctrl-cluster"></div>
     <div class="f-row"> <span>Thickness</span> <input type="range" id="cMainWidth" min="1" max="10" step="0.5" value="3.8"></div>
     <div class="f-row"> <span>Opacity</span> <input type="range" id="cMainOp" min="0" max="1" step="0.1" value="1"></div>
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">SECONDARY ROADS</div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="cSecColor" value="#c99c37"></div>
+    <div id="cSecColorCtrl" class="color-ctrl-cluster"></div>
     <div class="f-row"> <span>Thickness</span> <input type="range" id="cSecWidth" min="0.5" max="8" step="0.5" value="2.8"></div>
     <div class="f-row"> <span>Opacity</span> <input type="range" id="cSecOp" min="0" max="1" step="0.1" value="0.8"></div>
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">TERTIARY ROADS</div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="cTerColor" value="#7d5f14"></div>
+    <div id="cTerColorCtrl" class="color-ctrl-cluster"></div>
     <div class="f-row"> <span>Thickness</span> <input type="range" id="cTerWidth" min="0.5" max="6" step="0.5" value="2.0"></div>
     <div class="f-row"> <span>Opacity</span> <input type="range" id="cTerOp" min="0" max="1" step="0.1" value="0.65"></div>
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">RAILWAYS</div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="cRailColor" value="#d9b451"></div>
+    <div id="cRailColorCtrl" class="color-ctrl-cluster"></div>
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BOUNDARIES (RED DASHED)</div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="cBoundColor" value="#ff1e1e"></div>
+    <div id="cBoundColorCtrl" class="color-ctrl-cluster"></div>
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BUILDINGS</div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="cBldColor" value="#8e7258"></div>
+    <div id="cBldColorCtrl" class="color-ctrl-cluster"></div>
     <div class="f-row"> <span>Opacity</span> <input type="range" id="cBldOp" min="0" max="1" step="0.05" value="0.25"></div>
     <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">WATER</div>
-    <div class="f-row"> <span>Color</span> <input type="color" id="cWaterColor" value="#0a1424"></div>
+    <div id="cWaterColorCtrl" class="color-ctrl-cluster"></div>
     <div class="f-row"> <span>Opacity</span> <input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"></div>
 </div>
 
@@ -1006,11 +1019,10 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <select id="tradePolygonSelect" style="width:170px;"> <option value="">-- Choose --</option></select>
         </div>
         <div style="font-weight:600; font-size:11px; color:#768390;">POI CATEGORIES</div>
-        <div id="poiCategoryCheckboxes" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
-        </div>
+        <div id="poiCategoryCheckboxes" style="max-height:220px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;"></div>
         <div style="margin-top:8px;">
-            <div style="font-weight:600; font-size:11px; color:#768390; margin-bottom:4px;">Custom POI Search</div>
-            <input type="text" id="customPoiSearchInput" placeholder="e.g. amenity=restaurant" style="width:100%; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px; font-size:11px;"/>
+            <div style="font-weight:600; font-size:11px; color:#768390; margin-bottom:4px;">Custom POI Search (Amenity / Shop)</div>
+            <input type="text" id="customPoiSearchInput" placeholder="e.g. amenity=dentist or ev_charging" style="width:100%; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px; font-size:11px;"/>
         </div>
         <button class="trade-btn" id="btnScanTradeArea" style="margin-top:8px;">Scan POIs</button>
         <div id="tradeResults" class="poi-summary"></div>
@@ -1020,7 +1032,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <span style="font-size:14px;">▸</span>
         </div>
         <div id="customQueryBody" style="display:none;">
-            <textarea id="overpassQueryInput" rows="5" style="background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px; font-size:12px; width:100%;"></textarea>
+            <textarea id="overpassQueryInput" rows="4" style="background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px; font-size:12px; width:100%;"></textarea>
             <div class="f-row"> <span>Result type</span>
                 <select id="overpassResultType" style="width:110px;">
                     <option value="marker">Markers</option>
@@ -1032,19 +1044,20 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </div>
 </div>
 
-<!-- Attribute Table Modal -->
+<!-- Attribute Table Modal (#popup-attribute-table) -->
 <div id="popup-attribute-table" class="float-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <span style="font-weight:700; color:#f0f6fc;" id="attrTableTitle">Attributes</span>
         <button class="card-btn" id="closeAttrTableBtn">✕</button>
     </div>
-    <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <input type="text" id="attrTableSearch" placeholder="Find in table..." style="flex:1; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px; font-size:11px;"/>
+    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
+        <input type="text" id="attrTableSearch" placeholder="Find in table (filter)..." style="flex:1; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px 10px; font-size:11px;"/>
         <button id="btnAddAttrCol" class="trade-btn" style="padding:6px 10px; font-size:10px;">+ Add Column</button>
+        <button id="btnAddAttrRow" class="trade-btn" style="padding:6px 10px; font-size:10px; background:#22272e; border:1px solid #2d333b;">+ Add Row</button>
     </div>
     <div class="attr-table-container">
         <table class="attr-table" id="attrTableGrid">
-            <thead><tr id="attrTableHeader"></tr></thead>
+            <thead id="attrTableHeader"></thead>
             <tbody id="attrTableBody"></tbody>
         </table>
     </div>
@@ -1053,6 +1066,10 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 <!-- Right-click context menu -->
 <div id="map-context-menu">
     <div class="ctx-coords" id="ctx-coords-label">0.000000, 0.000000</div>
+    <div class="ctx-item" id="ctx-edit" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+        Edit Feature
+    </div>
     <div class="ctx-item" id="ctx-copy">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
         Copy Coordinates
@@ -1064,6 +1081,10 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="ctx-item" id="ctx-streetview">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
         Open in Street View
+    </div>
+    <div class="ctx-item" id="ctx-delete" style="display:none; color:#ff7b72;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        Delete Feature
     </div>
 </div>
 
@@ -1135,31 +1156,25 @@ let customGroups = __INITIAL_CUSTOM_GROUPS__ || {"Trade Area Scan": {collapsed: 
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
 let markerShape = 'pin', markerColor = '#003366', markerIconSize = 0.9;
-let markerFrame = 'none';
 let customMarkerImageKey = null;
 let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
 let isDirty = false;
 
-// Undo/Redo State
+// Undo/Redo State Stacks
 let undoStack = [];
 let redoStack = [];
-let isApplyingHistory = false;
 
 // Vertex dragging state
-let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null;
+let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null, isRadiusHandle = false;
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
 
-// Rotation state
+// Rotation dragging state
 let isDraggingRotation = false, rotatingPolyId = null, rotCenter = null, rotStartAngle = 0, rotOriginalCoords = null;
 
 // Context menu state
 let ctxLngLat = null;
 let ctxFeatureId = null;
-
-// Search temp marker
-let searchTempMarker = null;
-let searchTempTimeout = null;
 
 // Attribute Table State
 let currentTableFeatureId = null;
@@ -1168,10 +1183,63 @@ let currentTableFeatureId = null;
 let currentRouteMode = 'driving';
 let currentRouteColor = '#38bdf8';
 
-// 3D Polygon State
-let current3DPolyHeight = 50;
-let current3DPolyColor = '#e8b84a';
-let current3DPolyOpacity = 0.7;
+const COLOR_SWATCHES = ['#38bdf8', '#3fb950', '#f85149', '#a371f7', '#e8b84a', '#ffffff', '#003366', '#0a1628', '#ffaa00', '#f59e0b', '#768390'];
+
+function setupColorPicker(containerId, initialColor, onColorChange) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = `
+        <div class="swatch-row">
+            ${COLOR_SWATCHES.map(hex => `<div class="swatch" data-color="${hex}" style="background:${hex};"></div>`).join('')}
+        </div>
+        <div class="color-input-combo" style="margin-top:4px;">
+            <input type="color" class="native-color" value="${initialColor}">
+            <input type="text" class="hex-text" value="${initialColor}">
+            <button class="btn-eyedropper" title="Pick color from screen">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11l-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l2.83 2.83a2.12 2.12 0 0 0 3 0L19 11z"></path><path d="M5 19l-3 3"></path></svg>
+            </button>
+        </div>
+    `;
+    const nativeColor = el.querySelector('.native-color');
+    const hexText = el.querySelector('.hex-text');
+    const eyedropperBtn = el.querySelector('.btn-eyedropper');
+    
+    const updateAll = (col) => {
+        nativeColor.value = col;
+        hexText.value = col;
+        onColorChange(col);
+    };
+
+    el.querySelectorAll('.swatch').forEach(sw => {
+        sw.onclick = () => updateAll(sw.dataset.color);
+    });
+
+    nativeColor.oninput = e => {
+        hexText.value = e.target.value;
+        onColorChange(e.target.value);
+    };
+
+    hexText.onchange = e => {
+        let val = e.target.value.trim();
+        if (!val.startsWith('#')) val = '#' + val;
+        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+            nativeColor.value = val;
+            onColorChange(val);
+        }
+    };
+
+    eyedropperBtn.onclick = async () => {
+        if (window.EyeDropper) {
+            try {
+                const ed = new EyeDropper();
+                const res = await ed.open();
+                if (res && res.sRGBHex) updateAll(res.sRGBHex);
+            } catch(e) {}
+        } else {
+            hint('EyeDropper API is not supported in this browser.');
+        }
+    };
+}
 
 const vis = {
     label_city: true, label_brgy: true, label_street: true,
@@ -1214,81 +1282,48 @@ const setSaveBadgeStatus = status => {
 };
 
 function pushState() {
-    if (isApplyingHistory) return;
     undoStack.push(JSON.stringify({
         features: features,
         customGroups: customGroups
     }));
-    if (undoStack.length > 40) undoStack.shift();
+    if (undoStack.length > 50) undoStack.shift();
     redoStack = [];
 }
 
-const markDirty = (recordHistory = false) => {
+const markDirty = (recordHistory = true) => {
     if (recordHistory) pushState();
     isDirty = true;
     setSaveBadgeStatus('unsaved');
 };
 
 const undo = () => {
-    if (!undoStack.length) {
-        hint('Nothing to undo');
-        return;
-    }
-    isApplyingHistory = true;
-    redoStack.push(JSON.stringify({
-        features: features,
-        customGroups: customGroups
-    }));
+    if (!undoStack.length) { hint('Nothing to undo'); return; }
+    redoStack.push(JSON.stringify({ features: features, customGroups: customGroups }));
     const prev = JSON.parse(undoStack.pop());
-    features = prev.features || [];
-    customGroups = prev.customGroups || {"Trade Area Scan": {collapsed: false, ids: []}};
+    features = prev.features;
+    customGroups = prev.customGroups;
     fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
-    features.forEach(f => {
-        if (f.kind === 'marker') {
-            const sh = f.props.shape || 'pin';
-            const col = f.props.color || '#003366';
-            f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
-        }
-    });
     syncDraw();
     renderMyLayers();
     setSaveBadgeStatus('unsaved');
-    isDirty = true;
-    isApplyingHistory = false;
-    hint('Undo successful');
+    hint('Undo');
 };
 
 const redo = () => {
-    if (!redoStack.length) {
-        hint('Nothing to redo');
-        return;
-    }
-    isApplyingHistory = true;
-    undoStack.push(JSON.stringify({
-        features: features,
-        customGroups: customGroups
-    }));
+    if (!redoStack.length) { hint('Nothing to redo'); return; }
+    undoStack.push(JSON.stringify({ features: features, customGroups: customGroups }));
     const next = JSON.parse(redoStack.pop());
-    features = next.features || [];
-    customGroups = next.customGroups || {"Trade Area Scan": {collapsed: false, ids: []}};
+    features = next.features;
+    customGroups = next.customGroups;
     fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
-    features.forEach(f => {
-        if (f.kind === 'marker') {
-            const sh = f.props.shape || 'pin';
-            const col = f.props.color || '#003366';
-            f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
-        }
-    });
     syncDraw();
     renderMyLayers();
     setSaveBadgeStatus('unsaved');
-    isDirty = true;
-    isApplyingHistory = false;
-    hint('Redo successful');
+    hint('Redo');
 };
 
 const closeFloatingCards = () => {
-    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-route-settings','popup-polygon3d-settings','browser-panel','mylayers-panel','popup-attribute-table'].forEach(id => {
+    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-route-settings','browser-panel','mylayers-panel','popup-attribute-table'].forEach(id => {
         const el = $(id);
         if (el) el.classList.remove('open');
     });
@@ -1401,8 +1436,6 @@ window.loadProjectDirectly = function(projectId) {
     closeHomeDialog();
     undoStack = [];
     redoStack = [];
-    setSaveBadgeStatus('saved');
-    isDirty = false;
 };
 
 window.renameProjectFromLauncher = async function(e, projectId, oldName) {
@@ -1484,10 +1517,6 @@ $('btn-create-project-submit').onclick = async () => {
             customGroups = {"Trade Area Scan": {collapsed: false, ids: []}};
             map.setCenter(centerLL);
             closeHomeDialog();
-            undoStack = [];
-            redoStack = [];
-            renderMyLayers();
-            syncDraw();
         }
     } catch(e) {
         closeHomeDialog();
@@ -1497,7 +1526,6 @@ $('btn-create-project-submit').onclick = async () => {
 $('project-name-display').onclick = () => {
     const newN = prompt('Rename project name:', currentProjectName);
     if (newN && newN.trim() && newN.trim() !== currentProjectName) {
-        pushState();
         currentProjectName = newN.trim();
         $('project-name-display').textContent = currentProjectName;
         markDirty();
@@ -1507,7 +1535,6 @@ $('project-name-display').onclick = () => {
 // ----------------- Supabase Sync & Autosave Engine -----------------
 async function saveProjectToSupabase(showToast = false) {
     if (!currentProjectId || currentProjectId === "local-temp" || !SUPABASE_URL || !SUPABASE_KEY) {
-        if (showToast) hint('Local workspace (saved client-side)');
         return;
     }
     setSaveBadgeStatus('saving');
@@ -1555,15 +1582,16 @@ $('btn-undo').onclick = undo;
 $('btn-redo').onclick = redo;
 
 document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         saveProjectToSupabase(true);
     }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
-        undo();
+        if (e.shiftKey) redo();
+        else undo();
     }
-    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
         e.preventDefault();
         redo();
     }
@@ -1571,26 +1599,6 @@ document.addEventListener('keydown', e => {
         $('map-context-menu').style.display = 'none';
     }
 });
-
-// ----------------- Route Settings Color Swatches -----------------
-document.querySelectorAll('#popup-route-settings .color-swatch').forEach(sw => {
-    sw.onclick = () => {
-        document.querySelectorAll('#popup-route-settings .color-swatch').forEach(s => s.classList.remove('active'));
-        sw.classList.add('active');
-        currentRouteColor = sw.dataset.color;
-        $('rCustomColor').value = currentRouteColor;
-    };
-});
-$('rCustomColor').oninput = e => {
-    currentRouteColor = e.target.value;
-    document.querySelectorAll('#popup-route-settings .color-swatch').forEach(s => s.classList.remove('active'));
-};
-$('rProfile').onchange = e => { currentRouteMode = e.target.value; };
-
-// 3D Poly settings bindings
-$('p3dHeight').oninput = e => { current3DPolyHeight = parseFloat(e.target.value) || 50; };
-$('p3dColor').oninput = e => { current3DPolyColor = e.target.value; };
-$('p3dOpacity').oninput = e => { current3DPolyOpacity = parseFloat(e.target.value) || 0.7; };
 
 // ----------------- Marker Icon Pipeline -----------------
 function renderIconCanvas(shape, color) {
@@ -1670,8 +1678,7 @@ $('customMarkerFileInput').onchange = function(e) {
             const c = document.createElement('canvas');
             c.width = 64; c.height = 64;
             const ctx = c.getContext('2d');
-            ctx.clearRect(0,0,64,64);
-            ctx.drawImage(img, 4, 4, 56, 56);
+            ctx.drawImage(img, 0, 0, 64, 64);
             const key = 'custom_marker_' + Date.now();
             const imgData = ctx.getImageData(0,0,64,64);
             try {
@@ -1707,7 +1714,6 @@ $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
     customMarkerImageKey = null;
     markDirty();
 });
-$('mColor').oninput = e => { markerColor = e.target.value; markDirty(); };
 $('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); markDirty(); };
 
 // ----------------- Vector Layers Pipeline -----------------
@@ -1724,20 +1730,18 @@ function addDrawStack() {
     if (!map.getSource('draw')) {
         map.addSource('draw', { type: 'geojson', data: fc(features) });
 
-        // 2D Polygons Fill (Exclude 3D Polygons)
         map.addLayer({
             id: 'draw-fill', type: 'fill', source: 'draw',
-            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
+            filter: ['==', ['geometry-type'], 'Polygon'],
             paint: {
                 'fill-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
                 'fill-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.35], ['get', 'visible']]
             }
         });
 
-        // 2D Polygons Outline (Exclude 3D Polygons)
         map.addLayer({
             id: 'draw-outline', type: 'line', source: 'draw',
-            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
+            filter: ['==', ['geometry-type'], 'Polygon'],
             paint: {
                 'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#e8b84a'],
                 'line-width': ['coalesce', ['get', 'width'], 3],
@@ -1745,43 +1749,18 @@ function addDrawStack() {
             }
         });
 
-        // 3D Extrusion Layer (Filter: kind == polygon3d)
-        map.addLayer({
-            id: 'draw-3d-extrusion', type: 'fill-extrusion', source: 'draw',
-            filter: ['==', ['get', 'kind'], 'polygon3d'],
-            paint: {
-                'fill-extrusion-color': ['coalesce', ['get', 'extrusionColor'], ['get', 'fillColor'], '#e8b84a'],
-                'fill-extrusion-height': ['coalesce', ['get', 'height'], 50],
-                'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.7], ['get', 'visible']]
-            }
-        });
-
-        // 3D Roof Outline Layer
-        map.addLayer({
-            id: 'draw-3d-roof', type: 'line', source: 'draw',
-            filter: ['==', ['get', 'kind'], 'polygon3d'],
-            paint: {
-                'line-color': '#ffffff',
-                'line-width': 1,
-                'line-opacity': ['*', 0.5, ['get', 'visible']]
-            }
-        });
-
-        // Lines & Routes
         map.addLayer({
             id: 'draw-line', type: 'line', source: 'draw',
             filter: ['==', ['geometry-type'], 'LineString'],
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-                'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#38bdf8'],
+                'line-color': ['case', ['boolean', ['get', 'routingFailed'], false], '#f85149', ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#38bdf8']],
                 'line-width': ['coalesce', ['get', 'width'], 4],
                 'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['get', 'visible']],
                 'line-dasharray': ['case', ['boolean', ['get', 'routingFailed'], false], ['literal', [2, 2]], ['literal', [1, 0]]]
             }
         });
 
-        // Standard Markers
         map.addLayer({
             id: 'draw-marker', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
@@ -1794,7 +1773,6 @@ function addDrawStack() {
             paint: { 'icon-opacity': ['get', 'visible'] }
         });
 
-        // Text Labels
         map.addLayer({
             id: 'draw-text', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'text']],
@@ -1813,14 +1791,13 @@ function addDrawStack() {
             }
         });
 
-        // Polygon Labels
         map.addSource('label-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
             id: 'draw-poly-labels', type: 'symbol', source: 'label-src',
             layout: {
                 'text-field': ['get', 'labelText'],
                 'text-font': ['Noto Sans Regular'],
-                'text-size': 12,
+                'text-size': 13,
                 'text-allow-overlap': true,
                 'text-anchor': 'center',
                 'text-justify': 'center'
@@ -1832,7 +1809,6 @@ function addDrawStack() {
             }
         });
 
-        // Pulse highlight source
         map.addSource('pulse-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
             id: 'pulse-circle', type: 'circle', source: 'pulse-src',
@@ -1842,18 +1818,6 @@ function addDrawStack() {
                 'circle-opacity': 0.85,
                 'circle-stroke-color': '#ffffff',
                 'circle-stroke-width': 2
-            }
-        });
-
-        // Search temporary marker source
-        map.addSource('search-temp-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        map.addLayer({
-            id: 'search-temp-point', type: 'circle', source: 'search-temp-src',
-            paint: {
-                'circle-color': '#38bdf8',
-                'circle-radius': 8,
-                'circle-stroke-color': '#ffffff',
-                'circle-stroke-width': 2.5
             }
         });
     } else {
@@ -1872,7 +1836,7 @@ function addDrawStack() {
             filter: ['==', ['geometry-type'], 'Point'],
             paint: {
                 'circle-color': ['case', ['get', 'isLastPoint'], '#38bdf8', '#e8b84a'],
-                'circle-radius': ['case', ['get', 'isLastPoint'], 9, ['case', ['get', 'isOrigin'], 8, 5]],
+                'circle-radius': ['case', ['get', 'isLastPoint'], 10, ['case', ['get', 'isOrigin'], 8, 5]],
                 'circle-stroke-width': 2.5
             }
         });
@@ -1883,7 +1847,7 @@ function addDrawStack() {
         map.addLayer({
             id: 'vertex-points', type: 'circle', source: 'vertex-handles',
             paint: {
-                'circle-color': '#38bdf8',
+                'circle-color': ['case', ['boolean', ['get', 'isRotHandle'], false], '#e8b84a', ['case', ['boolean', ['get', 'isRadiusHandle'], false], '#3fb950', '#38bdf8']],
                 'circle-radius': 6,
                 'circle-stroke-color': '#ffffff',
                 'circle-stroke-width': 2
@@ -1903,12 +1867,18 @@ function syncLabels() {
     if (!src) return;
     const feats = [];
     features.forEach(f => {
-        if (!f.props.showLabel || f.props.visible === 0 || !f.name) return;
-        
+        if (!f.props.showLabel || f.props.visible === 0) return;
         let labelText = f.name;
-        if (f.kind === 'route' && f.props.description) {
-            labelText = f.props.description;
+        if (f.kind === 'route' && f.props.metadata) {
+            const dist = f.props.metadata.distance;
+            const dur = f.props.metadata.duration;
+            const distStr = dist > 1000 ? `${(dist/1000).toFixed(2)} km` : `${Math.round(dist)} m`;
+            const durStr = dur > 3600 ? `${(dur/3600).toFixed(1)} hr` : `${Math.round(dur/60)} min`;
+            labelText = `${distStr} · ${durStr}`;
+        } else if (f.props.attributes && f.props.attributes.label_text) {
+            labelText = f.props.attributes.label_text;
         }
+        if (!labelText) return;
 
         const pos = f.props.labelPos || 'center';
         let coords = null;
@@ -1974,7 +1944,18 @@ function syncVertexHandles() {
     const handleFeats = [];
     features.forEach(f => {
         if (f.props.visible === 0) return;
-        if (['polygon','rectangle','circle','polygon3d'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+        if (f.kind === 'circle') {
+            if (f.props.centerCoord && f.props.radiusMeters) {
+                const c = f.props.centerCoord;
+                const r = f.props.radiusMeters;
+                const edgeCoord = [c[0] + (r / (111320 * Math.cos(c[1]*Math.PI/180))), c[1]];
+                handleFeats.push({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: edgeCoord },
+                    properties: { polyId: f.id, isRadiusHandle: true }
+                });
+            }
+        } else if (['polygon','rectangle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
             const coords = f.geometry.coordinates[0];
             for (let i = 0; i < coords.length - 1; i++) {
                 handleFeats.push({
@@ -1983,26 +1964,26 @@ function syncVertexHandles() {
                     properties: { polyId: f.id, vIdx: i }
                 });
             }
-            if (f.id === selectedId) {
-                const b = calcBounds(f);
-                if (b) {
-                    const cx = (b[0][0] + b[1][0]) / 2;
-                    const offset = (b[1][1] - b[0][1]) * 0.25 || 0.001;
-                    handleFeats.push({
-                        type: 'Feature',
-                        geometry: { type: 'Point', coordinates: [cx, b[1][1] + offset] },
-                        properties: { polyId: f.id, isRotHandle: true }
-                    });
-                }
-            }
-        }
-        if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry && f.geometry.coordinates) {
-            const waypoints = (f.props.waypoints && f.props.waypoints.length) ? f.props.waypoints : f.geometry.coordinates;
-            for (let i = 0; i < waypoints.length; i++) {
+        } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry && f.geometry.coordinates) {
+            const coords = f.props.waypoints || f.geometry.coordinates;
+            for (let i = 0; i < coords.length; i++) {
                 handleFeats.push({
                     type: 'Feature',
-                    geometry: { type: 'Point', coordinates: waypoints[i] },
-                    properties: { polyId: f.id, vIdx: i, isWaypoint: !!f.props.waypoints }
+                    geometry: { type: 'Point', coordinates: coords[i] },
+                    properties: { polyId: f.id, vIdx: i, isWaypoint: true }
+                });
+            }
+        }
+        
+        if (f.id === selectedId) {
+            const b = calcBounds(f);
+            if (b) {
+                const cx = (b[0][0] + b[1][0]) / 2;
+                const offset = (b[1][1] - b[0][1]) * 0.25 || 0.001;
+                handleFeats.push({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [cx, b[1][1] + offset] },
+                    properties: { polyId: f.id, isRotHandle: true }
                 });
             }
         }
@@ -2020,14 +2001,14 @@ function renderDraft() {
     });
     const ln = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
     draft.forEach((p, i) => {
-        const isOrigin = i === 0 && (activeTool === 'polygon' || activeTool === 'polygon3d');
+        const isOrigin = i === 0 && activeTool === 'polygon';
         const isLastPoint = i === draft.length - 1 && activeTool === 'route' && draft.length > 0;
         f.push(pt(p, isOrigin, isLastPoint));
     });
     if ((activeTool === 'polyline' || activeTool === 'route') && draft.length) {
         f.push(ln(cursorLL ? [...draft, cursorLL] : draft));
     }
-    if ((activeTool === 'polygon' || activeTool === 'polygon3d') && draft.length) {
+    if (activeTool === 'polygon' && draft.length) {
         const pts = cursorLL ? [...draft, cursorLL] : draft;
         if (pts.length > 1) f.push(ln([...pts, pts[0]]));
     }
@@ -2064,9 +2045,36 @@ map.on('load', () => {
     renderMyLayers();
     renderProjectsList();
     populateTradeAreaCheckboxes();
+    
+    // Init Color Pickers
+    setupColorPicker('mColorCtrl', '#003366', col => { markerColor = col; markDirty(); });
+    setupColorPicker('tColorCtrl', '#d9b451', col => { $('tColorCtrl').dataset.val = col; markDirty(); });
+    setupColorPicker('eBorderColorCtrl', '#38bdf8', col => {
+        const f = features.find(x => x.id === selectedId);
+        if (f) {
+            f.props.borderColor = col; f.props.color = col;
+            if (f.kind === 'marker' && !customMarkerImageKey) f.props.iconKey = getIconKey(f.props.shape || 'pin', col);
+            syncDraw(); markDirty();
+        }
+    });
+    setupColorPicker('eFillColorCtrl', '#e8b84a', col => {
+        const f = features.find(x => x.id === selectedId);
+        if (f) { f.props.fillColor = col; syncDraw(); markDirty(); }
+    });
+    
+    // Basemap Color Pickers
+    setupColorPicker('cBgColorCtrl', '#0a1628', col => { setMapPaint('bg', 'background-color', col); markDirty(); });
+    setupColorPicker('cExpColorCtrl', '#ffaa00', col => { setMapPaint('rd_express', 'line-color', col); markDirty(); });
+    setupColorPicker('cMainColorCtrl', '#e8b84a', col => { setMapPaint('rd_major', 'line-color', col); markDirty(); });
+    setupColorPicker('cSecColorCtrl', '#c99c37', col => { setMapPaint('rd_secondary', 'line-color', col); markDirty(); });
+    setupColorPicker('cTerColorCtrl', '#7d5f14', col => { ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-color', col)); markDirty(); });
+    setupColorPicker('cRailColorCtrl', '#d9b451', col => { setMapPaint('rd_rail', 'line-color', col); markDirty(); });
+    setupColorPicker('cBoundColorCtrl', '#ff1e1e', col => { ['bound_prov','bound_city','bound_brgy'].forEach(id => setMapPaint(id, 'line-color', col)); markDirty(); });
+    setupColorPicker('cBldColorCtrl', '#8e7258', col => { setMapPaint('building-2d', 'fill-color', col); setMapPaint('building-2d', 'fill-outline-color', col); markDirty(); });
+    setupColorPicker('cWaterColorCtrl', '#0a1424', col => { setMapPaint('water', 'fill-color', col); setMapPaint('waterway', 'line-color', col); markDirty(); });
 });
 
-// ----------------- 2D vs 3D Dimension Switcher -----------------
+// ----------------- Dimension Switcher -----------------
 $('btn2DMode').onclick = () => {
     $('btn2DMode').classList.add('active');
     $('btn3DMode').classList.remove('active');
@@ -2120,15 +2128,32 @@ function pointInPolygon(point, vs) {
     return inside;
 }
 
-// ----------------- Routing Engine -----------------
+function rotateGeometry(f, angleRad, center) {
+    const cosA = Math.cos(angleRad), sinA = Math.sin(angleRad);
+    const rotPt = pt => {
+        const dx = pt[0] - center[0], dy = pt[1] - center[1];
+        return [center[0] + dx * cosA - dy * sinA, center[1] + dx * sinA + dy * cosA];
+    };
+    if (f.geometry.type === 'Point') {
+        f.props.rotation = ((f.props.rotation || 0) + (angleRad * 180 / Math.PI)) % 360;
+    } else if (f.geometry.type === 'LineString') {
+        f.geometry.coordinates = f.geometry.coordinates.map(rotPt);
+        if (f.props.waypoints) f.props.waypoints = f.props.waypoints.map(rotPt);
+    } else if (f.geometry.type === 'Polygon') {
+        f.geometry.coordinates = f.geometry.coordinates.map(ring => ring.map(rotPt));
+    }
+}
+
+// ----------------- Routing Engine (OSRM) -----------------
 let rerouteTimeout = null;
 function fetchMultiPointRoute(pts, updateId = null, mode = null) {
     hint('Calculating route…');
     const profile = mode || currentRouteMode || 'driving';
+    const osrmMode = profile === 'walking' ? 'foot' : (profile === 'cycling' ? 'bike' : 'car');
     const coordStr = pts.map(p => `${p[0]},${p[1]}`).join(';');
-    const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${coordStr}?overview=full&geometries=geojson&steps=true`;
+    const url = `https://router.project-osrm.org/route/v1/${profile}/${coordStr}?overview=full&geometries=geojson&steps=true`;
     
-    fetch(osrmUrl)
+    fetch(url)
     .then(r => r.json())
     .then(j => {
         if (j.routes && j.routes[0]) {
@@ -2143,83 +2168,66 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
             if (updateId) {
                 const f = features.find(x => x.id === updateId);
                 if (f) {
-                    pushState();
                     f.geometry = geom;
+                    f.props.waypoints = pts;
                     f.props.description = desc;
                     f.props.routeMode = profile;
-                    f.props.waypoints = pts;
-                    f.props.metadata = { distance: dist, duration: dur };
                     f.props.routingFailed = false;
+                    f.props.metadata = { distance: dist, duration: dur };
                     syncDraw();
                     renderMyLayers();
                     markDirty();
                     if (selectedId === updateId) {
                         $('eRouteStats').textContent = desc;
-                        renderRouteWaypointsEditor(f);
+                        renderWaypointEditor(f);
                     }
                 }
             } else {
-                const color = currentRouteColor || '#38bdf8';
                 addFeatureRecord('route', geom, { 
-                    color: color, borderColor: color, width: 4, borderOpacity: 0.9,
+                    color: currentRouteColor, borderColor: currentRouteColor, width: 4, borderOpacity: 0.9,
                     description: desc,
                     routeMode: profile,
                     waypoints: pts,
+                    routingFailed: false,
                     metadata: { distance: dist, duration: dur },
-                    showLabel: true,
-                    routingFailed: false
+                    showLabel: true
                 });
             }
-            hint('');
         } else {
             throw new Error("No route found");
         }
+        hint('');
     })
     .catch(() => {
         if (updateId) {
              const f = features.find(x => x.id === updateId);
              if (f) {
-                 pushState();
                  f.geometry = { type: 'LineString', coordinates: pts };
                  f.props.waypoints = pts;
                  f.props.routingFailed = true;
                  f.props.description = "Routing unavailable – straight line shown";
                  syncDraw();
                  markDirty();
-                 if (selectedId === updateId) $('eRouteStats').textContent = f.props.description;
              }
         } else {
-            const color = currentRouteColor || '#38bdf8';
             addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { 
-                color: color, borderColor: color, width: 3, borderOpacity: 0.8,
+                color: currentRouteColor, borderColor: currentRouteColor, width: 3, borderOpacity: 0.8,
                 routingFailed: true,
                 waypoints: pts,
                 description: "Routing unavailable – straight line shown",
-                routeMode: profile
+                routeMode: profile,
+                showLabel: true
             });
         }
-        hint('Routing failed – straight line shown');
+        hint('Routing unavailable – straight line shown');
     });
 }
 
 function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, explicitName = null) {
     const newId = ++fid;
     const isRoute = kind === 'route';
-    const is3D = kind === 'polygon3d';
-    
-    // Performance guard: Limit visible 3D Polygons to 50
-    if (is3D) {
-        const poly3dCount = features.filter(f => f.kind === 'polygon3d').length;
-        if (poly3dCount >= 50) {
-            hint('Limit of 50 3D polygons reached for performance.');
-            return null;
-        }
-    }
-
-    const defaultBorder = isRoute ? (currentRouteColor || '#38bdf8') : (is3D ? current3DPolyColor : '#e8b84a');
-    const assignedName = explicitName || `${is3D ? '3D Polygon' : kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
-    
-    pushState();
+    const defaultBorder = isRoute ? currentRouteColor : '#e8b84a';
+    const assignedName = explicitName || `${kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
     const feat = {
         id: newId,
         name: assignedName,
@@ -2230,15 +2238,14 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
             borderColor: defaultBorder,
             borderOpacity: 0.9,
             width: 3,
-            fillColor: is3D ? current3DPolyColor : '#e8b84a',
-            fillOpacity: is3D ? current3DPolyOpacity : 0.35,
-            extrusionColor: is3D ? current3DPolyColor : '#e8b84a',
-            height: is3D ? current3DPolyHeight : 50,
+            fillColor: '#e8b84a',
+            fillOpacity: 0.35,
             showLabel: false,
             labelPos: 'center',
             iconSize: markerIconSize,
             visible: 1,
-            attributes: {},
+            rotation: 0,
+            attributes: { name: assignedName, description: isRoute ? (customProps.description || '') : '' },
             ...customProps
         }
     };
@@ -2259,7 +2266,7 @@ function populateTradeAreaCheckboxes() {
     for (const category in POI_CONFIG) {
         html += `<div style="font-weight:600; font-size:11px; margin-top:4px;">${category}</div>`;
         html += '<div class="trade-area-poi-row">';
-        POI_CONFIG[category].forEach(([label, tag], idx) => {
+        POI_CONFIG[category].forEach(([label, tag]) => {
             html += `<label> <input type="checkbox" class="poi-cat-check" data-cat="${category}" data-tag="${tag}" data-label="${label}" style="accent-color:#316dca;"> ${label}</label>`;
         });
         html += '</div>';
@@ -2270,7 +2277,7 @@ function populateTradeAreaCheckboxes() {
 $('btnOpenTradeAreaPopup').onclick = () => {
     closeFloatingCards();
     $('trade-area-modal').style.display = 'flex';
-    const polyList = features.filter(f => ['polygon','rectangle','circle','polygon3d'].includes(f.kind));
+    const polyList = features.filter(f => ['polygon','rectangle','circle'].includes(f.kind));
     $('tradePolygonSelect').innerHTML = '<option value="">-- Choose --</option>' + polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
 };
 $('closeTradeAreaBtn').onclick = () => { $('trade-area-modal').style.display = 'none'; };
@@ -2324,11 +2331,12 @@ $('btnScanTradeArea').onclick = async () => {
     
     const customSearch = $('customPoiSearchInput').value.trim();
     if (customSearch) {
-        selectedTags.push(customSearch);
+        if (customSearch.includes('=')) selectedTags.push(`"${customSearch.split('=')[0]}"="${customSearch.split('=')[1]}"`);
+        else selectedTags.push(`"amenity"~"${customSearch}",i`);
     }
 
     if (!selectedTags.length) {
-        hint('Please select at least one POI category or enter a custom search.');
+        hint('Please select at least one category or enter a custom POI tag.');
         return;
     }
     const bnd = calcBounds(targetPoly);
@@ -2349,12 +2357,12 @@ $('btnScanTradeArea').onclick = async () => {
     });
     const overpassQuery = `[out:json][timeout:25];(${queryParts});out center 100;`;
     hint('Scanning POIs with robust fetch…');
-    $('tradeResults').innerHTML = '<div style="color:#d9b451;">Querying local spatial features…</div>';
+    $('tradeResults').innerHTML = '<div style="color:#d9b451;">Querying spatial features…</div>';
     if (!customGroups["Trade Area Scan"]) customGroups["Trade Area Scan"] = { collapsed: false, ids: [] };
     const data = await robustOverpassFetch(overpassQuery, 90);
     if (!data) {
-        $('tradeResults').innerHTML = '<div style="color:#ff7b72;">All Overpass endpoints failed after retries.</div>';
-        hint('Overpass query failed after retries.');
+        $('tradeResults').innerHTML = '<div style="color:#ff7b72;">Overpass API endpoints failed.</div>';
+        hint('Query failed.');
         return;
     }
     const results = data.elements || [];
@@ -2365,8 +2373,8 @@ $('btnScanTradeArea').onclick = async () => {
         return lat && lon && pointInPolygon([lon, lat], polyCoords);
     });
     if (!filtered.length) {
-        $('tradeResults').innerHTML = '<div style="color:#8b949e;">No matching POIs inside this polygon.</div>';
-        hint('Scan complete: 0 POIs inside area.');
+        $('tradeResults').innerHTML = '<div style="color:#8b949e;">No matching POIs inside this area.</div>';
+        hint('Scan complete: 0 POIs.');
         return;
     }
     const counts = {};
@@ -2388,10 +2396,10 @@ $('btnScanTradeArea').onclick = async () => {
         html += `<div class="poi-badge"><span>${k}</span> <span style="font-weight:700; color:#38bdf8;">${counts[k]}</span></div>`;
     }
     $('tradeResults').innerHTML = html;
-    hint(`Added ${filtered.length} POIs to "Trade Area Scan" layer group!`);
+    hint(`Added ${filtered.length} POIs to "Trade Area Scan"!`);
 };
 
-// ----------------- Custom Overpass Query (collapsible) -----------------
+// ----------------- Custom Overpass Query -----------------
 $('customQueryToggle').onclick = () => {
     const body = $('customQueryBody');
     const toggleIcon = $('customQueryToggle').querySelector('span:last-child');
@@ -2410,10 +2418,7 @@ $('btnRunOverpass').onclick = async () => {
     const resultType = $('overpassResultType').value;
     hint('Running custom Overpass query…');
     const data = await robustOverpassFetch(ql, 90);
-    if (!data) {
-        hint('Overpass query failed after retries.');
-        return;
-    }
+    if (!data) { hint('Query failed.'); return; }
     const elements = data.elements || [];
     if (!elements.length) { hint('Query returned no results'); return; }
     elements.forEach(el => {
@@ -2426,16 +2431,14 @@ $('btnRunOverpass').onclick = async () => {
                 osmTags: el.tags || {}
             });
         } else if (el.type === 'way' && el.geometry) {
-            if (resultType === 'marker') {
-                if (el.center) {
-                    addFeatureRecord('marker', { type: 'Point', coordinates: [el.center.lon, el.center.lat] }, {
-                        shape: 'pin',
-                        color: '#003366',
-                        iconSize: 0.9,
-                        iconKey: getIconKey('pin', '#003366'),
-                        osmTags: el.tags || {}
-                    });
-                }
+            if (resultType === 'marker' && el.center) {
+                addFeatureRecord('marker', { type: 'Point', coordinates: [el.center.lon, el.center.lat] }, {
+                    shape: 'pin',
+                    color: '#003366',
+                    iconSize: 0.9,
+                    iconKey: getIconKey('pin', '#003366'),
+                    osmTags: el.tags || {}
+                });
             } else if (resultType === 'polygon') {
                 const geom = el.geometry;
                 if (geom.type === 'Polygon') addFeatureRecord('polygon', geom, {});
@@ -2443,7 +2446,7 @@ $('btnRunOverpass').onclick = async () => {
             }
         }
     });
-    hint(`Added ${elements.length} features from custom query`);
+    hint(`Added ${elements.length} features from query`);
 };
 
 // ----------------- Selective Boundary Autocomplete -----------------
@@ -2517,19 +2520,45 @@ document.addEventListener('click', (e) => {
 // ----------------- Right-Click Context Menu -----------------
 map.on('contextmenu', e => {
     ctxLngLat = e.lngLat;
-    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
+    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
     ctxFeatureId = fs.length && fs[0].properties.id != null ? parseInt(fs[0].properties.id, 10) : null;
     
     const menu = $('map-context-menu');
     $('ctx-coords-label').textContent = `${e.lngLat.lat.toFixed(6)}, ${e.lngLat.lng.toFixed(6)}`;
+    
+    if (ctxFeatureId) {
+        $('ctx-edit').style.display = 'flex';
+        $('ctx-delete').style.display = 'flex';
+    } else {
+        $('ctx-edit').style.display = 'none';
+        $('ctx-delete').style.display = 'none';
+    }
+
     const maxX = window.innerWidth - 220;
-    const maxY = window.innerHeight - 120;
+    const maxY = window.innerHeight - 150;
     menu.style.left = Math.min(e.point.x, maxX) + 'px';
     menu.style.top = Math.min(e.point.y, maxY) + 'px';
     menu.style.display = 'block';
 });
 
 map.on('movestart', () => { $('map-context-menu').style.display = 'none'; });
+
+$('ctx-edit').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) openShapeEditor(ctxFeatureId);
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-delete').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) {
+        features = features.filter(x => x.id !== ctxFeatureId);
+        for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== ctxFeatureId);
+        selectedLayerIds.delete(ctxFeatureId);
+        syncDraw(); renderMyLayers(); markDirty();
+    }
+    $('map-context-menu').style.display = 'none';
+};
 
 $('ctx-copy').onclick = (e) => {
     e.stopPropagation();
@@ -2560,7 +2589,7 @@ $('ctx-streetview').onclick = (e) => {
     $('map-context-menu').style.display = 'none';
 };
 
-// ----------------- Google Maps-like Search Place -----------------
+// ----------------- Search Place -----------------
 const searchInput = $('searchInput');
 const searchResultsList = $('searchResultsList');
 let searchResults = [];
@@ -2598,24 +2627,31 @@ function renderSearchResults(results) {
             searchResultsList.innerHTML = '';
             
             const coords = [parseFloat(selected.lon), parseFloat(selected.lat)];
+            pulseFeature({geometry: {type: 'Point', coordinates: coords}});
             
-            // Temporary marker & pulse feedback
-            if (map.getSource('search-temp-src')) {
-                map.getSource('search-temp-src').setData({
-                    type: 'FeatureCollection',
-                    features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: {} }]
-                });
-                if (searchTempTimeout) clearTimeout(searchTempTimeout);
-                searchTempTimeout = setTimeout(() => {
-                    if (map.getSource('search-temp-src')) {
-                        map.getSource('search-temp-src').setData({ type: 'FeatureCollection', features: [] });
-                    }
-                }, 5000);
-            }
-            
-            pulseFeature({ geometry: { type: 'Point', coordinates: coords } });
+            // Temporary marker element
+            const el = document.createElement('div');
+            el.className = 'temp-search-marker';
+            el.style.width = '16px';
+            el.style.height = '16px';
+            el.style.backgroundColor = '#38bdf8';
+            el.style.borderRadius = '50%';
+            el.style.border = '2px solid #ffffff';
+            el.style.boxShadow = '0 0 10px rgba(56, 189, 248, 0.8)';
+            el.style.transition = 'opacity 1s ease';
+
+            const tempMarker = new maplibregl.Marker({ element: el })
+                .setLngLat(coords)
+                .addTo(map);
+
             map.flyTo({ center: coords, zoom: 15, duration: 1500 });
             
+            setTimeout(() => {
+                el.style.opacity = '0';
+                setTimeout(() => tempMarker.remove(), 1000);
+            }, 4000);
+            
+            hint('');
             $('popup-search').classList.remove('open');
         };
     });
@@ -2627,6 +2663,20 @@ $('btn-search').onclick = () => {
     closeFloatingCards();
     if (willOpen) { p.classList.add('open'); searchInput.focus(); }
 };
+
+// Route Settings Card Presets & Handlers
+document.querySelectorAll('#popup-route-settings .swatch').forEach(sw => {
+    sw.onclick = () => {
+        currentRouteColor = sw.dataset.rcol;
+        hint(`Route color set to ${currentRouteColor}`);
+    };
+});
+$('rProfile').onchange = e => { currentRouteMode = e.target.value; };
+$('btnStartRouteDraw').onclick = () => {
+    $('popup-route-settings').classList.remove('open');
+    hint('Click waypoints along roads · Double-click or click endpoint to finalize');
+};
+$('closeRouteSettingsBtn').onclick = () => { $('popup-route-settings').classList.remove('open'); resetActiveTools(); };
 
 // ----------------- Tool Handlers & Drawing Engine -----------------
 document.querySelectorAll('.tool').forEach(btn => {
@@ -2651,14 +2701,9 @@ document.querySelectorAll('.tool').forEach(btn => {
             if (t === 'textbox') $('popup-text-settings').classList.add('open');
             if (t === 'route') {
                 $('popup-route-settings').classList.add('open');
-                hint('Route: Click waypoints · Double click or click last point to finish');
             }
-            if (t === 'polygon3d') {
-                $('popup-polygon3d-settings').classList.add('open');
-                hint('Click vertices · Click origin to save · Set height in panel');
-            }
-            if (t === 'polyline') hint('Click points · Click last point again to finish');
-            if (t === 'polygon') hint('Click vertices · Click origin or same point to save');
+            if (t === 'polyline') hint('Click points · Double-click or click last point to finish');
+            if (t === 'polygon') hint('Click vertices · Double-click or click origin to close');
             if (t === 'rectangle') hint('Click corner 1, then click opposite corner');
             if (t === 'circle') hint('Click center, then outer edge');
         }
@@ -2679,11 +2724,13 @@ map.on('mousemove', e => {
             return coords.map(translateCoords);
         };
         f.geometry.coordinates = translateCoords(dragOriginalCoords);
-        if (f.kind === 'route' && f.props.waypoints) {
-            f.props.waypoints = f.props.waypoints.map(wp => [wp[0] + dx, wp[1] + dy]);
+        if (f.kind === 'circle' && f.props.centerCoord) {
+            f.props.centerCoord = [f.props.centerCoord[0] + dx, f.props.centerCoord[1] + dy];
+        }
+        if (f.props.waypoints) {
+            f.props.waypoints = f.props.waypoints.map(pt => [pt[0] + dx, pt[1] + dy]);
         }
         syncDraw();
-        markDirty();
     }
     
     if (isDraggingRotation && rotatingPolyId != null) {
@@ -2691,44 +2738,34 @@ map.on('mousemove', e => {
         if (f && rotCenter) {
             const currentAngle = Math.atan2(cursorLL[1] - rotCenter[1], cursorLL[0] - rotCenter[0]);
             const deltaAngle = currentAngle - rotStartAngle;
-            const cosA = Math.cos(deltaAngle), sinA = Math.sin(deltaAngle);
-            const orig = rotOriginalCoords[0];
-            const newCoords = orig.map(c => {
-                const dx = c[0] - rotCenter[0];
-                const dy = c[1] - rotCenter[1];
-                return [rotCenter[0] + dx * cosA - dy * sinA, rotCenter[1] + dx * sinA + dy * cosA];
-            });
-            newCoords.push(newCoords[0]);
-            f.geometry.coordinates = [newCoords];
+            rotateGeometry(f, deltaAngle, rotCenter);
+            rotStartAngle = currentAngle;
             syncDraw();
-            markDirty();
         }
     }
 
-    if (isDraggingVertex && draggedPolyId != null && draggedVertexIdx >= 0) {
+    if (isDraggingVertex && draggedPolyId != null) {
         const f = features.find(x => x.id === draggedPolyId);
-        if (f && f.geometry && f.geometry.coordinates) {
-            if (['polygon','rectangle','circle','polygon3d'].includes(f.kind) && f.geometry.coordinates[0]) {
+        if (f) {
+            if (isRadiusHandle && f.kind === 'circle') {
+                const c = f.props.centerCoord;
+                const newRadius = haversineDist(c, cursorLL);
+                f.props.radiusMeters = newRadius;
+                f.geometry.coordinates = circleCoords(c, cursorLL).coords;
+            } else if (['polygon','rectangle'].includes(f.kind) && f.geometry.coordinates[0]) {
                 const coords = f.geometry.coordinates[0];
                 coords[draggedVertexIdx] = cursorLL;
                 if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
             } else if (f.kind === 'polyline' && f.geometry.coordinates) {
                 f.geometry.coordinates[draggedVertexIdx] = cursorLL;
-            } else if (f.kind === 'route') {
-                if (f.props.waypoints) {
-                    f.props.waypoints[draggedVertexIdx] = cursorLL;
-                } else {
-                    f.geometry.coordinates[draggedVertexIdx] = cursorLL;
-                }
-                // Debounced dynamic reroute
+            } else if (f.kind === 'route' && f.props.waypoints) {
+                f.props.waypoints[draggedVertexIdx] = cursorLL;
                 clearTimeout(rerouteTimeout);
                 rerouteTimeout = setTimeout(() => {
-                    const pts = f.props.waypoints || f.geometry.coordinates;
-                    fetchMultiPointRoute(pts, f.id, f.props.routeMode);
+                    fetchMultiPointRoute(f.props.waypoints, f.id, f.props.routeMode);
                 }, 300);
             }
             syncDraw();
-            markDirty();
         }
     }
 });
@@ -2736,7 +2773,7 @@ map.on('mousemove', e => {
 map.on('click', e => {
     if (!activeTool) {
         if (!editMode) {
-            const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
+            const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
             if (fs.length && fs[0].properties.id != null) {
                 const id = parseInt(fs[0].properties.id, 10);
                 const f = features.find(x => x.id === id);
@@ -2771,17 +2808,18 @@ map.on('click', e => {
         });
         resetActiveTools();
         closeFloatingCards();
-        if (feat) openShapeEditor(feat.id);
+        openShapeEditor(feat.id);
     } else if (activeTool === 'textbox') {
+        const tColor = $('tColorCtrl').dataset.val || '#d9b451';
         const feat = addFeatureRecord('text', { type: 'Point', coordinates: ll }, {
             text: $('tContent').value || 'Label',
             fontSize: parseInt($('tSize').value, 10),
-            color: $('tColor').value,
+            color: tColor,
             opacity: parseFloat($('tOp').value)
         });
         resetActiveTools();
         closeFloatingCards();
-        if (feat) openShapeEditor(feat.id);
+        openShapeEditor(feat.id);
     } else if (activeTool === 'polyline') {
         if (draft.length >= 2) {
             const pScreen = map.project(ll);
@@ -2789,28 +2827,20 @@ map.on('click', e => {
             if (Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 18) {
                 const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
                 resetActiveTools();
-                if (feat) openShapeEditor(feat.id);
+                openShapeEditor(feat.id);
                 return;
             }
         }
         draft.push(ll);
-    } else if (activeTool === 'polygon' || activeTool === 'polygon3d') {
+    } else if (activeTool === 'polygon') {
         if (draft.length >= 3) {
             const pScreen = map.project(ll);
             for (const pt of draft) {
                 const vScreen = map.project(pt);
                 if (Math.hypot(pScreen.x - vScreen.x, pScreen.y - vScreen.y) < 18) {
-                    const kind = activeTool;
-                    const props = {};
-                    if (kind === 'polygon3d') {
-                        props.height = parseFloat($('p3dHeight').value) || 50;
-                        props.extrusionColor = $('p3dColor').value;
-                        props.fillOpacity = parseFloat($('p3dOpacity').value);
-                    }
-                    const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
+                    const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
                     resetActiveTools();
-                    if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
-                    if (feat) openShapeEditor(feat.id);
+                    openShapeEditor(feat.id);
                     return;
                 }
             }
@@ -2821,15 +2851,15 @@ map.on('click', e => {
         if (draft.length === 2) {
             const feat = addFeatureRecord('rectangle', { type: 'Polygon', coordinates: rectCoords(draft[0], draft[1]) });
             resetActiveTools();
-            if (feat) openShapeEditor(feat.id);
+            openShapeEditor(feat.id);
         }
     } else if (activeTool === 'circle') {
         draft.push(ll);
         if (draft.length === 2) {
             const { coords, r } = circleCoords(draft[0], draft[1]);
-            const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { radiusMeters: r });
+            const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { centerCoord: draft[0], radiusMeters: r });
             resetActiveTools();
-            if (feat) openShapeEditor(feat.id);
+            openShapeEditor(feat.id);
         }
     } else if (activeTool === 'route') {
         if (draft.length >= 2) {
@@ -2846,38 +2876,28 @@ map.on('click', e => {
     renderDraft();
 });
 
-// Double click handling for tools & route midpoint insertion
 map.on('dblclick', e => {
-    if (activeTool === 'route' && draft.length >= 2) {
-        if ($('rAutoFinish') && $('rAutoFinish').checked) {
-            e.preventDefault();
-            fetchMultiPointRoute(draft);
-            resetActiveTools();
-            return;
-        }
+    if (activeTool === 'route' && $('rAutoFinish') && $('rAutoFinish').checked && draft.length >= 2) {
+        e.preventDefault();
+        fetchMultiPointRoute(draft);
+        resetActiveTools();
+        return;
     }
     if (editMode) {
+        // Midpoint insertion for route
         const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-line'] });
         if (fs.length && fs[0].properties.id != null) {
-            const id = parseInt(fs[0].properties.id, 10);
-            const f = features.find(x => x.id === id);
-            if (f && f.kind === 'route') {
-                e.preventDefault();
-                const clickLL = [e.lngLat.lng, e.lngLat.lat];
-                const pts = f.props.waypoints || f.geometry.coordinates;
-                // Find closest segment to insert waypoint
-                let bestIdx = -1, bestDist = Infinity;
+            const f = features.find(x => x.id === parseInt(fs[0].properties.id, 10));
+            if (f && f.kind === 'route' && f.props.waypoints) {
+                const ll = [e.lngLat.lng, e.lngLat.lat];
+                let bestIdx = -1, bestDist = 1e9;
+                const pts = f.props.waypoints;
                 for (let i = 0; i < pts.length - 1; i++) {
-                    const d = haversineDist(pts[i], clickLL) + haversineDist(clickLL, pts[i+1]);
-                    if (d < bestDist) {
-                        bestDist = d;
-                        bestIdx = i + 1;
-                    }
+                    const d = haversineDist(pts[i], ll) + haversineDist(ll, pts[i+1]);
+                    if (d < bestDist) { bestDist = d; bestIdx = i + 1; }
                 }
-                if (bestIdx > -1) {
-                    pushState();
-                    pts.splice(bestIdx, 0, clickLL);
-                    f.props.waypoints = pts;
+                if (bestIdx !== -1) {
+                    pts.splice(bestIdx, 0, ll);
                     fetchMultiPointRoute(pts, f.id, f.props.routeMode);
                     hint('Waypoint inserted');
                 }
@@ -2886,48 +2906,7 @@ map.on('dblclick', e => {
     }
 });
 
-document.addEventListener('keydown', e => {
-    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-    if (e.key === 'Enter') {
-        if ((activeTool === 'polygon' || activeTool === 'polygon3d') && draft.length >= 3) {
-            const kind = activeTool;
-            const props = {};
-            if (kind === 'polygon3d') {
-                props.height = parseFloat($('p3dHeight').value) || 50;
-                props.extrusionColor = $('p3dColor').value;
-                props.fillOpacity = parseFloat($('p3dOpacity').value);
-            }
-            const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
-            resetActiveTools();
-            if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
-            if (feat) openShapeEditor(feat.id);
-        } else if (activeTool === 'polyline' && draft.length >= 2) {
-            const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
-            resetActiveTools();
-            if (feat) openShapeEditor(feat.id);
-        } else if (activeTool === 'route' && draft.length >= 2) {
-            fetchMultiPointRoute(draft);
-            resetActiveTools();
-        }
-    }
-    if (e.key === 'Escape') {
-        resetActiveTools();
-        closeFloatingCards();
-        editMode = false;
-        $('btn-edit-mode').classList.remove('primary-active');
-        syncVertexHandles();
-    }
-    if (e.key === 'Delete' && selectedId && editMode) {
-         pushState();
-         features = features.filter(x => x.id !== selectedId);
-         for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== selectedId);
-         selectedId = null;
-         syncDraw(); renderMyLayers(); markDirty();
-         hint('Deleted selected layer');
-    }
-});
-
-// ----------------- Edit Mode -----------------
+// ----------------- Edit Mode & Dragging -----------------
 $('btn-edit-mode').onclick = () => {
     editMode = !editMode;
     $('btn-edit-mode').classList.toggle('primary-active', editMode);
@@ -2935,40 +2914,39 @@ $('btn-edit-mode').onclick = () => {
     document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
     closeFloatingCards();
     syncVertexHandles();
-    hint(editMode ? 'Edit mode: drag shapes or vertices (blue dots)' : '');
+    hint(editMode ? 'Edit Mode: Drag shapes, rotate via gold handle, or tweak handles' : '');
 };
 
 map.on('mousedown', e => {
     if (editMode) {
         const vHits = map.queryRenderedFeatures(e.point, { layers: ['vertex-points'] });
         if (vHits.length && vHits[0].properties.polyId != null) {
-            if (vHits[0].properties.isRotHandle) {
+            const prop = vHits[0].properties;
+            if (prop.isRotHandle) {
                 isDraggingRotation = true;
-                rotatingPolyId = parseInt(vHits[0].properties.polyId, 10);
+                rotatingPolyId = parseInt(prop.polyId, 10);
                 const f = features.find(x => x.id === rotatingPolyId);
                 const b = calcBounds(f);
                 rotCenter = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
                 rotStartAngle = Math.atan2(cursorLL[1] - rotCenter[1], cursorLL[0] - rotCenter[0]);
-                rotOriginalCoords = JSON.parse(JSON.stringify(f.geometry.coordinates));
                 map.dragPan.disable();
                 return;
             }
             isDraggingVertex = true;
-            draggedPolyId = parseInt(vHits[0].properties.polyId, 10);
-            draggedVertexIdx = parseInt(vHits[0].properties.vIdx, 10);
+            draggedPolyId = parseInt(prop.polyId, 10);
+            draggedVertexIdx = prop.vIdx != null ? parseInt(prop.vIdx, 10) : -1;
+            isRadiusHandle = !!prop.isRadiusHandle;
             map.dragPan.disable();
             return;
         }
-        const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text','draw-3d-extrusion'] });
+        const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
         if (fs.length && fs[0].properties.id != null) {
             isDragging = true;
             dragFeatureId = parseInt(fs[0].properties.id, 10);
-            selectedId = dragFeatureId;
             dragStartCoord = [e.lngLat.lng, e.lngLat.lat];
             const f = features.find(x => x.id === dragFeatureId);
             if (f) dragOriginalCoords = JSON.parse(JSON.stringify(f.geometry.coordinates));
             map.dragPan.disable();
-            syncVertexHandles();
         }
     }
 });
@@ -2978,31 +2956,31 @@ map.on('mouseup', () => {
         isDragging = false;
         dragFeatureId = null;
         map.dragPan.enable();
-        markDirty(true);
+        markDirty();
     }
     if (isDraggingVertex) {
         if (draggedPolyId != null) {
             const f = features.find(x => x.id === draggedPolyId);
-            if (f && f.kind === 'route') {
-                const pts = f.props.waypoints || f.geometry.coordinates;
-                fetchMultiPointRoute(pts, f.id, f.props.routeMode);
+            if (f && f.kind === 'route' && f.props.waypoints) {
+                fetchMultiPointRoute(f.props.waypoints, f.id, f.props.routeMode);
             }
         }
         isDraggingVertex = false;
         draggedPolyId = null;
         draggedVertexIdx = -1;
+        isRadiusHandle = false;
         map.dragPan.enable();
-        markDirty(true);
+        markDirty();
     }
     if (isDraggingRotation) {
         isDraggingRotation = false;
         rotatingPolyId = null;
         map.dragPan.enable();
-        markDirty(true);
+        markDirty();
     }
 });
 
-// ----------------- Customizer / Shape Editor -----------------
+// ----------------- Shape Editor / Customizer -----------------
 function openShapeEditor(id) {
     const f = features.find(x => x.id === id);
     if (!f) return;
@@ -3010,41 +2988,25 @@ function openShapeEditor(id) {
     closeFloatingCards();
     $('editShapeTitle').textContent = `Edit ${f.name}`;
     $('eName').value = f.name;
-    $('eBorderColor').value = f.props.borderColor || f.props.color || '#e8b84a';
+    $('eRotationVal').value = Math.round(f.props.rotation || 0);
+    
     $('eBorderOp').value = f.props.borderOpacity != null ? f.props.borderOpacity : 0.9;
     $('eWidth').value = f.props.width || 3;
-    $('eFillColor').value = f.props.fillColor || f.props.color || '#e8b84a';
     $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
     
     const isPolygon = ['polygon', 'rectangle', 'circle'].includes(f.kind);
-    const is3D = f.kind === 'polygon3d';
-    
-    $('eFillColorRow').style.display = isPolygon ? 'flex' : 'none';
+    $('eFillColorRowContainer').style.display = isPolygon ? 'flex' : 'none';
     $('eFillOpRow').style.display = isPolygon ? 'flex' : 'none';
-    $('eBorderColorRow').style.display = !is3D ? 'flex' : 'none';
-    $('eBorderOpRow').style.display = !is3D ? 'flex' : 'none';
-    $('eWidthRow').style.display = !is3D ? 'flex' : 'none';
-
-    $('eLabelToggleRow').style.display = (isPolygon || is3D || f.kind === 'route') ? 'flex' : 'none';
-    $('eLabelPosRow').style.display = (isPolygon || is3D || f.kind === 'route') ? 'flex' : 'none';
+    $('eLabelToggleRow').style.display = 'flex';
+    $('eLabelPosRow').style.display = 'flex';
     
-    if (isPolygon || is3D || f.kind === 'route') {
-        $('eShowLabel').checked = !!f.props.showLabel;
-        $('eLabelPos').value = f.props.labelPos || 'center';
-    }
-
-    if (is3D) {
-        $('p3dEditorControls').style.display = 'block';
-        $('eP3dHeight').value = f.props.height || 50;
-        $('eP3dColor').value = f.props.extrusionColor || '#e8b84a';
-        $('eP3dOpacity').value = f.props.fillOpacity || 0.7;
-    } else {
-        $('p3dEditorControls').style.display = 'none';
-    }
+    $('eShowLabel').checked = !!f.props.showLabel;
+    $('eLabelPos').value = f.props.labelPos || 'center';
 
     const isMarker = f.kind === 'marker';
     $('eMarkerSizeRow').style.display = isMarker ? 'flex' : 'none';
     if (isMarker) $('eMarkerSize').value = f.props.iconSize || 0.9;
+    
     const isText = f.kind === 'text';
     $('eTextRow').style.display = isText ? 'flex' : 'none';
     $('eFontSizeRow').style.display = isText ? 'flex' : 'none';
@@ -3053,56 +3015,52 @@ function openShapeEditor(id) {
         $('eFontSize').value = f.props.fontSize || 16;
     }
     
+    // Route Specifics
     const isRoute = f.kind === 'route';
     $('routeEditorControls').style.display = isRoute ? 'block' : 'none';
     if (isRoute) {
         $('eRouteMode').value = f.props.routeMode || 'driving';
         $('eRouteStats').textContent = f.props.description || '-';
-        renderRouteWaypointsEditor(f);
+        renderWaypointEditor(f);
     }
 
     $('popup-shape-editor').classList.add('open');
+    syncVertexHandles();
 }
 
-function renderRouteWaypointsEditor(f) {
-    const container = $('eRouteWaypointsList');
-    if (!container) return;
-    const pts = f.props.waypoints || f.geometry.coordinates || [];
-    container.innerHTML = pts.map((pt, idx) => `
-        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:3px 6px; border-radius:4px; font-size:10px;">
-            <span>Pt ${idx + 1}: ${pt[1].toFixed(4)}, ${pt[0].toFixed(4)}</span>
-            ${pts.length > 2 ? `<button class="card-btn" onclick="removeRouteWaypoint(${f.id}, ${idx})" style="color:#ff7b72;">✕</button>` : ''}
+function renderWaypointEditor(f) {
+    const list = $('eWaypointList');
+    if (!f.props.waypoints || !f.props.waypoints.length) {
+        list.innerHTML = '<span style="font-size:10px; color:#768390;">No intermediate waypoints.</span>';
+        return;
+    }
+    list.innerHTML = f.props.waypoints.map((pt, i) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; font-size:10px;">
+            <span>Pt ${i+1}: ${pt[1].toFixed(4)}, ${pt[0].toFixed(4)}</span>
+            ${f.props.waypoints.length > 2 ? `<button class="card-btn" onclick="removeWaypoint(${f.id}, ${i})" title="Remove waypoint" style="color:#ff7b72;">✕</button>` : ''}
         </div>
     `).join('');
 }
 
-window.removeRouteWaypoint = function(featureId, idx) {
-    const f = features.find(x => x.id === featureId);
-    if (!f || f.kind !== 'route') return;
-    const pts = f.props.waypoints || f.geometry.coordinates;
-    if (pts.length <= 2) return;
-    pushState();
-    pts.splice(idx, 1);
-    f.props.waypoints = pts;
-    fetchMultiPointRoute(pts, f.id, f.props.routeMode);
+window.removeWaypoint = function(featId, idx) {
+    const f = features.find(x => x.id === featId);
+    if (f && f.props.waypoints && f.props.waypoints.length > 2) {
+        f.props.waypoints.splice(idx, 1);
+        fetchMultiPointRoute(f.props.waypoints, f.id, f.props.routeMode);
+    }
 };
 
 $('eName').oninput = e => {
     const f = features.find(x => x.id === selectedId);
-    if (f) { f.name = e.target.value; syncDraw(); renderMyLayers(); markDirty(); }
-};
-$('eBorderColor').oninput = e => {
-    const f = features.find(x => x.id === selectedId);
-    if (!f) return;
-    f.props.borderColor = e.target.value;
-    f.props.color = e.target.value;
-    if (f.kind === 'marker' && !customMarkerImageKey) f.props.iconKey = getIconKey(f.props.shape || 'pin', e.target.value);
-    syncDraw();
-    markDirty();
+    if (f) {
+        f.name = e.target.value;
+        if (!f.props.attributes) f.props.attributes = {};
+        f.props.attributes.name = e.target.value;
+        syncDraw(); renderMyLayers(); markDirty();
+    }
 };
 $('eBorderOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.borderOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.width = parseFloat(e.target.value); syncDraw(); markDirty(); } };
-$('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); markDirty(); } };
 $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); markDirty(); } };
 $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); markDirty(); } };
@@ -3110,28 +3068,32 @@ $('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selected
 $('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); markDirty(); } };
 $('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); markDirty(); } };
 
-// 3D Editor Controls
-$('eP3dHeight').oninput = e => {
+// Rotation Control in Shape Editor
+$('eRotationVal').oninput = e => {
     const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'polygon3d') {
-        f.props.height = parseFloat(e.target.value);
+    if (!f) return;
+    const val = parseFloat(e.target.value) || 0;
+    const current = f.props.rotation || 0;
+    const diffDeg = val - current;
+    const b = calcBounds(f);
+    if (b) {
+        const center = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
+        rotateGeometry(f, diffDeg * Math.PI / 180, center);
+        f.props.rotation = val;
         syncDraw();
         markDirty();
     }
 };
-$('eP3dColor').oninput = e => {
+
+$('btnRotateQuarter').onclick = () => {
     const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'polygon3d') {
-        f.props.extrusionColor = e.target.value;
-        f.props.fillColor = e.target.value;
-        syncDraw();
-        markDirty();
-    }
-};
-$('eP3dOpacity').oninput = e => {
-    const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'polygon3d') {
-        f.props.fillOpacity = parseFloat(e.target.value);
+    if (!f) return;
+    const b = calcBounds(f);
+    if (b) {
+        const center = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
+        rotateGeometry(f, Math.PI / 2, center);
+        f.props.rotation = ((f.props.rotation || 0) + 90) % 360;
+        $('eRotationVal').value = Math.round(f.props.rotation);
         syncDraw();
         markDirty();
     }
@@ -3140,42 +3102,48 @@ $('eP3dOpacity').oninput = e => {
 // Route Editor Controls
 $('eRouteMode').onchange = e => {
     const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'route') {
+    if (f && f.kind === 'route' && f.props.waypoints) {
         f.props.routeMode = e.target.value;
-        const pts = f.props.waypoints || f.geometry.coordinates;
-        fetchMultiPointRoute(pts, f.id, e.target.value);
+        fetchMultiPointRoute(f.props.waypoints, f.id, e.target.value);
     }
 };
 
 $('eRecalcRoute').onclick = () => {
     const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'route') {
-        const pts = f.props.waypoints || f.geometry.coordinates;
-        fetchMultiPointRoute(pts, f.id, f.props.routeMode);
+    if (f && f.kind === 'route' && f.props.waypoints) {
+        fetchMultiPointRoute(f.props.waypoints, f.id, f.props.routeMode);
     }
 };
 
 $('eDeleteBtn').onclick = () => {
-    pushState();
     features = features.filter(x => x.id !== selectedId);
     for (const g in customGroups) { customGroups[g].ids = customGroups[g].ids.filter(id => id !== selectedId); }
+    selectedId = null;
     syncDraw();
     renderMyLayers();
     $('popup-shape-editor').classList.remove('open');
     markDirty();
 };
-$('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
-$('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
+$('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); selectedId = null; syncVertexHandles(); };
+$('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); selectedId = null; syncVertexHandles(); };
 
 // ----------------- My Layers Panel -----------------
 $('btnAddCustomGroup').onclick = () => {
     const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
     if (gName && gName.trim() && !customGroups[gName]) {
-        pushState();
         customGroups[gName.trim()] = { collapsed: false, ids: [] };
         renderMyLayers();
         markDirty();
     }
+};
+
+$('btnSelectAllGlobal').onclick = () => {
+    if (selectedLayerIds.size === features.length && features.length > 0) {
+        selectedLayerIds.clear();
+    } else {
+        features.forEach(f => selectedLayerIds.add(f.id));
+    }
+    renderMyLayers();
 };
 
 $('btnHideSelected').onclick = () => {
@@ -3183,7 +3151,6 @@ $('btnHideSelected').onclick = () => {
         hint('Select at least one layer first');
         return;
     }
-    pushState();
     const allHidden = Array.from(selectedLayerIds).every(id => {
         const f = features.find(x => x.id === id);
         return f && f.props.visible === 0;
@@ -3196,7 +3163,7 @@ $('btnHideSelected').onclick = () => {
     syncDraw();
     renderMyLayers();
     markDirty();
-    hint(allHidden ? 'Layers unhidden' : 'Layers hidden');
+    hint(allHidden ? 'Layers shown' : 'Layers hidden');
 };
 
 function renderLayerCardHtml(f) {
@@ -3205,8 +3172,6 @@ function renderLayerCardHtml(f) {
         subInfo = `Radius: ${f.props.radiusMeters > 1000 ? (f.props.radiusMeters/1000).toFixed(2)+' km' : Math.round(f.props.radiusMeters)+' m'}`;
     } else if (f.kind === 'route' && f.props.description) {
         subInfo = f.props.description;
-    } else if (f.kind === 'polygon3d') {
-        subInfo = `3D (${f.props.height || 50}m)`;
     }
     const isSelected = selectedLayerIds.has(f.id);
     const posOptions = ['center','top','bottom','left','right']
@@ -3251,7 +3216,7 @@ function renderLayerCardHtml(f) {
 function renderMyLayers() {
     const container = $('my-layers-list');
     $('layer-badge-count').textContent = features.length;
-    const polyList = features.filter(f => ['polygon', 'rectangle', 'circle', 'polygon3d'].includes(f.kind));
+    const polyList = features.filter(f => ['polygon', 'rectangle', 'circle'].includes(f.kind));
     $('tradePolygonSelect').innerHTML = '<option value="">-- Choose --</option>' + polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     if (!features.length && !Object.keys(customGroups).length) {
         container.innerHTML = '<div style="font-size:12px; color:#768390; padding:6px 0;">No drawings yet. Use the tools to create shapes.</div>';
@@ -3273,7 +3238,7 @@ function renderMyLayers() {
                         <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group"/>
                     </div>
                     <div style="display:flex; align-items:center; gap:2px;">
-                         <button class="card-btn" data-act="groupSelectAll" data-group="${gName}" title="Select All in Group">
+                        <button class="card-btn" data-act="groupSelectAll" data-group="${gName}" title="Select All in Group">
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
                         </button>
                         <button class="card-btn" data-act="groupStyle" data-group="${gName}" title="Style Group">
@@ -3314,7 +3279,7 @@ function renderMyLayers() {
     const looseFeats = features.filter(f => !groupedIds.has(f.id));
     html += '<div id="ungrouped-zone">';
     if (looseFeats.length) {
-        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;"><span>Ungrouped Layers</span> <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped" style="font-size:10px; display:flex; align-items:center; gap:2px;"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg> Select All</button></div>';
+        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">Ungrouped Layers <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></button></div>';
         html += looseFeats.slice().reverse().map(f => renderLayerCardHtml(f)).join('');
     }
     html += '</div>';
@@ -3323,7 +3288,11 @@ function renderMyLayers() {
     const btnSelAllUng = container.querySelector('#btnSelectAllUngrouped');
     if (btnSelAllUng) {
         btnSelAllUng.onclick = () => {
-            looseFeats.forEach(f => selectedLayerIds.add(f.id));
+            const allSelected = looseFeats.every(f => selectedLayerIds.has(f.id));
+            looseFeats.forEach(f => {
+                if (allSelected) selectedLayerIds.delete(f.id);
+                else selectedLayerIds.add(f.id);
+            });
             renderMyLayers();
         };
     }
@@ -3344,7 +3313,6 @@ function renderMyLayers() {
             gc.classList.remove('drop-hover');
             const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
             if (isNaN(draggedId)) return;
-            pushState();
             for (const g in customGroups) {
                 customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
             }
@@ -3372,7 +3340,6 @@ function renderMyLayers() {
             uz.classList.remove('drop-hover');
             const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
             if (isNaN(draggedId)) return;
-            pushState();
             for (const g in customGroups) {
                 customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
             }
@@ -3415,7 +3382,11 @@ function renderMyLayers() {
             const gName = btn.dataset.group;
             const grp = customGroups[gName];
             if (grp) {
-                grp.ids.forEach(id => selectedLayerIds.add(id));
+                const allSelected = grp.ids.every(id => selectedLayerIds.has(id));
+                grp.ids.forEach(id => {
+                    if (allSelected) selectedLayerIds.delete(id);
+                    else selectedLayerIds.add(id);
+                });
                 renderMyLayers();
             }
         };
@@ -3426,7 +3397,6 @@ function renderMyLayers() {
             const oldN = e.target.dataset.oldname;
             const newN = e.target.value.trim();
             if (newN && newN !== oldN) {
-                pushState();
                 customGroups[newN] = customGroups[oldN];
                 delete customGroups[oldN];
                 renderMyLayers();
@@ -3439,7 +3409,12 @@ function renderMyLayers() {
         inp.onchange = e => {
             const id = parseInt(e.target.dataset.id, 10);
             const f = features.find(x => x.id === id);
-            if (f) { pushState(); f.name = e.target.value; syncDraw(); markDirty(); }
+            if (f) {
+                f.name = e.target.value;
+                if (!f.props.attributes) f.props.attributes = {};
+                f.props.attributes.name = e.target.value;
+                syncDraw(); markDirty();
+            }
         };
     });
 
@@ -3463,7 +3438,6 @@ function renderMyLayers() {
                 return;
             }
             if (act === 'groupEye') {
-                pushState();
                 const g = b.dataset.group;
                 const ids = customGroups[g].ids || [];
                 const anyVis = features.some(f => ids.includes(f.id) && f.props.visible);
@@ -3472,7 +3446,6 @@ function renderMyLayers() {
                 return;
             }
             if (act === 'groupDel') {
-                pushState();
                 const g = b.dataset.group;
                 delete customGroups[g];
                 renderMyLayers();
@@ -3486,18 +3459,16 @@ function renderMyLayers() {
                 openAttributeTable(id);
                 return;
             }
-            if (act === 'labelToggle') { pushState(); f.props.showLabel = b.checked; syncDraw(); markDirty(); }
-            if (act === 'labelPos') { pushState(); f.props.labelPos = b.value; syncDraw(); markDirty(); }
+            if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); markDirty(); }
+            if (act === 'labelPos') { f.props.labelPos = b.value; syncDraw(); markDirty(); }
             if (act === 'edit') openShapeEditor(id);
             if (act === 'eye') {
-                pushState();
                 f.props.visible = f.props.visible ? 0 : 1;
                 syncDraw();
                 renderMyLayers();
                 markDirty();
             }
             if (act === 'del') {
-                pushState();
                 features = features.filter(x => x.id !== id);
                 for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== id);
                 selectedLayerIds.delete(id);
@@ -3522,7 +3493,6 @@ function renderMyLayers() {
             const size = parseFloat(panel.querySelector('.grp-style-size').value);
             const grp = customGroups[gName];
             if (!grp) return;
-            pushState();
             grp.ids.forEach(id => {
                 const f = features.find(x => x.id === id);
                 if (f && f.kind === 'marker') {
@@ -3545,7 +3515,6 @@ function reorderFeatures(draggedId, targetId) {
     const draggedIndex = features.findIndex(f => f.id === draggedId);
     const targetIndex = features.findIndex(f => f.id === targetId);
     if (draggedIndex === -1 || targetIndex === -1) return;
-    pushState();
     const [draggedItem] = features.splice(draggedIndex, 1);
     features.splice(targetIndex, 0, draggedItem);
     syncDraw();
@@ -3568,66 +3537,99 @@ function calcBounds(f) {
     return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Attribute Table Logic -----------------
+// ----------------- Attribute Table Modal & Logic -----------------
 function openAttributeTable(featureId) {
     currentTableFeatureId = featureId;
     const f = features.find(x => x.id === featureId);
     if (!f) return;
     
     $('attrTableTitle').textContent = `Attributes: ${f.name}`;
-    closeFloatingCards();
     $('popup-attribute-table').classList.add('open');
     
-    if (!f.props.attributes) f.props.attributes = {};
+    if (!f.props.attributes) {
+        f.props.attributes = {
+            name: f.name || '',
+            description: f.props.description || ''
+        };
+    }
+    if (!f.props.attrTypes) {
+        f.props.attrTypes = { name: 'text', description: 'text' };
+    }
+    if (!f.props.attrRows) {
+        f.props.attrRows = [{ ...f.props.attributes }];
+    }
+    
     renderAttributeTable(f);
 }
 
 function renderAttributeTable(f) {
-    const attrs = f.props.attributes || {};
     const headerRow = $('attrTableHeader');
     const bodyRow = $('attrTableBody');
+    const types = f.props.attrTypes || { name: 'text', description: 'text' };
+    const cols = Object.keys(types);
+    const rows = f.props.attrRows || [{ ...f.props.attributes }];
     
-    let cols = ['name', 'description'];
-    Object.keys(attrs).forEach(k => {
-        if (!cols.includes(k)) cols.push(k);
+    headerRow.innerHTML = `<tr>` + cols.map(c => `
+        <th>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
+                <span>${c}</span>
+                <select onchange="changeColType('${c}', this.value)" style="font-size:9px; padding:1px 2px; border-radius:3px;">
+                    <option value="text" ${types[c] === 'text' ? 'selected' : ''}>Text</option>
+                    <option value="image" ${types[c] === 'image' ? 'selected' : ''}>Image</option>
+                </select>
+            </div>
+        </th>
+    `).join('') + `<th style="width:40px;">DEL</th></tr>`;
+    
+    let html = '';
+    rows.forEach((r, rIdx) => {
+        html += `<tr>`;
+        cols.forEach(c => {
+            const val = r[c] || '';
+            const t = types[c] || 'text';
+            if (t === 'image') {
+                if (val && typeof val === 'string' && val.startsWith('data:image')) {
+                    html += `<td><img src="${val}" class="attr-img-preview" onclick="triggerAttrImageUpload(${rIdx}, '${c}')" oncontextmenu="clearAttrImage(${rIdx}, '${c}'); return false;" title="Click to replace, Right-click to clear"></td>`;
+                } else {
+                    html += `<td><div class="attr-img-placeholder" onclick="triggerAttrImageUpload(${rIdx}, '${c}')">+ Upload Image</div></td>`;
+                }
+            } else {
+                html += `<td><input type="text" value="${val}" onchange="updateAttrCell(${rIdx}, '${c}', this.value)"></td>`;
+            }
+        });
+        html += `<td><button class="card-btn" onclick="removeAttrRow(${rIdx})" title="Delete row" style="color:#ff7b72;">✕</button></td></tr>`;
     });
-    
-    headerRow.innerHTML = cols.map(c => `<th>${c.toUpperCase()}</th>`).join('') + '<th>ACTIONS</th>';
-    
-    let html = '<tr>';
-    cols.forEach(c => {
-        let val = '';
-        if (c === 'name') val = f.name;
-        else if (c === 'description') val = f.props.description || '';
-        else val = attrs[c] || '';
-        
-        if (typeof val === 'string' && val.startsWith('data:image')) {
-            html += `<td data-key="${c}"><img src="${val}" class="attr-img-preview" onclick="triggerAttrImageUpload('${c}')" oncontextmenu="clearAttrImage('${c}'); return false;" title="Click to upload, right click to clear"></td>`;
-        } else {
-            html += `<td data-key="${c}"><input type="text" value="${val}" onblur="updateAttr('${c}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();}"></td>`;
-        }
-    });
-    html += `<td><button class="card-btn" onclick="removeAttrColumn()" title="Remove Last Custom Column" style="color:#ff7b72;">✕</button></td></tr>`;
     bodyRow.innerHTML = html;
 }
 
-window.updateAttr = (key, value) => {
+window.changeColType = (colName, newType) => {
     const f = features.find(x => x.id === currentTableFeatureId);
     if (!f) return;
-    pushState();
-    if (key === 'name') {
-        f.name = value;
-        renderMyLayers();
-    } else if (key === 'description') {
-        f.props.description = value;
-    } else {
-        f.props.attributes[key] = value;
+    f.props.attrTypes[colName] = newType;
+    renderAttributeTable(f);
+    markDirty();
+};
+
+window.updateAttrCell = (rIdx, key, val) => {
+    const f = features.find(x => x.id === currentTableFeatureId);
+    if (!f) return;
+    if (!f.props.attrRows[rIdx]) f.props.attrRows[rIdx] = {};
+    f.props.attrRows[rIdx][key] = val;
+    if (rIdx === 0) {
+        f.props.attributes[key] = val;
+        if (key === 'name') {
+            f.name = val;
+            renderMyLayers();
+        }
+        if (key === 'description') {
+            f.props.description = val;
+        }
     }
     syncDraw();
     markDirty();
 };
 
-window.triggerAttrImageUpload = (key) => {
+window.triggerAttrImageUpload = (rIdx, key) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -3638,8 +3640,9 @@ window.triggerAttrImageUpload = (key) => {
             reader.onload = ev => {
                 const f = features.find(x => x.id === currentTableFeatureId);
                 if (f) {
-                    pushState();
-                    f.props.attributes[key] = ev.target.result;
+                    if (!f.props.attrRows[rIdx]) f.props.attrRows[rIdx] = {};
+                    f.props.attrRows[rIdx][key] = ev.target.result;
+                    if (rIdx === 0) f.props.attributes[key] = ev.target.result;
                     renderAttributeTable(f);
                     markDirty();
                 }
@@ -3650,27 +3653,35 @@ window.triggerAttrImageUpload = (key) => {
     input.click();
 };
 
-window.clearAttrImage = (key) => {
+window.clearAttrImage = (rIdx, key) => {
     const f = features.find(x => x.id === currentTableFeatureId);
-    if (f && f.props.attributes[key]) {
-        pushState();
-        delete f.props.attributes[key];
+    if (f && f.props.attrRows[rIdx]) {
+        f.props.attrRows[rIdx][key] = '';
+        if (rIdx === 0) f.props.attributes[key] = '';
         renderAttributeTable(f);
         markDirty();
     }
 };
 
-window.removeAttrColumn = () => {
+window.removeAttrRow = (rIdx) => {
+    const f = features.find(x => x.id === currentTableFeatureId);
+    if (!f || f.props.attrRows.length <= 1) {
+        hint('Cannot remove the primary row');
+        return;
+    }
+    f.props.attrRows.splice(rIdx, 1);
+    renderAttributeTable(f);
+    markDirty();
+};
+
+$('btnAddAttrRow').onclick = () => {
     const f = features.find(x => x.id === currentTableFeatureId);
     if (!f) return;
-    const attrs = f.props.attributes;
-    const keys = Object.keys(attrs);
-    if (keys.length > 0) {
-        pushState();
-        delete attrs[keys[keys.length - 1]];
-        renderAttributeTable(f);
-        markDirty();
-    }
+    const newRow = {};
+    Object.keys(f.props.attrTypes).forEach(k => newRow[k] = '');
+    f.props.attrRows.push(newRow);
+    renderAttributeTable(f);
+    markDirty();
 };
 
 $('btnAddAttrCol').onclick = () => {
@@ -3678,11 +3689,12 @@ $('btnAddAttrCol').onclick = () => {
     if (!f) return;
     const name = prompt("Enter new column name:");
     if (name && name.trim()) {
-        const cleanName = name.trim().toLowerCase();
-        if (!f.props.attributes[cleanName]) {
-            const isImg = confirm("Is this an Image column? Click OK for Image, Cancel for Text.");
-            pushState();
-            f.props.attributes[cleanName] = isImg ? "data:image/placeholder" : "";
+        const c = name.trim();
+        const type = confirm("Is this column for Images? (Click Cancel for standard Text)") ? "image" : "text";
+        if (!f.props.attrTypes[c]) {
+            f.props.attrTypes[c] = type;
+            f.props.attrRows.forEach(r => r[c] = '');
+            f.props.attributes[c] = '';
             renderAttributeTable(f);
             markDirty();
         }
@@ -3691,15 +3703,10 @@ $('btnAddAttrCol').onclick = () => {
 
 $('attrTableSearch').oninput = e => {
     const term = e.target.value.toLowerCase();
-    const cells = $('attrTableBody').querySelectorAll('td[data-key]');
-    cells.forEach(td => {
-        const inp = td.querySelector('input[type="text"]');
-        const text = inp ? inp.value.toLowerCase() : '';
-        if (text.includes(term) || !term) {
-            td.style.opacity = '1';
-        } else {
-            td.style.opacity = '0.2';
-        }
+    const rows = $('attrTableBody').querySelectorAll('tr');
+    rows.forEach(tr => {
+        const text = tr.innerText.toLowerCase() + Array.from(tr.querySelectorAll('input')).map(i => i.value.toLowerCase()).join(' ');
+        tr.style.display = text.includes(term) ? '' : 'none';
     });
 };
 
@@ -3788,22 +3795,13 @@ $('presetBtnList').querySelectorAll('button').forEach(b => {
 });
 
 const setMapPaint = (id, prop, val) => { if (map.getLayer(id)) map.setPaintProperty(id, prop, val); };
-$('cBgColor').oninput = e => { setMapPaint('bg', 'background-color', e.target.value); markDirty(); };
-$('cExpColor').oninput = e => { setMapPaint('rd_express', 'line-color', e.target.value); markDirty(); };
-$('cMainColor').oninput = e => { setMapPaint('rd_major', 'line-color', e.target.value); markDirty(); };
 $('cMainWidth').oninput = e => { setMapPaint('rd_major', 'line-width', parseFloat(e.target.value)); markDirty(); };
 $('cMainOp').oninput = e => { setMapPaint('rd_major', 'line-opacity', parseFloat(e.target.value)); markDirty(); };
-$('cSecColor').oninput = e => { setMapPaint('rd_secondary', 'line-color', e.target.value); markDirty(); };
 $('cSecWidth').oninput = e => { setMapPaint('rd_secondary', 'line-width', parseFloat(e.target.value)); markDirty(); };
 $('cSecOp').oninput = e => { setMapPaint('rd_secondary', 'line-opacity', parseFloat(e.target.value)); markDirty(); };
-$('cTerColor').oninput = e => { ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-color', e.target.value)); markDirty(); };
 $('cTerWidth').oninput = e => { setMapPaint('rd_tertiary', 'line-width', parseFloat(e.target.value)); markDirty(); };
 $('cTerOp').oninput = e => { ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-opacity', parseFloat(e.target.value))); markDirty(); };
-$('cRailColor').oninput = e => { setMapPaint('rd_rail', 'line-color', e.target.value); markDirty(); };
-$('cBoundColor').oninput = e => { ['bound_prov','bound_city','bound_brgy'].forEach(id => setMapPaint(id, 'line-color', e.target.value)); markDirty(); };
-$('cBldColor').oninput = e => { setMapPaint('building-2d', 'fill-color', e.target.value); setMapPaint('building-2d', 'fill-outline-color', e.target.value); setMapPaint('building-3d', 'fill-extrusion-color', e.target.value); markDirty(); };
 $('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('building-3d', 'fill-extrusion-opacity', parseFloat(e.target.value)); markDirty(); };
-$('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
 // ----------------- Import -----------------
@@ -3863,30 +3861,22 @@ function processGeoJSON(geojson) {
         } else if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
             if (props.route_mode || props.routeMode) {
                 addFeatureRecord('route', geom, {
-                    routeMode: props.route_mode || props.routeMode || 'driving',
+                    routeMode: props.route_mode || props.routeMode,
                     description: props.description || '',
                     color: props.color || '#38bdf8',
-                    borderColor: props.borderColor || props.color || '#38bdf8',
-                    metadata: props.metadata || {}
+                    borderColor: props.color || '#38bdf8',
+                    waypoints: geom.coordinates
                 });
             } else {
                 addFeatureRecord('polyline', geom, {});
             }
         } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-            if (props.height != null || props.extrude) {
-                addFeatureRecord('polygon3d', geom, {
-                    height: parseFloat(props.height) || 50,
-                    extrusionColor: props.extrusionColor || props.fillColor || '#e8b84a',
-                    fillOpacity: parseFloat(props.fillOpacity) || 0.7
-                });
-            } else {
-                addFeatureRecord('polygon', geom, {});
-            }
+            addFeatureRecord('polygon', geom, {});
         }
     });
 }
 
-map.on('moveend', () => markDirty());
+map.on('moveend', () => markDirty(false));
 map.on('error', e => console.warn('Map Notice:', e));
 
 } catch (e) {
