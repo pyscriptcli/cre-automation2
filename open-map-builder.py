@@ -437,6 +437,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .save-badge { font-size: 9px; padding: 2px 7px; border-radius: 12px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: #8b949e; border: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 4px; }
 .save-badge.saving { color: #d9b451; border-color: rgba(217, 180, 81, 0.4); }
 .save-badge.saved { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); }
+.save-badge.unsaved { color: #f85149; border-color: rgba(248, 81, 73, 0.4); }
 .left-panel {
     position: fixed; top: 68px; left: 16px; bottom: 16px; width: 360px; z-index: 999;
     background-color: rgba(9, 16, 24, 0.97);
@@ -519,15 +520,15 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 }
 .float-card input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
 .float-card input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
-.float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
-.float-card input[type=text]:focus { border-color: #38bdf8; }
-#popup-search { width: 280px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
+.float-card input[type=text], .float-card select, .float-card input[type=number] { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
+.float-card input[type=text]:focus, .float-card select:focus, .float-card input[type=number]:focus { border-color: #38bdf8; }
+#popup-search { width: 340px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
 #popup-marker-settings { width: 250px; }
 #popup-text-settings { width: 260px; }
 #popup-shape-editor { width: 320px; }
 #popup-custom-map { width: 310px; }
 #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
-#popup-route-settings { width: 220px; }
+#popup-route-settings { width: 260px; }
 #popup-polygon3d-settings { width: 280px; }
 #popup-attribute-table { width: 600px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
 .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
@@ -621,35 +622,31 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 .search-wrapper input {
-    flex: 1; border: none; outline: none; font-size: 14px; color: #202124;
+    flex: 1; border: none; outline: none; font-size: 13px; color: #202124;
     background: transparent; padding: 6px 0;
 }
-.search-wrapper svg { stroke: #5f6368; width: 20px; height: 20px; }
+.search-wrapper svg { stroke: #5f6368; width: 18px; height: 18px; }
 .search-results {
     background: #fff; border-radius: 8px; margin-top: 4px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.3); overflow: hidden;
 }
 .search-result-item {
-    padding: 10px 14px; cursor: pointer; font-size: 13px; color: #202124;
+    padding: 10px 14px; cursor: pointer; font-size: 12px; color: #202124;
     display: flex; align-items: center; gap: 10px;
 }
 .search-result-item:hover { background: #f1f3f4; }
-.search-result-icon { width: 20px; height: 20px; flex-shrink: 0; color: #5f6368; }
-#trade-area-modal .float-card {
-    position: relative; top: auto; left: auto; transform: none; right: auto;
-    max-height: 85vh; width: 500px; max-width: 90vw; padding: 16px;
-}
-.trade-area-poi-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
-.trade-area-poi-row label { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; }
-.custom-query-collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; color: #f0f6fc; font-size: 12px; margin-top: 8px;}
+.search-result-icon { width: 18px; height: 18px; flex-shrink: 0; color: #5f6368; }
+.color-swatch-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.color-swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: 0.15s; }
+.color-swatch:hover, .color-swatch.active { border-color: #ffffff; transform: scale(1.1); }
 /* Attribute Table Styles */
-.attr-table-container { width: 100%; overflow-y: auto; max-height: 50vh; }
+.attr-table-container { width: 100%; overflow-x: auto; overflow-y: auto; max-height: 50vh; }
 .attr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.attr-table th { position: sticky; top: 0; background: #0f172a; color: #f0f6fc; padding: 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 10; }
+.attr-table th { position: sticky; top: 0; background: #0f172a; color: #f0f6fc; padding: 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 10; white-space: nowrap; }
 .attr-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
-.attr-table input[type="text"] { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #f0f6fc; padding: 4px; border-radius: 4px; }
+.attr-table input[type="text"] { width: 100%; min-width: 100px; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #f0f6fc; padding: 4px; border-radius: 4px; }
 .attr-table input[type="text"]:focus { border-color: #38bdf8; outline: none; }
-.attr-img-preview { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
+.attr-img-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; display: block; }
 </style>
 </head>
 <body>
@@ -878,27 +875,33 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div style="font-weight:600; font-size:11px; color:#768390;">ROUTE SETTINGS</div>
     <div class="f-row"><span>Mode</span>
         <select id="rProfile" style="width:130px;">
-            <option value="driving">Car</option>
-            <option value="cycling">Motorcycle</option>
-            <option value="walking">Walk</option>
+            <option value="driving" selected>Driving</option>
+            <option value="walking">Walking</option>
+            <option value="cycling">Cycling</option>
         </select>
     </div>
-    <div class="f-row"><span>Style</span>
-        <select id="rColor" style="width:130px;">
-            <option value="#38bdf8">Blue</option>
-            <option value="#3fb950">Green</option>
-            <option value="#f85149">Red</option>
-            <option value="#a371f7">Purple</option>
-        </select>
+    <div class="f-row">
+        <span>Auto-finish on double click</span>
+        <input type="checkbox" id="rAutoFinish" checked style="accent-color:#316dca; cursor:pointer;">
+    </div>
+    <div class="f-row" style="flex-direction:column; align-items:flex-start; gap:4px;">
+        <span>Style Preset:</span>
+        <div class="color-swatch-row">
+            <div class="color-swatch active" data-color="#38bdf8" style="background:#38bdf8;" title="Blue"></div>
+            <div class="color-swatch" data-color="#3fb950" style="background:#3fb950;" title="Green"></div>
+            <div class="color-swatch" data-color="#f85149" style="background:#f85149;" title="Red"></div>
+            <div class="color-swatch" data-color="#a371f7" style="background:#a371f7;" title="Purple"></div>
+            <input type="color" id="rCustomColor" value="#38bdf8" style="margin-left:4px;">
+        </div>
     </div>
 </div>
 
 <div id="popup-polygon3d-settings" class="float-card right-card">
     <div style="font-weight:600; font-size:11px; color:#768390;">3D POLYGON SETTINGS</div>
-    <div class="f-row"> <span>Height (m)</span> <input type="number" id="p3dHeight" min="1" max="500" step="1" value="50" style="width:100px;"></div>
+    <div class="f-row"> <span>Height (1-500m)</span> <input type="number" id="p3dHeight" min="1" max="500" step="1" value="50" style="width:90px;"></div>
     <div class="f-row"> <span>Color</span> <input type="color" id="p3dColor" value="#e8b84a"></div>
-    <div class="f-row"> <span>Opacity</span> <input type="range" id="p3dOpacity" min="0.1" max="1.0" step="0.1" value="0.7"></div>
-    <div class="f-row"> <span>Auto-Close</span> <input type="checkbox" id="p3dAutoClose" checked></div>
+    <div class="f-row"> <span>Opacity</span> <input type="range" id="p3dOpacity" min="0.1" max="1.0" step="0.05" value="0.7"></div>
+    <div class="f-row"> <span>Close popup after draw</span> <input type="checkbox" id="p3dAutoClose" checked style="accent-color:#316dca; cursor:pointer;"></div>
 </div>
 
 <div id="popup-shape-editor" class="float-card right-card">
@@ -912,7 +915,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="f-row" id="eWidthRow"> <span>Border Width</span> <input type="range" id="eWidth" min="1" max="16" step="1"></div>
     <div class="f-row" id="eFillColorRow"> <span>Fill Color</span> <input type="color" id="eFillColor"></div>
     <div class="f-row" id="eFillOpRow"> <span>Fill Opacity</span> <input type="range" id="eFillOp" min="0" max="1" step="0.05"></div>
-    <div class="f-row" id="eLabelToggleRow" style="display:none;"> <span>Show Label</span> <input type="checkbox" id="eShowLabel"></div>
+    <div class="f-row" id="eLabelToggleRow" style="display:none;"> <span>Show Label</span> <input type="checkbox" id="eShowLabel" style="accent-color:#316dca;"></div>
     <div class="f-row" id="eLabelPosRow" style="display:none;"> <span>Label Position</span>
         <select id="eLabelPos" style="width:110px;">
             <option value="center">Center</option>
@@ -928,22 +931,24 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     
     <!-- Route Specific Controls -->
     <div id="routeEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
-        <div class="f-row"> <span>Route Mode</span>
+        <div class="f-row"> <span>Mode</span>
             <select id="eRouteMode" style="width:110px;">
                 <option value="driving">Driving</option>
-                <option value="cycling">Cycling</option>
                 <option value="walking">Walking</option>
+                <option value="cycling">Cycling</option>
             </select>
         </div>
-        <div class="f-row" style="margin-top:4px;"> <span>Stats</span> <span id="eRouteStats" style="font-size:11px; color:#adbac7;">-</span></div>
+        <div class="f-row" style="margin-top:4px;"> <span>Stats</span> <span id="eRouteStats" style="font-size:11px; color:#38bdf8; font-weight:600;">-</span></div>
         <button id="eRecalcRoute" class="trade-btn" style="width:100%; margin-top:6px; font-size:10px;">Recalculate Route</button>
+        <div style="font-size:10px; color:#768390; margin-top:6px; font-weight:700;">WAYPOINTS</div>
+        <div id="eRouteWaypointsList" style="max-height:90px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
     </div>
 
     <!-- 3D Polygon Specific Controls -->
     <div id="p3dEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
-        <div class="f-row"> <span>Height (m)</span> <input type="number" id="eP3dHeight" min="1" max="500" step="1" style="width:100px;"></div>
+        <div class="f-row"> <span>Height (m)</span> <input type="number" id="eP3dHeight" min="1" max="500" step="1" style="width:90px;"></div>
         <div class="f-row"> <span>Extrusion Color</span> <input type="color" id="eP3dColor"></div>
-        <div class="f-row"> <span>Opacity</span> <input type="range" id="eP3dOpacity" min="0.1" max="1.0" step="0.1"></div>
+        <div class="f-row"> <span>Fill Opacity</span> <input type="range" id="eP3dOpacity" min="0.1" max="1.0" step="0.05"></div>
     </div>
 
     <div style="display:flex; justify-content:space-between; margin-top:6px;">
@@ -1137,9 +1142,9 @@ let selectedLayerIds = new Set();
 let isDirty = false;
 
 // Undo/Redo State
-let historyStack = [];
-let historyIndex = -1;
-let isHistoryAction = false;
+let undoStack = [];
+let redoStack = [];
+let isApplyingHistory = false;
 
 // Vertex dragging state
 let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null;
@@ -1152,11 +1157,16 @@ let isDraggingRotation = false, rotatingPolyId = null, rotCenter = null, rotStar
 let ctxLngLat = null;
 let ctxFeatureId = null;
 
+// Search temp marker
+let searchTempMarker = null;
+let searchTempTimeout = null;
+
 // Attribute Table State
 let currentTableFeatureId = null;
 
 // Route State
 let currentRouteMode = 'driving';
+let currentRouteColor = '#38bdf8';
 
 // 3D Polygon State
 let current3DPolyHeight = 50;
@@ -1203,60 +1213,79 @@ const setSaveBadgeStatus = status => {
     else text.textContent = 'Unsaved';
 };
 
-const markDirty = () => {
+function pushState() {
+    if (isApplyingHistory) return;
+    undoStack.push(JSON.stringify({
+        features: features,
+        customGroups: customGroups
+    }));
+    if (undoStack.length > 40) undoStack.shift();
+    redoStack = [];
+}
+
+const markDirty = (recordHistory = false) => {
+    if (recordHistory) pushState();
     isDirty = true;
     setSaveBadgeStatus('unsaved');
-    if (!isHistoryAction) {
-        // Push to history
-        const currentState = JSON.stringify({features, customGroups});
-        if (historyIndex < historyStack.length - 1) {
-            historyStack = historyStack.slice(0, historyIndex + 1);
-        }
-        historyStack.push(currentState);
-        historyIndex++;
-        // Limit stack size
-        if (historyStack.length > 50) {
-            historyStack.shift();
-            historyIndex--;
-        }
-    }
 };
 
 const undo = () => {
-    if (historyIndex > 0) {
-        historyIndex--;
-        const state = JSON.parse(historyStack[historyIndex]);
-        features = state.features;
-        customGroups = state.customGroups;
-        fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
-        syncDraw();
-        renderMyLayers();
-        isHistoryAction = true;
-        markDirty(); 
-        isHistoryAction = false;
-        hint('Undo');
+    if (!undoStack.length) {
+        hint('Nothing to undo');
+        return;
     }
+    isApplyingHistory = true;
+    redoStack.push(JSON.stringify({
+        features: features,
+        customGroups: customGroups
+    }));
+    const prev = JSON.parse(undoStack.pop());
+    features = prev.features || [];
+    customGroups = prev.customGroups || {"Trade Area Scan": {collapsed: false, ids: []}};
+    fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
+    features.forEach(f => {
+        if (f.kind === 'marker') {
+            const sh = f.props.shape || 'pin';
+            const col = f.props.color || '#003366';
+            f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
+        }
+    });
+    syncDraw();
+    renderMyLayers();
+    setSaveBadgeStatus('unsaved');
+    isDirty = true;
+    isApplyingHistory = false;
+    hint('Undo successful');
 };
 
 const redo = () => {
-    if (historyIndex < historyStack.length - 1) {
-        historyIndex++;
-        const state = JSON.parse(historyStack[historyIndex]);
-        features = state.features;
-        customGroups = state.customGroups;
-        fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
-        syncDraw();
-        renderMyLayers();
-        isHistoryAction = true;
-        markDirty();
-        isHistoryAction = false;
-        hint('Redo');
+    if (!redoStack.length) {
+        hint('Nothing to redo');
+        return;
     }
+    isApplyingHistory = true;
+    undoStack.push(JSON.stringify({
+        features: features,
+        customGroups: customGroups
+    }));
+    const next = JSON.parse(redoStack.pop());
+    features = next.features || [];
+    customGroups = next.customGroups || {"Trade Area Scan": {collapsed: false, ids: []}};
+    fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
+    features.forEach(f => {
+        if (f.kind === 'marker') {
+            const sh = f.props.shape || 'pin';
+            const col = f.props.color || '#003366';
+            f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
+        }
+    });
+    syncDraw();
+    renderMyLayers();
+    setSaveBadgeStatus('unsaved');
+    isDirty = true;
+    isApplyingHistory = false;
+    hint('Redo successful');
 };
-
-// Initialize history
-historyStack.push(JSON.stringify({features, customGroups}));
-historyIndex = 0;
 
 const closeFloatingCards = () => {
     ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-route-settings','popup-polygon3d-settings','browser-panel','mylayers-panel','popup-attribute-table'].forEach(id => {
@@ -1370,9 +1399,10 @@ window.loadProjectDirectly = function(projectId) {
         renderMyLayers();
     });
     closeHomeDialog();
-    // Reset history for new project
-    historyStack = [JSON.stringify({features, customGroups})];
-    historyIndex = 0;
+    undoStack = [];
+    redoStack = [];
+    setSaveBadgeStatus('saved');
+    isDirty = false;
 };
 
 window.renameProjectFromLauncher = async function(e, projectId, oldName) {
@@ -1454,6 +1484,10 @@ $('btn-create-project-submit').onclick = async () => {
             customGroups = {"Trade Area Scan": {collapsed: false, ids: []}};
             map.setCenter(centerLL);
             closeHomeDialog();
+            undoStack = [];
+            redoStack = [];
+            renderMyLayers();
+            syncDraw();
         }
     } catch(e) {
         closeHomeDialog();
@@ -1463,6 +1497,7 @@ $('btn-create-project-submit').onclick = async () => {
 $('project-name-display').onclick = () => {
     const newN = prompt('Rename project name:', currentProjectName);
     if (newN && newN.trim() && newN.trim() !== currentProjectName) {
+        pushState();
         currentProjectName = newN.trim();
         $('project-name-display').textContent = currentProjectName;
         markDirty();
@@ -1472,6 +1507,7 @@ $('project-name-display').onclick = () => {
 // ----------------- Supabase Sync & Autosave Engine -----------------
 async function saveProjectToSupabase(showToast = false) {
     if (!currentProjectId || currentProjectId === "local-temp" || !SUPABASE_URL || !SUPABASE_KEY) {
+        if (showToast) hint('Local workspace (saved client-side)');
         return;
     }
     setSaveBadgeStatus('saving');
@@ -1519,15 +1555,15 @@ $('btn-undo').onclick = undo;
 $('btn-redo').onclick = redo;
 
 document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         saveProjectToSupabase(true);
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         undo();
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
         e.preventDefault();
         redo();
     }
@@ -1536,7 +1572,27 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ----------------- Marker Icon Pipeline (Standard & Custom) -----------------
+// ----------------- Route Settings Color Swatches -----------------
+document.querySelectorAll('#popup-route-settings .color-swatch').forEach(sw => {
+    sw.onclick = () => {
+        document.querySelectorAll('#popup-route-settings .color-swatch').forEach(s => s.classList.remove('active'));
+        sw.classList.add('active');
+        currentRouteColor = sw.dataset.color;
+        $('rCustomColor').value = currentRouteColor;
+    };
+});
+$('rCustomColor').oninput = e => {
+    currentRouteColor = e.target.value;
+    document.querySelectorAll('#popup-route-settings .color-swatch').forEach(s => s.classList.remove('active'));
+};
+$('rProfile').onchange = e => { currentRouteMode = e.target.value; };
+
+// 3D Poly settings bindings
+$('p3dHeight').oninput = e => { current3DPolyHeight = parseFloat(e.target.value) || 50; };
+$('p3dColor').oninput = e => { current3DPolyColor = e.target.value; };
+$('p3dOpacity').oninput = e => { current3DPolyOpacity = parseFloat(e.target.value) || 0.7; };
+
+// ----------------- Marker Icon Pipeline -----------------
 function renderIconCanvas(shape, color) {
     const c = document.createElement('canvas');
     c.width = 64; c.height = 64;
@@ -1599,89 +1655,6 @@ function getIconKey(shape, color) {
     return key;
 }
 
-function createCustomMarkerImage(dataUrl, frame) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const c = document.createElement('canvas');
-            const baseSize = 64;
-            c.width = baseSize;
-            c.height = baseSize;
-            const ctx = c.getContext('2d');
-            ctx.clearRect(0,0,baseSize,baseSize);
-            if (frame === '2d' || frame === '3d') {
-                const pad = 6;
-                const rectX = pad, rectY = pad, rectW = baseSize - pad*2, rectH = baseSize - pad*2;
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = 'rgba(0,0,0,0.4)';
-                ctx.shadowBlur = 8;
-                ctx.shadowOffsetX = frame === '3d' ? 4 : 2;
-                ctx.shadowOffsetY = frame === '3d' ? 4 : 2;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(rectX, rectY, rectW, rectH, 10); else ctx.rect(rectX, rectY, rectW, rectH);
-                ctx.fill();
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-                const innerPad = 12;
-                ctx.drawImage(img, innerPad, innerPad, baseSize - innerPad*2, baseSize - innerPad*2);
-            } else if (frame === 'pinphoto') {
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(32, 22, 14, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(32, 22, 12, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.save();
-                ctx.clip();
-                ctx.drawImage(img, 20, 10, 24, 24);
-                ctx.restore();
-                ctx.beginPath();
-                ctx.arc(32, 22, 14, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(20, 32);
-                ctx.lineTo(44, 32);
-                ctx.lineTo(32, 50);
-                ctx.closePath();
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
-            } else if (frame === 'boxarrow') {
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                const boxX = 10, boxY = 10, boxW = 44, boxH = 32;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(boxX, boxY, boxW, boxH, 6); else ctx.rect(boxX, boxY, boxW, boxH);
-                ctx.fill();
-                ctx.save();
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(boxX+3, boxY+3, boxW-6, boxH-6, 4); else ctx.rect(boxX+3, boxY+3, boxW-6, boxH-6);
-                ctx.clip();
-                ctx.drawImage(img, boxX+3, boxY+3, boxW-6, boxH-6);
-                ctx.restore();
-                ctx.beginPath();
-                ctx.moveTo(32, boxY + boxH);
-                ctx.lineTo(28, boxY + boxH + 10);
-                ctx.lineTo(36, boxY + boxH + 10);
-                ctx.closePath();
-                ctx.fill();
-            } else {
-                ctx.drawImage(img, 0, 0, baseSize, baseSize);
-            }
-            resolve(c);
-        };
-        img.onerror = reject;
-        img.src = dataUrl;
-    });
-}
-
 $('customMarkerFileInput').onchange = function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -1692,16 +1665,23 @@ $('customMarkerFileInput').onchange = function(e) {
     const reader = new FileReader();
     reader.onload = async (ev) => {
         customMarkerDataUrl = ev.target.result;
-        const frame = $('markerFrameSelect') ? $('markerFrameSelect').value : 'none';
-        const canvas = await createCustomMarkerImage(customMarkerDataUrl, frame);
-        const key = 'custom_marker_' + Date.now();
-        const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
-        try {
-            if (map.hasImage(key)) map.removeImage(key);
-            map.addImage(key, imgData, { pixelRatio: 2 });
-            customMarkerImageKey = key;
-            hint('Custom marker ready');
-        } catch(err) { hint('Failed to add custom image'); }
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = 64; c.height = 64;
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0,0,64,64);
+            ctx.drawImage(img, 4, 4, 56, 56);
+            const key = 'custom_marker_' + Date.now();
+            const imgData = ctx.getImageData(0,0,64,64);
+            try {
+                if (map.hasImage(key)) map.removeImage(key);
+                map.addImage(key, imgData, { pixelRatio: 2 });
+                customMarkerImageKey = key;
+                hint('Custom marker ready');
+            } catch(err) { hint('Failed to add custom image'); }
+        };
+        img.src = customMarkerDataUrl;
     };
     reader.readAsDataURL(file);
 };
@@ -1744,18 +1724,20 @@ function addDrawStack() {
     if (!map.getSource('draw')) {
         map.addSource('draw', { type: 'geojson', data: fc(features) });
 
+        // 2D Polygons Fill (Exclude 3D Polygons)
         map.addLayer({
             id: 'draw-fill', type: 'fill', source: 'draw',
-            filter: ['==', ['geometry-type'], 'Polygon'],
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
             paint: {
                 'fill-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
                 'fill-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.35], ['get', 'visible']]
             }
         });
 
+        // 2D Polygons Outline (Exclude 3D Polygons)
         map.addLayer({
             id: 'draw-outline', type: 'line', source: 'draw',
-            filter: ['==', ['geometry-type'], 'Polygon'],
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
             paint: {
                 'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#e8b84a'],
                 'line-width': ['coalesce', ['get', 'width'], 3],
@@ -1763,6 +1745,30 @@ function addDrawStack() {
             }
         });
 
+        // 3D Extrusion Layer (Filter: kind == polygon3d)
+        map.addLayer({
+            id: 'draw-3d-extrusion', type: 'fill-extrusion', source: 'draw',
+            filter: ['==', ['get', 'kind'], 'polygon3d'],
+            paint: {
+                'fill-extrusion-color': ['coalesce', ['get', 'extrusionColor'], ['get', 'fillColor'], '#e8b84a'],
+                'fill-extrusion-height': ['coalesce', ['get', 'height'], 50],
+                'fill-extrusion-base': 0,
+                'fill-extrusion-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.7], ['get', 'visible']]
+            }
+        });
+
+        // 3D Roof Outline Layer
+        map.addLayer({
+            id: 'draw-3d-roof', type: 'line', source: 'draw',
+            filter: ['==', ['get', 'kind'], 'polygon3d'],
+            paint: {
+                'line-color': '#ffffff',
+                'line-width': 1,
+                'line-opacity': ['*', 0.5, ['get', 'visible']]
+            }
+        });
+
+        // Lines & Routes
         map.addLayer({
             id: 'draw-line', type: 'line', source: 'draw',
             filter: ['==', ['geometry-type'], 'LineString'],
@@ -1770,10 +1776,12 @@ function addDrawStack() {
             paint: {
                 'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#38bdf8'],
                 'line-width': ['coalesce', ['get', 'width'], 4],
-                'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['get', 'visible']]
+                'line-opacity': ['*', ['coalesce', ['get', 'borderOpacity'], 0.9], ['get', 'visible']],
+                'line-dasharray': ['case', ['boolean', ['get', 'routingFailed'], false], ['literal', [2, 2]], ['literal', [1, 0]]]
             }
         });
 
+        // Standard Markers
         map.addLayer({
             id: 'draw-marker', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
@@ -1786,6 +1794,7 @@ function addDrawStack() {
             paint: { 'icon-opacity': ['get', 'visible'] }
         });
 
+        // Text Labels
         map.addLayer({
             id: 'draw-text', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'text']],
@@ -1804,26 +1813,14 @@ function addDrawStack() {
             }
         });
 
-        // 3D Extrusion Layer
-        map.addLayer({
-            id: 'draw-3d-extrusion', type: 'fill-extrusion', source: 'draw',
-            filter: ['==', ['get', 'kind'], 'polygon3d'],
-            paint: {
-                'fill-extrusion-color': ['coalesce', ['get', 'extrusionColor'], '#e8b84a'],
-                'fill-extrusion-height': ['coalesce', ['get', 'height'], 50],
-                'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': ['coalesce', ['get', 'fillOpacity'], 0.7]
-            }
-        });
-
-        // Single-label-per-layer source
+        // Polygon Labels
         map.addSource('label-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({
             id: 'draw-poly-labels', type: 'symbol', source: 'label-src',
             layout: {
                 'text-field': ['get', 'labelText'],
                 'text-font': ['Noto Sans Regular'],
-                'text-size': 13,
+                'text-size': 12,
                 'text-allow-overlap': true,
                 'text-anchor': 'center',
                 'text-justify': 'center'
@@ -1847,6 +1844,18 @@ function addDrawStack() {
                 'circle-stroke-width': 2
             }
         });
+
+        // Search temporary marker source
+        map.addSource('search-temp-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({
+            id: 'search-temp-point', type: 'circle', source: 'search-temp-src',
+            paint: {
+                'circle-color': '#38bdf8',
+                'circle-radius': 8,
+                'circle-stroke-color': '#ffffff',
+                'circle-stroke-width': 2.5
+            }
+        });
     } else {
         map.getSource('draw').setData(fc(features));
     }
@@ -1863,7 +1872,7 @@ function addDrawStack() {
             filter: ['==', ['geometry-type'], 'Point'],
             paint: {
                 'circle-color': ['case', ['get', 'isLastPoint'], '#38bdf8', '#e8b84a'],
-                'circle-radius': ['case', ['get', 'isLastPoint'], 10, ['case', ['get', 'isOrigin'], 8, 5]],
+                'circle-radius': ['case', ['get', 'isLastPoint'], 9, ['case', ['get', 'isOrigin'], 8, 5]],
                 'circle-stroke-width': 2.5
             }
         });
@@ -1896,7 +1905,6 @@ function syncLabels() {
     features.forEach(f => {
         if (!f.props.showLabel || f.props.visible === 0 || !f.name) return;
         
-        // Handle route labels specially
         let labelText = f.name;
         if (f.kind === 'route' && f.props.description) {
             labelText = f.props.description;
@@ -1918,8 +1926,6 @@ function syncLabels() {
             if (!b) return;
             const cx = (b[0][0] + b[1][0]) / 2;
             const cy = (b[0][1] + b[1][1]) / 2;
-            
-            // For 3D polygons, adjust label position slightly up if needed, but usually center of base is fine for anchor
             if (pos === 'top') coords = [cx, b[1][1]];
             else if (pos === 'bottom') coords = [cx, b[0][1]];
             else if (pos === 'left') coords = [b[0][0], cy];
@@ -1977,12 +1983,10 @@ function syncVertexHandles() {
                     properties: { polyId: f.id, vIdx: i }
                 });
             }
-            // Add rotation handle if selected
             if (f.id === selectedId) {
                 const b = calcBounds(f);
                 if (b) {
                     const cx = (b[0][0] + b[1][0]) / 2;
-                    const cy = (b[0][1] + b[1][1]) / 2;
                     const offset = (b[1][1] - b[0][1]) * 0.25 || 0.001;
                     handleFeats.push({
                         type: 'Feature',
@@ -1993,12 +1997,12 @@ function syncVertexHandles() {
             }
         }
         if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry && f.geometry.coordinates) {
-            const coords = f.geometry.coordinates;
-            for (let i = 0; i < coords.length; i++) {
+            const waypoints = (f.props.waypoints && f.props.waypoints.length) ? f.props.waypoints : f.geometry.coordinates;
+            for (let i = 0; i < waypoints.length; i++) {
                 handleFeats.push({
                     type: 'Feature',
-                    geometry: { type: 'Point', coordinates: coords[i] },
-                    properties: { polyId: f.id, vIdx: i }
+                    geometry: { type: 'Point', coordinates: waypoints[i] },
+                    properties: { polyId: f.id, vIdx: i, isWaypoint: !!f.props.waypoints }
                 });
             }
         }
@@ -2116,12 +2120,15 @@ function pointInPolygon(point, vs) {
     return inside;
 }
 
+// ----------------- Routing Engine -----------------
 let rerouteTimeout = null;
 function fetchMultiPointRoute(pts, updateId = null, mode = null) {
     hint('Calculating route…');
-    const profile = mode || $('rProfile') ? $('rProfile').value : 'driving';
+    const profile = mode || currentRouteMode || 'driving';
     const coordStr = pts.map(p => `${p[0]},${p[1]}`).join(';');
-    fetch(`https://router.project-osrm.org/route/v1/${profile}/${coordStr}?overview=full&geometries=geojson`)
+    const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${coordStr}?overview=full&geometries=geojson&steps=true`;
+    
+    fetch(osrmUrl)
     .then(r => r.json())
     .then(j => {
         if (j.routes && j.routes[0]) {
@@ -2136,52 +2143,62 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
             if (updateId) {
                 const f = features.find(x => x.id === updateId);
                 if (f) {
+                    pushState();
                     f.geometry = geom;
                     f.props.description = desc;
                     f.props.routeMode = profile;
+                    f.props.waypoints = pts;
                     f.props.metadata = { distance: dist, duration: dur };
+                    f.props.routingFailed = false;
                     syncDraw();
                     renderMyLayers();
                     markDirty();
-                    // Update editor stats if open
                     if (selectedId === updateId) {
                         $('eRouteStats').textContent = desc;
+                        renderRouteWaypointsEditor(f);
                     }
                 }
             } else {
-                const color = $('rColor') ? $('rColor').value : '#38bdf8';
+                const color = currentRouteColor || '#38bdf8';
                 addFeatureRecord('route', geom, { 
                     color: color, borderColor: color, width: 4, borderOpacity: 0.9,
                     description: desc,
                     routeMode: profile,
+                    waypoints: pts,
                     metadata: { distance: dist, duration: dur },
-                    showLabel: true
+                    showLabel: true,
+                    routingFailed: false
                 });
             }
+            hint('');
         } else {
             throw new Error("No route found");
         }
-        hint('');
     })
     .catch(() => {
         if (updateId) {
              const f = features.find(x => x.id === updateId);
              if (f) {
+                 pushState();
+                 f.geometry = { type: 'LineString', coordinates: pts };
+                 f.props.waypoints = pts;
                  f.props.routingFailed = true;
                  f.props.description = "Routing unavailable – straight line shown";
                  syncDraw();
                  markDirty();
+                 if (selectedId === updateId) $('eRouteStats').textContent = f.props.description;
              }
         } else {
-            const color = $('rColor') ? $('rColor').value : '#38bdf8';
+            const color = currentRouteColor || '#38bdf8';
             addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { 
                 color: color, borderColor: color, width: 3, borderOpacity: 0.8,
                 routingFailed: true,
+                waypoints: pts,
                 description: "Routing unavailable – straight line shown",
                 routeMode: profile
             });
         }
-        hint('Direct route fallback');
+        hint('Routing failed – straight line shown');
     });
 }
 
@@ -2189,8 +2206,20 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
     const newId = ++fid;
     const isRoute = kind === 'route';
     const is3D = kind === 'polygon3d';
-    const defaultBorder = isRoute ? '#38bdf8' : '#e8b84a';
-    const assignedName = explicitName || `${kind === 'polygon3d' ? '3D Polygon' : kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
+    
+    // Performance guard: Limit visible 3D Polygons to 50
+    if (is3D) {
+        const poly3dCount = features.filter(f => f.kind === 'polygon3d').length;
+        if (poly3dCount >= 50) {
+            hint('Limit of 50 3D polygons reached for performance.');
+            return null;
+        }
+    }
+
+    const defaultBorder = isRoute ? (currentRouteColor || '#38bdf8') : (is3D ? current3DPolyColor : '#e8b84a');
+    const assignedName = explicitName || `${is3D ? '3D Polygon' : kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
+    
+    pushState();
     const feat = {
         id: newId,
         name: assignedName,
@@ -2201,13 +2230,15 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
             borderColor: defaultBorder,
             borderOpacity: 0.9,
             width: 3,
-            fillColor: '#e8b84a',
-            fillOpacity: 0.35,
+            fillColor: is3D ? current3DPolyColor : '#e8b84a',
+            fillOpacity: is3D ? current3DPolyOpacity : 0.35,
+            extrusionColor: is3D ? current3DPolyColor : '#e8b84a',
+            height: is3D ? current3DPolyHeight : 50,
             showLabel: false,
             labelPos: 'center',
             iconSize: markerIconSize,
             visible: 1,
-            attributes: {}, // For attribute table
+            attributes: {},
             ...customProps
         }
     };
@@ -2291,7 +2322,6 @@ $('btnScanTradeArea').onclick = async () => {
         selectedTags.push(cb.dataset.tag);
     });
     
-    // Add custom POI search
     const customSearch = $('customPoiSearchInput').value.trim();
     if (customSearch) {
         selectedTags.push(customSearch);
@@ -2567,17 +2597,25 @@ function renderSearchResults(results) {
             searchInput.value = selected.display_name;
             searchResultsList.innerHTML = '';
             
-            // Temporary Marker & Pulse
             const coords = [parseFloat(selected.lon), parseFloat(selected.lat)];
             
-            // Add temporary marker logic could go here if we had a dedicated source, 
-            // but for simplicity we rely on the flyTo and pulse
+            // Temporary marker & pulse feedback
+            if (map.getSource('search-temp-src')) {
+                map.getSource('search-temp-src').setData({
+                    type: 'FeatureCollection',
+                    features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: {} }]
+                });
+                if (searchTempTimeout) clearTimeout(searchTempTimeout);
+                searchTempTimeout = setTimeout(() => {
+                    if (map.getSource('search-temp-src')) {
+                        map.getSource('search-temp-src').setData({ type: 'FeatureCollection', features: [] });
+                    }
+                }, 5000);
+            }
             
-            pulseFeature({geometry: {type: 'Point', coordinates: coords}});
-            
+            pulseFeature({ geometry: { type: 'Point', coordinates: coords } });
             map.flyTo({ center: coords, zoom: 15, duration: 1500 });
             
-            hint('');
             $('popup-search').classList.remove('open');
         };
     });
@@ -2613,7 +2651,7 @@ document.querySelectorAll('.tool').forEach(btn => {
             if (t === 'textbox') $('popup-text-settings').classList.add('open');
             if (t === 'route') {
                 $('popup-route-settings').classList.add('open');
-                hint('Click points · Click the large blue endpoint to finish');
+                hint('Route: Click waypoints · Double click or click last point to finish');
             }
             if (t === 'polygon3d') {
                 $('popup-polygon3d-settings').classList.add('open');
@@ -2641,6 +2679,9 @@ map.on('mousemove', e => {
             return coords.map(translateCoords);
         };
         f.geometry.coordinates = translateCoords(dragOriginalCoords);
+        if (f.kind === 'route' && f.props.waypoints) {
+            f.props.waypoints = f.props.waypoints.map(wp => [wp[0] + dx, wp[1] + dy]);
+        }
         syncDraw();
         markDirty();
     }
@@ -2671,15 +2712,20 @@ map.on('mousemove', e => {
                 const coords = f.geometry.coordinates[0];
                 coords[draggedVertexIdx] = cursorLL;
                 if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
-            } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry.coordinates) {
+            } else if (f.kind === 'polyline' && f.geometry.coordinates) {
                 f.geometry.coordinates[draggedVertexIdx] = cursorLL;
-                // Debounced reroute for routes
-                if (f.kind === 'route') {
-                    clearTimeout(rerouteTimeout);
-                    rerouteTimeout = setTimeout(() => {
-                        fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
-                    }, 300);
+            } else if (f.kind === 'route') {
+                if (f.props.waypoints) {
+                    f.props.waypoints[draggedVertexIdx] = cursorLL;
+                } else {
+                    f.geometry.coordinates[draggedVertexIdx] = cursorLL;
                 }
+                // Debounced dynamic reroute
+                clearTimeout(rerouteTimeout);
+                rerouteTimeout = setTimeout(() => {
+                    const pts = f.props.waypoints || f.geometry.coordinates;
+                    fetchMultiPointRoute(pts, f.id, f.props.routeMode);
+                }, 300);
             }
             syncDraw();
             markDirty();
@@ -2716,12 +2762,7 @@ map.on('click', e => {
     if (!activeTool) return;
     const ll = [e.lngLat.lng, e.lngLat.lat];
     if (activeTool === 'marker') {
-        let iconKey;
-        if (customMarkerImageKey) {
-            iconKey = customMarkerImageKey;
-        } else {
-            iconKey = getIconKey(markerShape, markerColor);
-        }
+        let iconKey = customMarkerImageKey ? customMarkerImageKey : getIconKey(markerShape, markerColor);
         const feat = addFeatureRecord('marker', { type: 'Point', coordinates: ll }, {
             shape: markerShape,
             color: markerColor,
@@ -2730,7 +2771,7 @@ map.on('click', e => {
         });
         resetActiveTools();
         closeFloatingCards();
-        openShapeEditor(feat.id);
+        if (feat) openShapeEditor(feat.id);
     } else if (activeTool === 'textbox') {
         const feat = addFeatureRecord('text', { type: 'Point', coordinates: ll }, {
             text: $('tContent').value || 'Label',
@@ -2740,7 +2781,7 @@ map.on('click', e => {
         });
         resetActiveTools();
         closeFloatingCards();
-        openShapeEditor(feat.id);
+        if (feat) openShapeEditor(feat.id);
     } else if (activeTool === 'polyline') {
         if (draft.length >= 2) {
             const pScreen = map.project(ll);
@@ -2748,7 +2789,7 @@ map.on('click', e => {
             if (Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 18) {
                 const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
                 resetActiveTools();
-                openShapeEditor(feat.id);
+                if (feat) openShapeEditor(feat.id);
                 return;
             }
         }
@@ -2769,7 +2810,7 @@ map.on('click', e => {
                     const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
                     resetActiveTools();
                     if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
-                    openShapeEditor(feat.id);
+                    if (feat) openShapeEditor(feat.id);
                     return;
                 }
             }
@@ -2780,7 +2821,7 @@ map.on('click', e => {
         if (draft.length === 2) {
             const feat = addFeatureRecord('rectangle', { type: 'Polygon', coordinates: rectCoords(draft[0], draft[1]) });
             resetActiveTools();
-            openShapeEditor(feat.id);
+            if (feat) openShapeEditor(feat.id);
         }
     } else if (activeTool === 'circle') {
         draft.push(ll);
@@ -2788,7 +2829,7 @@ map.on('click', e => {
             const { coords, r } = circleCoords(draft[0], draft[1]);
             const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { radiusMeters: r });
             resetActiveTools();
-            openShapeEditor(feat.id);
+            if (feat) openShapeEditor(feat.id);
         }
     } else if (activeTool === 'route') {
         if (draft.length >= 2) {
@@ -2805,6 +2846,46 @@ map.on('click', e => {
     renderDraft();
 });
 
+// Double click handling for tools & route midpoint insertion
+map.on('dblclick', e => {
+    if (activeTool === 'route' && draft.length >= 2) {
+        if ($('rAutoFinish') && $('rAutoFinish').checked) {
+            e.preventDefault();
+            fetchMultiPointRoute(draft);
+            resetActiveTools();
+            return;
+        }
+    }
+    if (editMode) {
+        const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-line'] });
+        if (fs.length && fs[0].properties.id != null) {
+            const id = parseInt(fs[0].properties.id, 10);
+            const f = features.find(x => x.id === id);
+            if (f && f.kind === 'route') {
+                e.preventDefault();
+                const clickLL = [e.lngLat.lng, e.lngLat.lat];
+                const pts = f.props.waypoints || f.geometry.coordinates;
+                // Find closest segment to insert waypoint
+                let bestIdx = -1, bestDist = Infinity;
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const d = haversineDist(pts[i], clickLL) + haversineDist(clickLL, pts[i+1]);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        bestIdx = i + 1;
+                    }
+                }
+                if (bestIdx > -1) {
+                    pushState();
+                    pts.splice(bestIdx, 0, clickLL);
+                    f.props.waypoints = pts;
+                    fetchMultiPointRoute(pts, f.id, f.props.routeMode);
+                    hint('Waypoint inserted');
+                }
+            }
+        }
+    }
+});
+
 document.addEventListener('keydown', e => {
     if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (e.key === 'Enter') {
@@ -2819,11 +2900,11 @@ document.addEventListener('keydown', e => {
             const feat = addFeatureRecord(kind, { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, props);
             resetActiveTools();
             if ($('p3dAutoClose') && $('p3dAutoClose').checked) closeFloatingCards();
-            openShapeEditor(feat.id);
+            if (feat) openShapeEditor(feat.id);
         } else if (activeTool === 'polyline' && draft.length >= 2) {
             const feat = addFeatureRecord('polyline', { type: 'LineString', coordinates: draft });
             resetActiveTools();
-            openShapeEditor(feat.id);
+            if (feat) openShapeEditor(feat.id);
         } else if (activeTool === 'route' && draft.length >= 2) {
             fetchMultiPointRoute(draft);
             resetActiveTools();
@@ -2837,12 +2918,12 @@ document.addEventListener('keydown', e => {
         syncVertexHandles();
     }
     if (e.key === 'Delete' && selectedId && editMode) {
-         // Delete selected waypoint if in route edit mode could be implemented here
-         // For now, standard delete removes feature
+         pushState();
          features = features.filter(x => x.id !== selectedId);
          for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== selectedId);
          selectedId = null;
          syncDraw(); renderMyLayers(); markDirty();
+         hint('Deleted selected layer');
     }
 });
 
@@ -2882,10 +2963,12 @@ map.on('mousedown', e => {
         if (fs.length && fs[0].properties.id != null) {
             isDragging = true;
             dragFeatureId = parseInt(fs[0].properties.id, 10);
+            selectedId = dragFeatureId;
             dragStartCoord = [e.lngLat.lng, e.lngLat.lat];
             const f = features.find(x => x.id === dragFeatureId);
             if (f) dragOriginalCoords = JSON.parse(JSON.stringify(f.geometry.coordinates));
             map.dragPan.disable();
+            syncVertexHandles();
         }
     }
 });
@@ -2895,27 +2978,27 @@ map.on('mouseup', () => {
         isDragging = false;
         dragFeatureId = null;
         map.dragPan.enable();
-        markDirty();
+        markDirty(true);
     }
     if (isDraggingVertex) {
         if (draggedPolyId != null) {
             const f = features.find(x => x.id === draggedPolyId);
             if (f && f.kind === 'route') {
-                // Trigger reroute immediately on drop
-                fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
+                const pts = f.props.waypoints || f.geometry.coordinates;
+                fetchMultiPointRoute(pts, f.id, f.props.routeMode);
             }
         }
         isDraggingVertex = false;
         draggedPolyId = null;
         draggedVertexIdx = -1;
         map.dragPan.enable();
-        markDirty();
+        markDirty(true);
     }
     if (isDraggingRotation) {
         isDraggingRotation = false;
         rotatingPolyId = null;
         map.dragPan.enable();
-        markDirty();
+        markDirty(true);
     }
 });
 
@@ -2936,20 +3019,21 @@ function openShapeEditor(id) {
     const isPolygon = ['polygon', 'rectangle', 'circle'].includes(f.kind);
     const is3D = f.kind === 'polygon3d';
     
-    $('eFillColorRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
-    $('eFillOpRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
-    $('eLabelToggleRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
-    $('eLabelPosRow').style.display = (isPolygon || is3D) ? 'flex' : 'none';
+    $('eFillColorRow').style.display = isPolygon ? 'flex' : 'none';
+    $('eFillOpRow').style.display = isPolygon ? 'flex' : 'none';
+    $('eBorderColorRow').style.display = !is3D ? 'flex' : 'none';
+    $('eBorderOpRow').style.display = !is3D ? 'flex' : 'none';
+    $('eWidthRow').style.display = !is3D ? 'flex' : 'none';
+
+    $('eLabelToggleRow').style.display = (isPolygon || is3D || f.kind === 'route') ? 'flex' : 'none';
+    $('eLabelPosRow').style.display = (isPolygon || is3D || f.kind === 'route') ? 'flex' : 'none';
     
-    if (isPolygon || is3D) {
+    if (isPolygon || is3D || f.kind === 'route') {
         $('eShowLabel').checked = !!f.props.showLabel;
         $('eLabelPos').value = f.props.labelPos || 'center';
     }
 
-    // Hide standard fill controls for 3D, show 3D specific ones
     if (is3D) {
-        $('eFillColorRow').style.display = 'none';
-        $('eFillOpRow').style.display = 'none';
         $('p3dEditorControls').style.display = 'block';
         $('eP3dHeight').value = f.props.height || 50;
         $('eP3dColor').value = f.props.extrusionColor || '#e8b84a';
@@ -2969,16 +3053,39 @@ function openShapeEditor(id) {
         $('eFontSize').value = f.props.fontSize || 16;
     }
     
-    // Route Specifics
     const isRoute = f.kind === 'route';
     $('routeEditorControls').style.display = isRoute ? 'block' : 'none';
     if (isRoute) {
         $('eRouteMode').value = f.props.routeMode || 'driving';
         $('eRouteStats').textContent = f.props.description || '-';
+        renderRouteWaypointsEditor(f);
     }
 
     $('popup-shape-editor').classList.add('open');
 }
+
+function renderRouteWaypointsEditor(f) {
+    const container = $('eRouteWaypointsList');
+    if (!container) return;
+    const pts = f.props.waypoints || f.geometry.coordinates || [];
+    container.innerHTML = pts.map((pt, idx) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:3px 6px; border-radius:4px; font-size:10px;">
+            <span>Pt ${idx + 1}: ${pt[1].toFixed(4)}, ${pt[0].toFixed(4)}</span>
+            ${pts.length > 2 ? `<button class="card-btn" onclick="removeRouteWaypoint(${f.id}, ${idx})" style="color:#ff7b72;">✕</button>` : ''}
+        </div>
+    `).join('');
+}
+
+window.removeRouteWaypoint = function(featureId, idx) {
+    const f = features.find(x => x.id === featureId);
+    if (!f || f.kind !== 'route') return;
+    const pts = f.props.waypoints || f.geometry.coordinates;
+    if (pts.length <= 2) return;
+    pushState();
+    pts.splice(idx, 1);
+    f.props.waypoints = pts;
+    fetchMultiPointRoute(pts, f.id, f.props.routeMode);
+};
 
 $('eName').oninput = e => {
     const f = features.find(x => x.id === selectedId);
@@ -3016,6 +3123,7 @@ $('eP3dColor').oninput = e => {
     const f = features.find(x => x.id === selectedId);
     if (f && f.kind === 'polygon3d') {
         f.props.extrusionColor = e.target.value;
+        f.props.fillColor = e.target.value;
         syncDraw();
         markDirty();
     }
@@ -3034,18 +3142,21 @@ $('eRouteMode').onchange = e => {
     const f = features.find(x => x.id === selectedId);
     if (f && f.kind === 'route') {
         f.props.routeMode = e.target.value;
-        fetchMultiPointRoute(f.geometry.coordinates, f.id, e.target.value);
+        const pts = f.props.waypoints || f.geometry.coordinates;
+        fetchMultiPointRoute(pts, f.id, e.target.value);
     }
 };
 
 $('eRecalcRoute').onclick = () => {
     const f = features.find(x => x.id === selectedId);
     if (f && f.kind === 'route') {
-        fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
+        const pts = f.props.waypoints || f.geometry.coordinates;
+        fetchMultiPointRoute(pts, f.id, f.props.routeMode);
     }
 };
 
 $('eDeleteBtn').onclick = () => {
+    pushState();
     features = features.filter(x => x.id !== selectedId);
     for (const g in customGroups) { customGroups[g].ids = customGroups[g].ids.filter(id => id !== selectedId); }
     syncDraw();
@@ -3056,10 +3167,11 @@ $('eDeleteBtn').onclick = () => {
 $('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 
-// ----------------- My Layers with Grouping, Multi-select, Drag Reorder -----------------
+// ----------------- My Layers Panel -----------------
 $('btnAddCustomGroup').onclick = () => {
     const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
     if (gName && gName.trim() && !customGroups[gName]) {
+        pushState();
         customGroups[gName.trim()] = { collapsed: false, ids: [] };
         renderMyLayers();
         markDirty();
@@ -3071,6 +3183,7 @@ $('btnHideSelected').onclick = () => {
         hint('Select at least one layer first');
         return;
     }
+    pushState();
     const allHidden = Array.from(selectedLayerIds).every(id => {
         const f = features.find(x => x.id === id);
         return f && f.props.visible === 0;
@@ -3201,18 +3314,17 @@ function renderMyLayers() {
     const looseFeats = features.filter(f => !groupedIds.has(f.id));
     html += '<div id="ungrouped-zone">';
     if (looseFeats.length) {
-        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">Ungrouped Layers <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></button></div>';
+        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;"><span>Ungrouped Layers</span> <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped" style="font-size:10px; display:flex; align-items:center; gap:2px;"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg> Select All</button></div>';
         html += looseFeats.slice().reverse().map(f => renderLayerCardHtml(f)).join('');
     }
     html += '</div>';
     container.innerHTML = html;
 
-    // Select All Ungrouped
     const btnSelAllUng = container.querySelector('#btnSelectAllUngrouped');
     if (btnSelAllUng) {
         btnSelAllUng.onclick = () => {
             looseFeats.forEach(f => selectedLayerIds.add(f.id));
-            renderMyLayers(); // Re-render to update checkboxes
+            renderMyLayers();
         };
     }
 
@@ -3232,6 +3344,7 @@ function renderMyLayers() {
             gc.classList.remove('drop-hover');
             const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
             if (isNaN(draggedId)) return;
+            pushState();
             for (const g in customGroups) {
                 customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
             }
@@ -3259,6 +3372,7 @@ function renderMyLayers() {
             uz.classList.remove('drop-hover');
             const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
             if (isNaN(draggedId)) return;
+            pushState();
             for (const g in customGroups) {
                 customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
             }
@@ -3296,7 +3410,6 @@ function renderMyLayers() {
         });
     });
     
-    // Group Select All
     container.querySelectorAll('[data-act="groupSelectAll"]').forEach(btn => {
         btn.onclick = () => {
             const gName = btn.dataset.group;
@@ -3313,6 +3426,7 @@ function renderMyLayers() {
             const oldN = e.target.dataset.oldname;
             const newN = e.target.value.trim();
             if (newN && newN !== oldN) {
+                pushState();
                 customGroups[newN] = customGroups[oldN];
                 delete customGroups[oldN];
                 renderMyLayers();
@@ -3325,7 +3439,7 @@ function renderMyLayers() {
         inp.onchange = e => {
             const id = parseInt(e.target.dataset.id, 10);
             const f = features.find(x => x.id === id);
-            if (f) { f.name = e.target.value; syncDraw(); markDirty(); }
+            if (f) { pushState(); f.name = e.target.value; syncDraw(); markDirty(); }
         };
     });
 
@@ -3349,6 +3463,7 @@ function renderMyLayers() {
                 return;
             }
             if (act === 'groupEye') {
+                pushState();
                 const g = b.dataset.group;
                 const ids = customGroups[g].ids || [];
                 const anyVis = features.some(f => ids.includes(f.id) && f.props.visible);
@@ -3357,6 +3472,7 @@ function renderMyLayers() {
                 return;
             }
             if (act === 'groupDel') {
+                pushState();
                 const g = b.dataset.group;
                 delete customGroups[g];
                 renderMyLayers();
@@ -3370,16 +3486,18 @@ function renderMyLayers() {
                 openAttributeTable(id);
                 return;
             }
-            if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); markDirty(); }
-            if (act === 'labelPos') { f.props.labelPos = b.value; syncDraw(); markDirty(); }
+            if (act === 'labelToggle') { pushState(); f.props.showLabel = b.checked; syncDraw(); markDirty(); }
+            if (act === 'labelPos') { pushState(); f.props.labelPos = b.value; syncDraw(); markDirty(); }
             if (act === 'edit') openShapeEditor(id);
             if (act === 'eye') {
+                pushState();
                 f.props.visible = f.props.visible ? 0 : 1;
                 syncDraw();
                 renderMyLayers();
                 markDirty();
             }
             if (act === 'del') {
+                pushState();
                 features = features.filter(x => x.id !== id);
                 for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== id);
                 selectedLayerIds.delete(id);
@@ -3404,6 +3522,7 @@ function renderMyLayers() {
             const size = parseFloat(panel.querySelector('.grp-style-size').value);
             const grp = customGroups[gName];
             if (!grp) return;
+            pushState();
             grp.ids.forEach(id => {
                 const f = features.find(x => x.id === id);
                 if (f && f.kind === 'marker') {
@@ -3426,6 +3545,7 @@ function reorderFeatures(draggedId, targetId) {
     const draggedIndex = features.findIndex(f => f.id === draggedId);
     const targetIndex = features.findIndex(f => f.id === targetId);
     if (draggedIndex === -1 || targetIndex === -1) return;
+    pushState();
     const [draggedItem] = features.splice(draggedIndex, 1);
     features.splice(targetIndex, 0, draggedItem);
     syncDraw();
@@ -3455,11 +3575,10 @@ function openAttributeTable(featureId) {
     if (!f) return;
     
     $('attrTableTitle').textContent = `Attributes: ${f.name}`;
+    closeFloatingCards();
     $('popup-attribute-table').classList.add('open');
     
-    // Ensure attributes object exists
     if (!f.props.attributes) f.props.attributes = {};
-    
     renderAttributeTable(f);
 }
 
@@ -3468,17 +3587,13 @@ function renderAttributeTable(f) {
     const headerRow = $('attrTableHeader');
     const bodyRow = $('attrTableBody');
     
-    // Default columns
     let cols = ['name', 'description'];
-    // Add custom attribute keys
     Object.keys(attrs).forEach(k => {
         if (!cols.includes(k)) cols.push(k);
     });
     
-    // Render Header
     headerRow.innerHTML = cols.map(c => `<th>${c.toUpperCase()}</th>`).join('') + '<th>ACTIONS</th>';
     
-    // Render Body
     let html = '<tr>';
     cols.forEach(c => {
         let val = '';
@@ -3486,20 +3601,20 @@ function renderAttributeTable(f) {
         else if (c === 'description') val = f.props.description || '';
         else val = attrs[c] || '';
         
-        // Check if it's an image attribute (starts with data:image)
         if (typeof val === 'string' && val.startsWith('data:image')) {
-            html += `<td><img src="${val}" class="attr-img-preview" onclick="triggerAttrImageUpload('${c}')" oncontextmenu="clearAttrImage('${c}'); return false;"></td>`;
+            html += `<td data-key="${c}"><img src="${val}" class="attr-img-preview" onclick="triggerAttrImageUpload('${c}')" oncontextmenu="clearAttrImage('${c}'); return false;" title="Click to upload, right click to clear"></td>`;
         } else {
-            html += `<td><input type="text" value="${val}" onchange="updateAttr('${c}', this.value)"></td>`;
+            html += `<td data-key="${c}"><input type="text" value="${val}" onblur="updateAttr('${c}', this.value)" onkeydown="if(event.key==='Enter'){this.blur();}"></td>`;
         }
     });
-    html += `<td><button class="card-btn" onclick="removeAttrColumn()" title="Remove Last Column" style="color:#ff7b72;">✕</button></td></tr>`;
+    html += `<td><button class="card-btn" onclick="removeAttrColumn()" title="Remove Last Custom Column" style="color:#ff7b72;">✕</button></td></tr>`;
     bodyRow.innerHTML = html;
 }
 
 window.updateAttr = (key, value) => {
     const f = features.find(x => x.id === currentTableFeatureId);
     if (!f) return;
+    pushState();
     if (key === 'name') {
         f.name = value;
         renderMyLayers();
@@ -3523,6 +3638,7 @@ window.triggerAttrImageUpload = (key) => {
             reader.onload = ev => {
                 const f = features.find(x => x.id === currentTableFeatureId);
                 if (f) {
+                    pushState();
                     f.props.attributes[key] = ev.target.result;
                     renderAttributeTable(f);
                     markDirty();
@@ -3537,6 +3653,7 @@ window.triggerAttrImageUpload = (key) => {
 window.clearAttrImage = (key) => {
     const f = features.find(x => x.id === currentTableFeatureId);
     if (f && f.props.attributes[key]) {
+        pushState();
         delete f.props.attributes[key];
         renderAttributeTable(f);
         markDirty();
@@ -3549,6 +3666,7 @@ window.removeAttrColumn = () => {
     const attrs = f.props.attributes;
     const keys = Object.keys(attrs);
     if (keys.length > 0) {
+        pushState();
         delete attrs[keys[keys.length - 1]];
         renderAttributeTable(f);
         markDirty();
@@ -3558,23 +3676,29 @@ window.removeAttrColumn = () => {
 $('btnAddAttrCol').onclick = () => {
     const f = features.find(x => x.id === currentTableFeatureId);
     if (!f) return;
-    const name = prompt("Enter column name:");
-    if (name && !f.props.attributes[name]) {
-        f.props.attributes[name] = "";
-        renderAttributeTable(f);
-        markDirty();
+    const name = prompt("Enter new column name:");
+    if (name && name.trim()) {
+        const cleanName = name.trim().toLowerCase();
+        if (!f.props.attributes[cleanName]) {
+            const isImg = confirm("Is this an Image column? Click OK for Image, Cancel for Text.");
+            pushState();
+            f.props.attributes[cleanName] = isImg ? "data:image/placeholder" : "";
+            renderAttributeTable(f);
+            markDirty();
+        }
     }
 };
 
 $('attrTableSearch').oninput = e => {
     const term = e.target.value.toLowerCase();
-    const inputs = $('attrTableBody').querySelectorAll('input[type="text"]');
-    inputs.forEach(inp => {
-        const td = inp.closest('td');
-        if (inp.value.toLowerCase().includes(term)) {
-            td.style.display = '';
+    const cells = $('attrTableBody').querySelectorAll('td[data-key]');
+    cells.forEach(td => {
+        const inp = td.querySelector('input[type="text"]');
+        const text = inp ? inp.value.toLowerCase() : '';
+        if (text.includes(term) || !term) {
+            td.style.opacity = '1';
         } else {
-            td.style.display = term ? 'none' : '';
+            td.style.opacity = '0.2';
         }
     });
 };
@@ -3582,6 +3706,8 @@ $('attrTableSearch').oninput = e => {
 $('closeAttrTableBtn').onclick = () => {
     $('popup-attribute-table').classList.remove('open');
     currentTableFeatureId = null;
+    markDirty();
+    syncDraw();
 };
 
 // ----------------- Direct Export Engine -----------------
@@ -3735,24 +3861,23 @@ function processGeoJSON(geojson) {
                 osmTags: props
             });
         } else if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
-            // Check if it's a route
-            if (props.route_mode) {
+            if (props.route_mode || props.routeMode) {
                 addFeatureRecord('route', geom, {
-                    routeMode: props.route_mode,
+                    routeMode: props.route_mode || props.routeMode || 'driving',
                     description: props.description || '',
                     color: props.color || '#38bdf8',
-                    borderColor: props.color || '#38bdf8'
+                    borderColor: props.borderColor || props.color || '#38bdf8',
+                    metadata: props.metadata || {}
                 });
             } else {
                 addFeatureRecord('polyline', geom, {});
             }
         } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-            // Check if it's a 3D polygon
-            if (props.height || props.extrude) {
+            if (props.height != null || props.extrude) {
                 addFeatureRecord('polygon3d', geom, {
-                    height: props.height || 50,
-                    extrusionColor: props.extrusionColor || '#e8b84a',
-                    fillOpacity: props.fillOpacity || 0.7
+                    height: parseFloat(props.height) || 50,
+                    extrusionColor: props.extrusionColor || props.fillColor || '#e8b84a',
+                    fillOpacity: parseFloat(props.fillOpacity) || 0.7
                 });
             } else {
                 addFeatureRecord('polygon', geom, {});
