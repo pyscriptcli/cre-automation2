@@ -3250,9 +3250,9 @@ map.on('error', e => console.warn('Map Notice:', e));
 </body>
 </html>"""
 
-------------------------------------------------------------------------
+
 # 5. INITIAL STATE & COMPONENT MOUNTING
-------------------------------------------------------------------------
+
 try:
     initial_theme = "Midnight Blue"
     initial_center = [120.9842, 14.5995]
