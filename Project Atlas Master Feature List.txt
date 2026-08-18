@@ -202,3 +202,56 @@ Pulse Animation: Trigger existing pulseFeature() function centered on search res
 FlyTo Integration: Chain animation: Pulse starts → map.flyTo({center, zoom: 15, duration: 1500}) → Temporary marker fades out after fly completes.
 Visual Feedback: Add subtle scale-up animation to temporary marker during pulse (scale 1.0 → 1.3 → 1.0 over 800ms).
 
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+ACT AS A SENIOR SOFTWARE DEVELOPER. YOUR TASK IS TO UPDATE THE EXISTING PROJECT ATLAS CODEBASE BY IMPLEMENTING ALL FEATURES DEFINED IN THE MASTER FEATURE LIST PROVIDED.
+STRICT CONSTRAINTS:
+OUTPUT ONLY THE COMPLETE, UPDATED PYTHON FILE CONTENT FIRST. NO EXPLANATIONS OR PREAMBLE BEFORE THE CODE.
+MAINTAIN THE EXISTING SINGLE-PAGE ARCHITECTURE WHERE THE ENTIRE APP LOGIC RESIDES IN THE HTML_TEMPLATE STRING INJECTED VIA st.components.v1.html.
+PRESERVE ALL EXISTING FUNCTIONALITY NOT EXPLICITLY SUPERSEDED BY THE NEW REQUIREMENTS.
+ADHERE STRICTLY TO THE SPECIFIED UI/UX DESIGN SYSTEM: CENTURY GOTHIC FONT, DARK THEME (#0a1628 BG, #316dca ACCENTS), TRANSPARENT INPUTS WITH WHITE TEXT AND SUBTLE BORDERS.
+ALL ROUTING, SEARCH ANIMATIONS, 3D GEOMETRY, AND STATE MANAGEMENT MUST REMAIN CLIENT-SIDE JAVASCRIPT. DO NOT ADD NEW PYTHON BACKEND ENDPOINTS FOR THESE FEATURES.
+ENSURE SUPABASE PERSISTENCE SCHEMAS ARE UPDATED TO INCLUDE NEW PROPERTIES (props.routeMode, props.metadata, props.height, props.extrusionColor) WITHOUT BREAKING BACKWARD COMPATIBILITY.
+INCREMENTAL UPDATE STRATEGY: DO NOT REWRITE EXISTING FEATURES THAT ARE ALREADY CORRECTLY IMPLEMENTED. WHEN YOU SEE THAT THE CODEBASE ALREADY CONTAINS A FEATURE, JUST COPY AND PRESERVE THAT EXACT CODE. ONLY ADD OR MODIFY CODE IF THE FEATURE IS MISSING OR NEEDS UPDATING TO MEET THE NEW REQUIREMENTS.
+IMPLEMENT THE FOLLOWING SPECIFICATIONS EXACTLY:
+ROUTING SYSTEM OVERHAUL
+Route Tool Activation: Clicking data-tool="route" MUST open floating card #popup-route-settings instead of immediately activating draw mode.
+Settings Card: Create #popup-route-settings with Mode Selector (Driving/Walking/Cycling), Auto-Finish Toggle, and Style Presets (Blue/Green/Red/Purple).
+OSRM Integration: Update fetchMultiPointRoute() to use /route/v1/{mode}/ endpoint. Parse distance and duration. Fallback to straight line with props.routingFailed = true on error.
+Edit & Reroute: Enable vertex dragging in Edit Mode. Debounce reroute calls by 300ms on vertex drop. Support midpoint insertion via double-click on segment.
+Shape Editor: Add Route-specific controls (Mode dropdown, Stats display, Recalculate button, Waypoint list with remove buttons).
+Labels: Auto-display {distance} · {duration} at route center bounds.
+3D POLYGON TOOL
+Toolbar: Add data-tool="polygon3d" button with extruded cube SVG icon between Polygon and Rectangle tools.
+Settings Popup: Create #popup-polygon3d-settings with Height Input (1-500m), Color Picker, Opacity Slider, and Auto-Close toggle.
+Rendering: Extend addDrawStack() to include draw-3d-extrusion (fill-extrusion layer) and draw-3d-roof (line layer) filtered by kind === 'polygon3d'.
+Performance: Limit visible 3D polygons to 50; toggle visibility beyond limit.
+Shape Editor: Show height/color/opacity controls for polygon3d; hide standard fill controls. Live preview on change.
+Labels: Position at roof centroid. Bounds calculation ignores height.
+ATTRIBUTE TABLE MODAL
+Trigger: Add "Table" grid icon button to every layer card in My Layers panel.
+Modal: Create #popup-attribute-table (600px width, 70vh max-height) with sticky headers.
+Functionality: Dynamic columns based on feature attributes. Support Text and Image cell types. Image cells show thumbnails (80x80px) with upload/clear.
+Toolbar: "Find in table" search filter + "+ Add Column" button (prompts for name/type).
+Reactivity: Changes auto-save to feature state on blur/Enter. Closing modal triggers markDirty() and syncDraw().
+Label Mapping: Allow mapping attribute to visible map label in Shape Editor.
+UI/UX & INTERACTION ENHANCEMENTS
+Undo/Redo: Add buttons beside Save button in top toolbar.
+Cursors: Crosshair for Route/3D Polygon tools; Grab for vertex dragging.
+Keyboard Shortcuts: Enter finishes draw/route; Escape cancels draft; Delete removes selected waypoint in edit mode.
+Search Popup: Add temporary marker (pin, #38bdf8) at result location. Trigger pulseFeature() (1600ms) before flyTo. Fade marker after animation.
+Context Menu: Icons only. Options: Edit, Duplicate, Delete, Copy Coordinates, Open in Google Maps, Open in Street View.
+Trade Area: Add custom POI search input in Trade Area Modal. Show OSM data when scanned POI marker is clicked.
+Boundaries: Add Nominatim search input/button in Data Browser > Boundaries section to highlight specific administrative areas.
+My Layers: Add "Select All" button for both grouped and ungrouped layers.
+STATE & PERSISTENCE
+Global State: Add currentRouteMode, current3DPolyHeight, current3DPolyColor, current3DPolyOpacity, currentTableFeatureId.
+Import Compatibility: Recognize properties.route_mode as editable routes and properties.height/properties.extrude as polygon3d during GeoJSON import.
+Auto-Save: Maintain 20s interval + Ctrl+S listener. Update payload schema to include new props.
+OUTPUT INSTRUCTIONS:
+PROVIDE THE COMPLETE, UPDATED PYTHON CODE FIRST.
+AFTER THE CODE, APPEND A CHANGELOG SECTION.
+THE CHANGELOG MUST DETAIL ONLY THE NEWLY ADDED OR MODIFIED FEATURES. DO NOT LIST EXISTING FEATURES THAT WERE LEFT UNCHANGED.
+EXECUTE NOW.
