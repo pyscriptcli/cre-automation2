@@ -528,6 +528,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 #popup-custom-map { width: 310px; }
 #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
 #popup-route-settings { width: 220px; }
+#popup-attribute-table { width: 600px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
 .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
 .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
@@ -640,6 +641,14 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .trade-area-poi-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .trade-area-poi-row label { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; }
 .custom-query-collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; color: #f0f6fc; font-size: 12px; margin-top: 8px;}
+/* Attribute Table Styles */
+.attr-table-container { width: 100%; overflow-y: auto; max-height: 50vh; }
+.attr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.attr-table th { position: sticky; top: 0; background: #0f172a; color: #f0f6fc; padding: 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 10; }
+.attr-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
+.attr-table input[type="text"] { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #f0f6fc; padding: 4px; border-radius: 4px; }
+.attr-table input[type="text"]:focus { border-color: #38bdf8; outline: none; }
+.attr-img-preview { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); cursor: pointer; }
 </style>
 </head>
 <body>
@@ -656,6 +665,12 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <span id="save-text">Saved</span>
         </div>
     </div>
+    <button class="tb-btn" id="btn-undo" title="Undo (Ctrl+Z)" style="color:#adbac7;">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+    </button>
+    <button class="tb-btn" id="btn-redo" title="Redo (Ctrl+Y)" style="color:#adbac7;">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path></svg>
+    </button>
     <button class="tb-btn" id="btn-save-project" title="Save Workspace (Ctrl+S)" style="color:#3fb950;">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
     </button>
@@ -864,6 +879,14 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <option value="walking">Walk</option>
         </select>
     </div>
+    <div class="f-row"><span>Style</span>
+        <select id="rColor" style="width:130px;">
+            <option value="#38bdf8">Blue</option>
+            <option value="#3fb950">Green</option>
+            <option value="#f85149">Red</option>
+            <option value="#a371f7">Purple</option>
+        </select>
+    </div>
 </div>
 
 <div id="popup-shape-editor" class="float-card right-card">
@@ -890,6 +913,18 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="f-row" id="eMarkerSizeRow" style="display:none;"> <span>Icon Size</span> <input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
     <div class="f-row" id="eTextRow" style="display:none;"> <span>Text</span> <input type="text" id="eTextVal" style="width:140px;"></div>
     <div class="f-row" id="eFontSizeRow" style="display:none;"> <span>Font Size</span> <input type="range" id="eFontSize" min="10" max="42" step="1"></div>
+    <!-- Route Specific Controls -->
+    <div id="routeEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; padding-top:10px;">
+        <div class="f-row"> <span>Route Mode</span>
+            <select id="eRouteMode" style="width:110px;">
+                <option value="driving">Driving</option>
+                <option value="cycling">Cycling</option>
+                <option value="walking">Walking</option>
+            </select>
+        </div>
+        <div class="f-row" style="margin-top:4px;"> <span>Stats</span> <span id="eRouteStats" style="font-size:11px; color:#adbac7;">-</span></div>
+        <button id="eRecalcRoute" class="trade-btn" style="width:100%; margin-top:6px; font-size:10px;">Recalculate Route</button>
+    </div>
     <div style="display:flex; justify-content:space-between; margin-top:6px;">
         <button id="eDeleteBtn" style="color:#f85149; border:1px solid #da36334d; background:#da36331a; padding:6px 12px; border-radius:6px; cursor:pointer;">Delete</button>
         <button id="eDoneBtn" style="background:#316dca; color:#fff; border:none; padding:6px 16px; border-radius:6px; cursor:pointer;">Done</button>
@@ -947,7 +982,11 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <div style="font-weight:600; font-size:11px; color:#768390;">POI CATEGORIES</div>
         <div id="poiCategoryCheckboxes" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
         </div>
-        <button class="trade-btn" id="btnScanTradeArea">Scan POIs</button>
+        <div style="margin-top:8px;">
+            <div style="font-weight:600; font-size:11px; color:#768390; margin-bottom:4px;">Custom POI Search</div>
+            <input type="text" id="customPoiSearchInput" placeholder="e.g. amenity=restaurant" style="width:100%; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px; font-size:11px;"/>
+        </div>
+        <button class="trade-btn" id="btnScanTradeArea" style="margin-top:8px;">Scan POIs</button>
         <div id="tradeResults" class="poi-summary"></div>
         <hr style="border-color:rgba(255,255,255,0.1); width:100%;"/>
         <div class="custom-query-collapse-header" id="customQueryToggle">
@@ -964,6 +1003,24 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             </div>
             <button id="btnRunOverpass" class="trade-btn">Run Custom Query</button>
         </div>
+    </div>
+</div>
+
+<!-- Attribute Table Modal -->
+<div id="popup-attribute-table" class="float-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-weight:700; color:#f0f6fc;" id="attrTableTitle">Attributes</span>
+        <button class="card-btn" id="closeAttrTableBtn">✕</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <input type="text" id="attrTableSearch" placeholder="Find in table..." style="flex:1; background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:6px; font-size:11px;"/>
+        <button id="btnAddAttrCol" class="trade-btn" style="padding:6px 10px; font-size:10px;">+ Add Column</button>
+    </div>
+    <div class="attr-table-container">
+        <table class="attr-table" id="attrTableGrid">
+            <thead><tr id="attrTableHeader"></tr></thead>
+            <tbody id="attrTableBody"></tbody>
+        </table>
     </div>
 </div>
 
@@ -1058,6 +1115,11 @@ let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
 let isDirty = false;
 
+// Undo/Redo State
+let historyStack = [];
+let historyIndex = -1;
+let isHistoryAction = false;
+
 // Vertex dragging state
 let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null;
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
@@ -1067,6 +1129,13 @@ let isDraggingRotation = false, rotatingPolyId = null, rotCenter = null, rotStar
 
 // Context menu state
 let ctxLngLat = null;
+let ctxFeatureId = null;
+
+// Attribute Table State
+let currentTableFeatureId = null;
+
+// Route State
+let currentRouteMode = 'driving';
 
 const vis = {
     label_city: true, label_brgy: true, label_street: true,
@@ -1111,10 +1180,60 @@ const setSaveBadgeStatus = status => {
 const markDirty = () => {
     isDirty = true;
     setSaveBadgeStatus('unsaved');
+    if (!isHistoryAction) {
+        // Push to history
+        const currentState = JSON.stringify({features, customGroups});
+        if (historyIndex < historyStack.length - 1) {
+            historyStack = historyStack.slice(0, historyIndex + 1);
+        }
+        historyStack.push(currentState);
+        historyIndex++;
+        // Limit stack size
+        if (historyStack.length > 50) {
+            historyStack.shift();
+            historyIndex--;
+        }
+    }
 };
 
+const undo = () => {
+    if (historyIndex > 0) {
+        historyIndex--;
+        const state = JSON.parse(historyStack[historyIndex]);
+        features = state.features;
+        customGroups = state.customGroups;
+        fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
+        syncDraw();
+        renderMyLayers();
+        isHistoryAction = true;
+        markDirty(); // This will push again, but we handle index carefully or just disable push during undo
+        isHistoryAction = false;
+        hint('Undo');
+    }
+};
+
+const redo = () => {
+    if (historyIndex < historyStack.length - 1) {
+        historyIndex++;
+        const state = JSON.parse(historyStack[historyIndex]);
+        features = state.features;
+        customGroups = state.customGroups;
+        fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
+        syncDraw();
+        renderMyLayers();
+        isHistoryAction = true;
+        markDirty();
+        isHistoryAction = false;
+        hint('Redo');
+    }
+};
+
+// Initialize history
+historyStack.push(JSON.stringify({features, customGroups}));
+historyIndex = 0;
+
 const closeFloatingCards = () => {
-    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','browser-panel','mylayers-panel'].forEach(id => {
+    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-route-settings','browser-panel','mylayers-panel','popup-attribute-table'].forEach(id => {
         const el = $(id);
         if (el) el.classList.remove('open');
     });
@@ -1225,6 +1344,9 @@ window.loadProjectDirectly = function(projectId) {
         renderMyLayers();
     });
     closeHomeDialog();
+    // Reset history for new project
+    historyStack = [JSON.stringify({features, customGroups})];
+    historyIndex = 0;
 };
 
 window.renameProjectFromLauncher = async function(e, projectId, oldName) {
@@ -1367,11 +1489,21 @@ async function saveProjectToSupabase(showToast = false) {
 
 setInterval(() => { if (isDirty) saveProjectToSupabase(false); }, 20000);
 $('btn-save-project').onclick = () => saveProjectToSupabase(true);
+$('btn-undo').onclick = undo;
+$('btn-redo').onclick = redo;
 
 document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         saveProjectToSupabase(true);
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        undo();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        redo();
     }
     if (e.key === 'Escape') {
         $('map-context-menu').style.display = 'none';
@@ -1725,6 +1857,13 @@ function syncLabels() {
     const feats = [];
     features.forEach(f => {
         if (!f.props.showLabel || f.props.visible === 0 || !f.name) return;
+        
+        // Handle route labels specially
+        let labelText = f.name;
+        if (f.kind === 'route' && f.props.description) {
+            labelText = f.props.description;
+        }
+
         const pos = f.props.labelPos || 'center';
         let coords = null;
         if (f.geometry.type === 'Point') {
@@ -1750,7 +1889,7 @@ function syncLabels() {
         feats.push({
             type: 'Feature',
             geometry: { type: 'Point', coordinates: coords },
-            properties: { labelText: f.name }
+            properties: { labelText: labelText }
         });
     });
     src.setData({ type: 'FeatureCollection', features: feats });
@@ -1937,9 +2076,10 @@ function pointInPolygon(point, vs) {
     return inside;
 }
 
-function fetchMultiPointRoute(pts, updateId = null) {
+let rerouteTimeout = null;
+function fetchMultiPointRoute(pts, updateId = null, mode = null) {
     hint('Calculating route…');
-    const profile = $('rProfile') ? $('rProfile').value : 'driving';
+    const profile = mode || $('rProfile') ? $('rProfile').value : 'driving';
     const coordStr = pts.map(p => `${p[0]},${p[1]}`).join(';');
     fetch(`https://router.project-osrm.org/route/v1/${profile}/${coordStr}?overview=full&geometries=geojson`)
     .then(r => r.json())
@@ -1958,29 +2098,48 @@ function fetchMultiPointRoute(pts, updateId = null) {
                 if (f) {
                     f.geometry = geom;
                     f.props.description = desc;
-                    f.props.profile = profile;
+                    f.props.routeMode = profile;
+                    f.props.metadata = { distance: dist, duration: dur };
                     syncDraw();
                     renderMyLayers();
                     markDirty();
+                    // Update editor stats if open
+                    if (selectedId === updateId) {
+                        $('eRouteStats').textContent = desc;
+                    }
                 }
             } else {
+                const color = $('rColor') ? $('rColor').value : '#38bdf8';
                 addFeatureRecord('route', geom, { 
-                    color: '#38bdf8', borderColor: '#38bdf8', width: 4, borderOpacity: 0.9,
+                    color: color, borderColor: color, width: 4, borderOpacity: 0.9,
                     description: desc,
-                    profile: profile,
+                    routeMode: profile,
+                    metadata: { distance: dist, duration: dur },
                     showLabel: true
                 });
             }
         } else {
-            if (!updateId) {
-                addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { color: '#38bdf8', borderColor: '#38bdf8', width: 3, borderOpacity: 0.8 });
-            }
+            throw new Error("No route found");
         }
         hint('');
     })
     .catch(() => {
-        if (!updateId) {
-            addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { color: '#38bdf8', borderColor: '#38bdf8', width: 3, borderOpacity: 0.8 });
+        if (updateId) {
+             const f = features.find(x => x.id === updateId);
+             if (f) {
+                 f.props.routingFailed = true;
+                 f.props.description = "Routing unavailable – straight line shown";
+                 syncDraw();
+                 markDirty();
+             }
+        } else {
+            const color = $('rColor') ? $('rColor').value : '#38bdf8';
+            addFeatureRecord('route', { type: 'LineString', coordinates: pts }, { 
+                color: color, borderColor: color, width: 3, borderOpacity: 0.8,
+                routingFailed: true,
+                description: "Routing unavailable – straight line shown",
+                routeMode: profile
+            });
         }
         hint('Direct route fallback');
     });
@@ -2007,6 +2166,7 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
             labelPos: 'center',
             iconSize: markerIconSize,
             visible: 1,
+            attributes: {}, // For attribute table
             ...customProps
         }
     };
@@ -2084,12 +2244,20 @@ $('btnScanTradeArea').onclick = async () => {
         hint('Please select a target polygon first.');
         return;
     }
-    const selectedTags = [];
+    
+    let selectedTags = [];
     document.querySelectorAll('.poi-cat-check:checked').forEach(cb => {
         selectedTags.push(cb.dataset.tag);
     });
+    
+    // Add custom POI search
+    const customSearch = $('customPoiSearchInput').value.trim();
+    if (customSearch) {
+        selectedTags.push(customSearch);
+    }
+
     if (!selectedTags.length) {
-        hint('Please select at least one POI category.');
+        hint('Please select at least one POI category or enter a custom search.');
         return;
     }
     const bnd = calcBounds(targetPoly);
@@ -2278,6 +2446,9 @@ document.addEventListener('click', (e) => {
 // ----------------- Right-Click Context Menu -----------------
 map.on('contextmenu', e => {
     ctxLngLat = e.lngLat;
+    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+    ctxFeatureId = fs.length && fs[0].properties.id != null ? parseInt(fs[0].properties.id, 10) : null;
+    
     const menu = $('map-context-menu');
     $('ctx-coords-label').textContent = `${e.lngLat.lat.toFixed(6)}, ${e.lngLat.lng.toFixed(6)}`;
     const maxX = window.innerWidth - 220;
@@ -2447,6 +2618,13 @@ map.on('mousemove', e => {
                 if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
             } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry.coordinates) {
                 f.geometry.coordinates[draggedVertexIdx] = cursorLL;
+                // Debounced reroute for routes
+                if (f.kind === 'route') {
+                    clearTimeout(rerouteTimeout);
+                    rerouteTimeout = setTimeout(() => {
+                        fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
+                    }, 300);
+                }
             }
             syncDraw();
             markDirty();
@@ -2587,6 +2765,14 @@ document.addEventListener('keydown', e => {
         $('btn-edit-mode').classList.remove('primary-active');
         syncVertexHandles();
     }
+    if (e.key === 'Delete' && selectedId && editMode) {
+         // Delete selected waypoint if in route edit mode could be implemented here
+         // For now, standard delete removes feature
+         features = features.filter(x => x.id !== selectedId);
+         for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== selectedId);
+         selectedId = null;
+         syncDraw(); renderMyLayers(); markDirty();
+    }
 });
 
 // ----------------- Edit Mode -----------------
@@ -2644,7 +2830,8 @@ map.on('mouseup', () => {
         if (draggedPolyId != null) {
             const f = features.find(x => x.id === draggedPolyId);
             if (f && f.kind === 'route') {
-                fetchMultiPointRoute(f.geometry.coordinates, f.id);
+                // Trigger reroute immediately on drop
+                fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
             }
         }
         isDraggingVertex = false;
@@ -2693,6 +2880,15 @@ function openShapeEditor(id) {
         $('eTextVal').value = f.props.text || '';
         $('eFontSize').value = f.props.fontSize || 16;
     }
+    
+    // Route Specifics
+    const isRoute = f.kind === 'route';
+    $('routeEditorControls').style.display = isRoute ? 'block' : 'none';
+    if (isRoute) {
+        $('eRouteMode').value = f.props.routeMode || 'driving';
+        $('eRouteStats').textContent = f.props.description || '-';
+    }
+
     $('popup-shape-editor').classList.add('open');
 }
 
@@ -2718,6 +2914,22 @@ $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedI
 $('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); markDirty(); } };
 $('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); markDirty(); } };
+
+// Route Editor Controls
+$('eRouteMode').onchange = e => {
+    const f = features.find(x => x.id === selectedId);
+    if (f && f.kind === 'route') {
+        f.props.routeMode = e.target.value;
+        fetchMultiPointRoute(f.geometry.coordinates, f.id, e.target.value);
+    }
+};
+
+$('eRecalcRoute').onclick = () => {
+    const f = features.find(x => x.id === selectedId);
+    if (f && f.kind === 'route') {
+        fetchMultiPointRoute(f.geometry.coordinates, f.id, f.props.routeMode);
+    }
+};
 
 $('eDeleteBtn').onclick = () => {
     features = features.filter(x => x.id !== selectedId);
@@ -2779,6 +2991,9 @@ function renderLayerCardHtml(f) {
                 <button class="card-btn" data-act="edit" data-id="${f.id}" title="Edit Properties">
                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
                 </button>
+                <button class="card-btn" data-act="table" data-id="${f.id}" title="View/Edit Attributes">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                </button>
                 <button class="card-btn" data-act="eye" data-id="${f.id}" title="Toggle Visibility">
                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                 </button>
@@ -2829,6 +3044,9 @@ function renderMyLayers() {
                         <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group"/>
                     </div>
                     <div style="display:flex; align-items:center; gap:2px;">
+                         <button class="card-btn" data-act="groupSelectAll" data-group="${gName}" title="Select All in Group">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                        </button>
                         <button class="card-btn" data-act="groupStyle" data-group="${gName}" title="Style Group">
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                         </button>
@@ -2867,11 +3085,20 @@ function renderMyLayers() {
     const looseFeats = features.filter(f => !groupedIds.has(f.id));
     html += '<div id="ungrouped-zone">';
     if (looseFeats.length) {
-        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px;">Ungrouped Layers</div>';
+        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">Ungrouped Layers <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></button></div>';
         html += looseFeats.slice().reverse().map(f => renderLayerCardHtml(f)).join('');
     }
     html += '</div>';
     container.innerHTML = html;
+
+    // Select All Ungrouped
+    const btnSelAllUng = container.querySelector('#btnSelectAllUngrouped');
+    if (btnSelAllUng) {
+        btnSelAllUng.onclick = () => {
+            looseFeats.forEach(f => selectedLayerIds.add(f.id));
+            renderMyLayers(); // Re-render to update checkboxes
+        };
+    }
 
     container.querySelectorAll('.group-container').forEach(gc => {
         const gName = gc.dataset.group;
@@ -2952,6 +3179,18 @@ function renderMyLayers() {
             else selectedLayerIds.delete(id);
         });
     });
+    
+    // Group Select All
+    container.querySelectorAll('[data-act="groupSelectAll"]').forEach(btn => {
+        btn.onclick = () => {
+            const gName = btn.dataset.group;
+            const grp = customGroups[gName];
+            if (grp) {
+                grp.ids.forEach(id => selectedLayerIds.add(id));
+                renderMyLayers();
+            }
+        };
+    });
 
     container.querySelectorAll('.group-title-input').forEach(inp => {
         inp.onchange = e => {
@@ -3011,6 +3250,10 @@ function renderMyLayers() {
             const id = parseInt(b.dataset.id, 10);
             const f = features.find(x => x.id === id);
             if (!f) return;
+            if (act === 'table') {
+                openAttributeTable(id);
+                return;
+            }
             if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); markDirty(); }
             if (act === 'labelPos') { f.props.labelPos = b.value; syncDraw(); markDirty(); }
             if (act === 'edit') openShapeEditor(id);
@@ -3088,6 +3331,142 @@ function calcBounds(f) {
     if (minX === maxX && minY === maxY) return [[minX - 0.005, minY - 0.005], [maxX + 0.005, maxY + 0.005]];
     return [[minX, minY], [maxX, maxY]];
 }
+
+// ----------------- Attribute Table Logic -----------------
+function openAttributeTable(featureId) {
+    currentTableFeatureId = featureId;
+    const f = features.find(x => x.id === featureId);
+    if (!f) return;
+    
+    $('attrTableTitle').textContent = `Attributes: ${f.name}`;
+    $('popup-attribute-table').classList.add('open');
+    
+    // Ensure attributes object exists
+    if (!f.props.attributes) f.props.attributes = {};
+    
+    renderAttributeTable(f);
+}
+
+function renderAttributeTable(f) {
+    const attrs = f.props.attributes || {};
+    const headerRow = $('attrTableHeader');
+    const bodyRow = $('attrTableBody');
+    
+    // Default columns
+    let cols = ['name', 'description'];
+    // Add custom attribute keys
+    Object.keys(attrs).forEach(k => {
+        if (!cols.includes(k)) cols.push(k);
+    });
+    
+    // Render Header
+    headerRow.innerHTML = cols.map(c => `<th>${c.toUpperCase()}</th>`).join('') + '<th>ACTIONS</th>';
+    
+    // Render Body
+    let html = '<tr>';
+    cols.forEach(c => {
+        let val = '';
+        if (c === 'name') val = f.name;
+        else if (c === 'description') val = f.props.description || '';
+        else val = attrs[c] || '';
+        
+        // Check if it's an image attribute (starts with data:image)
+        if (typeof val === 'string' && val.startsWith('data:image')) {
+            html += `<td><img src="${val}" class="attr-img-preview" onclick="triggerAttrImageUpload('${c}')" oncontextmenu="clearAttrImage('${c}'); return false;"></td>`;
+        } else {
+            html += `<td><input type="text" value="${val}" onchange="updateAttr('${c}', this.value)"></td>`;
+        }
+    });
+    html += `<td><button class="card-btn" onclick="removeAttrColumn()" title="Remove Last Column" style="color:#ff7b72;">✕</button></td></tr>`;
+    bodyRow.innerHTML = html;
+}
+
+window.updateAttr = (key, value) => {
+    const f = features.find(x => x.id === currentTableFeatureId);
+    if (!f) return;
+    if (key === 'name') {
+        f.name = value;
+        renderMyLayers();
+    } else if (key === 'description') {
+        f.props.description = value;
+    } else {
+        f.props.attributes[key] = value;
+    }
+    syncDraw();
+    markDirty();
+};
+
+window.triggerAttrImageUpload = (key) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const f = features.find(x => x.id === currentTableFeatureId);
+                if (f) {
+                    f.props.attributes[key] = ev.target.result;
+                    renderAttributeTable(f);
+                    markDirty();
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    input.click();
+};
+
+window.clearAttrImage = (key) => {
+    const f = features.find(x => x.id === currentTableFeatureId);
+    if (f && f.props.attributes[key]) {
+        delete f.props.attributes[key];
+        renderAttributeTable(f);
+        markDirty();
+    }
+};
+
+window.removeAttrColumn = () => {
+    const f = features.find(x => x.id === currentTableFeatureId);
+    if (!f) return;
+    const attrs = f.props.attributes;
+    const keys = Object.keys(attrs);
+    if (keys.length > 0) {
+        delete attrs[keys[keys.length - 1]];
+        renderAttributeTable(f);
+        markDirty();
+    }
+};
+
+$('btnAddAttrCol').onclick = () => {
+    const f = features.find(x => x.id === currentTableFeatureId);
+    if (!f) return;
+    const name = prompt("Enter column name:");
+    if (name && !f.props.attributes[name]) {
+        f.props.attributes[name] = "";
+        renderAttributeTable(f);
+        markDirty();
+    }
+};
+
+$('attrTableSearch').oninput = e => {
+    const term = e.target.value.toLowerCase();
+    const inputs = $('attrTableBody').querySelectorAll('input[type="text"]');
+    inputs.forEach(inp => {
+        const td = inp.closest('td');
+        if (inp.value.toLowerCase().includes(term)) {
+            td.style.display = '';
+        } else {
+            td.style.display = term ? 'none' : '';
+        }
+    });
+};
+
+$('closeAttrTableBtn').onclick = () => {
+    $('popup-attribute-table').classList.remove('open');
+    currentTableFeatureId = null;
+};
 
 // ----------------- Direct Export Engine -----------------
 $('btn-export-direct').onclick = () => {
@@ -3230,16 +3609,27 @@ function processGeoJSON(geojson) {
     feats.forEach(f => {
         if (!f.geometry) return;
         const geom = f.geometry;
+        const props = f.properties || {};
         if (geom.type === 'Point') {
             addFeatureRecord('marker', geom, {
                 shape: 'pin',
                 color: '#003366',
                 iconSize: 0.9,
                 iconKey: getIconKey('pin', '#003366'),
-                osmTags: f.properties || {}
+                osmTags: props
             });
         } else if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
-            addFeatureRecord('polyline', geom, {});
+            // Check if it's a route
+            if (props.route_mode) {
+                addFeatureRecord('route', geom, {
+                    routeMode: props.route_mode,
+                    description: props.description || '',
+                    color: props.color || '#38bdf8',
+                    borderColor: props.color || '#38bdf8'
+                });
+            } else {
+                addFeatureRecord('polyline', geom, {});
+            }
         } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
             addFeatureRecord('polygon', geom, {});
         }
