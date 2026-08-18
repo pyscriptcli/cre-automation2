@@ -303,15 +303,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0a1628; }
   #map { position: absolute; inset: 0; width: 100vw; height: 100vh; z-index: 1; }
 
-  select, select option {
-    background-color: #0f172a !important;
-    color: #f8fafc !important;
-  }
-  select option:hover, select option:checked {
-    background-color: #2563eb !important;
-    color: #ffffff !important;
-  }
+  /* Professional Custom Scrollbars */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
 
+  select, select option { background-color: #0f172a !important; color: #f8fafc !important; }
+  select option:hover, select option:checked { background-color: #2563eb !important; color: #ffffff !important; }
+
+  /* Top Centered Unified Toolbar Island */
   #top-toolbar-bar {
     position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
     background-color: rgba(9, 16, 24, 0.97);
@@ -335,48 +336,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .save-badge.saving { color: #d9b451; border-color: rgba(217, 180, 81, 0.4); }
   .save-badge.saved { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); }
 
-  /* Floating cards - left side for panels, right side for tools */
-  .float-card {
-    position: absolute; top: 68px; z-index: 12;
+  /* Left Floating Panels */
+  .left-panel {
+    position: absolute; top: 68px; left: 16px; bottom: 16px; width: 360px; z-index: 9;
     background-color: rgba(9, 16, 24, 0.97);
-    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 14px;
-    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75); display: none; flex-direction: column;
-    gap: 10px; font-size: 12px; color: #adbac7;
-    max-height: 80vh; overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7); display: none; flex-direction: column;
+    overflow: hidden; color: #adbac7;
   }
-  .float-card.open { display: flex; }
-  .left-card { left: 16px; right: auto; transform: none; width: 360px; }
-  .right-card { right: 16px; left: auto; transform: none; width: 320px; }
+  .left-panel.open { display: flex; }
 
-  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 8px; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
   .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #f0f6fc; }
-  .icon-action-btn { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); border-radius: 8px; cursor: pointer; color: #adbac7; }
+  .icon-action-btn { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); border-radius: 8px; cursor: pointer; color: #adbac7; transition: 0.2s; }
   .icon-action-btn:hover { background: rgba(255, 255, 255, 0.15); color: #f0f6fc; }
-  .panel-content { overflow-y: auto; padding: 8px 0; display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
+  .panel-content { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
 
-  .acc-item { border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
-  .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 6px 0; }
-  .acc-body { padding: 6px 0 2px 0; display: flex; flex-direction: column; gap: 8px; }
+  /* Accordions */
+  .acc-item { border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; transition: 0.2s; }
+  .acc-item:hover { background: rgba(255,255,255,0.02); }
+  .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 6px 4px; border-radius: 4px;}
+  .acc-body { padding: 6px 4px 2px 4px; display: flex; flex-direction: column; gap: 8px; }
   .acc-body.hidden { display: none !important; }
 
   .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
   .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
 
-  .dimension-mode-bar { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.35); padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .dimension-mode-bar { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.35); padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 4px; }
   .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 6px; cursor: pointer; }
   .dimension-mode-btn.active { background: #316dca; color: #ffffff; }
 
   .bound-select-row { display: flex; gap: 6px; margin-top: 4px; position: relative; }
   .bound-select-row input[type=text] { flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.12); color: #f0f6fc; padding: 6px 8px; border-radius: 8px; font-size: 11px; }
-  .bound-select-row button { background: #ff1e1e; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
   .autocomplete-list {
     position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
     background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
-    max-height: 200px; overflow-y: auto; display: none;
+    max-height: 200px; overflow-y: auto; display: none; margin-top: 4px; box-shadow: 0 8px 16px rgba(0,0,0,0.5);
   }
-  .autocomplete-item { padding: 6px 8px; cursor: pointer; font-size: 11px; color: #adbac7; }
+  .autocomplete-item { padding: 8px 10px; cursor: pointer; font-size: 11px; color: #adbac7; border-bottom: 1px solid rgba(255,255,255,0.05); }
   .autocomplete-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
+  /* My Layers & Grouping Container */
   .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
   .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
   .group-container { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; }
@@ -389,26 +389,62 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .layer-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; cursor: grab; }
   .layer-card:active { cursor: grabbing; }
   .layer-card-top { display: flex; align-items: center; gap: 6px; }
-  .layer-card-top input[type=checkbox] { width: 14px; height: 14px; accent-color: #316dca; cursor: pointer; }
   .layer-name-input { flex: 1; border: 1px solid transparent; background: transparent; font-weight: 600; font-size: 12px; color: #f0f6fc; padding: 2px 4px; border-radius: 4px; }
   .layer-name-input:focus { border-color: #316dca; background: rgba(0,0,0,0.4); outline: none; }
-  .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+  .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: 0.15s; }
   .card-btn:hover { color: #f0f6fc; background: rgba(255,255,255,0.1); }
 
+  /* Trade Area Controls */
   .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
   .trade-controls select { background: #0f172a; color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
-  .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; }
+  .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; transition:0.2s;}
+  .trade-btn:hover { background: #2563eb; }
   .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
   .poi-badge { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 5px 8px; border-radius: 6px; }
 
+  /* Floating Tool Options Popups */
+  .float-card {
+    position: absolute; top: 68px; z-index: 12;
+    background-color: rgba(9, 16, 24, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 14px;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75); display: none; flex-direction: column;
+    gap: 10px; font-size: 12px; color: #adbac7;
+    max-height: 80vh; overflow-y: auto;
+  }
+  .float-card.open { display: flex; }
+  .right-card { right: 16px; left: auto; transform: none; width: 320px; }
+  
+  .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
+  
+  /* Modern Square Color Box */
+  .float-card input[type=color] { 
+    -webkit-appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.15); 
+    width: 22px; 
+    height: 22px; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    background: transparent; 
+    padding: 0;
+  }
+  .float-card input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
+  .float-card input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
+  
+  .float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
+  .float-card input[type=text]:focus { border-color: #38bdf8; }
+
+  #popup-search { width: 280px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
+  #popup-marker-settings { width: 250px; }
+  #popup-text-settings { width: 260px; }
+  #popup-shape-editor { width: 320px; }
+  #popup-custom-map { width: 310px; }
+
   .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; }
+  .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
   .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
 
-  .layout-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0; }
-  .layout-btn { padding: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #f0f6fc; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
-  .layout-btn.active { background: #316dca; border-color: #316dca; }
-
+  /* Tag Inspector Table */
   .maplibregl-popup-content {
     background: rgba(9, 16, 24, 0.97) !important; color: #f0f6fc !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important;
@@ -425,9 +461,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 15;
     background-color: rgba(9, 16, 24, 0.97); color: #f0f6fc;
     border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 7px 18px;
-    font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none;
+    font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none; font-weight:600;
   }
 
+  /* Solid Glass Minimalist Launcher Overlay */
   #launcher-modal-scrim {
     position: fixed; inset: 0; z-index: 9999;
     display: flex; align-items: center; justify-content: center;
@@ -487,7 +524,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   .file-input-label {
     display: inline-block; background: #316dca; color: #fff; padding: 6px 12px;
-    border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600;
+    border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition:0.2s;
   }
   .file-input-label:hover { background: #255bb0; }
 
@@ -501,9 +538,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     flex: 1; border: none; outline: none; font-size: 14px; color: #202124;
     background: transparent; padding: 6px 0;
   }
-  .search-wrapper svg {
-    stroke: #5f6368; width: 20px; height: 20px;
-  }
+  .search-wrapper svg { stroke: #5f6368; width: 20px; height: 20px; }
   .search-results {
     background: #fff; border-radius: 8px; margin-top: 4px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.3); overflow: hidden;
@@ -513,14 +548,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     display: flex; align-items: center; gap: 10px;
   }
   .search-result-item:hover { background: #f1f3f4; }
-  .search-result-icon {
-    width: 20px; height: 20px; flex-shrink: 0; color: #5f6368;
-  }
+  .search-result-icon { width: 20px; height: 20px; flex-shrink: 0; color: #5f6368; }
   
-  .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
-  .float-card input[type=color] { border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; background: transparent; }
-  .float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; }
-  .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 </style>
 </head>
 <body>
@@ -528,7 +557,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="map"></div>
 
 <div id="top-toolbar-bar">
-  <button class="tb-btn" id="btn-home-dialog" title="Project Selection (Home)">
+  <button class="tb-btn" id="btn-home-dialog" title="Select Workspace">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
   </button>
   
@@ -554,9 +583,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </button>
   <button class="tb-btn" id="btn-search" title="Search Place">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
-  </button>
-  <button class="tb-btn" id="btn-import" title="Import KML/KMZ/GeoJSON/Shapefile">
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
   </button>
 
   <div class="tb-sep"></div>
@@ -585,8 +611,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <div class="tb-sep"></div>
 
-  <button class="tb-btn" id="btn-edit-mode" title="Select & Drag / Edit Vertices">
+  <button class="tb-btn" id="btn-edit-mode" title="Select & Drag Features">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+  </button>
+  <button class="tb-btn" id="btn-vertex-mode" title="Edit Polygon Points (Vertices)">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><circle cx="12" cy="18" r="3"></circle><line x1="6" y1="6" x2="18" y2="6"></line><line x1="6" y1="6" x2="12" y2="18"></line><line x1="18" y1="6" x2="12" y2="18"></line></svg>
   </button>
 
   <div class="tb-sep"></div>
@@ -594,13 +623,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <button class="tb-btn" id="btn-custom-map" title="Basemap Styling">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
   </button>
-  <button class="tb-btn" id="btn-export-dialog" title="Export Map Layout">
+  <button class="tb-btn" id="btn-export-direct" title="Export Map to PNG">
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
   </button>
 </div>
 
 <!-- Left floating panels -->
-<div id="browser-panel" class="float-card left-card">
+<div id="browser-panel" class="left-panel">
   <div class="panel-header">
     <div class="panel-title">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6-10 6L2 8z"></path><path d="M2 12l10 6 10-6"></path><path d="M2 16l10 6 10-6"></path></svg>
@@ -612,17 +641,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <div class="panel-content">
+    <div style="margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <button id="btn-import" class="trade-btn" style="width:100%; display:flex; justify-content:center; align-items:center; gap:6px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            Import Spatial Data (KML, GeoJSON, SHP)
+        </button>
+        <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip" style="display:none;" />
+    </div>
+
     <div class="dimension-mode-bar">
       <button class="dimension-mode-btn active" id="btn2DMode">2D MAP</button>
       <button class="dimension-mode-btn" id="btn3DMode">3D BUILDINGS</button>
     </div>
 
-    <div class="acc-item">
-      <div class="acc-header" data-target="body-trade-area">
-        <span>Trade Area Analysis</span><span>▸</span>
-      </div>
-      <div class="acc-body hidden" id="body-trade-area">
-        <button id="btnOpenTradeArea" class="trade-btn">Open Trade Area Analysis</button>
+    <div class="acc-item" id="btnOpenTradeAreaPopup" style="cursor:pointer;">
+      <div class="acc-header" style="justify-content:flex-start; gap:8px; color:#38bdf8;">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        <span>Trade Area Analysis</span>
+        <span style="margin-left:auto;">↗</span>
       </div>
     </div>
 
@@ -681,7 +717,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         
         <div style="font-weight:600; font-size:11px; color:#f0f6fc; margin-top:4px;">Highlight City Boundary</div>
         <div class="bound-select-row">
-          <input type="text" id="boundarySearchInput" placeholder="Search for a place…" autocomplete="off"/>
+          <input type="text" id="boundarySearchInput" placeholder="Search for a boundary..." autocomplete="off"/>
           <div class="autocomplete-list" id="boundaryAutocompleteList"></div>
         </div>
       </div>
@@ -689,7 +725,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 
-<div id="mylayers-panel" class="float-card left-card">
+<div id="mylayers-panel" class="left-panel">
   <div class="panel-header">
     <div class="panel-title">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
@@ -713,11 +749,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 
-<!-- Right side tool popups -->
-<div id="popup-search" class="float-card right-card">
+<div id="popup-search" class="float-card">
   <div class="search-wrapper">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
-    <input type="text" id="searchInput" placeholder="Search for a place" />
+    <input type="text" id="searchInput" placeholder="Search location (Press Enter)..." autocomplete="off"/>
   </div>
   <div class="search-results" id="searchResultsList"></div>
 </div>
@@ -725,17 +760,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <div id="popup-marker-settings" class="float-card right-card">
   <div style="font-weight:600; font-size:11px; color:#768390;">CHOOSE MARKER ICON</div>
   <div class="icon-grid" id="markerIconGrid"></div>
-  <div style="display:flex; gap:6px; align-items:center;">
-    <span style="font-size:11px;">Custom Image:</span>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+    <span style="font-size:11px;">Custom Image Pin:</span>
     <label class="file-input-label" for="customMarkerFileInput">Upload (max 5MB)</label>
     <input type="file" id="customMarkerFileInput" accept="image/*" style="display:none;" />
-  </div>
-  <div class="f-row"><span>Frame</span>
-    <select id="markerFrameSelect" style="width:130px;">
-      <option value="none">None</option>
-      <option value="2d">2D Frame</option>
-      <option value="3d">3D Frame</option>
-    </select>
   </div>
   <div class="f-row"><span>Icon Color</span><input type="color" id="mColor" value="#003366"></div>
   <div class="f-row"><span>Icon Size</span><input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"></div>
@@ -786,7 +814,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row" id="eFontSizeRow" style="display:none;"><span>Font Size</span><input type="range" id="eFontSize" min="10" max="42" step="1"></div>
   
   <div style="display:flex; justify-content:space-between; margin-top:6px;">
-    <button id="eDeleteBtn" style="color:#f85149; border:1px solid #da36334d; background:#da36331a; padding:6px 12px; border-radius:6px; cursor:pointer;">Delete</button>
+    <button id="eDeleteBtn" style="color:#ff7b72; border:1px solid rgba(255,123,114,0.3); background:rgba(255,123,114,0.1); padding:6px 12px; border-radius:6px; cursor:pointer;">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete
+    </button>
     <button id="eDoneBtn" style="background:#316dca; color:#fff; border:none; padding:6px 16px; border-radius:6px; cursor:pointer;">Done</button>
   </div>
 </div>
@@ -835,28 +865,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <div class="f-row"><span>Opacity</span><input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"></div>
 </div>
 
-<div id="popup-export" class="float-card right-card">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <span style="font-weight:700; color:#f0f6fc;">Export Layout</span>
-    <button class="card-btn" id="closeExportBtn">✕</button>
-  </div>
-  
-  <div style="font-size:10px; font-weight:700; color:#768390; text-transform:uppercase;">Live Export Preview</div>
-  <img id="exportPreviewImg" style="width:100%; height:110px; object-fit:cover; background:#0d1117; border-radius:6px; border:1px solid #2d333b;" />
-  
-  <div style="font-weight:600; font-size:11px; color:#768390;">LAYOUT RATIO</div>
-  <div class="layout-grid">
-    <button class="layout-btn active" data-ratio="screen">Screen</button>
-    <button class="layout-btn" data-ratio="1:1">1:1</button>
-    <button class="layout-btn" data-ratio="16:9">16:9</button>
-    <button class="layout-btn" data-ratio="4:3">4:3</button>
-    <button class="layout-btn" data-ratio="9:16">9:16</button>
-    <button class="layout-btn" data-ratio="a4">A4</button>
-  </div>
-  
-  <button id="triggerExportBtn" style="background:#316dca; color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:4px;">Download Rendered Image</button>
-</div>
-
 <!-- Trade Area Analysis dedicated popup -->
 <div id="popup-trade-area" class="float-card right-card" style="width:360px;">
   <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -868,17 +876,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <select id="tradePolygonSelect" style="width:170px;"><option value="">-- Choose --</option></select>
   </div>
 
-  <div style="font-weight:600; font-size:11px; color:#768390;">POI CATEGORIES (multi-select)</div>
-  <div id="poiCategoryCheckboxes" style="display:flex; flex-wrap:wrap; gap:6px; max-height:200px; overflow-y:auto;">
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:10px;">CUSTOM POI SEARCH</div>
+  <input type="text" id="poiKeywordSearch" placeholder="e.g., Jollibee, Starbucks..." style="width:100%; margin-top:4px;" />
+
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:10px;">PRESET CATEGORIES (multi-select)</div>
+  <div id="poiCategoryCheckboxes" style="display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto; padding-right:6px; margin-bottom:8px;">
   </div>
 
   <button class="trade-btn" id="btnScanTradeArea">Scan POIs</button>
   <div id="tradeResults" class="poi-summary"></div>
 
-  <hr style="border-color:rgba(255,255,255,0.1); width:100%;"/>
+  <hr style="border-color:rgba(255,255,255,0.1); width:100%; margin: 12px 0;"/>
 
   <div style="font-weight:600; font-size:11px; color:#768390;">CUSTOM OVERPASS QUERY</div>
-  <textarea id="overpassQueryInput" rows="5" style="background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px; font-size:12px;"></textarea>
+  <textarea id="overpassQueryInput" rows="4" style="background:rgba(0,0,0,0.4); color:#f0f6fc; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px; font-size:12px; resize:none;"></textarea>
   <div class="f-row"><span>Result type</span>
     <select id="overpassResultType" style="width:110px;">
       <option value="marker">Markers</option>
@@ -958,14 +969,12 @@ let features = __INITIAL_FEATURES__;
 let fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
 let customGroups = __INITIAL_CUSTOM_GROUPS__ || { "Trade Area Scan": { collapsed: false, ids: [] } };
 
-let activeTool = null, editMode = false;
+let activeTool = null, editMode = false, vertexMode = false;
 let draft = [], cursorLL = null, selectedId = null;
 let markerShape = 'pin', markerColor = '#003366', markerIconSize = 0.9;
-let markerFrame = 'none';
 let customMarkerImageKey = null;
 let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
-let currentExportRatio = 'screen';
 let isDirty = false;
 
 // Vertex dragging state
@@ -1023,7 +1032,7 @@ const markDirty = () => {
 };
 
 const closeFloatingCards = () => {
-  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-export','browser-panel','mylayers-panel','popup-trade-area'].forEach(id => {
+  ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','browser-panel','mylayers-panel','popup-trade-area'].forEach(id => {
     const el = $(id);
     if (el) el.classList.remove('open');
   });
@@ -1129,7 +1138,7 @@ window.loadProjectDirectly = function(projectId) {
     if (f.kind === 'marker') {
       const sh = f.props.shape || 'pin';
       const col = f.props.color || '#003366';
-      f.props.iconKey = getIconKey(sh, col);
+      f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
     }
   });
 
@@ -1302,7 +1311,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ----------------- Marker Icon Pipeline -----------------
+// ----------------- Marker Canvas Icon Pipeline -----------------
 function renderIconCanvas(shape, color) {
   const c = document.createElement('canvas');
   c.width = 64; c.height = 64;
@@ -1356,38 +1365,37 @@ function getIconKey(shape, color) {
   return key;
 }
 
-function createCustomMarkerImage(dataUrl, frame) {
+function createCustomMarkerImage(dataUrl) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas');
       const baseSize = 64;
-      c.width = baseSize;
-      c.height = baseSize;
+      c.width = baseSize; c.height = baseSize;
       const ctx = c.getContext('2d');
-      ctx.clearRect(0,0,baseSize,baseSize);
-
-      if (frame === '2d' || frame === '3d') {
-        const pad = 6;
-        const rectX = pad, rectY = pad, rectW = baseSize - pad*2, rectH = baseSize - pad*2;
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = 'rgba(0,0,0,0.4)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetX = frame === '3d' ? 4 : 2;
-        ctx.shadowOffsetY = frame === '3d' ? 4 : 2;
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(rectX, rectY, rectW, rectH, 10) : ctx.rect(rectX, rectY, rectW, rectH);
-        ctx.fill();
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        const innerPad = 12;
-        ctx.drawImage(img, innerPad, innerPad, baseSize - innerPad*2, baseSize - innerPad*2);
-      } else {
-        ctx.drawImage(img, 0, 0, baseSize, baseSize);
-      }
-
+      
+      // Draw circular crop with white border
+      ctx.beginPath();
+      ctx.arc(32, 32, 30, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      
+      // Calculate cover dimensions
+      const scale = Math.max(baseSize / img.width, baseSize / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      const x = (baseSize - w) / 2;
+      const y = (baseSize - h) / 2;
+      
+      ctx.drawImage(img, x, y, w, h);
+      
+      // Inner ring for polish
+      ctx.beginPath();
+      ctx.arc(32, 32, 29, 0, Math.PI * 2);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      
       resolve(c);
     };
     img.onerror = reject;
@@ -1405,8 +1413,7 @@ $('customMarkerFileInput').onchange = function(e) {
   const reader = new FileReader();
   reader.onload = async (ev) => {
     customMarkerDataUrl = ev.target.result;
-    const frame = $('markerFrameSelect').value;
-    const canvas = await createCustomMarkerImage(customMarkerDataUrl, frame);
+    const canvas = await createCustomMarkerImage(customMarkerDataUrl);
     const key = 'custom_marker_' + Date.now();
     const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
     try {
@@ -1417,20 +1424,6 @@ $('customMarkerFileInput').onchange = function(e) {
     } catch(err) { hint('Failed to add custom image'); }
   };
   reader.readAsDataURL(file);
-};
-
-$('markerFrameSelect').onchange = async () => {
-  if (customMarkerDataUrl) {
-    const frame = $('markerFrameSelect').value;
-    const canvas = await createCustomMarkerImage(customMarkerDataUrl, frame);
-    const key = 'custom_marker_' + Date.now();
-    const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
-    try {
-      if (map.hasImage(key)) map.removeImage(key);
-      map.addImage(key, imgData, { pixelRatio: 2 });
-      customMarkerImageKey = key;
-    } catch(err) {}
-  }
 };
 
 const ICON_SVGS = {
@@ -1505,7 +1498,11 @@ function addDrawStack() {
       filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
       layout: {
         'icon-image': ['get', 'iconKey'],
-        'icon-size': ['coalesce', ['get', 'iconSize'], 0.9],
+        'icon-size': [
+            '*', 
+            ['coalesce', ['get', 'iconSize'], 0.9], 
+            ['interpolate', ['linear'], ['zoom'], 10, 0.6, 16, 1.0, 20, 1.5]
+        ],
         'icon-allow-overlap': true,
         'icon-anchor': 'bottom'
       },
@@ -1554,6 +1551,7 @@ function addDrawStack() {
     map.getSource('draw').setData(fc(features));
   }
 
+  // Draft preview layer
   if (!map.getSource('draft')) {
     map.addSource('draft', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
@@ -1572,6 +1570,7 @@ function addDrawStack() {
     });
   }
 
+  // Vertex Editing Handles Layer (Direct Vertex Manipulation)
   if (!map.getSource('vertex-handles')) {
     map.addSource('vertex-handles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
@@ -1593,25 +1592,15 @@ const syncDraw = () => {
 
 function syncVertexHandles() {
   if (!map.getSource('vertex-handles')) return;
-  if (!editMode) {
+  if (!vertexMode) {
     map.getSource('vertex-handles').setData({ type: 'FeatureCollection', features: [] });
     return;
   }
   const handleFeats = [];
   features.forEach(f => {
-    if (['polygon','rectangle','circle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+    if (f.kind === 'polygon' && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
       const coords = f.geometry.coordinates[0];
       for (let i = 0; i < coords.length - 1; i++) {
-        handleFeats.push({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: coords[i] },
-          properties: { polyId: f.id, vIdx: i }
-        });
-      }
-    }
-    if (f.kind === 'polyline' && f.geometry && f.geometry.coordinates) {
-      const coords = f.geometry.coordinates;
-      for (let i = 0; i < coords.length; i++) {
         handleFeats.push({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: coords[i] },
@@ -1671,7 +1660,7 @@ map.on('load', () => {
     if (f.kind === 'marker') {
       const sh = f.props.shape || 'pin';
       const col = f.props.color || '#003366';
-      f.props.iconKey = getIconKey(sh, col);
+      f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
     }
   });
   addDrawStack(); 
@@ -1797,17 +1786,19 @@ function populateTradeAreaCheckboxes() {
   const container = $('poiCategoryCheckboxes');
   let html = '';
   for (const category in POI_CONFIG) {
-    html += `<div style="font-weight:600; font-size:11px; margin-top:4px;">${category}</div>`;
+    html += `<div style="font-weight:700; font-size:11px; margin-top:8px; color:#f0f6fc;">${category}</div>`;
+    html += `<div style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">`;
     POI_CONFIG[category].forEach(([label, tag], idx) => {
-      html += `<label style="display:inline-flex; align-items:center; gap:4px; font-size:11px; margin-right:8px;">
-        <input type="checkbox" class="poi-cat-check" data-cat="${category}" data-tag="${tag}" data-label="${label}" style="accent-color:#316dca;"> ${label}
+      html += `<label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#adbac7; cursor:pointer;">
+        <input type="checkbox" class="poi-cat-check" data-cat="${category}" data-idx="${idx}" style="accent-color:#316dca;"> ${label}
       </label>`;
     });
+    html += `</div>`;
   }
   container.innerHTML = html;
 }
 
-$('btnOpenTradeArea').onclick = () => {
+$('btnOpenTradeAreaPopup').onclick = () => {
   closeFloatingCards();
   $('popup-trade-area').classList.add('open');
   // Refresh polygon select
@@ -1825,20 +1816,28 @@ $('btnScanTradeArea').onclick = () => {
     return;
   }
 
-  // Gather selected tags
+  const keyword = $('poiKeywordSearch').value.trim();
   const selectedTags = [];
   document.querySelectorAll('.poi-cat-check:checked').forEach(cb => {
-    selectedTags.push(cb.dataset.tag);
+    const cat = cb.dataset.cat;
+    const idx = cb.dataset.idx;
+    selectedTags.push(POI_CONFIG[cat][idx][1]);
   });
 
-  if (!selectedTags.length) {
-    hint('Please select at least one POI category.');
+  if (!selectedTags.length && !keyword) {
+    hint('Please select a category or enter a search keyword.');
     return;
   }
 
   const bnd = calcBounds(targetPoly);
   const bbox = `${bnd[0][1]},${bnd[0][0]},${bnd[1][1]},${bnd[1][0]}`;
   let queryParts = '';
+  
+  if (keyword) {
+    const kw = keyword.replace(/"/g, '\\"');
+    queryParts += `node["name"~"${kw}",i](${bbox});way["name"~"${kw}",i](${bbox});`;
+  }
+
   selectedTags.forEach(rawTag => {
     if (rawTag.includes('~')) {
       const parts = rawTag.split('~');
@@ -2153,7 +2152,7 @@ map.on('mousemove', e => {
 
 map.on('click', e => {
   if (!activeTool) {
-    if (!editMode) {
+    if (!vertexMode) {
       const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
       if (fs.length && fs[0].properties.id != null) {
         openShapeEditor(parseInt(fs[0].properties.id, 10));
@@ -2636,78 +2635,21 @@ function calcBounds(f) {
   return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Live Export Preview & Layout Engine -----------------
-function updateExportPreview() {
-  const canvas = map.getCanvas();
-  try {
-    const dataUrl = canvas.toDataURL('image/png');
-    $('exportPreviewImg').src = dataUrl;
-  } catch(e) {}
-}
-
-$('btn-export-dialog').onclick = () => {
-  const p = $('popup-export');
-  const willOpen = !p.classList.contains('open');
-  closeFloatingCards();
-  if (willOpen) {
-    p.classList.add('open');
-    updateExportPreview();
-  }
-};
-$('closeExportBtn').onclick = () => { $('popup-export').classList.remove('open'); };
-
-document.querySelectorAll('.layout-grid .layout-btn').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('.layout-grid .layout-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentExportRatio = btn.dataset.ratio;
-    updateExportPreview();
-  };
-});
-
-$('triggerExportBtn').onclick = () => {
-  hint('Exporting snapshot layout…');
+// ----------------- Layout Export Engine -----------------
+$('btn-export-direct').onclick = () => {
+  hint('Exporting high-quality snapshot...');
   map.once('render', () => {
     try {
       const srcCanvas = map.getCanvas();
-      let targetW = srcCanvas.width, targetH = srcCanvas.height;
-
-      if (currentExportRatio === '1:1') {
-        const dim = Math.min(srcCanvas.width, srcCanvas.height);
-        targetW = dim; targetH = dim;
-      } else if (currentExportRatio === '16:9') {
-        targetW = srcCanvas.width; targetH = Math.round(srcCanvas.width * (9/16));
-      } else if (currentExportRatio === '4:3') {
-        targetW = srcCanvas.width; targetH = Math.round(srcCanvas.width * (3/4));
-      } else if (currentExportRatio === '9:16') {
-        targetH = srcCanvas.height; targetW = Math.round(srcCanvas.height * (9/16));
-      } else if (currentExportRatio === 'a4') {
-        targetW = srcCanvas.width; targetH = Math.round(srcCanvas.width * 1.414);
-      }
-
-      const outCanvas = document.createElement('canvas');
-      outCanvas.width = targetW;
-      outCanvas.height = targetH;
-      const ctx = outCanvas.getContext('2d');
-
-      const sx = (srcCanvas.width - targetW) / 2;
-      const sy = (srcCanvas.height - targetH) / 2;
-      ctx.drawImage(srcCanvas, sx, sy, targetW, targetH, 0, 0, targetW, targetH);
-
       const a = document.createElement('a');
-      a.download = `atlas_${currentExportRatio}_${Date.now()}.png`;
-      a.href = outCanvas.toDataURL('image/png', 0.95);
+      a.download = `Project_Atlas_${Date.now()}.png`;
+      a.href = srcCanvas.toDataURL('image/png', 0.98);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      hint('Export downloaded successfully!');
-      $('popup-export').classList.remove('open');
+      hint('Export complete!');
     } catch(e) {
-      hint('Direct export fallback');
-      const a = document.createElement('a');
-      a.download = `atlas_export_${Date.now()}.png`;
-      a.href = map.getCanvas().toDataURL('image/png');
-      a.click();
+      hint('Export failed.');
     }
   });
   map.triggerRepaint();
@@ -2732,10 +2674,12 @@ $('btn-close-mylayers').onclick = () => { $('mylayers-panel').classList.remove('
 
 document.querySelectorAll('.acc-header').forEach(h => {
   h.onclick = () => {
-    const body = $(h.dataset.target);
-    body.classList.toggle('hidden');
-    const chev = h.querySelector('span:last-child');
-    if (chev) chev.textContent = body.classList.contains('hidden') ? '▸' : '▾';
+    const body = h.nextElementSibling;
+    if (body && body.classList.contains('acc-body')) {
+        body.classList.toggle('hidden');
+        const chev = h.querySelector('span:last-child');
+        if (chev) chev.textContent = body.classList.contains('hidden') ? '▸' : '▾';
+    }
   };
 });
 
@@ -2789,14 +2733,10 @@ $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e
 
 // ----------------- Import System (KML, KMZ, GeoJSON, SHP) -----------------
 $('btn-import').onclick = () => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.kml,.kmz,.geojson,.json,.zip';
-  input.onchange = handleImportFiles;
-  input.click();
+  $('importFileInput').click();
 };
 
-async function handleImportFiles(e) {
+$('importFileInput').onchange = async function(e) {
   const file = e.target.files[0];
   if (!file) return;
   const ext = file.name.split('.').pop().toLowerCase();
@@ -2831,7 +2771,7 @@ async function handleImportFiles(e) {
   } catch(err) {
     hint('Import failed: ' + err.message);
   }
-}
+};
 
 function processGeoJSON(geojson) {
   const feats = geojson.features || [];
