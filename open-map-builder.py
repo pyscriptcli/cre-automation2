@@ -108,6 +108,7 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
 ------------------------------------------------------------------------
 # 1. PAGE CONFIGURATION & ROOT OVERRIDES
 ------------------------------------------------------------------------
+
 st.set_page_config(
     page_title="Project Atlas",
     layout="wide",
