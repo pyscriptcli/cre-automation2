@@ -105,9 +105,9 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
         logging.error(f"OSMnx fallback also failed: {e}")
         return []
 
-------------------------------------------------------------------------
+
 # 1. PAGE CONFIGURATION & ROOT OVERRIDES
-------------------------------------------------------------------------
+
 
 st.set_page_config(
     page_title="Project Atlas",
@@ -168,9 +168,9 @@ html, body {
     unsafe_allow_html=True,
 )
 
-------------------------------------------------------------------------
+
 # 2. SUPABASE REST INTEGRATION
-------------------------------------------------------------------------
+
 SUPABASE_URL = st.secrets.get("supabase", {}).get("url", "https://cyczyaswxkpdcremqnkn.supabase.co")
 SUPABASE_KEY = st.secrets.get("supabase", {}).get("key", "sb_publishable_pUppHGjwmT1mLlhWGZH6Og_4GcCLCPR")
 BASE_API_URL = SUPABASE_URL.replace("/rest/v1/", "").rstrip("/") + "/rest/v1"
@@ -195,9 +195,9 @@ def fetch_projects():
 
 ALL_PROJECTS_LIST = fetch_projects()
 
-------------------------------------------------------------------------
+
 # 3. POI TAXONOMY & VECTOR BASEMAP THEMES
-------------------------------------------------------------------------
+
 POI_CONFIG = {
     "COMMERCIAL & OFFICES": [
         ['Corporate Office', '"building"~"office|commercial",i'],
@@ -383,9 +383,9 @@ ALL_STYLES = {
     "Satellite": raster_style(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "#000000", 19),
 }
 
-------------------------------------------------------------------------
+
 # 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
-------------------------------------------------------------------------
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
