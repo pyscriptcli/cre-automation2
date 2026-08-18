@@ -556,6 +556,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .search-result-item:hover { background: #f1f3f4; }
   .search-result-icon { width: 20px; height: 20px; flex-shrink: 0; color: #5f6368; }
   
+  /* Frame customization for markers */
+  #frameSettingsRow { display: flex; flex-direction: column; gap: 6px; }
+  #frameSettingsRow select, #frameSettingsRow input { font-size: 11px; }
+  
 </style>
 </head>
 <body>
@@ -748,6 +752,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <span class="badge-count" id="layer-badge-count">0</span>
       </div>
     </div>
+
+    <!-- New: Select All / Hide / Delete controls -->
+    <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+      <label style="font-size:11px; display:flex; align-items:center; gap:3px;"><input type="checkbox" id="selectAllLayersCheckbox" /> Select All</label>
+      <button id="btnHideSelected" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">HIDE</button>
+      <button id="btnDeleteSelected" style="background:#22272e; border:1px solid #2d333b; color:#ff7b72; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">DELETE</button>
+    </div>
+
     <div id="my-layers-list"></div>
   </div>
 </div>
@@ -770,6 +782,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
   <div class="f-row"><span>Icon Color</span><input type="color" id="mColor" value="#003366"></div>
   <div class="f-row"><span>Icon Size</span><input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"></div>
+
+  <!-- Frame customization -->
+  <div style="font-weight:600; font-size:11px; color:#768390; margin-top:4px;">FRAME OPTIONS</div>
+  <div id="frameSettingsRow">
+    <div class="f-row"><span>Frame Shape</span>
+      <select id="frameShape" style="width:120px;">
+        <option value="none">None</option>
+        <option value="circle" selected>Circle</option>
+        <option value="square">Square</option>
+        <option value="rounded">Rounded Rect</option>
+      </select>
+    </div>
+    <div class="f-row"><span>Frame Color</span><input type="color" id="frameColor" value="#ffffff"></div>
+    <div class="f-row"><span>Frame Width</span><input type="range" id="frameWidth" min="2" max="10" step="1" value="4"></div>
+    <div class="f-row"><span>Padding</span><input type="range" id="framePadding" min="0" max="10" step="1" value="3"></div>
+  </div>
 </div>
 
 <div id="popup-text-settings" class="float-card right-card">
@@ -975,6 +1003,7 @@ let customGroups = __INITIAL_CUSTOM_GROUPS__ || { "Trade Area Scan": { collapsed
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
 let markerShape = 'pin', markerColor = '#003366', markerIconSize = 0.9;
+let frameShape = 'circle', frameColor = '#ffffff', frameWidth = 4, framePadding = 3;
 let customMarkerImageKey = null;
 let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
@@ -1108,10 +1137,10 @@ function renderProjectsList() {
         <span style="font-size:11px; color:rgba(255,255,255,0.5);">${p.basemap || 'Midnight Blue'} · ${p.features ? p.features.length : 0} layers</span>
       </div>
       <div style="display:flex; align-items:center; gap:6px;">
-        <button class="card-btn" onclick="renameProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Rename">
+        <button class="card-btn" onclick="renameProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" title="Rename">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
         </button>
-        <button class="card-btn" onclick="deleteProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\\\'")}')" title="Delete" style="color:#ff7b72;">
+        <button class="card-btn" onclick="deleteProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" title="Delete" style="color:#ff7b72;">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
@@ -1171,7 +1200,7 @@ window.renameProjectFromLauncher = async function(e, projectId, oldName) {
   renderProjectsList();
 
   try {
-    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
+    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
       method: 'PATCH',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -1192,7 +1221,7 @@ window.deleteProjectFromLauncher = async function(e, projectId, name) {
   renderProjectsList();
 
   try {
-    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
+    await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
       method: 'DELETE',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -1219,7 +1248,7 @@ $('btn-create-project-submit').onclick = async () => {
   };
 
   try {
-    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects`, {
+    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects`, {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -1280,7 +1309,7 @@ async function saveProjectToSupabase(showToast = false) {
   };
 
   try {
-    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${currentProjectId}`, {
+    const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${currentProjectId}`, {
       method: 'PATCH',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -1368,38 +1397,89 @@ function getIconKey(shape, color) {
   return key;
 }
 
-function createCustomMarkerImage(dataUrl) {
+// New: Create custom marker with frame
+function createFramedMarkerImage(dataUrl, frameShape, frameColor, frameWidth, framePadding) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const c = document.createElement('canvas');
       const baseSize = 64;
-      c.width = baseSize; c.height = baseSize;
-      const ctx = c.getContext('2d');
+      const canvas = document.createElement('canvas');
+      canvas.width = baseSize; canvas.height = baseSize;
+      const ctx = canvas.getContext('2d');
       
-      // Draw circular crop with white border
-      ctx.beginPath();
-      ctx.arc(32, 32, 30, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
+      // Clear
+      ctx.clearRect(0,0,baseSize,baseSize);
       
-      // Calculate cover dimensions
-      const scale = Math.max(baseSize / img.width, baseSize / img.height);
+      // Frame dimensions
+      const innerSize = baseSize - 2 * frameWidth - 2 * framePadding;
+      
+      // Draw frame according to shape
+      if (frameShape !== 'none') {
+        ctx.beginPath();
+        if (frameShape === 'circle') {
+          ctx.arc(32, 32, innerSize / 2 + frameWidth + framePadding, 0, Math.PI * 2);
+        } else if (frameShape === 'square') {
+          const start = 32 - (innerSize / 2 + frameWidth + framePadding);
+          ctx.rect(start, start, innerSize + 2 * frameWidth + 2 * framePadding, innerSize + 2 * frameWidth + 2 * framePadding);
+        } else if (frameShape === 'rounded') {
+          const start = 32 - (innerSize / 2 + frameWidth + framePadding);
+          const size = innerSize + 2 * frameWidth + 2 * framePadding;
+          const radius = 12;
+          ctx.roundRect(start, start, size, size, radius);
+        }
+        ctx.fillStyle = frameColor;
+        ctx.fill();
+      }
+      
+      // Draw image clipped inside frame
+      ctx.save();
+      if (frameShape === 'circle') {
+        ctx.beginPath();
+        ctx.arc(32, 32, innerSize / 2, 0, Math.PI * 2);
+        ctx.clip();
+      } else if (frameShape === 'square') {
+        const start = 32 - innerSize / 2;
+        ctx.rect(start, start, innerSize, innerSize);
+        ctx.clip();
+      } else if (frameShape === 'rounded') {
+        const start = 32 - innerSize / 2;
+        const size = innerSize;
+        const radius = 8;
+        ctx.roundRect(start, start, size, size, radius);
+        ctx.clip();
+      } else {
+        // no clip
+      }
+      
+      // Draw image fitting inside
+      const scale = Math.max(innerSize / img.width, innerSize / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
-      const x = (baseSize - w) / 2;
-      const y = (baseSize - h) / 2;
-      
+      const x = 32 - w / 2;
+      const y = 32 - h / 2;
       ctx.drawImage(img, x, y, w, h);
+      ctx.restore();
       
-      // Inner ring for polish
-      ctx.beginPath();
-      ctx.arc(32, 32, 29, 0, Math.PI * 2);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#ffffff';
-      ctx.stroke();
+      // Optional inner border
+      if (frameShape !== 'none' && frameWidth > 0) {
+        ctx.beginPath();
+        if (frameShape === 'circle') {
+          ctx.arc(32, 32, innerSize / 2, 0, Math.PI * 2);
+        } else if (frameShape === 'square') {
+          const start = 32 - innerSize / 2;
+          ctx.rect(start, start, innerSize, innerSize);
+        } else if (frameShape === 'rounded') {
+          const start = 32 - innerSize / 2;
+          const size = innerSize;
+          const radius = 8;
+          ctx.roundRect(start, start, size, size, radius);
+        }
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+      }
       
-      resolve(c);
+      resolve(canvas);
     };
     img.onerror = reject;
     img.src = dataUrl;
@@ -1416,18 +1496,25 @@ $('customMarkerFileInput').onchange = function(e) {
   const reader = new FileReader();
   reader.onload = async (ev) => {
     customMarkerDataUrl = ev.target.result;
-    const canvas = await createCustomMarkerImage(customMarkerDataUrl);
+    // Use current frame settings to generate the framed icon
+    const canvas = await createFramedMarkerImage(customMarkerDataUrl, frameShape, frameColor, frameWidth, framePadding);
     const key = 'custom_marker_' + Date.now();
     const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
     try {
       if (map.hasImage(key)) map.removeImage(key);
       map.addImage(key, imgData, { pixelRatio: 2 });
       customMarkerImageKey = key;
-      hint('Custom marker ready');
+      hint('Custom marker with frame ready');
     } catch(err) { hint('Failed to add custom image'); }
   };
   reader.readAsDataURL(file);
 };
+
+// Update frame settings on change
+$('frameShape').onchange = () => { frameShape = $('frameShape').value; markDirty(); };
+$('frameColor').oninput = () => { frameColor = $('frameColor').value; markDirty(); };
+$('frameWidth').oninput = () => { frameWidth = parseInt($('frameWidth').value, 10); markDirty(); };
+$('framePadding').oninput = () => { framePadding = parseInt($('framePadding').value, 10); markDirty(); };
 
 const ICON_SVGS = {
   pin: '<path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle>',
@@ -1602,7 +1689,22 @@ function syncVertexHandles() {
   const handleFeats = [];
   features.forEach(f => {
     if (f.props.visible === 0) return;
-    if (['polygon','rectangle','circle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+    // For circles we show only one handle at the radius point (first vertex after center)
+    if (f.kind === 'circle' && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+      const coords = f.geometry.coordinates[0];
+      // Find the point at 90 degrees from center to indicate radius handle
+      if (f.props.center) {
+        const c = f.props.center;
+        const r = haversineDist(c, coords[0]);
+        const handleLng = c[0] + (r / (111320 * Math.cos(c[1]*Math.PI/180)));
+        const handleLat = c[1];
+        handleFeats.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [handleLng, handleLat] },
+          properties: { polyId: f.id, vIdx: 0 } // special vIdx for radius editing
+        });
+      }
+    } else if (['polygon','rectangle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
       const coords = f.geometry.coordinates[0];
       for (let i = 0; i < coords.length - 1; i++) {
         handleFeats.push({
@@ -2144,17 +2246,17 @@ map.on('mousemove', e => {
   if (isDraggingVertex && draggedPolyId != null && draggedVertexIdx >= 0) {
     const f = features.find(x => x.id === draggedPolyId);
     if (f && f.geometry && f.geometry.coordinates) {
-      if (['polygon','rectangle'].includes(f.kind) && f.geometry.coordinates[0]) {
-        const coords = f.geometry.coordinates[0];
-        coords[draggedVertexIdx] = cursorLL;
-        if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
-      } else if (f.kind === 'circle' && f.geometry.coordinates[0]) {
-        // Redraw circle dynamically from original center to new mouse pos
+      // For circle: draggedVertexIdx === 0 means radius handle
+      if (f.kind === 'circle') {
         if (f.props.center) {
           const { coords, r } = circleCoords(f.props.center, cursorLL);
           f.geometry.coordinates = coords;
           f.props.radiusMeters = r;
         }
+      } else if (['polygon','rectangle'].includes(f.kind) && f.geometry.coordinates[0]) {
+        const coords = f.geometry.coordinates[0];
+        coords[draggedVertexIdx] = cursorLL;
+        if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
       } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry.coordinates) {
         f.geometry.coordinates[draggedVertexIdx] = cursorLL;
       }
@@ -2169,7 +2271,23 @@ map.on('click', e => {
   if (!activeTool && !isDragging && !isDraggingVertex) {
     const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
     if (fs.length && fs[0].properties.id != null) {
-      openShapeEditor(parseInt(fs[0].properties.id, 10));
+      const feat = features.find(x => x.id === parseInt(fs[0].properties.id, 10));
+      if (feat && feat.kind === 'marker' && feat.props.osmTags) {
+        // Show popup with OSM tags
+        const tags = feat.props.osmTags;
+        let tableHtml = '<table class="tag-table">';
+        tableHtml += '<tr><th>Key</th><th>Value</th></tr>';
+        for (const k in tags) {
+          tableHtml += `<tr><td>${k}</td><td>${tags[k]}</td></tr>`;
+        }
+        tableHtml += '</table>';
+        new maplibregl.Popup()
+          .setLngLat(feat.geometry.coordinates)
+          .setHTML(`<div style="font-weight:700;">${feat.name || 'POI'}</div>${tableHtml}`)
+          .addTo(map);
+      } else {
+        openShapeEditor(parseInt(fs[0].properties.id, 10));
+      }
       resetActiveTools();
       return;
     }
@@ -2282,6 +2400,22 @@ document.addEventListener('keydown', e => {
     editMode = false;
     $('btn-edit-mode').classList.remove('primary-active');
     syncVertexHandles();
+  }
+});
+
+// ----------------- Right-Click Copy Coordinates -----------------
+map.on('contextmenu', e => {
+  const lngLat = e.lngLat;
+  const coordsStr = `${lngLat.lat.toFixed(6)}, ${lngLat.lng.toFixed(6)}`;
+  // Copy to clipboard
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(coordsStr).then(() => {
+      hint(`Copied coordinates: ${coordsStr}`);
+    }).catch(() => {
+      hint(`Coordinates: ${coordsStr}`);
+    });
+  } else {
+    hint(`Coordinates: ${coordsStr}`);
   }
 });
 
@@ -2411,7 +2545,7 @@ $('eDeleteBtn').onclick = () => {
 $('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); };
 
-// ----------------- My Layers with Grouping, Multi-select, Drag Reorder -----------------
+// ----------------- My Layers with Grouping, Multi-select, Drag Reorder, Drop to Group -----------------
 $('btnAddCustomGroup').onclick = () => {
   const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
   if (gName && gName.trim() && !customGroups[gName]) {
@@ -2433,6 +2567,37 @@ $('btnGroupSelected').onclick = () => {
     renderMyLayers();
     markDirty();
   }
+};
+
+// New: Select All / Hide Selected / Delete Selected
+$('selectAllLayersCheckbox').onchange = (e) => {
+  if (e.target.checked) {
+    selectedLayerIds = new Set(features.map(f => f.id));
+  } else {
+    selectedLayerIds.clear();
+  }
+  // Update checkboxes
+  document.querySelectorAll('.layer-select-check').forEach(cb => {
+    cb.checked = selectedLayerIds.has(parseInt(cb.dataset.id, 10));
+  });
+};
+
+$('btnHideSelected').onclick = () => {
+  if (selectedLayerIds.size === 0) { hint('No layers selected'); return; }
+  features.forEach(f => { if (selectedLayerIds.has(f.id)) f.props.visible = 0; });
+  syncDraw();
+  renderMyLayers();
+  markDirty();
+};
+
+$('btnDeleteSelected').onclick = () => {
+  if (selectedLayerIds.size === 0) { hint('No layers selected'); return; }
+  features = features.filter(f => !selectedLayerIds.has(f.id));
+  for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(id => !selectedLayerIds.has(id));
+  selectedLayerIds.clear();
+  syncDraw();
+  renderMyLayers();
+  markDirty();
 };
 
 function renderLayerCardHtml(f) {
@@ -2487,13 +2652,14 @@ function renderMyLayers() {
   let html = '';
   const groupedIds = new Set();
 
+  // Render group containers with drop target for dragging layers into group
   for (const gName in customGroups) {
     const grp = customGroups[gName];
     const groupFeats = features.filter(f => grp.ids.includes(f.id));
     grp.ids.forEach(id => groupedIds.add(id));
 
     html += `
-      <div class="group-container">
+      <div class="group-container" data-group="${gName}" style="position:relative;">
         <div class="group-header" data-group="${gName}">
           <div style="display:flex; align-items:center; gap:6px;">
             <span class="card-btn" data-act="groupToggleCollapse" data-group="${gName}">
@@ -2510,8 +2676,8 @@ function renderMyLayers() {
             </button>
           </div>
         </div>
-        <div class="group-items ${grp.collapsed ? 'hidden' : ''}">
-          ${groupFeats.length ? groupFeats.map(f => renderLayerCardHtml(f)).join('') : '<div style="font-size:10px; color:#768390; padding:4px;">Empty group</div>'}
+        <div class="group-items ${grp.collapsed ? 'hidden' : ''}" data-group="${gName}">
+          ${groupFeats.length ? groupFeats.map(f => renderLayerCardHtml(f)).join('') : '<div style="font-size:10px; color:#768390; padding:4px;">Drop layers here or empty group</div>'}
         </div>
       </div>
     `;
@@ -2525,6 +2691,7 @@ function renderMyLayers() {
 
   container.innerHTML = html;
 
+  // Attach drag/drop events
   container.querySelectorAll('.layer-card').forEach(card => {
     card.addEventListener('dragstart', e => {
       e.dataTransfer.setData('text/plain', card.dataset.id);
@@ -2544,11 +2711,45 @@ function renderMyLayers() {
     });
   });
 
+  // Allow dropping onto group containers
+  container.querySelectorAll('.group-container').forEach(groupEl => {
+    groupEl.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      groupEl.style.outline = '1px dashed #316dca';
+    });
+    groupEl.addEventListener('dragleave', () => {
+      groupEl.style.outline = 'none';
+    });
+    groupEl.addEventListener('drop', e => {
+      e.preventDefault();
+      groupEl.style.outline = 'none';
+      const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      const gName = groupEl.dataset.group;
+      // Add dragged feature to this group if not already there
+      if (draggedId && customGroups[gName]) {
+        if (!customGroups[gName].ids.includes(draggedId)) {
+          customGroups[gName].ids.push(draggedId);
+          // Remove from other groups
+          for (const otherG in customGroups) {
+            if (otherG !== gName) {
+              customGroups[otherG].ids = customGroups[otherG].ids.filter(id => id !== draggedId);
+            }
+          }
+          renderMyLayers();
+          markDirty();
+        }
+      }
+    });
+  });
+
   container.querySelectorAll('.layer-select-check').forEach(cb => {
     cb.addEventListener('change', e => {
       const id = parseInt(e.target.dataset.id, 10);
       if (e.target.checked) selectedLayerIds.add(id);
       else selectedLayerIds.delete(id);
+      // Update select all checkbox state
+      $('selectAllLayersCheckbox').checked = selectedLayerIds.size === features.length;
     });
   });
 
@@ -2650,24 +2851,25 @@ function calcBounds(f) {
   return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Layout Export Engine -----------------
+// ----------------- Layout Export Engine (Fixed) -----------------
 $('btn-export-direct').onclick = () => {
   hint('Exporting high-quality snapshot...');
-  map.once('render', () => {
-    try {
-      const srcCanvas = map.getCanvas();
+  const srcCanvas = map.getCanvas();
+  srcCanvas.toBlob(blob => {
+    if (blob) {
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
+      a.href = url;
       a.download = `Project_Atlas_${Date.now()}.png`;
-      a.href = srcCanvas.toDataURL('image/png', 0.98);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       hint('Export complete!');
-    } catch(e) {
+    } else {
       hint('Export failed.');
     }
-  });
-  map.triggerRepaint();
+  }, 'image/png', 0.98);
 };
 
 // ----------------- UI Panel Toggles -----------------
