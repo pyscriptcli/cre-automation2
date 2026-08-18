@@ -7,6 +7,9 @@ import logging
 import time
 import random
 
+# ------------------------------------------------------------------------
+# ROBUST OVERPASS API QUERY FUNCTION (PYTHON)
+# ------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 90) -> list:
@@ -20,6 +23,7 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
         "https://overpass.openstreetmap.fr/api/interpreter"
     ]
     
+    # Build Overpass QL query
     statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
     ql = f"[out:json][timeout:{timeout}];(\n{statements}\n);\nout center;"
     
@@ -37,6 +41,7 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
                 if not data or 'elements' not in data:
                     raise ValueError("Malformed JSON response")
                 
+                # Parse successful response
                 results = []
                 for el in data['elements']:
                     el_lat = el.get('lat') or (el.get('center', {}).get('lat'))
@@ -105,10 +110,9 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
         logging.error(f"OSMnx fallback also failed: {e}")
         return []
 
-
+# ------------------------------------------------------------------------
 # 1. PAGE CONFIGURATION & ROOT OVERRIDES
-
-
+# ------------------------------------------------------------------------
 st.set_page_config(
     page_title="Project Atlas",
     layout="wide",
@@ -168,9 +172,9 @@ html, body {
     unsafe_allow_html=True,
 )
 
-
+# ------------------------------------------------------------------------
 # 2. SUPABASE REST INTEGRATION
-
+# ------------------------------------------------------------------------
 SUPABASE_URL = st.secrets.get("supabase", {}).get("url", "https://cyczyaswxkpdcremqnkn.supabase.co")
 SUPABASE_KEY = st.secrets.get("supabase", {}).get("key", "sb_publishable_pUppHGjwmT1mLlhWGZH6Og_4GcCLCPR")
 BASE_API_URL = SUPABASE_URL.replace("/rest/v1/", "").rstrip("/") + "/rest/v1"
@@ -195,9 +199,9 @@ def fetch_projects():
 
 ALL_PROJECTS_LIST = fetch_projects()
 
-
+# ------------------------------------------------------------------------
 # 3. POI TAXONOMY & VECTOR BASEMAP THEMES
-
+# ------------------------------------------------------------------------
 POI_CONFIG = {
     "COMMERCIAL & OFFICES": [
         ['Corporate Office', '"building"~"office|commercial",i'],
@@ -299,7 +303,9 @@ THEMES = {
 
 def w(*stops):
     out = ["interpolate", ["exponential", 1.2], ["zoom"]]
-    for z, val in stops: out += [z, val]
+    for stop in stops:
+        z, val = stop
+        out += [z, val]
     return out
 
 def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=1.0):
@@ -307,12 +313,12 @@ def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=
         "id": lid, "type": "line", "source": "omt", "source-layer": "transportation",
         "filter": ["match", ["get", "class"], classes, True, False],
         "layout": {"line-cap": "round", "line-join": "round"},
-        "paint": {"line-color": color, "line-width": w(widths), "line-opacity": opacity},
+        "paint": {"line-color": color, "line-width": w(*widths), "line-opacity": opacity},
     }
     if minzoom: lyr["minzoom"] = minzoom
     if casing:
         lyr["paint"]["line-color"] = p["rd_case"]
-        lyr["paint"]["line-width"] = w([(z, val + 1.8) for z, val in widths])
+        lyr["paint"]["line-width"] = w(*[(z, val + 1.8) for z, val in widths])
         lyr["id"] = lid + "_casing"
     return lyr
 
@@ -383,9 +389,9 @@ ALL_STYLES = {
     "Satellite": raster_style(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "#000000", 19),
 }
 
-
+# ------------------------------------------------------------------------
 # 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
-
+# ------------------------------------------------------------------------
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
@@ -1108,7 +1114,7 @@ const markDirty = () => {
 };
 
 const closeFloatingCards = () => {
-    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-route-settings','browser-panel','mylayers-panel'].forEach(id => {
+    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','browser-panel','mylayers-panel'].forEach(id => {
         const el = $(id);
         if (el) el.classList.remove('open');
     });
@@ -3250,9 +3256,9 @@ map.on('error', e => console.warn('Map Notice:', e));
 </body>
 </html>"""
 
-
+# ------------------------------------------------------------------------
 # 5. INITIAL STATE & COMPONENT MOUNTING
-
+# ------------------------------------------------------------------------
 try:
     initial_theme = "Midnight Blue"
     initial_center = [120.9842, 14.5995]
