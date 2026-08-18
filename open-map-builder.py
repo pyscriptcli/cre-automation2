@@ -375,7 +375,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
 .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
 .group-container { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; }
-.group-header { background: rgba(255, 255, 255, 0.05); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: 0.2s; }
+.group-header { background: rgba(255, 255, 255, 0.05); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
 .group-title-input { background: transparent; border: none; font-weight: 700; color: #f0f6fc; font-size: 12px; width: 140px; }
 .group-title-input:focus { background: rgba(0, 0, 0, 0.5); outline: none; border-radius: 4px; padding: 2px 4px; }
 .group-items { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
@@ -388,6 +388,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .layer-name-input:focus { border-color: #316dca; background: rgba(0,0,0,0.4); outline: none; }
 .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: 0.15s; flex-shrink: 0; }
 .card-btn:hover { color: #f0f6fc; background: rgba(255,255,255,0.1); }
+.card-btn svg { width: 14px; height: 14px; }
 
 .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
 .trade-controls select { background: #0f172a; color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
@@ -409,8 +410,14 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
 .float-card input[type=color] {
-    -webkit-appearance: none; border: 1px solid rgba(255, 255, 255, 0.15);
-    width: 22px; height: 22px; border-radius: 4px; cursor: pointer; background: transparent; padding: 0;
+    -webkit-appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+    padding: 0;
 }
 .float-card input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
 .float-card input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
@@ -418,11 +425,10 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .float-card input[type=text]:focus { border-color: #38bdf8; }
 
 #popup-search { width: 280px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
-#popup-marker-settings { width: 260px; }
+#popup-marker-settings { width: 250px; }
 #popup-text-settings { width: 260px; }
 #popup-shape-editor { width: 320px; }
 #popup-custom-map { width: 310px; }
-
 #popup-trade-area { width: 420px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 85vh; }
 
 .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
@@ -475,7 +481,9 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     font-size: 12px; font-weight: 600; padding: 7px 0; border-radius: 11px; cursor: pointer;
     transition: all 0.15s ease;
 }
-.ios26-seg-btn.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
+.ios26-seg-btn.active {
+    background: rgba(255, 255, 255, 0.18); color: #ffffff;
+}
 .ios26-body { padding: 0 24px 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .ios26-input-group { display: flex; flex-direction: column; gap: 6px; }
 .ios26-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.5); }
@@ -489,7 +497,9 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     border-radius: 14px; padding: 10px 14px; display: flex; justify-content: space-between;
     align-items: center; transition: all 0.15s ease;
 }
-.ios26-proj-item:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(56, 189, 248, 0.3); }
+.ios26-proj-item:hover {
+    background: rgba(255, 255, 255, 0.1); border-color: rgba(56, 189, 248, 0.3);
+}
 .ios26-action-btn {
     background: #316dca; color: #ffffff; border: none; border-radius: 14px;
     padding: 11px; font-weight: 700; font-size: 13px; cursor: pointer;
@@ -527,12 +537,127 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .trade-area-poi-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .trade-area-poi-row label { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; }
 .custom-query-collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; color: #f0f6fc; font-size: 12px; }
+
+/* Trade Area Styling Controls */
+.styling-controls {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px;
+    margin-top: 8px;
+}
+.styling-controls-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #768390;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.styling-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.styling-row label {
+    font-size: 11px;
+    color: #adbac7;
+    min-width: 60px;
+}
+.styling-row input[type="color"] {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+}
+.styling-row select, .styling-row input[type="number"] {
+    flex: 1;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: #f0f6fc;
+}
+.styling-row input[type="range"] {
+    flex: 1;
+    accent-color: #316dca;
+}
+.styling-value {
+    font-size: 10px;
+    color: #768390;
+    min-width: 35px;
+    text-align: right;
+}
+
+/* Grouped POI Item Styling */
+.grouped-poi-item {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 6px;
+}
+.grouped-poi-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.grouped-poi-name {
+    font-weight: 600;
+    font-size: 12px;
+    color: #f0f6fc;
+}
+.grouped-poi-count {
+    background: #316dca;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+}
+.grouped-poi-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.grouped-poi-controls .control-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.grouped-poi-controls label {
+    font-size: 10px;
+    color: #768390;
+}
+.grouped-poi-controls input[type="color"] {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+}
+.grouped-poi-controls select {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 10px;
+    color: #f0f6fc;
+}
+.grouped-poi-controls input[type="checkbox"] {
+    accent-color: #316dca;
+    width: 14px;
+    height: 14px;
+}
 </style>
 </head>
 <body>
-
 <div id="map"></div>
-
 <div id="top-toolbar-bar">
     <button class="tb-btn" id="btn-home-dialog" title="Select Workspace">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -589,7 +714,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 
     <div class="tb-sep"></div>
 
-    <button class="tb-btn" id="btn-edit-mode" title="Select & Drag / Edit Vertices">
+    <button class="tb-btn" id="btn-edit-mode" title="Select, Drag & Edit Vertices">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
     </button>
 
@@ -615,6 +740,13 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         </div>
     </div>
     <div class="panel-content">
+        <div style="margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <button id="btn-import" class="trade-btn" style="width:100%; display:flex; justify-content:center; align-items:center; gap:6px;">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Import Spatial Data (KML, GeoJSON, SHP)
+            </button>
+            <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip" style="display:none;" />
+        </div>
         <div class="dimension-mode-bar">
             <button class="dimension-mode-btn active" id="btn2DMode">2D MAP</button>
             <button class="dimension-mode-btn" id="btn3DMode">3D BUILDINGS</button>
@@ -623,7 +755,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <div class="acc-header" style="justify-content:flex-start; gap:8px; color:#38bdf8;">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                 <span>Trade Area Analysis</span>
-                <span style="margin-left:auto;">↗</span>
+                <span style="margin-left:auto;"></span>
             </div>
         </div>
         <div class="acc-item">
@@ -697,11 +829,9 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="panel-content">
         <div class="layers-heading">
             <span>Layer Groups</span>
-            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:6px;">
                 <button id="btnAddCustomGroup" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">+ GROUP</button>
-                <button id="btnSelectAll" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">ALL</button>
-                <button id="btnHideSelected" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">HIDE</button>
-                <button id="btnDeleteSelected" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer;">DEL</button>
+                <button id="btnSelectAll" style="background:#22272e; border:1px solid #2d333b; color:#adbac7; border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; cursor:pointer; min-width: 40px;">All</button>
                 <span class="badge-count" id="layer-badge-count">0</span>
             </div>
         </div>
@@ -724,15 +854,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <span style="font-size:11px;">Custom Image Pin:</span>
         <label class="file-input-label" for="customMarkerFileInput">Upload (max 5MB)</label>
         <input type="file" id="customMarkerFileInput" accept="image/*" style="display:none;" />
-    </div>
-    <div class="f-row"><span>Frame Style</span>
-        <select id="markerFrameSelect" style="width:130px;">
-            <option value="none">None</option>
-            <option value="2d">2D Frame</option>
-            <option value="3d">3D Frame</option>
-            <option value="pinphoto">Pin with Photo</option>
-            <option value="boxarrow">Box with Arrow</option>
-        </select>
     </div>
     <div class="f-row"><span>Icon Color</span><input type="color" id="mColor" value="#003366"></div>
     <div class="f-row"><span>Icon Size</span><input type="range" id="mSize" min="0.4" max="4.0" step="0.1" value="0.9"></div>
@@ -895,6 +1016,8 @@ const map = new maplibregl.Map({
     preserveDrawingBuffer: true
 });
 
+map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
+
 // ----------------- Debounce Utility -----------------
 function debounce(func, wait) {
     let timeout;
@@ -916,15 +1039,22 @@ let customGroups = __INITIAL_CUSTOM_GROUPS__ || { "Trade Area Scan": { collapsed
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
 let markerShape = 'pin', markerColor = '#003366', markerIconSize = 0.9;
-let markerFrame = 'none';
 let customMarkerImageKey = null;
 let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
 let isDirty = false;
 
 // Vertex dragging state
-let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null, draggedHandleType = 'vertex';
+let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null;
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
+
+const textSettings = {
+    content: 'Custom Label',
+    font: 'Century Gothic Custom',
+    size: 16,
+    color: '#d9b451',
+    opacity: 1.0
+};
 
 const vis = {
     label_city: true, label_brgy: true, label_street: true,
@@ -969,7 +1099,7 @@ const markDirty = () => {
 };
 
 const closeFloatingCards = () => {
-    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','popup-trade-area','browser-panel','mylayers-panel'].forEach(id => {
+    ['popup-marker-settings','popup-text-settings','popup-shape-editor','popup-custom-map','popup-search','browser-panel','mylayers-panel','popup-trade-area'].forEach(id => {
         const el = $(id);
         if (el) el.classList.remove('open');
     });
@@ -987,7 +1117,7 @@ const resetActiveTools = () => {
 
 // ----------------- Project Auto-Naming Calculation -----------------
 function getNextUntitledProjectName() {
-    const untitledRegex = /^Untitled Project (\d+)$/i;
+    const untitledRegex = /^Untitled Project (\\d+)$/i;
     let maxN = 0;
     ALL_PROJECTS.forEach(p => {
         const match = (p.name || '').match(untitledRegex);
@@ -1105,7 +1235,7 @@ window.renameProjectFromLauncher = async function(e, projectId, oldName) {
     renderProjectsList();
 
     try {
-        await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
+        await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
             method: 'PATCH',
             headers: {
                 'apikey': SUPABASE_KEY,
@@ -1126,7 +1256,7 @@ window.deleteProjectFromLauncher = async function(e, projectId, name) {
     renderProjectsList();
 
     try {
-        await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
+        await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${projectId}`, {
             method: 'DELETE',
             headers: {
                 'apikey': SUPABASE_KEY,
@@ -1153,7 +1283,7 @@ $('btn-create-project-submit').onclick = async () => {
     };
 
     try {
-        const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects`, {
+        const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects`, {
             method: 'POST',
             headers: {
                 'apikey': SUPABASE_KEY,
@@ -1214,7 +1344,7 @@ async function saveProjectToSupabase(showToast = false) {
     };
 
     try {
-        const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\/$/,'')}/rest/v1/map_projects?id=eq.${currentProjectId}`, {
+        const res = await fetch(`${SUPABASE_URL.replace('/rest/v1/','').replace(/\\/$/,'')}/rest/v1/map_projects?id=eq.${currentProjectId}`, {
             method: 'PATCH',
             headers: {
                 'apikey': SUPABASE_KEY,
@@ -1248,7 +1378,7 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ----------------- Marker Icon Pipeline (Standard & Custom Frames) -----------------
+// ----------------- Marker Canvas Icon Pipeline -----------------
 function renderIconCanvas(shape, color) {
     const c = document.createElement('canvas');
     c.width = 64; c.height = 64;
@@ -1282,6 +1412,20 @@ function renderIconCanvas(shape, color) {
         ctx.moveTo(32, 54);
         ctx.bezierCurveTo(6, 34, 14, 10, 32, 22);
         ctx.bezierCurveTo(50, 10, 58, 34, 32, 54);
+    } else if (shape === 'pinball') {
+        // Pinball/marker icon
+        ctx.arc(32, 28, 18, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(32, 28, 14, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(32, 28, 10, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        return c;
     }
     ctx.fill(); ctx.stroke();
 
@@ -1302,93 +1446,32 @@ function getIconKey(shape, color) {
     return key;
 }
 
-function createCustomMarkerImage(dataUrl, frame) {
+function createCustomMarkerImage(dataUrl) {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
             const c = document.createElement('canvas');
             const baseSize = 64;
-            c.width = baseSize;
-            c.height = baseSize;
+            c.width = baseSize; c.height = baseSize;
             const ctx = c.getContext('2d');
-            ctx.clearRect(0,0,baseSize,baseSize);
-
-            if (frame === '2d' || frame === '3d') {
-                const pad = 6;
-                const rectX = pad, rectY = pad, rectW = baseSize - pad*2, rectH = baseSize - pad*2;
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = 'rgba(0,0,0,0.4)';
-                ctx.shadowBlur = 8;
-                ctx.shadowOffsetX = frame === '3d' ? 4 : 2;
-                ctx.shadowOffsetY = frame === '3d' ? 4 : 2;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(rectX, rectY, rectW, rectH, 10);
-                else ctx.rect(rectX, rectY, rectW, rectH);
-                ctx.fill();
-                
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-
-                const innerPad = 12;
-                ctx.drawImage(img, innerPad, innerPad, baseSize - innerPad*2, baseSize - innerPad*2);
-            } else if (frame === 'pinphoto') {
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(32, 22, 14, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.fill();
-                
-                ctx.beginPath();
-                ctx.arc(32, 22, 12, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.save();
-                ctx.clip();
-                ctx.drawImage(img, 20, 10, 24, 24);
-                ctx.restore();
-                
-                ctx.beginPath();
-                ctx.arc(32, 22, 14, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.stroke();
-                
-                ctx.beginPath();
-                ctx.moveTo(20, 32);
-                ctx.lineTo(44, 32);
-                ctx.lineTo(32, 50);
-                ctx.closePath();
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
-            } else if (frame === 'boxarrow') {
-                ctx.fillStyle = '#ffffff';
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
-                const boxX = 10, boxY = 10, boxW = 44, boxH = 32;
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(boxX, boxY, boxW, boxH, 6);
-                else ctx.rect(boxX, boxY, boxW, boxH);
-                ctx.fill();
-                
-                ctx.save();
-                ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(boxX+3, boxY+3, boxW-6, boxH-6, 4);
-                else ctx.rect(boxX+3, boxY+3, boxW-6, boxH-6);
-                ctx.clip();
-                ctx.drawImage(img, boxX+3, boxY+3, boxW-6, boxH-6);
-                ctx.restore();
-                
-                ctx.beginPath();
-                ctx.moveTo(32, boxY + boxH);
-                ctx.lineTo(28, boxY + boxH + 10);
-                ctx.lineTo(36, boxY + boxH + 10);
-                ctx.closePath();
-                ctx.fill();
-            } else {
-                ctx.drawImage(img, 0, 0, baseSize, baseSize);
-            }
+            // Draw circular crop with white border
+            ctx.beginPath();
+            ctx.arc(32, 32, 30, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+            // Calculate cover dimensions
+            const scale = Math.max(baseSize / img.width, baseSize / img.height);
+            const w = img.width * scale;
+            const h = img.height * scale;
+            const x = (baseSize - w) / 2;
+            const y = (baseSize - h) / 2;
+            ctx.drawImage(img, x, y, w, h);
+            // Inner ring for polish
+            ctx.beginPath();
+            ctx.arc(32, 32, 29, 0, Math.PI * 2);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
             resolve(c);
         };
         img.onerror = reject;
@@ -1406,8 +1489,7 @@ $('customMarkerFileInput').onchange = function(e) {
     const reader = new FileReader();
     reader.onload = async (ev) => {
         customMarkerDataUrl = ev.target.result;
-        const frame = $('markerFrameSelect').value;
-        const canvas = await createCustomMarkerImage(customMarkerDataUrl, frame);
+        const canvas = await createCustomMarkerImage(customMarkerDataUrl);
         const key = 'custom_marker_' + Date.now();
         const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
         try {
@@ -1420,27 +1502,14 @@ $('customMarkerFileInput').onchange = function(e) {
     reader.readAsDataURL(file);
 };
 
-$('markerFrameSelect').onchange = async () => {
-    if (customMarkerDataUrl) {
-        const frame = $('markerFrameSelect').value;
-        const canvas = await createCustomMarkerImage(customMarkerDataUrl, frame);
-        const key = 'custom_marker_' + Date.now();
-        const imgData = canvas.getContext('2d').getImageData(0,0,64,64);
-        try {
-            if (map.hasImage(key)) map.removeImage(key);
-            map.addImage(key, imgData, { pixelRatio: 2 });
-            customMarkerImageKey = key;
-        } catch(err) {}
-    }
-};
-
 const ICON_SVGS = {
     pin: '<path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle>',
     star: '<path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8-6.1-3.4-6.1 3.4 1.4-6.8L2.2 9.1l6.9-.8z"></path>',
     circle: '<circle cx="12" cy="12" r="8"></circle>',
     square: '<rect x="5" y="5" width="14" height="14"></rect>',
     flag: '<path d="M6 21V4"></path><path d="M6 4l12 3-12 3"></path>',
-    heart: '<path d="M12 20s-7-4.6-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.4-7 10-7 10z"></path>'
+    heart: '<path d="M12 20s-7-4.6-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.4-7 10-7 10z"></path>',
+    pinball: '<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="5" fill="currentColor"></circle>'
 };
 
 $('markerIconGrid').innerHTML = Object.keys(ICON_SVGS).map(s =>
@@ -1565,10 +1634,10 @@ function addDrawStack() {
         map.addLayer({
             id: 'draft-point', type: 'circle', source: 'draft',
             filter: ['==', ['geometry-type'], 'Point'],
-            paint: { 
+            paint: {
                 'circle-color': ['case', ['get', 'isLastPoint'], '#38bdf8', '#e8b84a'],
-                'circle-radius': ['case', ['get', 'isLastPoint'], 10, ['case', ['get', 'isOrigin'], 8, 5]], 
-                'circle-stroke-width': 2.5 
+                'circle-radius': ['case', ['get', 'isLastPoint'], 10, ['case', ['get', 'isOrigin'], 8, 5]],
+                'circle-stroke-width': 2.5
             }
         });
     }
@@ -1587,8 +1656,8 @@ function addDrawStack() {
     }
 }
 
-const syncDraw = () => { 
-    if (map.getSource('draw')) map.getSource('draw').setData(fc(features)); 
+const syncDraw = () => {
+    if (map.getSource('draw')) map.getSource('draw').setData(fc(features));
     syncVertexHandles();
 };
 
@@ -1600,37 +1669,23 @@ function syncVertexHandles() {
     }
     const handleFeats = [];
     features.forEach(f => {
-        if (f.props.visible === 0) return;
-        if (f.kind === 'circle' && f.props.center) {
-            handleFeats.push({
-                type: 'Feature',
-                geometry: { type: 'Point', coordinates: f.props.center },
-                properties: { polyId: f.id, vIdx: -1, handleType: 'center' }
-            });
-            const r = f.props.radiusMeters || 100;
-            const c = f.props.center;
-            const edgeLng = c[0] + (r / (111320 * Math.cos(c[1]*Math.PI/180)));
-            handleFeats.push({
-                type: 'Feature',
-                geometry: { type: 'Point', coordinates: [edgeLng, c[1]] },
-                properties: { polyId: f.id, vIdx: -2, handleType: 'radius' }
-            });
-        } else if (['polygon','rectangle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+        if (['polygon','rectangle','circle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
             const coords = f.geometry.coordinates[0];
             for (let i = 0; i < coords.length - 1; i++) {
                 handleFeats.push({
                     type: 'Feature',
                     geometry: { type: 'Point', coordinates: coords[i] },
-                    properties: { polyId: f.id, vIdx: i, handleType: 'vertex' }
+                    properties: { polyId: f.id, vIdx: i }
                 });
             }
-        } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry && f.geometry.coordinates) {
+        }
+        if (f.kind === 'polyline' && f.geometry && f.geometry.coordinates) {
             const coords = f.geometry.coordinates;
             for (let i = 0; i < coords.length; i++) {
                 handleFeats.push({
                     type: 'Feature',
                     geometry: { type: 'Point', coordinates: coords[i] },
-                    properties: { polyId: f.id, vIdx: i, handleType: 'vertex' }
+                    properties: { polyId: f.id, vIdx: i }
                 });
             }
         }
@@ -1641,10 +1696,10 @@ function syncVertexHandles() {
 function renderDraft() {
     if (!map.getSource('draft')) return;
     const f = [];
-    const pt = (c, isOrigin=false, isLastPoint=false) => ({ 
-        type: 'Feature', 
-        geometry: { type: 'Point', coordinates: c }, 
-        properties: { isOrigin, isLastPoint } 
+    const pt = (c, isOrigin=false, isLastPoint=false) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: c },
+        properties: { isOrigin, isLastPoint }
     });
     const ln = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
 
@@ -1681,7 +1736,7 @@ function applyVis() {
     }
 }
 
-map.on('load', () => { 
+map.on('load', () => {
     features.forEach(f => {
         if (f.kind === 'marker') {
             const sh = f.props.shape || 'pin';
@@ -1689,8 +1744,8 @@ map.on('load', () => {
             f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
         }
     });
-    addDrawStack(); 
-    applyVis(); 
+    addDrawStack();
+    applyVis();
     renderMyLayers();
     renderProjectsList();
     populateTradeAreaCheckboxes();
@@ -1854,7 +1909,7 @@ $('btnScanTradeArea').onclick = () => {
     let queryParts = '';
     
     if (keyword) {
-        const kw = keyword.replace(/"/g, '\\"');
+        const kw = keyword.replace(/"/g, '\\\"');
         queryParts += `node["name"~"${kw}",i](${bbox});way["name"~"${kw}",i](${bbox});`;
     }
 
@@ -1926,6 +1981,18 @@ $('btnScanTradeArea').onclick = () => {
         });
 };
 
+// ----------------- Custom Overpass Query (collapsible) -----------------
+$('customQueryToggle').onclick = () => {
+    const body = $('customQueryBody');
+    const toggleIcon = $('customQueryToggle').querySelector('span:last-child');
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        toggleIcon.textContent = '▾';
+    } else {
+        body.style.display = 'none';
+        toggleIcon.textContent = '';
+    }
+};
 $('btnRunOverpass').onclick = () => {
     const ql = $('overpassQueryInput').value.trim();
     if (!ql) { hint('Please enter an Overpass QL query'); return; }
@@ -2143,37 +2210,19 @@ map.on('mousemove', e => {
             return coords.map(translateCoords);
         };
         f.geometry.coordinates = translateCoords(dragOriginalCoords);
-        if (f.kind === 'circle' && f.props.center) {
-            f.props.center = [f.props.center[0] + dx, f.props.center[1] + dy];
-        }
         syncDraw();
         markDirty();
     }
 
-    if (isDraggingVertex && draggedPolyId != null) {
+    if (isDraggingVertex && draggedPolyId != null && draggedVertexIdx >= 0) {
         const f = features.find(x => x.id === draggedPolyId);
-        if (f) {
-            if (f.kind === 'circle') {
-                if (draggedHandleType === 'center') {
-                    const dx = cursorLL[0] - dragStartCoord[0];
-                    const dy = cursorLL[1] - dragStartCoord[1];
-                    f.props.center = [f.props.center[0] + dx, f.props.center[1] + dy];
-                    dragStartCoord = cursorLL; // update for continuous dragging
-                    const r = f.props.radiusMeters || 100;
-                    const edge = [f.props.center[0] + (r / (111320 * Math.cos(f.props.center[1]*Math.PI/180))), f.props.center[1]];
-                    const { coords } = circleCoords(f.props.center, edge);
-                    f.geometry.coordinates = coords;
-                } else if (draggedHandleType === 'radius') {
-                    const { coords, r } = circleCoords(f.props.center, cursorLL);
-                    f.props.radiusMeters = r;
-                    f.geometry.coordinates = coords;
-                }
-            } else {
-                const coords = f.geometry.coordinates[0] || f.geometry.coordinates;
+        if (f && f.geometry && f.geometry.coordinates) {
+            if (['polygon','rectangle','circle'].includes(f.kind) && f.geometry.coordinates[0]) {
+                const coords = f.geometry.coordinates[0];
                 coords[draggedVertexIdx] = cursorLL;
-                if (['polygon','rectangle'].includes(f.kind) && draggedVertexIdx === 0) {
-                    coords[coords.length - 1] = cursorLL;
-                }
+                if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
+            } else if (f.kind === 'polyline' && f.geometry.coordinates) {
+                f.geometry.coordinates[draggedVertexIdx] = cursorLL;
             }
             syncDraw();
             markDirty();
@@ -2185,26 +2234,7 @@ map.on('click', e => {
     if (!activeTool && !isDragging && !isDraggingVertex) {
         const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
         if (fs.length && fs[0].properties.id != null) {
-            const fProps = fs[0].properties;
-            let tags = {};
-            try { tags = typeof fProps.osmTags === 'string' ? JSON.parse(fProps.osmTags) : fProps.osmTags; } catch(err) {}
-            
-            if (tags && Object.keys(tags).length) {
-                let tableRows = '';
-                for (const k in tags) {
-                    tableRows += `<tr><th>${k}</th><td>${tags[k]}</td></tr>`;
-                }
-                const html = `
-                    <div style="font-weight:700; color:#38bdf8; margin-bottom:4px; font-size:12px;">${fProps.name || 'POI Details'}</div>
-                    <table class="tag-table">${tableRows}</table>
-                `;
-                new maplibregl.Popup()
-                    .setLngLat(e.lngLat)
-                    .setHTML(html)
-                    .addTo(map);
-            } else {
-                openShapeEditor(parseInt(fs[0].properties.id, 10));
-            }
+            openShapeEditor(parseInt(fs[0].properties.id, 10));
             resetActiveTools();
             return;
         }
@@ -2276,7 +2306,7 @@ map.on('click', e => {
         draft.push(ll);
         if (draft.length === 2) {
             const { coords, r } = circleCoords(draft[0], draft[1]);
-            const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { radiusMeters: r, center: draft[0] });
+            const feat = addFeatureRecord('circle', { type: 'Polygon', coordinates: coords }, { radiusMeters: r });
             resetActiveTools();
             openShapeEditor(feat.id);
         }
@@ -2328,7 +2358,7 @@ $('btn-edit-mode').onclick = () => {
     document.querySelectorAll('.tool').forEach(b => b.classList.remove('primary-active'));
     closeFloatingCards();
     syncVertexHandles();
-    hint(editMode ? 'Edit mode: drag shapes or vertices (blue dots)' : '');
+    hint(editMode ? 'Edit Mode: Drag shapes or blue vertex points to modify' : '');
 };
 
 map.on('mousedown', e => {
@@ -2338,8 +2368,6 @@ map.on('mousedown', e => {
             isDraggingVertex = true;
             draggedPolyId = parseInt(vHits[0].properties.polyId, 10);
             draggedVertexIdx = parseInt(vHits[0].properties.vIdx, 10);
-            draggedHandleType = vHits[0].properties.handleType || 'vertex';
-            dragStartCoord = [e.lngLat.lng, e.lngLat.lat];
             map.dragPan.disable();
             return;
         }
@@ -2367,7 +2395,6 @@ map.on('mouseup', () => {
         isDraggingVertex = false;
         draggedPolyId = null;
         draggedVertexIdx = -1;
-        draggedHandleType = 'vertex';
         map.dragPan.enable();
         markDirty();
     }
@@ -2380,7 +2407,7 @@ function openShapeEditor(id) {
     selectedId = id;
     closeFloatingCards();
 
-    $('editShapeTitle').textContent = `Edit ${f.name}`;
+    $('editShapeTitle').textContent = `Edit Layer`;
     $('eName').value = f.name;
     $('eBorderColor').value = f.props.borderColor || f.props.color || '#e8b84a';
     $('eBorderOp').value = f.props.borderOpacity != null ? f.props.borderOpacity : 0.9;
@@ -2423,7 +2450,9 @@ $('eBorderColor').oninput = e => {
     if (!f) return;
     f.props.borderColor = e.target.value;
     f.props.color = e.target.value;
-    if (f.kind === 'marker' && !customMarkerImageKey) f.props.iconKey = getIconKey(f.props.shape || 'pin', e.target.value);
+    if (f.kind === 'marker' && !f.props.iconKey.includes('custom')) {
+        f.props.iconKey = getIconKey(f.props.shape || 'pin', e.target.value);
+    }
     syncDraw();
     markDirty();
 };
@@ -2461,27 +2490,10 @@ $('btnAddCustomGroup').onclick = () => {
 $('btnSelectAll').onclick = () => {
     document.querySelectorAll('.layer-select-check').forEach(cb => {
         cb.checked = true;
-        selectedLayerIds.add(parseInt(cb.dataset.id, 10));
+        const id = parseInt(cb.dataset.id, 10);
+        selectedLayerIds.add(id);
     });
-};
-
-$('btnHideSelected').onclick = () => {
-    if (selectedLayerIds.size === 0) { hint('Select layers first'); return; }
-    selectedLayerIds.forEach(id => {
-        const f = features.find(x => x.id === id);
-        if (f) f.props.visible = 0;
-    });
-    syncDraw(); renderMyLayers(); markDirty();
-};
-
-$('btnDeleteSelected').onclick = () => {
-    if (selectedLayerIds.size === 0) { hint('Select layers first'); return; }
-    features = features.filter(x => !selectedLayerIds.has(x.id));
-    for (const g in customGroups) {
-        customGroups[g].ids = customGroups[g].ids.filter(id => !selectedLayerIds.has(id));
-    }
-    selectedLayerIds.clear();
-    syncDraw(); renderMyLayers(); markDirty();
+    hint('All layers selected');
 };
 
 function renderLayerCardHtml(f) {
@@ -2497,25 +2509,27 @@ function renderLayerCardHtml(f) {
             <div class="layer-card-top">
                 <input type="checkbox" class="layer-select-check" data-id="${f.id}" ${isSelected ? 'checked' : ''} />
                 <input class="layer-name-input" data-id="${f.id}" value="${f.name}" title="Click to rename" />
-                <button class="card-btn" data-act="edit" data-id="${f.id}" title="Edit Properties">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
-                </button>
-                <button class="card-btn" data-act="eye" data-id="${f.id}" title="Toggle Visibility">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                ${isPoly ? `
+                    <label style="display:flex; align-items:center; gap:2px; cursor:pointer; font-size:10px; color:#768390; margin-right:4px; flex-shrink:0; white-space:nowrap;">
+                        <input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''} style="width:10px;height:10px;accent-color:#316dca;"/> Label
+                    </label>
+                ` : ''}
+                <button class="card-btn" data-act="eye" data-id="${f.id}" title="${f.props.visible ? 'Hide' : 'Show'}">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        ${f.props.visible 
+                            ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>'
+                            : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>'
+                        }
+                    </svg>
                 </button>
                 <button class="card-btn" data-act="zoom" data-id="${f.id}" title="Zoom To">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 </button>
                 <button class="card-btn" data-act="del" data-id="${f.id}" title="Delete" style="color:#ff7b72;">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 </button>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#768390; padding:0 4px;">
-                <span>${subInfo}</span>
-                ${isPoly ? `
-                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''}/> Label</label>
-                ` : ''}
-            </div>
+            <div style="font-size:10px; color:#768390; padding:0 18px;">${subInfo}</div>
         </div>
     `;
 }
@@ -2567,52 +2581,11 @@ function renderMyLayers() {
 
     const looseFeats = features.filter(f => !groupedIds.has(f.id));
     if (looseFeats.length) {
-        html += '<div id="ungrouped-layers-area" style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; min-height: 20px;">Ungrouped Layers</div>';
+        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px;">Ungrouped Layers</div>';
         html += looseFeats.slice().reverse().map(f => renderLayerCardHtml(f)).join('');
     }
 
     container.innerHTML = html;
-
-    // Drag & Drop to Group
-    container.querySelectorAll('.group-header').forEach(header => {
-        header.addEventListener('dragover', e => {
-            e.preventDefault();
-            header.style.background = 'rgba(56, 189, 248, 0.2)';
-        });
-        header.addEventListener('dragleave', e => {
-            header.style.background = '';
-        });
-        header.addEventListener('drop', e => {
-            e.preventDefault();
-            header.style.background = '';
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            const groupName = header.dataset.group;
-            if (groupName && draggedId) {
-                for (const g in customGroups) {
-                    customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-                }
-                if (!customGroups[groupName].ids.includes(draggedId)) {
-                    customGroups[groupName].ids.push(draggedId);
-                }
-                renderMyLayers();
-                markDirty();
-            }
-        });
-    });
-
-    const ungroupedEl = document.getElementById('ungrouped-layers-area');
-    if (ungroupedEl) {
-        ungroupedEl.addEventListener('dragover', e => e.preventDefault());
-        ungroupedEl.addEventListener('drop', e => {
-            e.preventDefault();
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-            }
-            renderMyLayers();
-            markDirty();
-        });
-    }
 
     container.querySelectorAll('.layer-card').forEach(card => {
         card.addEventListener('dragstart', e => {
@@ -2697,13 +2670,17 @@ function renderMyLayers() {
             if (!f) return;
 
             if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); markDirty(); }
-            if (act === 'edit') openShapeEditor(id);
-            if (act === 'eye') { f.props.visible = f.props.visible ? 0 : 1; syncDraw(); renderMyLayers(); markDirty(); }
-            if (act === 'del') { 
+            if (act === 'eye') { 
+                f.props.visible = f.props.visible ? 0 : 1; 
+                syncDraw(); 
+                renderMyLayers(); 
+                markDirty(); 
+            }
+            if (act === 'del') {
                 features = features.filter(x => x.id !== id);
                 for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== id);
                 selectedLayerIds.delete(id);
-                syncDraw(); renderMyLayers(); markDirty(); 
+                syncDraw(); renderMyLayers(); markDirty();
             }
             if (act === 'zoom') {
                 const bnd = calcBounds(f);
@@ -2740,21 +2717,21 @@ function calcBounds(f) {
     return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Direct Export Engine -----------------
+// ----------------- Layout Export Engine -----------------
 $('btn-export-direct').onclick = () => {
-    hint('Exporting map...');
+    hint('Exporting high-quality snapshot...');
     map.once('render', () => {
         try {
-            const canvas = map.getCanvas();
+            const srcCanvas = map.getCanvas();
             const a = document.createElement('a');
             a.download = `Project_Atlas_${Date.now()}.png`;
-            a.href = canvas.toDataURL('image/png');
+            a.href = srcCanvas.toDataURL('image/png', 0.98);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             hint('Export complete!');
         } catch(e) {
-            hint('Export failed: ' + e.message);
+            hint('Export failed.');
         }
     });
     map.triggerRepaint();
@@ -2783,7 +2760,7 @@ document.querySelectorAll('.acc-header').forEach(h => {
         if (body && body.classList.contains('acc-body')) {
             body.classList.toggle('hidden');
             const chev = h.querySelector('span:last-child');
-            if (chev) chev.textContent = body.classList.contains('hidden') ? '▸' : '▾';
+            if (chev) chev.textContent = body.classList.contains('hidden') ? '' : '▾';
         }
     };
 });
@@ -2901,17 +2878,6 @@ function processGeoJSON(geojson) {
         }
     });
 }
-
-// ----------------- Right-Click Copy Coordinates -----------------
-map.on('contextmenu', e => {
-    e.preventDefault();
-    const coords = `${e.lngLat.lat.toFixed(6)}, ${e.lngLat.lng.toFixed(6)}`;
-    navigator.clipboard.writeText(coords).then(() => {
-        hint(`Copied: ${coords}`);
-    }).catch(() => {
-        hint(`Coordinates: ${coords}`);
-    });
-});
 
 map.on('moveend', () => markDirty());
 map.on('error', e => console.warn('Map Notice:', e));
