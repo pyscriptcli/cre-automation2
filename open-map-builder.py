@@ -4071,11 +4071,165 @@ function parseWKT(wktStr) {
 }
 
 function processCSV(text) {
-    const lines = text.split(/\\r?\\n/).map(l => l.trim()).filter(l => l.length > 0);
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
     if (lines.length < 2) throw new Error("CSV contains insufficient data");
     
     const headers = parseCSVLine(lines[0]);
     const lowerHeaders = headers.map(h => h.toLowerCase().trim());
     
     let latIdx = lowerHeaders.findIndex(h => ['lat', 'latitude', 'y', 'lat_dd'].includes(h));
-    let lonIdx = lowerHeaders.findIndex(h => ['lon', 'long', 'longitude', 'x',I seem to be encountering an error. Can I try something else for you?
+    let lonIdx = lowerHeaders.findIndex(h => ['lon', 'long', 'longitude', 'x', 'I seem to be encountering an error. Can I try something else for you?
+    let lonIdx = lowerHeaders.findIndex(h => ['lon', 'long', 'longitude', 'x', 'lng', 'lon_dd'].includes(h));
+    let geomIdx = lowerHeaders.findIndex(h => ['geom', 'geometry', 'wkt', 'the_geom'].includes(h));
+    let nameIdx = lowerHeaders.findIndex(h => ['name', 'title', 'label', 'poi_name'].includes(h));
+
+    for (let i = 1; i < lines.length; i++) {
+        const row = parseCSVLine(lines[i]);
+        if (row.length < headers.length) continue;
+
+        let geom = null;
+        if (geomIdx !== -1 && row[geomIdx]) {
+            geom = parseWKT(row[geomIdx]);
+        }
+        
+        if (!geom && latIdx !== -1 && lonIdx !== -1) {
+            const lat = parseFloat(row[latIdx]);
+            const lon = parseFloat(row[lonIdx]);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                geom = { type: 'Point', coordinates: [lon, lat] };
+            }
+        }
+
+        if (!geom) continue;
+
+        const rowProps = {};
+        const attrTypes = {};
+        headers.forEach((h, hIdx) => {
+            if ([latIdx, lonIdx, geomIdx].includes(hIdx)) return;
+            const val = row[hIdx] || '';
+            const key = h.trim();
+            if (!key) return;
+            rowProps[key] = val;
+            attrTypes[key] = (typeof val === 'string' && val.startsWith('data:image')) ? 'image' : 'text';
+        });
+
+        const featName = (nameIdx !== -1 && row[nameIdx]) ? row[nameIdx] : `Imported ${geom.type} ${fid + 1}`;
+        const kind = geom.type === 'Point' ? 'marker' : (geom.type === 'LineString' ? 'polyline' : 'polygon');
+        
+        addFeatureRecord(kind, geom, {
+            attributes: rowProps,
+            attrTypes: attrTypes,
+            attrRows: [rowProps],
+            shape: 'pin',
+            color: '#1e40af',
+            borderColor: '#38bdf8',
+            iconSize: 0.9,
+            iconKey: getIconKey('pin', '#1e40af')
+        }, null, featName);
+    }
+}
+
+function processGeoJSON(geojson) {
+    const feats = geojson.features || [];
+    feats.forEach(f => {
+        if (!f.geometry) return;
+        const geom = f.geometry;
+        const props = f.properties || {};
+        const featName = props.name || props.title || `${geom.type} ${fid + 1}`;
+        
+        const attrTypes = {};
+        for (const k in props) {
+            attrTypes[k] = (typeof props[k] === 'string' && props[k].startsWith('data:image')) ? 'image' : 'text';
+        }
+
+        if (geom.type === 'Point') {
+            addFeatureRecord('marker', geom, {
+                shape: 'pin',
+                color: '#1e40af',
+                iconSize: 0.9,
+                iconKey: getIconKey('pin', '#1e40af'),
+                attributes: props,
+                attrTypes: attrTypes,
+                attrRows: [props],
+                osmTags: props
+            }, null, featName);
+        } else if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
+            if (props.route_mode || props.routeMode) {
+                addFeatureRecord('route', geom, {
+                    routeMode: props.route_mode || props.routeMode,
+                    description: props.description || '',
+                    color: props.color || '#38bdf8',
+                    borderColor: props.color || '#38bdf8',
+                    waypoints: geom.coordinates,
+                    attributes: props,
+                    attrTypes: attrTypes,
+                    attrRows: [props]
+                }, null, featName);
+            } else {
+                addFeatureRecord('polyline', geom, {
+                    attributes: props,
+                    attrTypes: attrTypes,
+                    attrRows: [props]
+                }, null, featName);
+            }
+        } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
+            addFeatureRecord('polygon', geom, {
+                attributes: props,
+                attrTypes: attrTypes,
+                attrRows: [props]
+            }, null, featName);
+        }
+    });
+}
+
+map.on('moveend', () => markDirty(false));
+map.on('error', e => console.warn('Map Notice:', e));
+
+} catch (e) {
+    console.error('App init error:', e);
+}
+</script>
+</body>
+</html>"""
+
+# ------------------------------------------------------------------------
+# 5. INITIAL STATE & COMPONENT MOUNTING
+# ------------------------------------------------------------------------
+try:
+    initial_theme = "Midnight Blue"
+    initial_center = [120.9842, 14.5995]
+    initial_zoom = 14
+    initial_name = "Untitled Project 1"
+    initial_id = "local-temp"
+    initial_features = []
+    initial_custom_groups = {"Trade Area Scan": {"collapsed": False, "ids": []}}
+    
+    if ALL_PROJECTS_LIST:
+        latest = ALL_PROJECTS_LIST[0]
+        initial_id = str(latest.get("id", "local-temp"))
+        initial_name = latest.get("name", "Untitled Project 1")
+        initial_theme = latest.get("basemap", "Midnight Blue")
+        initial_center = latest.get("center", [120.9842, 14.5995])
+        initial_zoom = latest.get("zoom", 14)
+        initial_features = latest.get("features", [])
+        initial_custom_groups = latest.get("custom_groups", {"Trade Area Scan": {"collapsed": False, "ids": []}})
+
+    html = (
+        HTML_TEMPLATE.replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
+        .replace("__POI_CONFIG__", json.dumps(POI_CONFIG))
+        .replace("__COLOR_PALETTES__", json.dumps(COLOR_PALETTES))
+        .replace("__SUPABASE_URL__", SUPABASE_URL)
+        .replace("__SUPABASE_KEY__", SUPABASE_KEY)
+        .replace("__ALL_PROJECTS_JSON__", json.dumps(ALL_PROJECTS_LIST))
+        .replace("__PROJECT_ID__", initial_id)
+        .replace("__PROJECT_NAME__", initial_name)
+        .replace("__INITIAL_BASEMAP__", initial_theme)
+        .replace("__INITIAL_FEATURES__", json.dumps(initial_features))
+        .replace("__INITIAL_CUSTOM_GROUPS__", json.dumps(initial_custom_groups))
+        .replace("__CENTER__", json.dumps(initial_center))
+        .replace("__ZOOM__", str(initial_zoom))
+        .replace("__BG__", THEMES.get(initial_theme, THEMES["Midnight Blue"])["overlay"])
+    )
+    components.html(html, height=1000, scrolling=False)
+except Exception as e:
+    st.error(f"Failed to load application: {e}")
