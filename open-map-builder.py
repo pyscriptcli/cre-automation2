@@ -312,7 +312,16 @@ THEMES = {
 
 def w(*stops):
     out = ["interpolate", ["exponential", 1.2], ["zoom"]]
-    for z, val in stops: out += [z, val]
+    # Handle both w(z1, v1, z2, v2) and w([(z1, v1), (z2, v2)])
+    if len(stops) == 1 and isinstance(stops[0], (list, tuple)) and len(stops[0]) > 0:
+        first_item = stops[0][0]
+        if isinstance(first_item, (list, tuple)):
+            stops = stops[0]
+    
+    for stop in stops:
+        if isinstance(stop, (list, tuple)) and len(stop) >= 2:
+            z, val = stop[0], stop[1]
+            out += [z, val]
     return out
 
 def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=1.0):
@@ -395,6 +404,13 @@ ALL_STYLES = {
     "OSM": raster_style(["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "#f2efe9", 19),
     "Satellite": raster_style(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "#000000", 19),
 }
+
+# ----------------- Color Palette Hierarchy (Primary, Secondary, Tertiary) -----------------
+COLOR_PALETTES = [
+    {"name": "Primary", "colors": ["#1e40af", "#dc2626", "#16a34a", "#ca8a04", "#0a1628", "#ffffff"]},
+    {"name": "Secondary", "colors": ["#38bdf8", "#3fb950", "#f85149", "#a371f7", "#fb923c", "#f43f5e"]},
+    {"name": "Tertiary", "colors": ["#0d9488", "#e8b84a", "#8b5cf6", "#64748b", "#8e7258", "#334155"]}
+]
 
 # ------------------------------------------------------------------------
 # 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
@@ -688,6 +704,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .attr-table input[type="text"]:focus { border-color: #38bdf8; outline: none; }
         .attr-img-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: block; }
         .attr-img-placeholder { width: 80px; height: 80px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 10px; color: #adbac7; cursor: pointer; text-align: center; }
+        
+        /* Color picker full control styles (Primary, Secondary, Tertiary) */
+        .color-ctrl-cluster { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+        .palette-group { display: flex; flex-direction: column; gap: 2px; }
+        .palette-label { font-size: 9px; font-weight: 700; color: #768390; text-transform: uppercase; letter-spacing: 0.5px; }
+        .swatch-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+        .swatch { width: 16px; height: 16px; border-radius: 3px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.1s; }
+        .swatch:hover { transform: scale(1.15); }
+        .color-input-combo { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+        .color-input-combo input[type=color] {
+            -webkit-appearance: none; border: 1px solid rgba(255, 255, 255, 0.15);
+            width: 24px; height: 24px; border-radius: 4px; cursor: pointer; background: transparent; padding: 0;
+        }
+        .color-input-combo input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
+        .color-input-combo input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
+        .color-input-combo input[type=text] { width: 75px; font-family: monospace; font-size: 11px; padding: 3px 5px; }
+        .btn-eyedropper { width: 24px; height: 24px; display: grid; place-items: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #adbac7; cursor: pointer; padding: 0; }
+        .btn-eyedropper:hover { color: #fff; background: rgba(255,255,255,0.2); }
     </style>
 </head>
 <body>
@@ -4190,11 +4224,7 @@ try:
     html = (
         HTML_TEMPLATE.replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
         .replace("__POI_CONFIG__", json.dumps(POI_CONFIG))
-        .replace("__COLOR_PALETTES__", json.dumps([
-            {"name": "Primary", "colors": ["#1e40af", "#dc2626", "#16a34a", "#ca8a04", "#0a1628", "#ffffff"]},
-            {"name": "Secondary", "colors": ["#38bdf8", "#3fb950", "#f85149", "#a371f7", "#fb923c", "#f43f5e"]},
-            {"name": "Tertiary", "colors": ["#0d9488", "#e8b84a", "#8b5cf6", "#64748b", "#8e7258", "#334155"]}
-        ]))
+        .replace("__COLOR_PALETTES__", json.dumps(COLOR_PALETTES))
         .replace("__SUPABASE_URL__", SUPABASE_URL)
         .replace("__SUPABASE_KEY__", SUPABASE_KEY)
         .replace("__ALL_PROJECTS_JSON__", json.dumps(ALL_PROJECTS_LIST))
