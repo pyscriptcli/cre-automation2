@@ -489,8 +489,9 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 }
 .group-styling-panel.open { display: flex; }
 .group-styling-panel .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.layer-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; cursor: grab; }
+.layer-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; cursor: grab; transition: background-color 0.15s ease, border-color 0.15s ease; }
 .layer-card:active { cursor: grabbing; }
+.layer-card.selected { background: rgba(49, 109, 202, 0.15); border-color: rgba(56, 189, 248, 0.4); }
 .layer-card-top { display: flex; align-items: center; gap: 4px; overflow: hidden; }
 .layer-name-input { flex: 1; min-width: 50px; border: 1px solid transparent; background: transparent; font-weight: 600; font-size: 12px; color: #f0f6fc; padding: 2px 4px; border-radius: 4px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 .layer-name-input:focus { border-color: #316dca; background: rgba(0,0,0,0.4); outline: none; }
@@ -559,6 +560,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .ctx-item:hover { background: rgba(255, 255, 255, 0.1); }
 .ctx-item svg { width: 14px; height: 14px; color: #adbac7; flex-shrink: 0; }
 .ctx-coords { padding: 6px 10px 8px 10px; font-size: 10px; color: #768390; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px; }
+.ctx-sep { height: 1px; background: rgba(255, 255, 255, 0.08); margin: 4px 0; }
 #launcher-modal-scrim {
     position: fixed; inset: 0; z-index: 9999;
     display: flex; align-items: center; justify-content: center;
@@ -697,7 +699,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <button class="tb-btn" id="btn-search" title="Search Place">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
     </button>
-    <button class="tb-btn" id="btn-import-toolbar" title="Import Spatial Data (KML, KMZ, GeoJSON, SHP)">
+    <button class="tb-btn" id="btn-import-toolbar" title="Import Spatial Data (KML, KMZ, GeoJSON, CSV, SHP)">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
     </button>
     <div class="tb-sep"></div>
@@ -746,9 +748,9 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <div style="margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
             <button id="btn-import" class="trade-btn" style="width:100%; display:flex; justify-content:center; align-items:center; gap:6px;">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                Import Spatial Data (KML, GeoJSON, SHP)
+                Import Spatial Data (KML, GeoJSON, CSV, SHP)
             </button>
-            <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip" style="display:none;"/>
+            <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.csv,.zip" style="display:none;"/>
         </div>
         <div class="dimension-mode-bar">
             <button class="dimension-mode-btn active" id="btn2DMode">2D MAP</button>
@@ -837,6 +839,9 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <div style="display:flex; align-items:center; gap:4px;">
                 <button class="icon-action-btn" id="btnSelectAllGlobal" title="Select / Deselect All Layers">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                </button>
+                <button class="icon-action-btn" id="btnDeleteSelectedGlobal" title="Delete Selected Layers" style="color:#ff7b72;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 </button>
                 <button id="btnAddCustomGroup" class="trade-btn" style="padding:2px 6px; font-size:10px;">+ GROUP</button>
                 <button id="btnHideSelected" class="trade-btn" style="padding:2px 6px; font-size:10px; background:#22272e; border:1px solid #2d333b; color:#adbac7;">Hide/Unhide</button>
@@ -1074,6 +1079,24 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
         Open Data Table
     </div>
+    <!-- Z-Index Reordering Actions -->
+    <div class="ctx-item" id="ctx-bring-front" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg>
+        Bring to Front
+    </div>
+    <div class="ctx-item" id="ctx-bring-forward" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+        Bring Forward
+    </div>
+    <div class="ctx-item" id="ctx-send-backward" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        Send Backward
+    </div>
+    <div class="ctx-item" id="ctx-send-back" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
+        Send to Back
+    </div>
+    <div class="ctx-sep" id="ctx-sep-actions" style="display:none;"></div>
     <div class="ctx-item" id="ctx-copy">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
         Copy Coordinates
@@ -1354,6 +1377,35 @@ const resetActiveTools = () => {
     map.doubleClickZoom.enable();
     hint('');
 };
+
+// ----------------- Layer Ordering / Z-Index Engine -----------------
+function reorderLayer(featureId, action) {
+    const idx = features.findIndex(f => f.id === featureId);
+    if (idx === -1) return;
+    
+    if (action === 'front') {
+        const [item] = features.splice(idx, 1);
+        features.push(item);
+    } else if (action === 'forward') {
+        if (idx < features.length - 1) {
+            const temp = features[idx];
+            features[idx] = features[idx + 1];
+            features[idx + 1] = temp;
+        }
+    } else if (action === 'backward') {
+        if (idx > 0) {
+            const temp = features[idx];
+            features[idx] = features[idx - 1];
+            features[idx - 1] = temp;
+        }
+    } else if (action === 'back') {
+        const [item] = features.splice(idx, 1);
+        features.unshift(item);
+    }
+    syncDraw();
+    renderMyLayers();
+    markDirty();
+}
 
 // ----------------- Project Auto-Naming Calculation -----------------
 function getNextUntitledProjectName() {
@@ -2257,7 +2309,9 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
             iconSize: markerIconSize,
             visible: 1,
             rotation: 0,
-            attributes: { name: assignedName, description: isRoute ? (customProps.description || '') : '' },
+            attributes: { description: isRoute ? (customProps.description || '') : '' },
+            attrTypes: { description: 'text' },
+            attrRows: [{ description: isRoute ? (customProps.description || '') : '' }],
             ...customProps
         }
     };
@@ -2271,7 +2325,7 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
     return feat;
 }
 
-// ----------------- Feature Popup on Left-Click -----------------
+// ----------------- Feature Popup on Left-Click (#popup-feature-info) -----------------
 function showFeaturePopup(f, clickLngLat) {
     let popupCoords = clickLngLat;
     if (!popupCoords) {
@@ -2283,7 +2337,7 @@ function showFeaturePopup(f, clickLngLat) {
     let primaryImageHtml = '';
     let tableRowsHtml = '';
 
-    // Check if there is an image in attributes / attrRows
+    // Check if there is an image in attributes / attrRows or custom properties
     if (f.props.attrRows && f.props.attrRows.length > 0 && f.props.attrTypes) {
         for (const row of f.props.attrRows) {
             for (const col in f.props.attrTypes) {
@@ -2295,13 +2349,24 @@ function showFeaturePopup(f, clickLngLat) {
             if (primaryImageHtml) break;
         }
     }
+    if (!primaryImageHtml && f.props) {
+        for (const k in f.props) {
+            const val = f.props[k];
+            if (typeof val === 'string' && val.startsWith('data:image')) {
+                primaryImageHtml = `<img src="${val}" style="width:100%; max-height:160px; object-fit:cover; border-radius:8px; margin-bottom:8px; display:block; border:1px solid rgba(255,255,255,0.15);"/>`;
+                break;
+            }
+        }
+    }
 
     if (f.props.osmTags && Object.keys(f.props.osmTags).length > 0) {
         for (const k in f.props.osmTags) {
+            if (k.toLowerCase() === 'name') continue;
             tableRowsHtml += `<tr><th>${k}</th><td>${f.props.osmTags[k]}</td></tr>`;
         }
     } else if (f.props.attributes && Object.keys(f.props.attributes).length > 0) {
         for (const k in f.props.attributes) {
+            if (k.toLowerCase() === 'name') continue;
             const val = f.props.attributes[k];
             if (val && typeof val === 'string' && val.startsWith('data:image')) continue;
             tableRowsHtml += `<tr><th>${k}</th><td>${val || '-'}</td></tr>`;
@@ -2309,19 +2374,21 @@ function showFeaturePopup(f, clickLngLat) {
     }
 
     if (!tableRowsHtml) {
-        tableRowsHtml = `<tr><th>name</th><td>${f.name}</td></tr><tr><th>type</th><td>${f.kind}</td></tr>`;
+        tableRowsHtml = `<tr><th>type</th><td>${f.kind}</td></tr>`;
         if (f.props.description) tableRowsHtml += `<tr><th>description</th><td>${f.props.description}</td></tr>`;
     }
 
     const html = `
-        <div style="font-weight:700; margin-bottom:6px; color:#38bdf8; font-size:13px;">${f.name}</div>
-        ${primaryImageHtml}
-        <table class="tag-table">
-            ${tableRowsHtml}
-        </table>
-        <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:8px; border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
-            <button onclick="editMode=true; selectedId=${f.id}; openShapeEditor(${f.id}); syncVertexHandles();" style="background:#316dca; color:#fff; border:none; border-radius:4px; padding:3px 8px; font-size:10px; cursor:pointer;">Edit</button>
-            <button onclick="openAttributeTable(${f.id});" style="background:rgba(255,255,255,0.1); color:#adbac7; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:3px 8px; font-size:10px; cursor:pointer;">Open Table</button>
+        <div id="popup-feature-info">
+            <div style="font-weight:700; margin-bottom:6px; color:#38bdf8; font-size:14px; letter-spacing:-0.2px;">${f.name}</div>
+            ${primaryImageHtml}
+            <table class="tag-table">
+                ${tableRowsHtml}
+            </table>
+            <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:8px; border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
+                <button onclick="editMode=true; selectedId=${f.id}; openShapeEditor(${f.id}); syncVertexHandles();" style="background:#316dca; color:#fff; border:none; border-radius:4px; padding:3px 8px; font-size:10px; cursor:pointer;">Edit</button>
+                <button onclick="openAttributeTable(${f.id});" style="background:rgba(255,255,255,0.1); color:#adbac7; border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:3px 8px; font-size:10px; cursor:pointer;">Open Table</button>
+            </div>
         </div>
     `;
 
@@ -2589,7 +2656,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ----------------- Right-Click Context Menu -----------------
+// ----------------- Right-Click Context Menu & Z-Index Handlers -----------------
 map.on('contextmenu', e => {
     ctxLngLat = e.lngLat;
     const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
@@ -2601,21 +2668,52 @@ map.on('contextmenu', e => {
     if (ctxFeatureId) {
         $('ctx-edit').style.display = 'flex';
         $('ctx-datatable').style.display = 'flex';
+        $('ctx-bring-front').style.display = 'flex';
+        $('ctx-bring-forward').style.display = 'flex';
+        $('ctx-send-backward').style.display = 'flex';
+        $('ctx-send-back').style.display = 'flex';
+        $('ctx-sep-actions').style.display = 'block';
         $('ctx-delete').style.display = 'flex';
     } else {
         $('ctx-edit').style.display = 'none';
         $('ctx-datatable').style.display = 'none';
+        $('ctx-bring-front').style.display = 'none';
+        $('ctx-bring-forward').style.display = 'none';
+        $('ctx-send-backward').style.display = 'none';
+        $('ctx-send-back').style.display = 'none';
+        $('ctx-sep-actions').style.display = 'none';
         $('ctx-delete').style.display = 'none';
     }
 
     const maxX = window.innerWidth - 220;
-    const maxY = window.innerHeight - 180;
+    const maxY = window.innerHeight - 280;
     menu.style.left = Math.min(e.point.x, maxX) + 'px';
     menu.style.top = Math.min(e.point.y, maxY) + 'px';
     menu.style.display = 'block';
 });
 
 map.on('movestart', () => { $('map-context-menu').style.display = 'none'; });
+
+$('ctx-bring-front').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) reorderLayer(ctxFeatureId, 'front');
+    $('map-context-menu').style.display = 'none';
+};
+$('ctx-bring-forward').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) reorderLayer(ctxFeatureId, 'forward');
+    $('map-context-menu').style.display = 'none';
+};
+$('ctx-send-backward').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) reorderLayer(ctxFeatureId, 'backward');
+    $('map-context-menu').style.display = 'none';
+};
+$('ctx-send-back').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) reorderLayer(ctxFeatureId, 'back');
+    $('map-context-menu').style.display = 'none';
+};
 
 $('ctx-edit').onclick = (e) => {
     e.stopPropagation();
@@ -2716,7 +2814,6 @@ function renderSearchResults(results) {
             const coords = [parseFloat(selected.lon), parseFloat(selected.lat)];
             pulseFeature({geometry: {type: 'Point', coordinates: coords}});
             
-            // Temporary marker element (#38bdf8, size 1.2)
             const el = document.createElement('div');
             el.className = 'temp-search-marker';
             el.style.width = '20px';
@@ -2958,7 +3055,6 @@ map.on('dblclick', e => {
         return;
     }
     if (editMode) {
-        // Midpoint insertion for route
         const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-line'] });
         if (fs.length && fs[0].properties.id != null) {
             const f = features.find(x => x.id === parseInt(fs[0].properties.id, 10));
@@ -3078,7 +3174,6 @@ function openShapeEditor(id) {
         $('eFontSize').value = f.props.fontSize || 16;
     }
     
-    // Route Specifics
     const isRoute = f.kind === 'route';
     $('routeEditorControls').style.display = isRoute ? 'block' : 'none';
     if (isRoute) {
@@ -3117,8 +3212,6 @@ $('eName').oninput = e => {
     const f = features.find(x => x.id === selectedId);
     if (f) {
         f.name = e.target.value;
-        if (!f.props.attributes) f.props.attributes = {};
-        f.props.attributes.name = e.target.value;
         syncDraw(); renderMyLayers(); markDirty();
     }
 };
@@ -3160,7 +3253,7 @@ $('eDeleteBtn').onclick = () => {
 $('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); selectedId = null; editMode = false; syncVertexHandles(); };
 $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); selectedId = null; editMode = false; syncVertexHandles(); };
 
-// ----------------- My Layers Panel -----------------
+// ----------------- My Layers Panel & Batch Logic -----------------
 $('btnAddCustomGroup').onclick = () => {
     const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
     if (gName && gName.trim() && !customGroups[gName]) {
@@ -3177,6 +3270,24 @@ $('btnSelectAllGlobal').onclick = () => {
         features.forEach(f => selectedLayerIds.add(f.id));
     }
     renderMyLayers();
+};
+
+$('btnDeleteSelectedGlobal').onclick = () => {
+    if (selectedLayerIds.size === 0) {
+        hint('Select at least one layer to delete');
+        return;
+    }
+    if (!confirm(`Delete ${selectedLayerIds.size} selected layer(s)?`)) return;
+    features = features.filter(f => !selectedLayerIds.has(f.id));
+    for (const g in customGroups) {
+        customGroups[g].ids = customGroups[g].ids.filter(id => !selectedLayerIds.has(id));
+    }
+    if (selectedId && selectedLayerIds.has(selectedId)) selectedId = null;
+    selectedLayerIds.clear();
+    syncDraw();
+    renderMyLayers();
+    markDirty();
+    hint('Selected layers deleted');
 };
 
 $('btnHideSelected').onclick = () => {
@@ -3211,7 +3322,7 @@ function renderLayerCardHtml(f) {
         .map(p => `<option value="${p}" ${(f.props.labelPos || 'center') === p ? 'selected' : ''}>${p}</option>`)
         .join('');
     return `
-        <div class="layer-card" draggable="true" data-id="${f.id}">
+        <div class="layer-card ${isSelected ? 'selected' : ''}" draggable="true" data-id="${f.id}">
             <div class="layer-card-top">
                 <input type="checkbox" class="layer-select-check" data-id="${f.id}" ${isSelected ? 'checked' : ''} style="width:14px;height:14px;accent-color:#316dca;cursor:pointer;"/>
                 <input class="layer-name-input" data-id="${f.id}" value="${f.name}" title="Click to rename"/>
@@ -3341,17 +3452,24 @@ function renderMyLayers() {
             e.preventDefault();
             e.stopPropagation();
             gc.classList.remove('drop-hover');
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            if (isNaN(draggedId)) return;
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
+            let ids = [];
+            try { ids = JSON.parse(e.dataTransfer.getData('application/json') || '[]'); } catch(err) {}
+            if (!ids.length) {
+                const single = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                if (!isNaN(single)) ids = [single];
             }
-            if (!customGroups[gName].ids.includes(draggedId)) {
-                customGroups[gName].ids.push(draggedId);
-            }
+            if (!ids.length) return;
+            ids.forEach(draggedId => {
+                for (const g in customGroups) {
+                    customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
+                }
+                if (!customGroups[gName].ids.includes(draggedId)) {
+                    customGroups[gName].ids.push(draggedId);
+                }
+            });
             renderMyLayers();
             markDirty();
-            hint(`Layer added to "${gName}"`);
+            hint(`${ids.length} layer(s) added to "${gName}"`);
         });
     });
 
@@ -3368,20 +3486,33 @@ function renderMyLayers() {
             e.preventDefault();
             e.stopPropagation();
             uz.classList.remove('drop-hover');
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            if (isNaN(draggedId)) return;
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
+            let ids = [];
+            try { ids = JSON.parse(e.dataTransfer.getData('application/json') || '[]'); } catch(err) {}
+            if (!ids.length) {
+                const single = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                if (!isNaN(single)) ids = [single];
             }
+            if (!ids.length) return;
+            ids.forEach(draggedId => {
+                for (const g in customGroups) {
+                    customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
+                }
+            });
             renderMyLayers();
             markDirty();
-            hint('Layer moved to Ungrouped');
+            hint(`${ids.length} layer(s) moved to Ungrouped`);
         });
     }
 
     container.querySelectorAll('.layer-card').forEach(card => {
         card.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/plain', card.dataset.id);
+            const id = parseInt(card.dataset.id, 10);
+            let dragIds = [id];
+            if (selectedLayerIds.has(id)) {
+                dragIds = Array.from(selectedLayerIds);
+            }
+            e.dataTransfer.setData('text/plain', String(id));
+            e.dataTransfer.setData('application/json', JSON.stringify(dragIds));
             e.dataTransfer.effectAllowed = 'move';
         });
         card.addEventListener('dragover', e => {
@@ -3391,10 +3522,15 @@ function renderMyLayers() {
         card.addEventListener('drop', e => {
             e.preventDefault();
             e.stopPropagation();
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+            let ids = [];
+            try { ids = JSON.parse(e.dataTransfer.getData('application/json') || '[]'); } catch(err) {}
+            if (!ids.length) {
+                const single = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                if (!isNaN(single)) ids = [single];
+            }
             const targetId = parseInt(card.dataset.id, 10);
-            if (draggedId !== targetId) {
-                reorderFeatures(draggedId, targetId);
+            if (ids.length && targetId) {
+                reorderFeaturesBatch(ids, targetId);
             }
         });
     });
@@ -3404,6 +3540,8 @@ function renderMyLayers() {
             const id = parseInt(e.target.dataset.id, 10);
             if (e.target.checked) selectedLayerIds.add(id);
             else selectedLayerIds.delete(id);
+            const parentCard = cb.closest('.layer-card');
+            if (parentCard) parentCard.classList.toggle('selected', e.target.checked);
         });
     });
     
@@ -3441,8 +3579,6 @@ function renderMyLayers() {
             const f = features.find(x => x.id === id);
             if (f) {
                 f.name = e.target.value;
-                if (!f.props.attributes) f.props.attributes = {};
-                f.props.attributes.name = e.target.value;
                 syncDraw(); markDirty();
             }
         };
@@ -3541,12 +3677,18 @@ function renderMyLayers() {
     });
 }
 
-function reorderFeatures(draggedId, targetId) {
-    const draggedIndex = features.findIndex(f => f.id === draggedId);
+function reorderFeaturesBatch(draggedIds, targetId) {
     const targetIndex = features.findIndex(f => f.id === targetId);
-    if (draggedIndex === -1 || targetIndex === -1) return;
-    const [draggedItem] = features.splice(draggedIndex, 1);
-    features.splice(targetIndex, 0, draggedItem);
+    if (targetIndex === -1) return;
+    const itemsToMove = [];
+    draggedIds.forEach(id => {
+        const idx = features.findIndex(f => f.id === id);
+        if (idx !== -1) itemsToMove.push(features[idx]);
+    });
+    features = features.filter(f => !draggedIds.includes(f.id));
+    const newTargetIdx = features.findIndex(f => f.id === targetId);
+    const insertIdx = newTargetIdx === -1 ? features.length : newTargetIdx;
+    features.splice(insertIdx, 0, ...itemsToMove);
     syncDraw();
     renderMyLayers();
     markDirty();
@@ -3567,7 +3709,7 @@ function calcBounds(f) {
     return [[minX, minY], [maxX, maxY]];
 }
 
-// ----------------- Attribute Table Modal & Logic -----------------
+// ----------------- Attribute Table Modal (#popup-attribute-table) -----------------
 function openAttributeTable(featureId) {
     currentTableFeatureId = featureId;
     const f = features.find(x => x.id === featureId);
@@ -3578,16 +3720,18 @@ function openAttributeTable(featureId) {
     $('popup-attribute-table').classList.add('open');
     
     if (!f.props.attributes) {
-        f.props.attributes = {
-            name: f.name || '',
-            description: f.props.description || ''
-        };
+        f.props.attributes = { description: f.props.description || '' };
     }
     if (!f.props.attrTypes) {
-        f.props.attrTypes = { name: 'text', description: 'text' };
+        f.props.attrTypes = { description: 'text' };
     }
+    if (f.props.attrTypes.name) delete f.props.attrTypes.name;
+    if (f.props.attributes.name) delete f.props.attributes.name;
+
     if (!f.props.attrRows) {
-        f.props.attrRows = [{ ...f.props.attributes }];
+        const r = { ...f.props.attributes };
+        delete r.name;
+        f.props.attrRows = [r];
     }
     
     renderAttributeTable(f);
@@ -3596,9 +3740,9 @@ function openAttributeTable(featureId) {
 function renderAttributeTable(f) {
     const headerRow = $('attrTableHeader');
     const bodyRow = $('attrTableBody');
-    const types = f.props.attrTypes || { name: 'text', description: 'text' };
-    const cols = Object.keys(types);
-    const rows = f.props.attrRows || [{ ...f.props.attributes }];
+    const types = f.props.attrTypes || { description: 'text' };
+    const cols = Object.keys(types).filter(c => c !== 'name');
+    const rows = f.props.attrRows || [{ description: f.props.description || '' }];
     
     headerRow.innerHTML = `<tr>` + cols.map(c => `
         <th>
@@ -3647,11 +3791,8 @@ window.updateAttrCell = (rIdx, key, val) => {
     if (!f.props.attrRows[rIdx]) f.props.attrRows[rIdx] = {};
     f.props.attrRows[rIdx][key] = val;
     if (rIdx === 0) {
+        if (!f.props.attributes) f.props.attributes = {};
         f.props.attributes[key] = val;
-        if (key === 'name') {
-            f.name = val;
-            renderMyLayers();
-        }
         if (key === 'description') {
             f.props.description = val;
         }
@@ -3673,7 +3814,10 @@ window.triggerAttrImageUpload = (rIdx, key) => {
                 if (f) {
                     if (!f.props.attrRows[rIdx]) f.props.attrRows[rIdx] = {};
                     f.props.attrRows[rIdx][key] = ev.target.result;
-                    if (rIdx === 0) f.props.attributes[key] = ev.target.result;
+                    if (rIdx === 0) {
+                        if (!f.props.attributes) f.props.attributes = {};
+                        f.props.attributes[key] = ev.target.result;
+                    }
                     renderAttributeTable(f);
                     markDirty();
                 }
@@ -3688,7 +3832,7 @@ window.clearAttrImage = (rIdx, key) => {
     const f = features.find(x => x.id === currentTableFeatureId);
     if (f && f.props.attrRows[rIdx]) {
         f.props.attrRows[rIdx][key] = '';
-        if (rIdx === 0) f.props.attributes[key] = '';
+        if (rIdx === 0 && f.props.attributes) f.props.attributes[key] = '';
         renderAttributeTable(f);
         markDirty();
     }
@@ -3721,10 +3865,15 @@ $('btnAddAttrCol').onclick = () => {
     const name = prompt("Enter new column name:");
     if (name && name.trim()) {
         const c = name.trim();
+        if (c.toLowerCase() === 'name') {
+            hint('"name" is managed directly on the layer');
+            return;
+        }
         const type = confirm("Is this column for Images? (Click Cancel for standard Text)") ? "image" : "text";
         if (!f.props.attrTypes[c]) {
             f.props.attrTypes[c] = type;
             f.props.attrRows.forEach(r => r[c] = '');
+            if (!f.props.attributes) f.props.attributes = {};
             f.props.attributes[c] = '';
             renderAttributeTable(f);
             markDirty();
@@ -3835,16 +3984,20 @@ $('cTerOp').oninput = e => { ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].f
 $('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('building-3d', 'fill-extrusion-opacity', parseFloat(e.target.value)); markDirty(); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
-// ----------------- Import -----------------
+// ----------------- Import System (CSV, GeoJSON, KML, SHP) -----------------
 $('btn-import').onclick = () => { $('importFileInput').click(); };
 $('btn-import-toolbar').onclick = () => { $('importFileInput').click(); };
+
 $('importFileInput').onchange = async function(e) {
     const file = e.target.files[0];
     if (!file) return;
     const ext = file.name.split('.').pop().toLowerCase();
     hint(`Importing ${file.name}…`);
     try {
-        if (ext === 'geojson' || ext === 'json') {
+        if (ext === 'csv') {
+            const text = await file.text();
+            processCSV(text);
+        } else if (ext === 'geojson' || ext === 'json') {
             const text = await file.text();
             const data = JSON.parse(text);
             const geojson = data.type === 'FeatureCollection' ? data : { type: 'FeatureCollection', features: [data] };
@@ -3874,86 +4027,49 @@ $('importFileInput').onchange = async function(e) {
     }
 };
 
-function processGeoJSON(geojson) {
-    const feats = geojson.features || [];
-    feats.forEach(f => {
-        if (!f.geometry) return;
-        const geom = f.geometry;
-        const props = f.properties || {};
-        if (geom.type === 'Point') {
-            addFeatureRecord('marker', geom, {
-                shape: 'pin',
-                color: '#1e40af',
-                iconSize: 0.9,
-                iconKey: getIconKey('pin', '#1e40af'),
-                osmTags: props
-            });
-        } else if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
-            if (props.route_mode || props.routeMode) {
-                addFeatureRecord('route', geom, {
-                    routeMode: props.route_mode || props.routeMode,
-                    description: props.description || '',
-                    color: props.color || '#38bdf8',
-                    borderColor: props.color || '#38bdf8',
-                    waypoints: geom.coordinates
-                });
+function parseCSVLine(text) {
+    const p = '', row = [''];
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (c === '"') {
+            if (inQuotes && text[i + 1] === '"') {
+                row[row.length - 1] += '"';
+                i++;
             } else {
-                addFeatureRecord('polyline', geom, {});
+                inQuotes = !inQuotes;
             }
-        } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-            addFeatureRecord('polygon', geom, {});
+        } else if (c === ',' && !inQuotes) {
+            row.push('');
+        } else {
+            row[row.length - 1] += c;
         }
-    });
+    }
+    return row.map(s => s.trim());
 }
 
-map.on('moveend', () => markDirty(false));
-map.on('error', e => console.warn('Map Notice:', e));
-
-} catch (e) {
-    console.error('App init error:', e);
+function parseWKT(wktStr) {
+    if (!wktStr) return null;
+    const str = wktStr.trim().toUpperCase();
+    if (str.startsWith('POINT')) {
+        const m = str.match(/POINT\s*\(\s*([-\d\.]+)\s+([-\d\.]+)\s*\)/i);
+        if (m) return { type: 'Point', coordinates: [parseFloat(m[1]), parseFloat(m[2])] };
+    } else if (str.startsWith('LINESTRING')) {
+        const m = str.match(/LINESTRING\s*\(([^)]+)\)/i);
+        if (m) {
+            const coords = m[1].split(',').map(pair => pair.trim().split(/\s+/).map(Number));
+            return { type: 'LineString', coordinates: coords };
+        }
+    } else if (str.startsWith('POLYGON')) {
+        const m = str.match(/POLYGON\s*\(\(([^)]+)\)\)/i);
+        if (m) {
+            const coords = m[1].split(',').map(pair => pair.trim().split(/\s+/).map(Number));
+            return { type: 'Polygon', coordinates: [coords] };
+        }
+    }
+    return null;
 }
-</script>
-</body>
-</html>"""
 
-# ------------------------------------------------------------------------
-# 5. INITIAL STATE & COMPONENT MOUNTING
-# ------------------------------------------------------------------------
-try:
-    initial_theme = "Midnight Blue"
-    initial_center = [120.9842, 14.5995]
-    initial_zoom = 14
-    initial_name = "Untitled Project 1"
-    initial_id = "local-temp"
-    initial_features = []
-    initial_custom_groups = {"Trade Area Scan": {"collapsed": False, "ids": []}}
-    
-    if ALL_PROJECTS_LIST:
-        latest = ALL_PROJECTS_LIST[0]
-        initial_id = str(latest.get("id", "local-temp"))
-        initial_name = latest.get("name", "Untitled Project 1")
-        initial_theme = latest.get("basemap", "Midnight Blue")
-        initial_center = latest.get("center", [120.9842, 14.5995])
-        initial_zoom = latest.get("zoom", 14)
-        initial_features = latest.get("features", [])
-        initial_custom_groups = latest.get("custom_groups", {"Trade Area Scan": {"collapsed": False, "ids": []}})
-
-    html = (
-        HTML_TEMPLATE.replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
-        .replace("__POI_CONFIG__", json.dumps(POI_CONFIG))
-        .replace("__COLOR_PALETTES__", json.dumps(COLOR_PALETTES))
-        .replace("__SUPABASE_URL__", SUPABASE_URL)
-        .replace("__SUPABASE_KEY__", SUPABASE_KEY)
-        .replace("__ALL_PROJECTS_JSON__", json.dumps(ALL_PROJECTS_LIST))
-        .replace("__PROJECT_ID__", initial_id)
-        .replace("__PROJECT_NAME__", initial_name)
-        .replace("__INITIAL_BASEMAP__", initial_theme)
-        .replace("__INITIAL_FEATURES__", json.dumps(initial_features))
-        .replace("__INITIAL_CUSTOM_GROUPS__", json.dumps(initial_custom_groups))
-        .replace("__CENTER__", json.dumps(initial_center))
-        .replace("__ZOOM__", str(initial_zoom))
-        .replace("__BG__", THEMES.get(initial_theme, THEMES["Midnight Blue"])["overlay"])
-    )
-    components.html(html, height=1000, scrolling=False)
-except Exception as e:
-    st.error(f"Failed to load application: {e}")
+function processCSV(text) {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length < Sorry, something went wrong. Please try your request again.
