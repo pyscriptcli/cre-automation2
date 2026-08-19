@@ -1,26 +1,185 @@
 import json
+import re
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 import logging
 import time
 import random
 
 # ------------------------------------------------------------------------
+# ROBUST OVERPASS API QUERY FUNCTION (PYTHON)
+# ------------------------------------------------------------------------
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 90) -> list:
+    """
+    Robustly queries Overpass API with built-in retries, multiple endpoint failover,
+    exponential backoff, and proper error handling. Falls back to OSMnx if all endpoints fail.
+    """
+    endpoints = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://overpass.openstreetmap.fr/api/interpreter"
+    ]
+    
+    # Build Overpass QL query
+    statements = "\n".join([f"  nwr[{tag}](around:{radius},{lat},{lon});" for tag in tags])
+    ql = f"[out:json][timeout:{timeout}];(\n{statements}\n);\nout center;"
+    
+    for endpoint in endpoints:
+        retries = 5
+        delay = 1.0
+        while retries > 0:
+            try:
+                url = f"{endpoint}?data={requests.utils.quote(ql)}"
+                res = requests.get(url, timeout=timeout)
+                if res.status_code in [429, 503, 504]:
+                    raise requests.exceptions.HTTPError(f"HTTP {res.status_code}")
+                res.raise_for_status()
+                data = res.json()
+                if not data or 'elements' not in data:
+                    raise ValueError("Malformed JSON response")
+                
+                # Parse successful response
+                results = []
+                for el in data['elements']:
+                    el_lat = el.get('lat') or (el.get('center', {}).get('lat'))
+                    el_lon = el.get('lon') or (el.get('center', {}).get('lon'))
+                    if el_lat is None or el_lon is None:
+                        continue
+                    
+                    tags_dict = el.get('tags', {})
+                    name = tags_dict.get('name', 'Unknown')
+                    poi_type = tags_dict.get('amenity') or tags_dict.get('shop') or tags_dict.get('building') or 'Node'
+                    
+                    results.append({
+                        'lat': float(el_lat),
+                        'lon': float(el_lon),
+                        'name': str(name),
+                        'type': str(poi_type),
+                        'tags': tags_dict
+                    })
+                
+                logging.info(f"Successfully fetched {len(results)} POIs from {endpoint}")
+                return results
+            
+            except Exception as e:
+                logging.warning(f"Endpoint {endpoint} failed: {e}. Retries left: {retries-1}")
+                retries -= 1
+                if retries == 0:
+                    break
+                jitter = random.uniform(0, 0.5)
+                time.sleep(delay + jitter)
+                delay *= 2
+
+    # Fallback to OSMnx
+    logging.info("All Overpass endpoints failed. Falling back to OSMnx...")
+    try:
+        import osmnx as ox
+        import geopandas as gpd
+        import pandas as pd
+        
+        tags_dict = {}
+        for tag in tags:
+            clean = tag.replace('"', '')
+            if '=' in clean:
+                k, v = clean.split('=', 1)
+                if '|' in v:
+                    tags_dict[k] = [x.strip() for x in v.split('|')]
+                else:
+                    tags_dict[k] = v
+            else:
+                tags_dict[clean] = True
+        
+        gdf = ox.geometries_from_point((lat, lon), tags_dict, dist=radius)
+        results = []
+        for idx, row in gdf.iterrows():
+            geom = row.geometry
+            if geom.geom_type == 'Point':
+                lon_val, lat_val = geom.x, geom.y
+            else:
+                lon_val, lat_val = geom.centroid.x, geom.centroid.y
+            
+            name = row.get('name', 'Unknown')
+            poi_type = row.get('amenity') or row.get('shop') or row.get('building') or 'Node'
+            
+            results.append({
+                'lat': float(lat_val),
+                'lon': float(lon_val),
+                'name': str(name) if pd.notna(name) else 'Unknown',
+                'type': str(poi_type) if pd.notna(poi_type) else 'Node',
+                'tags': {k: v for k, v in row.items() if k not in ['geometry', 'name', 'amenity', 'shop', 'building']}
+            })
+        
+        logging.info(f"Successfully fetched {len(results)} POIs via OSMnx fallback")
+        return results
+    
+    except Exception as e:
+        logging.error(f"OSMnx fallback also failed: {e}")
+        return []
+
+# ------------------------------------------------------------------------
 # 1. PAGE CONFIGURATION & ROOT OVERRIDES
 # ------------------------------------------------------------------------
-st.set_page_config(page_title="Project Atlas", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="Project Atlas",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-st.markdown("""
-<style>
-@font-face { font-family: 'Century Gothic Custom'; src: local('Century Gothic'), local('CenturyGothic'), sans-serif; }
-* { font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif !important; }
-[data-testid="stSidebar"], section[data-testid="stSidebar"], header, #MainMenu, footer, [data-testid="stHeader"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
-.stApp { margin: 0 !important; padding: 0 !important; background-color: #0a1628 !important; }
-.block-container { padding: 0rem !important; margin: 0rem !important; max-width: 100vw !important; width: 100vw !important; height: 100vh !important; max-height: 100vh !important; overflow: hidden !important; }
-iframe { border: none !important; overflow: hidden !important; height: 100vh !important; width: 100vw !important; margin: 0 !important; padding: 0 !important; position: fixed !important; inset: 0 !important; z-index: 1 !important; }
-html, body { overflow: hidden !important; margin: 0 !important; padding: 0 !important; width: 100vw !important; height: 100vh !important; background: #0a1628 !important; }
-</style>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <style>
+    @font-face {
+        font-family: 'Century Gothic Custom';
+        src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic'), sans-serif;
+    }
+    * { font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif !important; }
+    [data-testid="stSidebar"], section[data-testid="stSidebar"], 
+    header, #MainMenu, footer, [data-testid="stHeader"] {
+        display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .stApp {
+        margin: 0 !important;
+        padding: 0 !important;
+        background-color: #0a1628 !important;
+    }
+    .block-container {
+        padding: 0rem !important;
+        margin: 0rem !important;
+        max-width: 100vw !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+    }
+    iframe {
+        border: none !important;
+        overflow: hidden !important;
+        height: 100vh !important;
+        width: 100vw !important;
+        margin: 0 !important; 
+        padding: 0 !important;
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 1 !important;
+    }
+    html, body {
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: #0a1628 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ------------------------------------------------------------------------
 # 2. SUPABASE REST INTEGRATION
@@ -29,11 +188,21 @@ SUPABASE_URL = st.secrets.get("supabase", {}).get("url", "https://cyczyaswxkpdcr
 SUPABASE_KEY = st.secrets.get("supabase", {}).get("key", "sb_publishable_pUppHGjwmT1mLlhWGZH6Og_4GcCLCPR")
 BASE_API_URL = SUPABASE_URL.replace("/rest/v1/", "").rstrip("/") + "/rest/v1"
 
+def get_headers():
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+
 def fetch_projects():
     try:
         url = f"{BASE_API_URL}/map_projects?select=id,name,updated_at,basemap,zoom,center,features,custom_groups,layer_visibilities&order=updated_at.desc"
-        res = requests.get(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=6)
-        return res.json() if res.status_code == 200 else []
+        res = requests.get(url, headers=get_headers(), timeout=6)
+        if res.status_code == 200:
+            return res.json()
+        return []
     except Exception:
         return []
 
@@ -110,44 +279,40 @@ POI_CONFIG = {
 
 THEMES = {
     "Midnight Blue": {
-        "overlay": "#0a1628", "text": "#d9b451", "land": "#0d1830", "landcover": "#0f1d33",
-        "water": "#0a1424", "waterway": "#081120", "parks": "#142440", "buildings": "#8e7258",
-        "aeroway": "#152640", "rail": "#d9b451", "rd_express": "#ffaa00", "rd_major": "#e8b84a",
+        "overlay": "#0a1628", "text": "#d9b451", "land": "#0d1830",
+        "landcover": "#0f1d33", "water": "#0a1424", "waterway": "#081120",
+        "parks": "#142440", "buildings": "#8e7258", "aeroway": "#152640",
+        "rail": "#d9b451", "rd_express": "#ffaa00", "rd_major": "#e8b84a",
         "rd_secondary": "#c99c37", "rd_tertiary": "#7d5f14", "rd_min_md": "#46463e",
         "rd_min_lo": "#2f2f2a", "rd_path": "#4a4333", "rd_case": "#685c37",
-        "sec_opacity": 0.8, "ter_opacity": 0.65, "building_opacity": 0.35, "boundary": "#ff1e1e", "muted": "#8b949e",
+        "sec_opacity": 0.8, "ter_opacity": 0.65, "building_opacity": 0.35,
+        "boundary": "#ff1e1e", "muted": "#8b949e",
     },
     "Monochrome": {
-        "overlay": "#ece9e2", "text": "#2d2a26", "land": "#ece9e2", "landcover": "#e5e2da",
-        "water": "#cdd7db", "waterway": "#bac6cb", "parks": "#e2dfd7", "buildings": "#dedad2",
-        "aeroway": "#dbd7cf", "rail": "#1a1816", "rd_express": "#1a1816", "rd_major": "#2e2a25",
+        "overlay": "#ece9e2", "text": "#2d2a26", "land": "#ece9e2",
+        "landcover": "#e5e2da", "water": "#cdd7db", "waterway": "#bac6cb",
+        "parks": "#e2dfd7", "buildings": "#dedad2", "aeroway": "#dbd7cf",
+        "rail": "#1a1816", "rd_express": "#1a1816", "rd_major": "#2e2a25",
         "rd_secondary": "#47423b", "rd_tertiary": "#716b61", "rd_min_md": "#8a8377",
         "rd_min_lo": "#9e978d", "rd_path": "#b0a99f", "rd_case": "#1a1816",
-        "sec_opacity": 0.85, "ter_opacity": 0.7, "building_opacity": 0.6, "boundary": "#ff1e1e", "muted": "#716b61",
+        "sec_opacity": 0.85, "ter_opacity": 0.7, "building_opacity": 0.6,
+        "boundary": "#ff1e1e", "muted": "#716b61",
     },
     "White Gold": {
-        "overlay": "#ffffff", "text": "#a07d1c", "land": "#fafafa", "landcover": "#f1f1ec",
-        "water": "#d4dadc", "waterway": "#c2c9cc", "parks": "#e6ebe4", "buildings": "#d8d8d4",
-        "aeroway": "#e4e4e4", "rail": "#c99c37", "rd_express": "#f59e0b", "rd_major": "#e5a91d",
+        "overlay": "#ffffff", "text": "#a07d1c", "land": "#fafafa",
+        "landcover": "#f1f1ec", "water": "#d4dadc", "waterway": "#c2c9cc",
+        "parks": "#e6ebe4", "buildings": "#d8d8d4", "aeroway": "#e4e4e4",
+        "rail": "#c99c37", "rd_express": "#f59e0b", "rd_major": "#e5a91d",
         "rd_secondary": "#b08a24", "rd_tertiary": "#9c7a1a", "rd_min_md": "#e0be74",
         "rd_min_lo": "#ead9b0", "rd_path": "#e6dabd", "rd_case": "#b08a24",
-        "sec_opacity": 0.7, "ter_opacity": 0.6, "building_opacity": 0.5, "boundary": "#ff1e1e", "muted": "#6b7280",
+        "sec_opacity": 0.7, "ter_opacity": 0.6, "building_opacity": 0.5,
+        "boundary": "#ff1e1e", "muted": "#6b7280",
     },
 }
 
-COLOR_PALETTES = [
-    {"name": "Primary", "colors": ["#1e40af", "#dc2626", "#16a34a", "#ca8a04", "#0a1628", "#ffffff"]},
-    {"name": "Secondary", "colors": ["#38bdf8", "#3fb950", "#f85149", "#a371f7", "#fb923c", "#f43f5e"]},
-    {"name": "Tertiary", "colors": ["#0d9488", "#e8b84a", "#8b5cf6", "#64748b", "#8e7258", "#334155"]}
-]
-
 def w(*stops):
     out = ["interpolate", ["exponential", 1.2], ["zoom"]]
-    if len(stops) == 1 and isinstance(stops[0], (list, tuple)) and len(stops[0]) > 0 and isinstance(stops[0][0], (list, tuple)):
-        stops = stops[0]
-    for stop in stops:
-        if isinstance(stop, (list, tuple)) and len(stop) >= 2:
-            out += [stop[0], stop[1]]
+    for z, val in stops: out += [z, val]
     return out
 
 def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=1.0):
@@ -165,280 +330,61 @@ def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=
     return lyr
 
 def vector_style(p):
-    sec, ter = p["sec_opacity"], p["ter_opacity"]
-    layers = [
-        {"id": "bg", "type": "background", "paint": {"background-color": p["overlay"]}},
-        {"id": "landcover", "type": "fill", "source": "omt", "source-layer": "landcover", "paint": {"fill-color": p["landcover"], "fill-opacity": 0.6}},
-        {"id": "landuse", "type": "fill", "source": "omt", "source-layer": "landuse", "paint": {"fill-color": p["land"], "fill-opacity": 0.8}},
-        {"id": "park", "type": "fill", "source": "omt", "source-layer": "park", "paint": {"fill-color": p["parks"]}},
-        {"id": "water", "type": "fill", "source": "omt", "source-layer": "water", "paint": {"fill-color": p["water"]}},
-        {"id": "waterway", "type": "line", "source": "omt", "source-layer": "waterway", "paint": {"line-color": p["waterway"], "line-width": w((9, 1), (20, 6))}},
-        {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway", "paint": {"line-color": p["aeroway"], "line-width": w((11, 1), (20, 12))}},
-        {"id": "building-2d", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
-        {"id": "building-3d", "type": "fill-extrusion", "source": "omt", "source-layer": "building", "minzoom": 14, "layout": {"visibility": "none"}, "paint": {"fill-extrusion-color": p["buildings"], "fill-extrusion-height": ["coalesce", ["get", "render_height"], ["get", "height"], 12], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0], "fill-extrusion-opacity": 0.85}},
-        {"id": "bound_prov", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [2, 4], True, False], "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 2.2, "line-dasharray": [4, 2]}},
-        {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 7, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.8, "line-dasharray": [2, 2], "line-opacity": 0.9}},
-        {"id": "bound_brgy", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [9, 10], True, False], "minzoom": 11, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.2, "line-dasharray": [1, 2], "line-opacity": 0.8}},
-        road_layer(p, "case_express", ["motorway"], None, [(5, 1.5), (14, 5.5), (20, 24)], casing=True),
-        road_layer(p, "case_major", ["trunk", "primary"], None, [(6, 1.0), (14, 3.8), (20, 18)], casing=True),
-        road_layer(p, "case_secondary", ["secondary"], None, [(8, 0.8), (14, 2.8), (20, 15)], casing=True, opacity=sec),
-        road_layer(p, "case_tertiary", ["tertiary"], None, [(9, 0.6), (14, 2.0), (20, 12)], casing=True, opacity=ter),
-        road_layer(p, "rd_path", ["path", "pedestrian", "footway"], p["rd_path"], [(14, 0.6), (20, 5)], minzoom=14),
-        road_layer(p, "rd_min_lo", ["service", "track"], p["rd_min_lo"], [(14, 0.6), (20, 6)], minzoom=14),
-        road_layer(p, "rd_min_md", ["minor"], p["rd_min_md"], [(13, 0.8), (16, 3.5), (20, 10)], minzoom=13),
-        road_layer(p, "rd_tertiary", ["tertiary"], p["rd_tertiary"], [(9, 0.6), (14, 2.0), (20, 12)], opacity=ter),
-        road_layer(p, "rd_secondary", ["secondary"], p["rd_secondary"], [(8, 0.8), (14, 2.8), (20, 15)], opacity=sec),
-        road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 3.8), (20, 18)]),
-        road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 5.5), (20, 24)]),
-        {"id": "rd_rail", "type": "line", "source": "omt", "source-layer": "transportation", "filter": ["match", ["get", "class"], ["rail", "transit"], True, False], "minzoom": 10, "paint": {"line-color": p["rail"], "line-width": w((10, 1.2), (15, 2.5), (20, 4)), "line-dasharray": [3, 2]}},
-        {"id": "label_city", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["city", "town"], True, False], "minzoom": 6, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((6, 12), (14, 18)), "text-transform": "uppercase", "text-letter-spacing": 0.1}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 2}},
-        {"id": "label_brgy", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["suburb", "neighbourhood", "village", "quarter", "hamlet"], True, False], "minzoom": 11, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((11, 10), (16, 14)), "text-letter-spacing": 0.05}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
-        {"id": "label_street", "type": "symbol", "source": "omt", "source-layer": "transportation_name", "minzoom": 13, "layout": {"symbol-placement": "line", "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((13, 9), (18, 13))}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
-    ]
-    return {"version": 8, "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf", "sources": {"omt": {"type": "vector", "url": "https://tiles.openfreemap.org/planet"}}, "layers": layers}
-
-def raster_style(tile_urls, bg, maxzoom=20):
-    return {"version": 8, "sources": {"r": {"type": "raster", "tiles": tile_urls, "tileSize": 256, "maxzoom": maxzoom}}, "layers": [{"id": "bg", "type": "background", "paint": {"background-color": bg}}, {"id": "r", "type": "raster", "source": "r"}]}
-
-ALL_STYLES = {
-    "Midnight Blue": vector_style(THEMES["Midnight Blue"]),
-    "Monochrome": vector_style(THEMES["Monochrome"]),
-    "White Gold": vector_style(THEMES["White Gold"]),
-    "CartoDB Light": raster_style(["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png", "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], "#f8f9fa"),
-    "CartoDB Dark": raster_style(["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png", "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"], "#000000"),
-    "OSM": raster_style(["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "#f2efe9", 19),
-    "Satellite": raster_style(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "#000000", 19),
-}
-
-# ------------------------------------------------------------------------
-# 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
-# ------------------------------------------------------------------------
-HTML_TEMPLATE = r"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
-    <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
-    <style>
-        @font-face { font-family: 'Century Gothic Custom'; src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic'), sans-serif; }
-        * { box-sizing: border-box; user-select: none; font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
-        html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0a1628; }
-        #map { position: absolute; inset: 0; width: 100vw; height: 100vh; z-index: 1; }
-        ::-webkit-scrollbar { width: 5px; height: 5px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; } ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
-        select, select option { background-color: #0f172a !important; color: #f8fafc !important; } select option:hover, select option:checked { background-color: #2563eb !important; color: #ffffff !important; }
-        
-        #top-toolbar-bar { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 1000; background-color: rgba(9, 16, 24, 0.97); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 36px; padding: 4px 10px; display: flex; align-items: center; gap: 4px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6); color: #f0f6fc; }
-        .tb-btn { width: 32px; height: 32px; display: grid; place-items: center; background: transparent; border: none; color: #adbac7; border-radius: 50%; cursor: pointer; transition: all 0.15s ease; }
-        .tb-btn:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; } .tb-btn.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; } .tb-btn.primary-active { background: #316dca; color: #ffffff; }
-        .tb-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.12); margin: 0 4px; }
-        
-        #project-meta-cluster { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
-        #project-name-display { font-weight: 700; color: #38bdf8;```python
-import json
-import streamlit as st
-import requests
-import logging
-import time
-import random
-
-# ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & ROOT OVERRIDES
-# ------------------------------------------------------------------------
-st.set_page_config(page_title="Project Atlas", layout="wide", initial_sidebar_state="collapsed")
-
-st.markdown("""
-<style>
-@font-face { font-family: 'Century Gothic Custom'; src: local('Century Gothic'), local('CenturyGothic'), sans-serif; }
-* { font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif !important; }
-[data-testid="stSidebar"], section[data-testid="stSidebar"], header, #MainMenu, footer, [data-testid="stHeader"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
-.stApp { margin: 0 !important; padding: 0 !important; background-color: #0a1628 !important; }
-.block-container { padding: 0rem !important; margin: 0rem !important; max-width: 100vw !important; width: 100vw !important; height: 100vh !important; max-height: 100vh !important; overflow: hidden !important; }
-iframe { border: none !important; overflow: hidden !important; height: 100vh !important; width: 100vw !important; margin: 0 !important; padding: 0 !important; position: fixed !important; inset: 0 !important; z-index: 1 !important; }
-html, body { overflow: hidden !important; margin: 0 !important; padding: 0 !important; width: 100vw !important; height: 100vh !important; background: #0a1628 !important; }
-</style>
-""", unsafe_allow_html=True)
-
-# ------------------------------------------------------------------------
-# 2. SUPABASE REST INTEGRATION
-# ------------------------------------------------------------------------
-SUPABASE_URL = st.secrets.get("supabase", {}).get("url", "https://cyczyaswxkpdcremqnkn.supabase.co")
-SUPABASE_KEY = st.secrets.get("supabase", {}).get("key", "sb_publishable_pUppHGjwmT1mLlhWGZH6Og_4GcCLCPR")
-BASE_API_URL = SUPABASE_URL.replace("/rest/v1/", "").rstrip("/") + "/rest/v1"
-
-def fetch_projects():
-    try:
-        url = f"{BASE_API_URL}/map_projects?select=id,name,updated_at,basemap,zoom,center,features,custom_groups,layer_visibilities&order=updated_at.desc"
-        res = requests.get(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=6)
-        return res.json() if res.status_code == 200 else []
-    except Exception:
-        return []
-
-ALL_PROJECTS_LIST = fetch_projects()
-
-# ------------------------------------------------------------------------
-# 3. POI TAXONOMY & VECTOR BASEMAP THEMES
-# ------------------------------------------------------------------------
-POI_CONFIG = {
-    "COMMERCIAL & OFFICES": [
-        ['Corporate Office', '"building"~"office|commercial",i'],
-        ['IT/Tech Center', '"office"~"it|telecommunication",i'],
-        ['Business Center', '"building"="commercial"'],
-        ['Bank', '"amenity"="bank"'],
-        ['ATM', '"amenity"="atm"'],
-        ['Office', '"office"="yes"']
-    ],
-    "RETAIL": [
-        ['Mall/Department Store', '"shop"~"mall|department_store",i'],
-        ['Supermarket', '"shop"~"market|grocery",i'],
-        ['Convenience Store', '"shop"="convenience"'],
-        ['Pharmacy', '"amenity"="pharmacy"'],
-        ['Hardware', '"shop"~"hardware|doityourself",i'],
-        ['General Shops', '"shop"~"boutique|clothes|shoes",i'],
-        ['Marketplace', '"amenity"="marketplace"']
-    ],
-    "FOOD, BEVERAGE & HOSPITALITY": [
-        ['Restaurant', '"amenity"="restaurant"'],
-        ['Cafe/Coffee Shop', '"amenity"~"cafe|coffee",i'],
-        ['Fast Food', '"amenity"="fast_food"'],
-        ['Bar/Pub/Nightclub', '"amenity"~"bar|pub|nightclub",i'],
-        ['Bakery/Pastry', '"shop"="bakery"'],
-        ['Food court', '"amenity"="food_court"'],
-        ['Hotel', '"tourism"="hotel"'],
-        ['Hostel', '"tourism"="hostel"']
-    ],
-    "RESIDENTIAL": [
-        ['Apartments', '"building"="apartments"'],
-        ['House', '"building"="house"'],
-        ['Residential Area', '"landuse"="residential"'],
-        ['Condominium', '"building"="residential"']
-    ],
-    "INDUSTRIAL & LOGISTICS": [
-        ['Expressway Exits', '"highway"~"motorway_junction|toll_gantry",i'],
-        ['Ports & Terminals', '"industrial"="port"'],
-        ['Manufacturing Plants', '"industrial"~"factory|manufacturing|processing",i'],
-        ['Warehouses & Depots', '"building"~"warehouse|depot",i'],
-        ['Industrial Parks', '"landuse"~"industrial|industrial_estate",i']
-    ],
-    "HEALTH & EMERGENCY SERVICES": [
-        ['Hospital', '"amenity"~"hospital|clinic",i'],
-        ['Clinic', '"amenity"="clinic"'],
-        ['Pharmacy', '"amenity"="pharmacy"'],
-        ['Police Station', '"amenity"="police"'],
-        ['Fire Station', '"amenity"="fire_station"']
-    ],
-    "GOVERNMENT, EDUCATION & INFRASTRUCTURE": [
-        ['City Hall', '"amenity"="townhall"'],
-        ['Airport Terminal', '"aeroway"~"terminal|aerodrome",i'],
-        ['University/College', '"amenity"~"university|college",i'],
-        ['K-12 School', '"amenity"="school"'],
-        ['Post Office', '"amenity"="post_office"']
-    ],
-    "LEISURE, SPORTS & PUBLIC SPACES": [
-        ['Church', '"religion"="christian"'],
-        ['Mosque', '"religion"="muslim"'],
-        ['Cinema', '"amenity"="cinema"'],
-        ['Fuel', '"amenity"="fuel"'],
-        ['Parking', '"amenity"="parking"'],
-        ['Sports centre', '"leisure"="sports_centre"'],
-        ['Busstop', '"highway"="bus_stop"']
-    ]
-}
-
-THEMES = {
-    "Midnight Blue": {
-        "overlay": "#0a1628", "text": "#d9b451", "land": "#0d1830", "landcover": "#0f1d33",
-        "water": "#0a1424", "waterway": "#081120", "parks": "#142440", "buildings": "#8e7258",
-        "aeroway": "#152640", "rail": "#d9b451", "rd_express": "#ffaa00", "rd_major": "#e8b84a",
-        "rd_secondary": "#c99c37", "rd_tertiary": "#7d5f14", "rd_min_md": "#46463e",
-        "rd_min_lo": "#2f2f2a", "rd_path": "#4a4333", "rd_case": "#685c37",
-        "sec_opacity": 0.8, "ter_opacity": 0.65, "building_opacity": 0.35, "boundary": "#ff1e1e", "muted": "#8b949e",
-    },
-    "Monochrome": {
-        "overlay": "#ece9e2", "text": "#2d2a26", "land": "#ece9e2", "landcover": "#e5e2da",
-        "water": "#cdd7db", "waterway": "#bac6cb", "parks": "#e2dfd7", "buildings": "#dedad2",
-        "aeroway": "#dbd7cf", "rail": "#1a1816", "rd_express": "#1a1816", "rd_major": "#2e2a25",
-        "rd_secondary": "#47423b", "rd_tertiary": "#716b61", "rd_min_md": "#8a8377",
-        "rd_min_lo": "#9e978d", "rd_path": "#b0a99f", "rd_case": "#1a1816",
-        "sec_opacity": 0.85, "ter_opacity": 0.7, "building_opacity": 0.6, "boundary": "#ff1e1e", "muted": "#716b61",
-    },
-    "White Gold": {
-        "overlay": "#ffffff", "text": "#a07d1c", "land": "#fafafa", "landcover": "#f1f1ec",
-        "water": "#d4dadc", "waterway": "#c2c9cc", "parks": "#e6ebe4", "buildings": "#d8d8d4",
-        "aeroway": "#e4e4e4", "rail": "#c99c37", "rd_express": "#f59e0b", "rd_major": "#e5a91d",
-        "rd_secondary": "#b08a24", "rd_tertiary": "#9c7a1a", "rd_min_md": "#e0be74",
-        "rd_min_lo": "#ead9b0", "rd_path": "#e6dabd", "rd_case": "#b08a24",
-        "sec_opacity": 0.7, "ter_opacity": 0.6, "building_opacity": 0.5, "boundary": "#ff1e1e", "muted": "#6b7280",
-    },
-}
-
-COLOR_PALETTES = [
-    {"name": "Primary", "colors": ["#1e40af", "#dc2626", "#16a34a", "#ca8a04", "#0a1628", "#ffffff"]},
-    {"name": "Secondary", "colors": ["#38bdf8", "#3fb950", "#f85149", "#a371f7", "#fb923c", "#f43f5e"]},
-    {"name": "Tertiary", "colors": ["#0d9488", "#e8b84a", "#8b5cf6", "#64748b", "#8e7258", "#334155"]}
-]
-
-def w(*stops):
-    out = ["interpolate", ["exponential", 1.2], ["zoom"]]
-    if len(stops) == 1 and isinstance(stops[0], (list, tuple)) and len(stops[0]) > 0 and isinstance(stops[0][0], (list, tuple)):
-        stops = stops[0]
-    for stop in stops:
-        if isinstance(stop, (list, tuple)) and len(stop) >= 2:
-            out += [stop[0], stop[1]]
-    return out
-
-def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=1.0):
-    lyr = {
-        "id": lid, "type": "line", "source": "omt", "source-layer": "transportation",
-        "filter": ["match", ["get", "class"], classes, True, False],
-        "layout": {"line-cap": "round", "line-join": "round"},
-        "paint": {"line-color": color, "line-width": w(widths), "line-opacity": opacity},
+    sec = p["sec_opacity"]
+    ter = p["ter_opacity"]
+    return {
+        "version": 8,
+        "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+        "sources": {"omt": {"type": "vector", "url": "https://tiles.openfreemap.org/planet"}},
+        "layers": [
+            {"id": "bg", "type": "background", "paint": {"background-color": p["overlay"]}},
+            {"id": "landcover", "type": "fill", "source": "omt", "source-layer": "landcover", "paint": {"fill-color": p["landcover"], "fill-opacity": 0.6}},
+            {"id": "landuse", "type": "fill", "source": "omt", "source-layer": "landuse", "paint": {"fill-color": p["land"], "fill-opacity": 0.8}},
+            {"id": "park", "type": "fill", "source": "omt", "source-layer": "park", "paint": {"fill-color": p["parks"]}},
+            {"id": "water", "type": "fill", "source": "omt", "source-layer": "water", "paint": {"fill-color": p["water"]}},
+            {"id": "waterway", "type": "line", "source": "omt", "source-layer": "waterway", "paint": {"line-color": p["waterway"], "line-width": w((9, 1), (20, 6))}},
+            {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway", "paint": {"line-color": p["aeroway"], "line-width": w((11, 1), (20, 12))}},
+            {"id": "building-2d", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
+            {
+                "id": "building-3d", "type": "fill-extrusion", "source": "omt", "source-layer": "building", "minzoom": 14,
+                "layout": {"visibility": "none"},
+                "paint": {
+                    "fill-extrusion-color": p["buildings"],
+                    "fill-extrusion-height": ["coalesce", ["get", "render_height"], ["get", "height"], 12],
+                    "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+                    "fill-extrusion-opacity": 0.85
+                }
+            },
+            {"id": "bound_prov", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [2, 4], True, False], "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 2.2, "line-dasharray": [4, 2]}},
+            {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 7, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.8, "line-dasharray": [2, 2], "line-opacity": 0.9}},
+            {"id": "bound_brgy", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [9, 10], True, False], "minzoom": 11, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.2, "line-dasharray": [1, 2], "line-opacity": 0.8}},
+            road_layer(p, "case_express", ["motorway"], None, [(5, 1.5), (14, 5.5), (20, 24)], casing=True),
+            road_layer(p, "case_major", ["trunk", "primary"], None, [(6, 1.0), (14, 3.8), (20, 18)], casing=True),
+            road_layer(p, "case_secondary", ["secondary"], None, [(8, 0.8), (14, 2.8), (20, 15)], casing=True, opacity=sec),
+            road_layer(p, "case_tertiary", ["tertiary"], None, [(9, 0.6), (14, 2.0), (20, 12)], casing=True, opacity=ter),
+            road_layer(p, "rd_path", ["path", "pedestrian", "footway"], p["rd_path"], [(14, 0.6), (20, 5)], minzoom=14),
+            road_layer(p, "rd_min_lo", ["service", "track"], p["rd_min_lo"], [(14, 0.6), (20, 6)], minzoom=14),
+            road_layer(p, "rd_min_md", ["minor"], p["rd_min_md"], [(13, 0.8), (16, 3.5), (20, 10)], minzoom=13),
+            road_layer(p, "rd_tertiary", ["tertiary"], p["rd_tertiary"], [(9, 0.6), (14, 2.0), (20, 12)], opacity=ter),
+            road_layer(p, "rd_secondary", ["secondary"], p["rd_secondary"], [(8, 0.8), (14, 2.8), (20, 15)], opacity=sec),
+            road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 3.8), (20, 18)]),
+            road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 5.5), (20, 24)]),
+            {"id": "rd_rail", "type": "line", "source": "omt", "source-layer": "transportation", "filter": ["match", ["get", "class"], ["rail", "transit"], True, False], "minzoom": 10, "paint": {"line-color": p["rail"], "line-width": w((10, 1.2), (15, 2.5), (20, 4)), "line-dasharray": [3, 2]}},
+            {"id": "label_city", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["city", "town"], True, False], "minzoom": 6, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((6, 12), (14, 18)), "text-transform": "uppercase", "text-letter-spacing": 0.1}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 2}},
+            {"id": "label_brgy", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["suburb", "neighbourhood", "village", "quarter", "hamlet"], True, False], "minzoom": 11, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((11, 10), (16, 14)), "text-letter-spacing": 0.05}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
+            {"id": "label_street", "type": "symbol", "source": "omt", "source-layer": "transportation_name", "minzoom": 13, "layout": {"symbol-placement": "line", "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((13, 9), (18, 13))}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
+        ],
     }
-    if minzoom: lyr["minzoom"] = minzoom
-    if casing:
-        lyr["paint"]["line-color"] = p["rd_case"]
-        lyr["paint"]["line-width"] = w([(z, val + 1.8) for z, val in widths])
-        lyr["id"] = lid + "_casing"
-    return lyr
-
-def vector_style(p):
-    sec, ter = p["sec_opacity"], p["ter_opacity"]
-    layers = [
-        {"id": "bg", "type": "background", "paint": {"background-color": p["overlay"]}},
-        {"id": "landcover", "type": "fill", "source": "omt", "source-layer": "landcover", "paint": {"fill-color": p["landcover"], "fill-opacity": 0.6}},
-        {"id": "landuse", "type": "fill", "source": "omt", "source-layer": "landuse", "paint": {"fill-color": p["land"], "fill-opacity": 0.8}},
-        {"id": "park", "type": "fill", "source": "omt", "source-layer": "park", "paint": {"fill-color": p["parks"]}},
-        {"id": "water", "type": "fill", "source": "omt", "source-layer": "water", "paint": {"fill-color": p["water"]}},
-        {"id": "waterway", "type": "line", "source": "omt", "source-layer": "waterway", "paint": {"line-color": p["waterway"], "line-width": w((9, 1), (20, 6))}},
-        {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway", "paint": {"line-color": p["aeroway"], "line-width": w((11, 1), (20, 12))}},
-        {"id": "building-2d", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
-        {"id": "building-3d", "type": "fill-extrusion", "source": "omt", "source-layer": "building", "minzoom": 14, "layout": {"visibility": "none"}, "paint": {"fill-extrusion-color": p["buildings"], "fill-extrusion-height": ["coalesce", ["get", "render_height"], ["get", "height"], 12], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0], "fill-extrusion-opacity": 0.85}},
-        {"id": "bound_prov", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [2, 4], True, False], "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 2.2, "line-dasharray": [4, 2]}},
-        {"id": "bound_city", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [6, 7, 8], True, False], "minzoom": 7, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.8, "line-dasharray": [2, 2], "line-opacity": 0.9}},
-        {"id": "bound_brgy", "type": "line", "source": "omt", "source-layer": "boundary", "filter": ["match", ["get", "admin_level"], [9, 10], True, False], "minzoom": 11, "layout": {"visibility": "none"}, "paint": {"line-color": "#ff1e1e", "line-width": 1.2, "line-dasharray": [1, 2], "line-opacity": 0.8}},
-        road_layer(p, "case_express", ["motorway"], None, [(5, 1.5), (14, 5.5), (20, 24)], casing=True),
-        road_layer(p, "case_major", ["trunk", "primary"], None, [(6, 1.0), (14, 3.8), (20, 18)], casing=True),
-        road_layer(p, "case_secondary", ["secondary"], None, [(8, 0.8), (14, 2.8), (20, 15)], casing=True, opacity=sec),
-        road_layer(p, "case_tertiary", ["tertiary"], None, [(9, 0.6), (14, 2.0), (20, 12)], casing=True, opacity=ter),
-        road_layer(p, "rd_path", ["path", "pedestrian", "footway"], p["rd_path"], [(14, 0.6), (20, 5)], minzoom=14),
-        road_layer(p, "rd_min_lo", ["service", "track"], p["rd_min_lo"], [(14, 0.6), (20, 6)], minzoom=14),
-        road_layer(p, "rd_min_md", ["minor"], p["rd_min_md"], [(13, 0.8), (16, 3.5), (20, 10)], minzoom=13),
-        road_layer(p, "rd_tertiary", ["tertiary"], p["rd_tertiary"], [(9, 0.6), (14, 2.0), (20, 12)], opacity=ter),
-        road_layer(p, "rd_secondary", ["secondary"], p["rd_secondary"], [(8, 0.8), (14, 2.8), (20, 15)], opacity=sec),
-        road_layer(p, "rd_major", ["trunk", "primary"], p["rd_major"], [(6, 1.0), (14, 3.8), (20, 18)]),
-        road_layer(p, "rd_express", ["motorway"], p["rd_express"], [(5, 1.5), (14, 5.5), (20, 24)]),
-        {"id": "rd_rail", "type": "line", "source": "omt", "source-layer": "transportation", "filter": ["match", ["get", "class"], ["rail", "transit"], True, False], "minzoom": 10, "paint": {"line-color": p["rail"], "line-width": w((10, 1.2), (15, 2.5), (20, 4)), "line-dasharray": [3, 2]}},
-        {"id": "label_city", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["city", "town"], True, False], "minzoom": 6, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((6, 12), (14, 18)), "text-transform": "uppercase", "text-letter-spacing": 0.1}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 2}},
-        {"id": "label_brgy", "type": "symbol", "source": "omt", "source-layer": "place", "filter": ["match", ["get", "class"], ["suburb", "neighbourhood", "village", "quarter", "hamlet"], True, False], "minzoom": 11, "layout": {"text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((11, 10), (16, 14)), "text-letter-spacing": 0.05}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
-        {"id": "label_street", "type": "symbol", "source": "omt", "source-layer": "transportation_name", "minzoom": 13, "layout": {"symbol-placement": "line", "text-field": ["coalesce", ["get", "name_en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": w((13, 9), (18, 13))}, "paint": {"text-color": p["text"], "text-halo-color": p["overlay"], "text-halo-width": 1.5}},
-    ]
-    return {"version": 8, "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf", "sources": {"omt": {"type": "vector", "url": "https://tiles.openfreemap.org/planet"}}, "layers": layers}
 
 def raster_style(tile_urls, bg, maxzoom=20):
-    return {"version": 8, "sources": {"r": {"type": "raster", "tiles": tile_urls, "tileSize": 256, "maxzoom": maxzoom}}, "layers": [{"id": "bg", "type": "background", "paint": {"background-color": bg}}, {"id": "r", "type": "raster", "source": "r"}]}
+    return {
+        "version": 8,
+        "sources": {"r": {"type": "raster", "tiles": tile_urls, "tileSize": 256, "maxzoom": maxzoom}},
+        "layers": [
+            {"id": "bg", "type": "background", "paint": {"background-color": bg}},
+            {"id": "r", "type": "raster", "source": "r"},
+        ],
+    }
 
 ALL_STYLES = {
     "Midnight Blue": vector_style(THEMES["Midnight Blue"]),
@@ -453,7 +399,7 @@ ALL_STYLES = {
 # ------------------------------------------------------------------------
 # 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
 # ------------------------------------------------------------------------
-HTML_TEMPLATE = r"""<!DOCTYPE html>
+HTML_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -464,25 +410,52 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
     <style>
-        @font-face { font-family: 'Century Gothic Custom'; src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic'), sans-serif; }
+        @font-face {
+            font-family: 'Century Gothic Custom';
+            src: local('Century Gothic'), local('CenturyGothic'), local('AppleGothic'), sans-serif;
+        }
         * { box-sizing: border-box; user-select: none; font-family: 'Century Gothic Custom', -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
         html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0a1628; }
         #map { position: absolute; inset: 0; width: 100vw; height: 100vh; z-index: 1; }
-        ::-webkit-scrollbar { width: 5px; height: 5px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; } ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
-        select, select option { background-color: #0f172a !important; color: #f8fafc !important; } select option:hover, select option:checked { background-color: #2563eb !important; color: #ffffff !important; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+        select, select option { background-color: #0f172a !important; color: #f8fafc !important; }
+        select option:hover, select option:checked { background-color: #2563eb !important; color: #ffffff !important; }
         
-        #top-toolbar-bar { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 1000; background-color: rgba(9, 16, 24, 0.97); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 36px; padding: 4px 10px; display: flex; align-items: center; gap: 4px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6); color: #f0f6fc; }
-        .tb-btn { width: 32px; height: 32px; display: grid; place-items: center; background: transparent; border: none; color: #adbac7; border-radius: 50%; cursor: pointer; transition: all 0.15s ease; }
-        .tb-btn:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; } .tb-btn.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; } .tb-btn.primary-active { background: #316dca; color: #ffffff; }
+        #top-toolbar-bar {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 1000;
+            background-color: rgba(9, 16, 24, 0.97);
+            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 36px; padding: 4px 10px;
+            display: flex; align-items: center; gap: 4px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+            color: #f0f6fc;
+        }
+        .tb-btn {
+            width: 32px; height: 32px; display: grid; place-items: center;
+            background: transparent; border: none; color: #adbac7; border-radius: 50%;
+            cursor: pointer; transition: all 0.15s ease;
+        }
+        .tb-btn:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; }
+        .tb-btn.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
+        .tb-btn.primary-active { background: #316dca; color: #ffffff; }
         .tb-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.12); margin: 0 4px; }
         
         #project-meta-cluster { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
         #project-name-display { font-weight: 700; color: #38bdf8; font-size: 12px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
         
         .save-badge { font-size: 9px; padding: 2px 7px; border-radius: 12px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: #8b949e; border: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; gap: 4px; }
-        .save-badge.saving { color: #d9b451; border-color: rgba(217, 180, 81, 0.4); } .save-badge.saved { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); } .save-badge.unsaved { color: #f85149; border-color: rgba(248, 81, 73, 0.4); }
+        .save-badge.saving { color: #d9b451; border-color: rgba(217, 180, 81, 0.4); }
+        .save-badge.saved { color: #3fb950; border-color: rgba(63, 185, 80, 0.4); }
+        .save-badge.unsaved { color: #f85149; border-color: rgba(248, 81, 73, 0.4); }
         
-        .left-panel { position: fixed; top: 68px; left: 16px; bottom: 16px; width: 360px; z-index: 999; background-color: rgba(9, 16, 24, 0.97); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7); display: none; flex-direction: column; overflow: hidden; color: #adbac7; }
+        .left-panel {
+            position: fixed; top: 68px; left: 16px; bottom: 16px; width: 360px; z-index: 999;
+            background-color: rgba(9, 16, 24, 0.97);
+            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7); display: none; flex-direction: column;
+            overflow: hidden; color: #adbac7;
+        }
         .left-panel.open { display: flex; }
         .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
         .panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: #f0f6fc; }
@@ -490,104 +463,218 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .icon-action-btn:hover { background: rgba(255, 255, 255, 0.15); color: #f0f6fc; }
         .panel-content { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
         
-        .acc-item { border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; transition: 0.2s; } .acc-item:hover { background: rgba(255,255,255,0.02); }
+        .acc-item { border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; transition: 0.2s; }
+        .acc-item:hover { background: rgba(255,255,255,0.02); }
         .acc-header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #f0f6fc; cursor: pointer; padding: 6px 4px; border-radius: 4px;}
-        .acc-body { padding: 6px 4px 2px 4px; display: flex; flex-direction: column; gap: 8px; } .acc-body.hidden { display: none !important; }
+        .acc-body { padding: 6px 4px 2px 4px; display: flex; flex-direction: column; gap: 8px; }
+        .acc-body.hidden { display: none !important; }
         
-        .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; } .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
+        .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; }
+        .layer-row input[type=checkbox] { accent-color: #316dca; cursor: pointer; }
         
         .dimension-mode-bar { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.35); padding: 3px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 4px; }
-        .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 6px; cursor: pointer; } .dimension-mode-btn.active { background: #316dca; color: #ffffff; }
+        .dimension-mode-btn { flex: 1; border: none; background: transparent; color: #adbac7; font-size: 11px; font-weight: 700; padding: 5px 0; border-radius: 6px; cursor: pointer; }
+        .dimension-mode-btn.active { background: #316dca; color: #ffffff; }
         
         .bound-select-row { display: flex; gap: 6px; margin-top: 4px; position: relative; }
         .bound-select-row input[type=text] { flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.12); color: #f0f6fc; padding: 6px 8px; border-radius: 8px; font-size: 11px; }
         
-        .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 1001; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; max-height: 200px; overflow-y: auto; display: none; margin-top: 4px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); }
-        .autocomplete-item { padding: 8px 10px; cursor: pointer; font-size: 11px; color: #adbac7; border-bottom: 1px solid rgba(255,255,255,0.05); } .autocomplete-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .autocomplete-list {
+            position: absolute; top: 100%; left: 0; right: 0; z-index: 1001;
+            background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+            max-height: 200px; overflow-y: auto; display: none; margin-top: 4px; box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+        }
+        .autocomplete-item { padding: 8px 10px; cursor: pointer; font-size: 11px; color: #adbac7; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .autocomplete-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
         
         .layers-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #f0f6fc; margin-top: 6px; }
         .badge-count { background: #316dca; color: #ffffff; border-radius: 12px; font-size: 11px; padding: 1px 8px; font-weight: 600; }
         
-        .group-container { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; transition: 0.15s; } .group-container.drop-hover { border-color: #38bdf8; background: rgba(56, 189, 248, 0.12); }
+        .group-container { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; margin-top: 6px; overflow: hidden; transition: 0.15s; }
+        .group-container.drop-hover { border-color: #38bdf8; background: rgba(56, 189, 248, 0.12); }
         .group-header { background: rgba(255, 255, 255, 0.05); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-        .group-title-input { background: transparent; border: none; font-weight: 700; color: #f0f6fc; font-size: 12px; width: 120px; } .group-title-input:focus { background: rgba(0, 0, 0, 0.5); outline: none; border-radius: 4px; padding: 2px 4px; }
-        .group-items { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; } .group-items.hidden { display: none !important; }
+        .group-title-input { background: transparent; border: none; font-weight: 700; color: #f0f6fc; font-size: 12px; width: 120px; }
+        .group-title-input:focus { background: rgba(0, 0, 0, 0.5); outline: none; border-radius: 4px; padding: 2px 4px; }
+        .group-items { padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; }
+        .group-items.hidden { display: none !important; }
         
-        .group-styling-panel { padding: 10px; background: rgba(0,0,0,0.4); border-top: 1px solid rgba(255,255,255,0.08); display: none; flex-direction: column; gap: 6px; } .group-styling-panel.open { display: flex; }
+        .group-styling-panel {
+            padding: 10px; background: rgba(0,0,0,0.4); border-top: 1px solid rgba(255,255,255,0.08);
+            display: none; flex-direction: column; gap: 6px;
+        }
+        .group-styling-panel.open { display: flex; }
         .group-styling-panel .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         
         .layer-card { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; cursor: grab; }
-        .layer-card.selected { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); } .layer-card:active { cursor: grabbing; }
+        .layer-card.selected { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
+        .layer-card:active { cursor: grabbing; }
         .layer-card-top { display: flex; align-items: center; gap: 4px; overflow: hidden; }
         .layer-name-input { flex: 1; min-width: 50px; border: 1px solid transparent; background: transparent; font-weight: 600; font-size: 12px; color: #f0f6fc; padding: 2px 4px; border-radius: 4px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
         .layer-name-input:focus { border-color: #316dca; background: rgba(0,0,0,0.4); outline: none; }
-        .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: 0.15s; flex-shrink: 0; } .card-btn:hover { color: #f0f6fc; background: rgba(255,255,255,0.1); } .card-btn svg { width: 14px; height: 14px; }
+        .card-btn { background: transparent; border: none; color: #768390; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: 0.15s; flex-shrink: 0; }
+        .card-btn:hover { color: #f0f6fc; background: rgba(255,255,255,0.1); }
+        .card-btn svg { width: 14px; height: 14px; }
         
-        #ungrouped-zone { border: 1px dashed transparent; border-radius: 8px; padding: 2px; transition: 0.15s; } #ungrouped-zone.drop-hover { border-color: #38bdf8; background: rgba(56, 189, 248, 0.08); }
+        #ungrouped-zone { border: 1px dashed transparent; border-radius: 8px; padding: 2px; transition: 0.15s; }
+        #ungrouped-zone.drop-hover { border-color: #38bdf8; background: rgba(56, 189, 248, 0.08); }
         
         .trade-controls { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.35); padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); }
         .trade-controls select { background: #0f172a; color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px; font-size: 11px; }
-        .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; transition:0.2s;} .trade-btn:hover { background: #2563eb; }
+        .trade-btn { background: #316dca; color: #ffffff; border: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; font-size: 11px; transition:0.2s;}
+        .trade-btn:hover { background: #2563eb; }
         
         .poi-summary { font-size: 11px; color: #adbac7; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
         .poi-badge { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 5px 8px; border-radius: 6px; }
         
-        .float-card { position: fixed; top: 68px; z-index: 998; background-color: rgba(9, 16, 24, 0.97); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 14px; box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75); display: none; flex-direction: column; gap: 10px; font-size: 12px; color: #adbac7; max-height: 80vh; overflow-y: auto; }
-        .float-card.open { display: flex; } .right-card { right: 16px; left: auto; transform: none; width: 320px; }
+        .float-card {
+            position: fixed; top: 68px; z-index: 998;
+            background-color: rgba(9, 16, 24, 0.97);
+            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 14px;
+            box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75); display: none; flex-direction: column;
+            gap: 10px; font-size: 12px; color: #adbac7;
+            max-height: 80vh; overflow-y: auto;
+        }
+        .float-card.open { display: flex; }
+        .right-card { right: 16px; left: auto; transform: none; width: 320px; }
         .float-card .f-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         .float-card input[type=range] { accent-color: #316dca; width: 110px; cursor: pointer; }
-        .float-card input[type=color] { -webkit-appearance: none; border: 1px solid rgba(255, 255, 255, 0.15); width: 22px; height: 22px; border-radius: 4px; cursor: pointer; background: transparent; padding: 0; }
-        .float-card input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; } .float-card input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
+        .float-card input[type=color] {
+            -webkit-appearance: none;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            width: 22px; height: 22px; border-radius: 4px; cursor: pointer; background: transparent; padding: 0;
+        }
+        .float-card input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
+        .float-card input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
         .float-card input[type=text], .float-card select { background: rgba(0,0,0,0.4); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; font-size: 12px; transition:0.2s; outline:none; }
         .float-card input[type=text]:focus { border-color: #38bdf8; }
         
         #popup-search { width: 280px; left: 50%; transform: translateX(-50%); top:68px; right:auto; }
-        #popup-marker-settings { width: 250px; } #popup-text-settings { width: 260px; } #popup-shape-editor { width: 320px; } #popup-custom-map { width: 310px; } #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
+        #popup-marker-settings { width: 250px; }
+        #popup-text-settings { width: 260px; }
+        #popup-shape-editor { width: 320px; }
+        #popup-custom-map { width: 310px; }
+        #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
         #popup-feature-info { width: 320px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
         #popup-attribute-table { width: 600px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
         
         .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-        .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;} .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
+        .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
+        .icon-grid button.active { border-color: #316dca; background: #316dca; color: #ffffff; }
         
-        .maplibregl-popup-content { background: rgba(9, 16, 24, 0.97) !important; color: #f0f6fc !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important; padding: 10px !important; box-shadow: 0 12px 32px rgba(0,0,0,0.7) !important; font-size: 11px !important; max-width: 280px !important; }
+        .maplibregl-popup-content {
+            background: rgba(9, 16, 24, 0.97) !important; color: #f0f6fc !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 12px !important;
+            padding: 10px !important; box-shadow: 0 12px 32px rgba(0,0,0,0.7) !important;
+            font-size: 11px !important; max-width: 280px !important;
+        }
         .maplibregl-popup-tip { border-top-color: rgba(9, 16, 24, 0.97) !important; }
         
         .tag-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-        .tag-table th, .tag-table td { text-align: left; padding: 4px 6px; border: 1px solid rgba(255,255,255,0.08); font-size: 10px; } .tag-table th { background: rgba(255,255,255,0.06); color: #38bdf8; } .tag-table td { word-break: break-all; }
+        .tag-table th, .tag-table td { text-align: left; padding: 4px 6px; border: 1px solid rgba(255,255,255,0.08); font-size: 10px; }
+        .tag-table th { background: rgba(255,255,255,0.06); color: #38bdf8; }
+        .tag-table td { word-break: break-all; }
         
-        #hint-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1001; background-color: rgba(9, 16, 24, 0.97); color: #f0f6fc; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 7px 18px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none; font-weight:600; }
+        #hint-toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1001;
+            background-color: rgba(9, 16, 24, 0.97); color: #f0f6fc;
+            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 7px 18px;
+            font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none; font-weight:600;
+        }
         
         /* Right-click context menu */
-        #map-context-menu { position: absolute; z-index: 3000; display: none; min-width: 200px; background: rgba(9, 16, 24, 0.98); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 4px; box-shadow: 0 12px 32px rgba(0,0,0,0.7); }
-        .ctx-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 12px; color: #f0f6fc; cursor: pointer; border-radius: 6px; } .ctx-item:hover { background: rgba(255, 255, 255, 0.1); }
+        #map-context-menu {
+            position: absolute; z-index: 3000; display: none; min-width: 200px;
+            background: rgba(9, 16, 24, 0.98); border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px; padding: 4px; box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+        }
+        .ctx-item {
+            display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+            font-size: 12px; color: #f0f6fc; cursor: pointer; border-radius: 6px;
+        }
+        .ctx-item:hover { background: rgba(255, 255, 255, 0.1); }
         .ctx-item svg { width: 14px; height: 14px; color: #adbac7; flex-shrink: 0; }
         .ctx-coords { padding: 6px 10px 8px 10px; font-size: 10px; color: #768390; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px; }
         
-        #launcher-modal-scrim { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background-color: rgba(9, 16, 24, 0.97); opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+        #launcher-modal-scrim {
+            position: fixed; inset: 0; z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            background-color: rgba(9, 16, 24, 0.97);
+            opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+        }
         #launcher-modal-scrim.visible { opacity: 1; pointer-events: auto; }
         
-        .ios26-card { width: 90%; max-width: 440px; max-height: 82vh; background-color: rgba(9, 16, 24, 0.97); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 24px; box-shadow: 0 32px 80px -12px rgba(0, 0, 0, 0.85); display: flex; flex-direction: column; overflow: hidden; color: #ffffff; }
+        .ios26-card {
+            width: 90%; max-width: 440px; max-height: 82vh;
+            background-color: rgba(9, 16, 24, 0.97);
+            border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 24px;
+            box-shadow: 0 32px 80px -12px rgba(0, 0, 0, 0.85);
+            display: flex; flex-direction: column; overflow: hidden; color: #ffffff;
+        }
         .ios26-header { padding: 22px 24px 14px 24px; display: flex; flex-direction: column; gap: 4px; }
-        .ios26-title { font-size: 20px; font-weight: 800; letter-spacing: -0.4px; color: #ffffff; } .ios26-subtitle { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
-        .ios26-seg { margin: 0 24px 14px 24px; display: flex; background: rgba(0, 0, 0, 0.4); padding: 3px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.08); }
-        .ios26-seg-btn { flex: 1; border: none; background: transparent; color: rgba(255, 255, 255, 0.65); font-size: 12px; font-weight: 600; padding: 7px 0; border-radius: 11px; cursor: pointer; transition: all 0.15s ease; } .ios26-seg-btn.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
+        .ios26-title { font-size: 20px; font-weight: 800; letter-spacing: -0.4px; color: #ffffff; }
+        .ios26-subtitle { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+        .ios26-seg {
+            margin: 0 24px 14px 24px; display: flex; background: rgba(0, 0, 0, 0.4);
+            padding: 3px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .ios26-seg-btn {
+            flex: 1; border: none; background: transparent; color: rgba(255, 255, 255, 0.65);
+            font-size: 12px; font-weight: 600; padding: 7px 0; border-radius: 11px; cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .ios26-seg-btn.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; }
         .ios26-body { padding: 0 24px 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .ios26-input-group { display: flex; flex-direction: column; gap: 6px; }
         .ios26-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255, 255, 255, 0.5); }
-        .ios26-input { background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 10px 14px; color: #ffffff; font-size: 13px; outline: none; } .ios26-input:focus { border-color: #38bdf8; }
-        .ios26-proj-item { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; transition: all 0.15s ease; } .ios26-proj-item:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(56, 189, 248, 0.3); }
-        .ios26-action-btn { background: #316dca; color: #ffffff; border: none; border-radius: 14px; padding: 11px; font-weight: 700; font-size: 13px; cursor: pointer; box-shadow: 0 8px 24px rgba(49, 109, 202, 0.4); } .ios26-action-btn:hover { background: #255bb0; }
+        .ios26-input {
+            background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px; padding: 10px 14px; color: #ffffff; font-size: 13px; outline: none;
+        }
+        .ios26-input:focus { border-color: #38bdf8; }
+        .ios26-proj-item {
+            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px; padding: 10px 14px; display: flex; justify-content: space-between;
+            align-items: center; transition: all 0.15s ease;
+        }
+        .ios26-proj-item:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(56, 189, 248, 0.3); }
+        .ios26-action-btn {
+            background: #316dca; color: #ffffff; border: none; border-radius: 14px;
+            padding: 11px; font-weight: 700; font-size: 13px; cursor: pointer;
+            box-shadow: 0 8px 24px rgba(49, 109, 202, 0.4);
+        }
+        .ios26-action-btn:hover { background: #255bb0; }
         
-        .file-input-label { display: inline-block; background: #316dca; color: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition:0.2s; } .file-input-label:hover { background: #255bb0; }
+        .file-input-label {
+            display: inline-block; background: #316dca; color: #fff; padding: 6px 12px;
+            border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition:0.2s;
+        }
+        .file-input-label:hover { background: #255bb0; }
         
-        .search-wrapper { display: flex; align-items: center; gap: 6px; background: #fff; border-radius: 24px; padding: 4px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
-        .search-wrapper input { flex: 1; border: none; outline: none; font-size: 14px; color: #202124; background: transparent; padding: 6px 0; }
+        .search-wrapper {
+            display: flex; align-items: center; gap: 6px;
+            background: #fff; border-radius: 24px; padding: 4px 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+        .search-wrapper input {
+            flex: 1; border: none; outline: none; font-size: 14px; color: #202124;
+            background: transparent; padding: 6px 0;
+        }
         .search-wrapper svg { stroke: #5f6368; width: 20px; height: 20px; }
-        .search-results { background: #fff; border-radius: 8px; margin-top: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); overflow: hidden; }
-        .search-result-item { padding: 10px 14px; cursor: pointer; font-size: 13px; color: #202124; display: flex; align-items: center; gap: 10px; } .search-result-item:hover { background: #f1f3f4; }
+        .search-results {
+            background: #fff; border-radius: 8px; margin-top: 4px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3); overflow: hidden;
+        }
+        .search-result-item {
+            padding: 10px 14px; cursor: pointer; font-size: 13px; color: #202124;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .search-result-item:hover { background: #f1f3f4; }
         .search-result-icon { width: 20px; height: 20px; flex-shrink: 0; color: #5f6368; }
         
-        #trade-area-modal .float-card { position: relative; top: auto; left: auto; transform: none; right: auto; max-height: 85vh; width: 500px; max-width: 90vw; padding: 16px; }
+        #trade-area-modal .float-card {
+            position: relative; top: auto; left: auto; transform: none; right: auto;
+            max-height: 85vh; width: 500px; max-width: 90vw; padding: 16px;
+        }
         .trade-area-poi-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
         .trade-area-poi-row label { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; }
         .custom-query-collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; color: #f0f6fc; font-size: 12px; margin-top: 8px;}
@@ -597,21 +684,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .attr-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
         .attr-table th { position: sticky; top: 0; background: #0f172a; color: #f0f6fc; padding: 8px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 10; font-size: 11px; }
         .attr-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
-        .attr-table input[type="text"] { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #f0f6fc; padding: 4px 6px; border-radius: 4px; } .attr-table input[type="text"]:focus { border-color: #38bdf8; outline: none; }
+        .attr-table input[type="text"] { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #f0f6fc; padding: 4px 6px; border-radius: 4px; }
+        .attr-table input[type="text"]:focus { border-color: #38bdf8; outline: none; }
         .attr-img-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: block; }
         .attr-img-placeholder { width: 80px; height: 80px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 10px; color: #adbac7; cursor: pointer; text-align: center; }
-        
-        /* Color picker full control styles (Primary, Secondary, Tertiary) */
-        .color-ctrl-cluster { display: flex; flex-direction: column; gap: 6px; width: 100%; }
-        .palette-group { display: flex; flex-direction: column; gap: 2px; }
-        .palette-label { font-size: 9px; font-weight: 700; color: #768390; text-transform: uppercase; letter-spacing: 0.5px; }
-        .swatch-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-        .swatch { width: 16px; height: 16px; border-radius: 3px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: transform 0.1s; } .swatch:hover { transform: scale(1.15); }
-        .color-input-combo { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
-        .color-input-combo input[type=color] { -webkit-appearance: none; border: 1px solid rgba(255, 255, 255, 0.15); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; background: transparent; padding: 0; }
-        .color-input-combo input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; } .color-input-combo input[type=color]::-webkit-color-swatch { border: none; border-radius: 2px; }
-        .color-input-combo input[type=text] { width: 75px; font-family: monospace; font-size: 11px; padding: 3px 5px; }
-        .btn-eyedropper { width: 24px; height: 24px; display: grid; place-items: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #adbac7; cursor: pointer; padding: 0; } .btn-eyedropper:hover { color: #fff; background: rgba(255,255,255,0.2); }
     </style>
 </head>
 <body>
@@ -628,12 +704,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 <span id="save-text">Saved</span>
             </div>
         </div>
-        <button class="tb-btn" id="btn-undo" title="Undo (Ctrl+Z)" style="color:#adbac7;">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
-        </button>
-        <button class="tb-btn" id="btn-redo" title="Redo (Ctrl+Y)" style="color:#adbac7;">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path></svg>
-        </button>
         <button class="tb-btn" id="btn-save-project" title="Save Workspace (Ctrl+S)" style="color:#3fb950;">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
         </button>
@@ -647,7 +717,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <button class="tb-btn" id="btn-search" title="Search Place">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
         </button>
-        <button class="tb-btn" id="btn-import-toolbar" title="Import Spatial Data (KML, KMZ, GeoJSON, SHP, CSV)">
+        <button class="tb-btn" id="btn-import-toolbar" title="Import Spatial Data (KML, KMZ, GeoJSON, SHP)">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
         </button>
         <div class="tb-sep"></div>
@@ -673,6 +743,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
         </button>
         <div class="tb-sep"></div>
+        <button class="tb-btn" id="btn-edit-mode" title="Toggle Edit Mode">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+        </button>
         <button class="tb-btn" id="btn-custom-map" title="Basemap Styling">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
         </button>
@@ -696,9 +769,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             <div style="margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
                 <button id="btn-import" class="trade-btn" style="width:100%; display:flex; justify-content:center; align-items:center; gap:6px;">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                    Import Spatial Data (KML, GeoJSON, SHP, CSV)
+                    Import Spatial Data (KML, GeoJSON, SHP)
                 </button>
-                <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip,.csv" style="display:none;">
+                <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip" style="display:none;">
             </div>
             <div class="dimension-mode-bar">
                 <button class="dimension-mode-btn active" id="btn2DMode">2D MAP</button>
@@ -785,12 +858,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             <div class="layers-heading">
                 <span>Layer Groups</span>
                 <div style="display:flex; align-items:center; gap:4px;">
-                    <button class="icon-action-btn" id="btnSelectAllGlobal" title="Select / Deselect All Layers">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-                    </button>
-                    <button class="icon-action-btn" id="btnDeleteSelectedGlobal" title="Delete Selected Layers" style="color:#f85149;">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
                     <button id="btnAddCustomGroup" class="trade-btn" style="padding:2px 6px; font-size:10px;">+ GROUP</button>
                     <button id="btnHideSelected" class="trade-btn" style="padding:2px 6px; font-size:10px; background:#22272e; border:1px solid #2d333b; color:#adbac7;">Hide/Unhide</button>
                     <span class="badge-count" id="layer-badge-count">0</span>
@@ -818,10 +885,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             <label class="file-input-label" for="customMarkerFileInput">Upload (max 5MB)</label>
             <input type="file" id="customMarkerFileInput" accept="image/*" style="display:none;">
         </div>
-        <div class="f-row" style="flex-direction:column; align-items:stretch;">
-            <span style="font-size:11px; margin-bottom:2px;">Icon Color</span>
-            <div id="mColorCtrl" class="color-ctrl-cluster"></div>
-        </div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="mColor" value="#1e40af"> </div>
         <div class="f-row"> <span>Icon Size</span> <input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"> </div>
     </div>
 
@@ -837,10 +901,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             </select>
         </div>
         <div class="f-row"> <span>Font Size</span> <input type="range" id="tSize" min="10" max="42" step="1" value="16"> </div>
-        <div class="f-row" style="flex-direction:column; align-items:stretch;">
-            <span style="font-size:11px; margin-bottom:2px;">Color</span>
-            <div id="tColorCtrl" class="color-ctrl-cluster"></div>
-        </div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="tColor" value="#d9b451"> </div>
         <div class="f-row"> <span>Opacity</span> <input type="range" id="tOp" min="0.1" max="1" step="0.05" value="1"> </div>
     </div>
 
@@ -877,16 +938,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             <button class="card-btn" id="closeEditorBtn">✕</button>
         </div>
         <div class="f-row"> <span>Name</span> <input type="text" id="eName" style="width:140px;"> </div>
-        <div id="eBorderColorRowContainer" class="f-row" style="flex-direction:column; align-items:stretch;">
-            <span style="font-size:11px; margin-bottom:2px;">Border Color</span>
-            <div id="eBorderColorCtrl" class="color-ctrl-cluster"></div>
-        </div>
+        <div class="f-row"> <span>Border Color</span> <input type="color" id="eBorderColor" value="#38bdf8"> </div>
         <div class="f-row" id="eBorderOpRow"> <span>Border Opacity</span> <input type="range" id="eBorderOp" min="0" max="1" step="0.05"> </div>
         <div class="f-row" id="eWidthRow"> <span>Border Width</span> <input type="range" id="eWidth" min="1" max="16" step="1"> </div>
-        <div id="eFillColorRowContainer" class="f-row" style="flex-direction:column; align-items:stretch;">
-            <span style="font-size:11px; margin-bottom:2px;">Fill Color</span>
-            <div id="eFillColorCtrl" class="color-ctrl-cluster"></div>
-        </div>
+        <div class="f-row" id="eFillColorRow"> <span>Fill Color</span> <input type="color" id="eFillColor" value="#e8b84a"> </div>
         <div class="f-row" id="eFillOpRow"> <span>Fill Opacity</span> <input type="range" id="eFillOp" min="0" max="1" step="0.05"> </div>
         <div class="f-row" id="eLabelToggleRow" style="display:none;"> <span>Show Label</span> <input type="checkbox" id="eShowLabel"> </div>
         <div class="f-row" id="eLabelPosRow" style="display:none;"> <span>Label Position</span>
@@ -931,30 +986,30 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:4px;">BASEMAP PRESETS</div>
         <div style="display:flex; flex-wrap:wrap; gap:4px;" id="presetBtnList"></div>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BACKGROUND</div>
-        <div id="cBgColorCtrl" class="color-ctrl-cluster"></div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="cBgColor" value="#0a1628"> </div>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">EXPRESS WAYS</div>
-        <div id="cExpColorCtrl" class="color-ctrl-cluster"></div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="cExpColor" value="#ffaa00"> </div>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">MAIN ROADS</div>
-        <div id="cMainColorCtrl" class="color-ctrl-cluster"></div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="cMainColor" value="#e8b84a"> </div>
         <div class="f-row"> <span>Thickness</span> <input type="range" id="cMainWidth" min="1" max="10" step="0.5" value="3.8"> </div>
         <div class="f-row"> <span>Opacity</span> <input type="range" id="cMainOp" min="0" max="1" step="0.1" value="1"> </div>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">SECONDARY ROADS</div>
-        <div id="cSecColorCtrl" class="color-ctrl-cluster"></div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="cSecColor" value="#c99c37"> </div>
         <div class="f-row"> <span>Thickness</span> <input type="range" id="cSecWidth" min="0.5" max="8" step="0.5" value="2.8"> </div>
         <div class="f-row"> <span>Opacity</span> <input type="range" id="cSecOp" min="0" max="1" step="0.1" value="0.8"> </div>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">TERTIARY ROADS</div>
-        <div id="cTerColorCtrl" class="color-ctrl-cluster"></div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="cTerColor" value="#7d5f14"> </div>
         <div class="f-row"> <span>Thickness</span> <input type="range" id="cTerWidth" min="0.5" max="6" step="0.5" value="2.0"> </div>
         <div class="f-row"> <span>Opacity</span> <input type="range" id="cTerOp" min="0" max="1" step="0.1" value="0.65"> </div>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">RAILWAYS</div>
-        <div id="cRailColorCtrl" class="color-ctrl-cluster"></div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="cRailColor" value="#d9b451"> </div>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BOUNDARIES (RED DASHED)</div>
-        <div id="cBoundColorCtrl" class="color-ctrl-cluster"></div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="cBoundColor" value="#ff1e1e"> </div>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">BUILDINGS</div>
-        <div id="cBldColorCtrl" class="color-ctrl-cluster"></div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="cBldColor" value="#8e7258"> </div>
         <div class="f-row"> <span>Opacity</span> <input type="range" id="cBldOp" min="0" max="1" step="0.05" value="0.25"> </div>
         <div style="font-weight:600; font-size:11px; color:#768390; margin-top:6px;">WATER</div>
-        <div id="cWaterColorCtrl" class="color-ctrl-cluster"></div>
+        <div class="f-row"> <span>Color</span> <input type="color" id="cWaterColor" value="#0a1424"> </div>
         <div class="f-row"> <span>Opacity</span> <input type="range" id="cWaterOp" min="0" max="1" step="0.1" value="1"> </div>
     </div>
 
@@ -1061,23 +1116,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             Delete
         </div>
-        <div style="border-top:1px solid rgba(255,255,255,0.1); margin:4px 0;"></div>
-        <div class="ctx-item" id="ctx-bring-front">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
-            Bring to Front
-        </div>
-        <div class="ctx-item" id="ctx-bring-forward">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12h14"></path></svg>
-            Bring Forward
-        </div>
-        <div class="ctx-item" id="ctx-send-backward">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
-            Send Backward
-        </div>
-        <div class="ctx-item" id="ctx-send-back">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12h14"></path></svg>
-            Send to Back
-        </div>
     </div>
 
     <div id="launcher-modal-scrim" class="visible">
@@ -1109,7 +1147,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     try {
         const ALL_STYLES = __ALL_STYLES__;
         const POI_CONFIG = __POI_CONFIG__;
-        const COLOR_PALETTES = __COLOR_PALETTES__;
         const SUPABASE_URL = "__SUPABASE_URL__";
         const SUPABASE_KEY = "__SUPABASE_KEY__";
         let ALL_PROJECTS = __ALL_PROJECTS_JSON__;
@@ -1154,10 +1191,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         let selectedLayerIds = new Set();
         let isDirty = false;
 
-        // Undo/Redo State Stacks
-        let undoStack = [];
-        let redoStack = [];
-
         // Vertex dragging state
         let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null, isRadiusHandle = false;
         let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
@@ -1175,74 +1208,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         // Route State
         let currentRouteMode = 'driving';
         let currentRouteColor = '#38bdf8';
-
-        // ----------------- Color Picker Helper -----------------
-        function setupColorPicker(containerId, initialColor, onColorChange) {
-            const el = document.getElementById(containerId);
-            if (!el) return;
-
-            let paletteRows = '';
-            COLOR_PALETTES.forEach(p => {
-                paletteRows += `
-                    <div class="palette-group">
-                        <span class="palette-label">${p.name}</span>
-                        <div class="swatch-row">
-                            ${p.colors.map(hex => `<div class="swatch" data-color="${hex}" style="background:${hex};" title="${hex}"></div>`).join('')}
-                        </div>
-                    </div>
-                `;
-            });
-
-            el.innerHTML = `
-                ${paletteRows}
-                <div class="color-input-combo">
-                    <input type="color" class="native-color" value="${initialColor}">
-                    <input type="text" class="hex-text" value="${initialColor}" placeholder="#hex">
-                    <button class="btn-eyedropper" title="Pick color from screen">
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11l-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l2.83 2.83a2.12 2.12 0 0 0 3 0L19 11z"></path><path d="M5 19l-3 3"></path></svg>
-                    </button>
-                </div>
-            `;
-            const nativeColor = el.querySelector('.native-color');
-            const hexText = el.querySelector('.hex-text');
-            const eyedropperBtn = el.querySelector('.btn-eyedropper');
-
-            const updateAll = (col) => {
-                nativeColor.value = col;
-                hexText.value = col;
-                onColorChange(col);
-            };
-
-            el.querySelectorAll('.swatch').forEach(sw => {
-                sw.onclick = () => updateAll(sw.dataset.color);
-            });
-
-            nativeColor.oninput = e => {
-                hexText.value = e.target.value;
-                onColorChange(e.target.value);
-            };
-
-            hexText.onchange = e => {
-                let val = e.target.value.trim();
-                if (!val.startsWith('#')) val = '#' + val;
-                if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-                    nativeColor.value = val;
-                    onColorChange(val);
-                }
-            };
-
-            eyedropperBtn.onclick = async () => {
-                if (window.EyeDropper) {
-                    try {
-                        const ed = new EyeDropper();
-                        const res = await ed.open();
-                        if (res && res.sRGBHex) updateAll(res.sRGBHex);
-                    } catch(e) {}
-                } else {
-                    hint('EyeDropper API is not supported in this browser.');
-                }
-            };
-        }
 
         const vis = {
             label_city: true, label_brgy: true, label_street: true,
@@ -1284,45 +1249,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             else text.textContent = 'Unsaved';
         };
 
-        function pushState() {
-            undoStack.push(JSON.stringify({
-                features: features,
-                customGroups: customGroups
-            }));
-            if (undoStack.length > 50) undoStack.shift();
-            redoStack = [];
-        }
-
-        const markDirty = (recordHistory = true) => {
-            if (recordHistory) pushState();
+        const markDirty = () => {
             isDirty = true;
             setSaveBadgeStatus('unsaved');
-        };
-
-        const undo = () => {
-            if (!undoStack.length) { hint('Nothing to undo'); return; }
-            redoStack.push(JSON.stringify({ features: features, customGroups: customGroups }));
-            const prev = JSON.parse(undoStack.pop());
-            features = prev.features;
-            customGroups = prev.customGroups;
-            fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
-            syncDraw();
-            renderMyLayers();
-            setSaveBadgeStatus('unsaved');
-            hint('Undo');
-        };
-
-        const redo = () => {
-            if (!redoStack.length) { hint('Nothing to redo'); return; }
-            undoStack.push(JSON.stringify({ features: features, customGroups: customGroups }));
-            const next = JSON.parse(redoStack.pop());
-            features = next.features;
-            customGroups = next.customGroups;
-            fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
-            syncDraw();
-            renderMyLayers();
-            setSaveBadgeStatus('unsaved');
-            hint('Redo');
         };
 
         const closeFloatingCards = () => {
@@ -1437,8 +1366,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 renderMyLayers();
             });
             closeHomeDialog();
-            undoStack = [];
-            redoStack = [];
         };
 
         window.renameProjectFromLauncher = async function(e, projectId, oldName) {
@@ -1581,22 +1508,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
         setInterval(() => { if (isDirty) saveProjectToSupabase(false); }, 20000);
         $('btn-save-project').onclick = () => saveProjectToSupabase(true);
-        $('btn-undo').onclick = undo;
-        $('btn-redo').onclick = redo;
 
         document.addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
                 saveProjectToSupabase(true);
-            }
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-                e.preventDefault();
-                if (e.shiftKey) redo();
-                else undo();
-            }
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
-                e.preventDefault();
-                redo();
             }
             if (e.key === 'Escape') {
                 $('map-context-menu').style.display = 'none';
@@ -1718,6 +1634,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             customMarkerImageKey = null;
             markDirty();
         });
+        $('mColor').oninput = e => { markerColor = e.target.value; markDirty(); };
         $('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); markDirty(); };
 
         // ----------------- Vector Layers Pipeline -----------------
@@ -2047,33 +1964,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             renderMyLayers();
             renderProjectsList();
             populateTradeAreaCheckboxes();
-
-            // Init Color Pickers
-            setupColorPicker('mColorCtrl', '#1e40af', col => { markerColor = col; markDirty(); });
-            setupColorPicker('tColorCtrl', '#d9b451', col => { $('tColorCtrl').dataset.val = col; markDirty(); });
-            setupColorPicker('eBorderColorCtrl', '#38bdf8', col => {
-                const f = features.find(x => x.id === selectedId);
-                if (f) {
-                    f.props.borderColor = col; f.props.color = col;
-                    if (f.kind === 'marker' && !customMarkerImageKey) f.props.iconKey = getIconKey(f.props.shape || 'pin', col);
-                    syncDraw(); markDirty();
-                }
-            });
-            setupColorPicker('eFillColorCtrl', '#e8b84a', col => {
-                const f = features.find(x => x.id === selectedId);
-                if (f) { f.props.fillColor = col; syncDraw(); markDirty(); }
-            });
-
-            // Basemap Color Pickers
-            setupColorPicker('cBgColorCtrl', '#0a1628', col => { setMapPaint('bg', 'background-color', col); markDirty(); });
-            setupColorPicker('cExpColorCtrl', '#ffaa00', col => { setMapPaint('rd_express', 'line-color', col); markDirty(); });
-            setupColorPicker('cMainColorCtrl', '#e8b84a', col => { setMapPaint('rd_major', 'line-color', col); markDirty(); });
-            setupColorPicker('cSecColorCtrl', '#c99c37', col => { setMapPaint('rd_secondary', 'line-color', col); markDirty(); });
-            setupColorPicker('cTerColorCtrl', '#7d5f14', col => { ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-color', col)); markDirty(); });
-            setupColorPicker('cRailColorCtrl', '#d9b451', col => { setMapPaint('rd_rail', 'line-color', col); markDirty(); });
-            setupColorPicker('cBoundColorCtrl', '#ff1e1e', col => { ['bound_prov','bound_city','bound_brgy'].forEach(id => setMapPaint(id, 'line-color', col)); markDirty(); });
-            setupColorPicker('cBldColorCtrl', '#8e7258', col => { setMapPaint('building-2d', 'fill-color', col); setMapPaint('building-2d', 'fill-outline-color', col); markDirty(); });
-            setupColorPicker('cWaterColorCtrl', '#0a1424', col => { setMapPaint('water', 'fill-color', col); setMapPaint('waterway', 'line-color', col); markDirty(); });
         });
 
         // ----------------- Dimension Switcher -----------------
@@ -2591,13 +2481,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 $('ctx-edit').style.display = 'flex';
                 $('ctx-datatable').style.display = 'flex';
                 $('ctx-delete').style.display = 'flex';
-                // Show ordering options only if a feature is selected
-                document.querySelectorAll('#map-context-menu .ctx-item[id^="ctx-bring"], #map-context-menu .ctx-item[id^="ctx-send"]').forEach(el => el.style.display = 'flex');
             } else {
                 $('ctx-edit').style.display = 'none';
                 $('ctx-datatable').style.display = 'none';
                 $('ctx-delete').style.display = 'none';
-                document.querySelectorAll('#map-context-menu .ctx-item[id^="ctx-bring"], #map-context-menu .ctx-item[id^="ctx-send"]').forEach(el => el.style.display = 'none');
             }
 
             const maxX = window.innerWidth - 220;
@@ -2632,7 +2519,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             if (ctxFeatureId) {
                 features = features.filter(x => x.id !== ctxFeatureId);
                 for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== ctxFeatureId);
-                selectedLayerIds.delete(ctxFeatureId);
                 if (selectedId === ctxFeatureId) selectedId = null;
                 syncDraw(); renderMyLayers(); markDirty();
             }
@@ -2667,51 +2553,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             }
             $('map-context-menu').style.display = 'none';
         };
-
-        // Layer Ordering Context Menu Items
-        $('ctx-bring-front').onclick = (e) => {
-            e.stopPropagation();
-            if (ctxFeatureId) reorderLayer(ctxFeatureId, 'front');
-            $('map-context-menu').style.display = 'none';
-        };
-        $('ctx-bring-forward').onclick = (e) => {
-            e.stopPropagation();
-            if (ctxFeatureId) reorderLayer(ctxFeatureId, 'forward');
-            $('map-context-menu').style.display = 'none';
-        };
-        $('ctx-send-backward').onclick = (e) => {
-            e.stopPropagation();
-            if (ctxFeatureId) reorderLayer(ctxFeatureId, 'backward');
-            $('map-context-menu').style.display = 'none';
-        };
-        $('ctx-send-back').onclick = (e) => {
-            e.stopPropagation();
-            if (ctxFeatureId) reorderLayer(ctxFeatureId, 'back');
-            $('map-context-menu').style.display = 'none';
-        };
-
-        function reorderLayer(featureId, action) {
-            const index = features.findIndex(f => f.id === featureId);
-            if (index === -1) return;
-            
-            const [item] = features.splice(index, 1);
-            
-            if (action === 'front') {
-                features.push(item);
-            } else if (action === 'back') {
-                features.unshift(item);
-            } else if (action === 'forward') {
-                const newIndex = Math.min(index + 1, features.length);
-                features.splice(newIndex, 0, item);
-            } else if (action === 'backward') {
-                const newIndex = Math.max(index - 1, 0);
-                features.splice(newIndex, 0, item);
-            }
-            
-            syncDraw();
-            renderMyLayers();
-            markDirty();
-        }
 
         // ----------------- Search Place -----------------
         const searchInput = $('searchInput');
@@ -2921,11 +2762,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 closeFloatingCards();
                 showFeaturePopup(feat, ll);
             } else if (activeTool === 'textbox') {
-                const tColor = $('tColorCtrl').dataset.val || '#d9b451';
                 const feat = addFeatureRecord('text', { type: 'Point', coordinates: ll }, {
                     text: $('tContent').value || 'Label',
                     fontSize: parseInt($('tSize').value, 10),
-                    color: tColor,
+                    color: $('tColor').value,
                     opacity: parseFloat($('tOp').value)
                 });
                 resetActiveTools();
@@ -3090,12 +2930,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             $('editShapeTitle').textContent = `Edit ${f.name}`;
             $('eName').value = f.name;
 
+            $('eBorderColor').value = f.props.borderColor || f.props.color || '#38bdf8';
             $('eBorderOp').value = f.props.borderOpacity != null ? f.props.borderOpacity : 0.9;
             $('eWidth').value = f.props.width || 3;
+            $('eFillColor').value = f.props.fillColor || '#e8b84a';
             $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
 
             const isPolygon = ['polygon', 'rectangle', 'circle'].includes(f.kind);
-            $('eFillColorRowContainer').style.display = isPolygon ? 'flex' : 'none';
+            $('eFillColorRow').style.display = isPolygon ? 'flex' : 'none';
             $('eFillOpRow').style.display = isPolygon ? 'flex' : 'none';
             $('eLabelToggleRow').style.display = 'flex';
             $('eLabelPosRow').style.display = 'flex';
@@ -3159,8 +3001,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 syncDraw(); renderMyLayers(); markDirty();
             }
         };
+        $('eBorderColor').oninput = e => {
+            const f = features.find(x => x.id === selectedId);
+            if (f) {
+                f.props.borderColor = e.target.value; f.props.color = e.target.value;
+                if (f.kind === 'marker' && !customMarkerImageKey) f.props.iconKey = getIconKey(f.props.shape || 'pin', e.target.value);
+                syncDraw(); markDirty();
+            }
+        };
         $('eBorderOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.borderOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
         $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.width = parseFloat(e.target.value); syncDraw(); markDirty(); } };
+        $('eFillColor').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillColor = e.target.value; syncDraw(); markDirty(); } };
         $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
         $('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); markDirty(); } };
         $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); markDirty(); } };
@@ -3205,33 +3056,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 renderMyLayers();
                 markDirty();
             }
-        };
-
-        $('btnSelectAllGlobal').onclick = () => {
-            if (selectedLayerIds.size === features.length && features.length > 0) {
-                selectedLayerIds.clear();
-            } else {
-                features.forEach(f => selectedLayerIds.add(f.id));
-            }
-            renderMyLayers();
-        };
-
-        $('btnDeleteSelectedGlobal').onclick = () => {
-            if (selectedLayerIds.size === 0) {
-                hint('Select at least one layer first');
-                return;
-            }
-            if (!confirm(`Delete ${selectedLayerIds.size} selected layers?`)) return;
-            
-            features = features.filter(f => !selectedLayerIds.has(f.id));
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => !selectedLayerIds.has(id));
-            }
-            selectedLayerIds.clear();
-            syncDraw();
-            renderMyLayers();
-            markDirty();
-            hint('Selected layers deleted');
         };
 
         $('btnHideSelected').onclick = () => {
@@ -3323,9 +3147,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                                 <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group">
                             </div>
                             <div style="display:flex; align-items:center; gap:2px;">
-                                <button class="card-btn" data-act="groupSelectAll" data-group="${gName}" title="Select All in Group">
-                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-                                </button>
                                 <button class="card-btn" data-act="groupStyle" data-group="${gName}" title="Style Group">
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                                 </button>
@@ -3364,23 +3185,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             const looseFeats = features.filter(f => !groupedIds.has(f.id));
             html += '<div id="ungrouped-zone">';
             if (looseFeats.length) {
-                html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;"> <span>Ungrouped Layers</span> <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped"> <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg> </button> </div>';
+                html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px;">Ungrouped Layers</div>';
                 html += looseFeats.slice().reverse().map(f => renderLayerCardHtml(f)).join('');
             }
             html += '</div>';
             container.innerHTML = html;
-
-            const btnSelAllUng = container.querySelector('#btnSelectAllUngrouped');
-            if (btnSelAllUng) {
-                btnSelAllUng.onclick = () => {
-                    const allSelected = looseFeats.every(f => selectedLayerIds.has(f.id));
-                    looseFeats.forEach(f => {
-                        if (allSelected) selectedLayerIds.delete(f.id);
-                        else selectedLayerIds.add(f.id);
-                    });
-                    renderMyLayers();
-                };
-            }
 
             container.querySelectorAll('.group-container').forEach(gc => {
                 const gName = gc.dataset.group;
@@ -3396,26 +3205,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     e.preventDefault();
                     e.stopPropagation();
                     gc.classList.remove('drop-hover');
-                    const draggedIdRaw = e.dataTransfer.getData('text/plain');
-                    let draggedIds = [];
-                    try {
-                        draggedIds = JSON.parse(draggedIdRaw);
-                    } catch(err) {
-                        draggedIds = [parseInt(draggedIdRaw, 10)];
+                    const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                    if (isNaN(draggedId)) return;
+                    for (const g in customGroups) {
+                        customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
                     }
-                    
-                    draggedIds.forEach(draggedId => {
-                        if (isNaN(draggedId)) return;
-                        for (const g in customGroups) {
-                            customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-                        }
-                        if (!customGroups[gName].ids.includes(draggedId)) {
-                            customGroups[gName].ids.push(draggedId);
-                        }
-                    });
+                    if (!customGroups[gName].ids.includes(draggedId)) {
+                        customGroups[gName].ids.push(draggedId);
+                    }
                     renderMyLayers();
                     markDirty();
-                    hint(`Layer(s) added to "${gName}"`);
+                    hint(`Layer added to "${gName}"`);
                 });
             });
 
@@ -3432,35 +3232,20 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     e.preventDefault();
                     e.stopPropagation();
                     uz.classList.remove('drop-hover');
-                    const draggedIdRaw = e.dataTransfer.getData('text/plain');
-                    let draggedIds = [];
-                    try {
-                        draggedIds = JSON.parse(draggedIdRaw);
-                    } catch(err) {
-                        draggedIds = [parseInt(draggedIdRaw, 10)];
+                    const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                    if (isNaN(draggedId)) return;
+                    for (const g in customGroups) {
+                        customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
                     }
-
-                    draggedIds.forEach(draggedId => {
-                        if (isNaN(draggedId)) return;
-                        for (const g in customGroups) {
-                            customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-                        }
-                    });
                     renderMyLayers();
                     markDirty();
-                    hint('Layer(s) moved to Ungrouped');
+                    hint('Layer moved to Ungrouped');
                 });
             }
 
             container.querySelectorAll('.layer-card').forEach(card => {
                 card.addEventListener('dragstart', e => {
-                    // If the dragged card is part of a selection, drag all selected IDs
-                    const cardId = parseInt(card.dataset.id, 10);
-                    let idsToDrag = [cardId];
-                    if (selectedLayerIds.has(cardId) && selectedLayerIds.size > 1) {
-                        idsToDrag = Array.from(selectedLayerIds);
-                    }
-                    e.dataTransfer.setData('text/plain', JSON.stringify(idsToDrag));
+                    e.dataTransfer.setData('text/plain', card.dataset.id);
                     e.dataTransfer.effectAllowed = 'move';
                 });
                 card.addEventListener('dragover', e => {
@@ -3470,23 +3255,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 card.addEventListener('drop', e => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const draggedIdRaw = e.dataTransfer.getData('text/plain');
-                    let draggedIds = [];
-                    try {
-                        draggedIds = JSON.parse(draggedIdRaw);
-                    } catch(err) {
-                        draggedIds = [parseInt(draggedIdRaw, 10)];
-                    }
-                    
+                    const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
                     const targetId = parseInt(card.dataset.id, 10);
-                    
-                    // For simplicity in multi-drag reorder, we just move them one by one relative to target
-                    // In a complex app, we'd calculate the final indices more carefully
-                    draggedIds.forEach(did => {
-                        if (did !== targetId && !isNaN(did)) {
-                            reorderFeatures(did, targetId);
-                        }
-                    });
+                    if (draggedId !== targetId && !isNaN(draggedId)) {
+                        reorderFeatures(draggedId, targetId);
+                    }
                 });
             });
 
@@ -3502,21 +3275,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                         else card.classList.remove('selected');
                     }
                 });
-            });
-
-            container.querySelectorAll('[data-act="groupSelectAll"]').forEach(btn => {
-                btn.onclick = () => {
-                    const gName = btn.dataset.group;
-                    const grp = customGroups[gName];
-                    if (grp) {
-                        const allSelected = grp.ids.every(id => selectedLayerIds.has(id));
-                        grp.ids.forEach(id => {
-                            if (allSelected) selectedLayerIds.delete(id);
-                            else selectedLayerIds.add(id);
-                        });
-                        renderMyLayers();
-                    }
-                };
             });
 
             container.querySelectorAll('.group-title-input').forEach(inp => {
@@ -3694,8 +3452,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             const headerRow = $('attrTableHeader');
             const bodyRow = $('attrTableBody');
             const types = f.props.attrTypes || { name: 'text', description: 'text' };
-            // Filter out 'name' from columns for the editable table as per requirements
-            const cols = Object.keys(types).filter(k => k !== 'name');
+            const cols = Object.keys(types);
             const rows = f.props.attrRows || [{ ...f.props.attributes }];
 
             headerRow.innerHTML = `<tr>` + cols.map(c => `
@@ -3924,16 +3681,25 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         });
 
         const setMapPaint = (id, prop, val) => { if (map.getLayer(id)) map.setPaintProperty(id, prop, val); };
+        $('cBgColor').oninput = e => { setMapPaint('bg', 'background-color', e.target.value); markDirty(); };
+        $('cExpColor').oninput = e => { setMapPaint('rd_express', 'line-color', e.target.value); markDirty(); };
+        $('cMainColor').oninput = e => { setMapPaint('rd_major', 'line-color', e.target.value); markDirty(); };
         $('cMainWidth').oninput = e => { setMapPaint('rd_major', 'line-width', parseFloat(e.target.value)); markDirty(); };
         $('cMainOp').oninput = e => { setMapPaint('rd_major', 'line-opacity', parseFloat(e.target.value)); markDirty(); };
+        $('cSecColor').oninput = e => { setMapPaint('rd_secondary', 'line-color', e.target.value); markDirty(); };
         $('cSecWidth').oninput = e => { setMapPaint('rd_secondary', 'line-width', parseFloat(e.target.value)); markDirty(); };
         $('cSecOp').oninput = e => { setMapPaint('rd_secondary', 'line-opacity', parseFloat(e.target.value)); markDirty(); };
+        $('cTerColor').oninput = e => { setMapPaint('rd_tertiary', 'line-color', e.target.value); markDirty(); };
         $('cTerWidth').oninput = e => { setMapPaint('rd_tertiary', 'line-width', parseFloat(e.target.value)); markDirty(); };
         $('cTerOp').oninput = e => { ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].forEach(id => setMapPaint(id, 'line-opacity', parseFloat(e.target.value))); markDirty(); };
+        $('cRailColor').oninput = e => { setMapPaint('rd_rail', 'line-color', e.target.value); markDirty(); };
+        $('cBoundColor').oninput = e => { ['bound_prov','bound_city','bound_brgy'].forEach(id => setMapPaint(id, 'line-color', e.target.value)); markDirty(); };
+        $('cBldColor').oninput = e => { setMapPaint('building-2d', 'fill-color', e.target.value); setMapPaint('building-2d', 'fill-outline-color', e.target.value); markDirty(); };
         $('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('building-3d', 'fill-extrusion-opacity', parseFloat(e.target.value)); markDirty(); };
+        $('cWaterColor').oninput = e => { setMapPaint('water', 'fill-color', e.target.value); setMapPaint('waterway', 'line-color', e.target.value); markDirty(); };
         $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
-        // ----------------- Import System (Including CSV) -----------------
+        // ----------------- Import System -----------------
         $('btn-import').onclick = () => { $('importFileInput').click(); };
         $('btn-import-toolbar').onclick = () => { $('importFileInput').click(); };
         
@@ -3966,86 +3732,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     const arrayBuffer = await file.arrayBuffer();
                     const geojson = await shp(arrayBuffer);
                     processGeoJSON(geojson);
-                } else if (ext === 'csv') {
-                    const text = await file.text();
-                    processCSV(text);
                 }
                 hint('Import successful');
             } catch(err) {
                 hint('Import failed: ' + err.message);
             }
         };
-
-        function processCSV(text) {
-            // Simple CSV parser that handles quotes
-            const lines = text.split(/\r\n|\n/);
-            if (lines.length < 2) return;
-            
-            const headers = parseCSVLine(lines[0]);
-            const latKeys = ['lat', 'latitude', 'y'];
-            const lonKeys = ['lon', 'longitude', 'lng', 'x'];
-            
-            let latIdx = -1, lonIdx = -1;
-            headers.forEach((h, i) => {
-                const lowerH = h.toLowerCase().trim();
-                if (latKeys.includes(lowerH)) latIdx = i;
-                if (lonKeys.includes(lowerH)) lonIdx = i;
-            });
-
-            if (latIdx === -1 || lonIdx === -1) {
-                hint('CSV must contain lat/lon columns');
-                return;
-            }
-
-            for (let i = 1; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
-                const row = parseCSVLine(lines[i]);
-                const lat = parseFloat(row[latIdx]);
-                const lon = parseFloat(row[lonIdx]);
-                
-                if (isNaN(lat) || isNaN(lon)) continue;
-                
-                const props = {};
-                headers.forEach((h, idx) => {
-                    if (idx !== latIdx && idx !== lonIdx) {
-                        props[h.trim()] = row[idx];
-                    }
-                });
-                
-                // Map common properties
-                const customProps = {
-                    shape: 'pin',
-                    color: '#1e40af',
-                    iconSize: 0.9,
-                    iconKey: getIconKey('pin', '#1e40af'),
-                    osmTags: props
-                };
-                
-                if (props.name) customProps.osmTags.name = props.name;
-                if (props.description) customProps.description = props.description;
-                
-                addFeatureRecord('marker', { type: 'Point', coordinates: [lon, lat] }, customProps);
-            }
-        }
-
-        function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current);
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            result.push(current);
-            return result;
-        }
 
         function processGeoJSON(geojson) {
             const feats = geojson.features || [];
@@ -4114,7 +3806,6 @@ try:
     html = (
         HTML_TEMPLATE.replace("__ALL_STYLES__", json.dumps(ALL_STYLES))
         .replace("__POI_CONFIG__", json.dumps(POI_CONFIG))
-        .replace("__COLOR_PALETTES__", json.dumps(COLOR_PALETTES))
         .replace("__SUPABASE_URL__", SUPABASE_URL)
         .replace("__SUPABASE_KEY__", SUPABASE_KEY)
         .replace("__ALL_PROJECTS_JSON__", json.dumps(ALL_PROJECTS_LIST))
@@ -4127,6 +3818,6 @@ try:
         .replace("__ZOOM__", str(initial_zoom))
         .replace("__BG__", THEMES.get(initial_theme, THEMES["Midnight Blue"])["overlay"])
     )
-    st.iframe(html, height=1000)
+    components.html(html, height=1000, scrolling=False)
 except Exception as e:
     st.error(f"Failed to load application: {e}")
