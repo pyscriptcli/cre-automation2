@@ -320,12 +320,14 @@ def road_layer(p, lid, classes, color, widths, minzoom=0, casing=False, opacity=
         "id": lid, "type": "line", "source": "omt", "source-layer": "transportation",
         "filter": ["match", ["get", "class"], classes, True, False],
         "layout": {"line-cap": "round", "line-join": "round"},
-        "paint": {"line-color": color, "line-width": w(widths), "line-opacity": opacity},
+        # FIXED: Pass '*widths' here to unpack the list correctly to the 'w' function
+        "paint": {"line-color": color, "line-width": w(*widths), "line-opacity": opacity},
     }
     if minzoom: lyr["minzoom"] = minzoom
     if casing:
         lyr["paint"]["line-color"] = p["rd_case"]
-        lyr["paint"]["line-width"] = w([(z, val + 1.8) for z, val in widths])
+        # FIXED: Pass with '*' unpacking
+        lyr["paint"]["line-width"] = w(*[(z, val + 1.8) for z, val in widths])
         lyr["id"] = lid + "_casing"
     return lyr
 
@@ -1056,7 +1058,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div id="popup-feature-info" class="float-card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-weight:700; color:#f0f6fc; font-size:14px;" id="featureInfoName">Feature Name</span>
-            <button class="card-btn" onclick="$('#popup-feature-info').classList.remove('open')">✕</button>
+            <button class="card-btn" onclick="document.getElementById('popup-feature-info').classList.remove('open')">✕</button>
         </div>
         <div id="featureInfoImageContainer" style="margin-bottom:8px;"></div>
         <div class="attr-table-container" style="max-height:40vh;">
