@@ -4032,4 +4032,50 @@ function parseCSVLine(text) {
     let inQuotes = false;
     for (let i = 0; i < text.length; i++) {
         const c = text[i];
-        if (c === '"') {Sorry, something went wrong. Please try your request again.
+        if (c === '"') {
+            if (inQuotes && text[i + 1] === '"') {
+                row[row.length - 1] += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (c === ',' && !inQuotes) {
+            row.push('');
+        } else {
+            row[row.length - 1] += c;
+        }
+    }
+    return row.map(s => s.trim());
+}
+
+function parseWKT(wktStr) {
+    if (!wktStr) return null;
+    const str = wktStr.trim().toUpperCase();
+    if (str.startsWith('POINT')) {
+        const m = str.match(/POINT\s*\(\s*([-\d\.]+)\s+([-\d\.]+)\s*\)/i);
+        if (m) return { type: 'Point', coordinates: [parseFloat(m[1]), parseFloat(m[2])] };
+    } else if (str.startsWith('LINESTRING')) {
+        const m = str.match(/LINESTRING\s*\(([^)]+)\)/i);
+        if (m) {
+            const coords = m[1].split(',').map(pair => pair.trim().split(/\s+/).map(Number));
+            return { type: 'LineString', coordinates: coords };
+        }
+    } else if (str.startsWith('POLYGON')) {
+        const m = str.match(/POLYGON\s*\(\(([^)]+)\)\)/i);
+        if (m) {
+            const coords = m[1].split(',').map(pair => pair.trim().split(/\s+/).map(Number));
+            return { type: 'Polygon', coordinates: [coords] };
+        }
+    }
+    return null;
+}
+
+function processCSV(text) {
+    const lines = text.split(/\\r?\\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length < 2) throw new Error("CSV contains insufficient data");
+    
+    const headers = parseCSVLine(lines[0]);
+    const lowerHeaders = headers.map(h => h.toLowerCase().trim());
+    
+    let latIdx = lowerHeaders.findIndex(h => ['lat', 'latitude', 'y', 'lat_dd'].includes(h));
+    let lonIdx = lowerHeaders.findIndex(h => ['lon', 'long', 'longitude', 'x',I seem to be encountering an error. Can I try something else for you?
