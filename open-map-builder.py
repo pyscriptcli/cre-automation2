@@ -1693,25 +1693,26 @@ window.loadProjectDirectly = function(projectId) {
         currentStyleName = p.basemap;
         map.setStyle(ALL_STYLES[p.basemap]);
     }
+    // Ensure 3D props exist
     features.forEach(f => {
         if (f.kind === 'marker') {
             const sh = f.props.shape || 'pin';
             const col = f.props.color || '#1e40af';
             f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
         }
-        // Ensure 3D props exist
         if (f.kind === 'polygon' || f.kind === 'rectangle' || f.kind === 'circle') {
             if (f.props.is3D === undefined) f.props.is3D = false;
             if (f.props.height === undefined) f.props.height = 20;
             if (f.props.baseHeight === undefined) f.props.baseHeight = 0;
         }
     });
+    // Update source and layers
     map.once('idle', () => {
         addDrawStack();
         applyVis();
         renderMyLayers();
-        // Enable 3D mode by default
         toggle3DMode(true);
+        syncDraw(); // Ensure source data is updated
     });
     closeHomeDialog();
     undoStack = [];
@@ -2499,6 +2500,7 @@ map.on('load', () => {
     });
     addDrawStack();
     applyVis();
+    toggle3DMode(true); // Ensure 3D is active initially
     renderMyLayers();
     renderProjectsList();
     populateTradeAreaCheckboxes();
@@ -3788,21 +3790,15 @@ function openShapeEditor(id) {
     
     // 3D Controls
     const is3DPoly = isPolygon && f.props.is3D;
-    $('e3DControls').style.display = is3DPoly ? 'block' : 'none';
-    if (is3DPoly) {
-        $('eHeight').value = f.props.height || 20;
-        $('eHeightDisplay').textContent = f.props.height || 20;
-        $('eBaseHeight').value = f.props.baseHeight || 0;
-        $('eBaseHeightDisplay').textContent = f.props.baseHeight || 0;
-        $('eIs3D').checked = true;
-    } else if (isPolygon) {
-        // Show checkbox to enable 3D
-        $('e3DControls').style.display = 'block';
+    $('e3DControls').style.display = (isPolygon && f.props.is3D) ? 'block' : 'none';
+    if (isPolygon) {
         $('eHeight').value = f.props.height || 20;
         $('eHeightDisplay').textContent = f.props.height || 20;
         $('eBaseHeight').value = f.props.baseHeight || 0;
         $('eBaseHeightDisplay').textContent = f.props.baseHeight || 0;
         $('eIs3D').checked = f.props.is3D || false;
+        // Show the controls always for polygons, but they can be hidden by default if not 3D? We'll show them always so user can enable.
+        $('e3DControls').style.display = 'block';
     }
     
     // Circle Radius Display
