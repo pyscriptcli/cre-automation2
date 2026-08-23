@@ -7,6 +7,21 @@ import logging
 import time
 import random
 
+#--- HIDE STREAMLIT CHROME & WATERMARK ---
+st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        [data-testid="stSidebar"] {display: none !important;}
+        .stDeployButton {display: none !important;}
+        div[data-testid="stDecoration"] {display: none !important;}
+        section[data-testid="stSidebar"] {display: none !important;}
+        div[class^="css-"] {display: none !important;} /* Fallback for older versions */
+        iframe {border: none !important;}
+    </style>
+""", unsafe_allow_html=True)
+
 # ------------------------------------------------------------------------
 # ROBUST OVERPASS API QUERY FUNCTION (PYTHON)
 # ------------------------------------------------------------------------
