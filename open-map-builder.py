@@ -1,7 +1,7 @@
 import json
 import re
 import streamlit as st
-import streamlit.components.v1 as components
+import streamlit.components.v1 as stc
 import requests
 import logging
 import time
@@ -19,6 +19,21 @@ st.markdown("""
         section[data-testid="stSidebar"] {display: none !important;}
         div[class^="css-"] {display: none !important;} /* Fallback for older versions */
         iframe {border: none !important;}
+    </style>
+""", unsafe_allow_html=True)
+
+#--- FULL SCREEN MAP OVERRIDE ---
+st.markdown("""
+    <style>
+        .block-container {
+            padding: 0rem !important;
+            margin: 0rem !important;
+            max-width: 100vw !important;
+            width: 100vw !important;
+        }
+        .stApp {
+            background-color: #0a1628 !important; /* Match Midnight Blue */
+        }
     </style>
 """, unsafe_allow_html=True)
 
