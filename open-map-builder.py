@@ -1,15 +1,16 @@
 import json
 import re
 import streamlit as st
-import streamlit.components.v1 as stc
+import streamlit.components.v1 as components
 import requests
 import logging
 import time
 import random
 
-#--- HIDE STREAMLIT CHROME & WATERMARK ---
+# --- HIDE STREAMLIT CHROME & WATERMARK ---
 st.markdown("""
     <style>
+        /* Hide Streamlit default UI elements */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
@@ -17,25 +18,27 @@ st.markdown("""
         .stDeployButton {display: none !important;}
         div[data-testid="stDecoration"] {display: none !important;}
         section[data-testid="stSidebar"] {display: none !important;}
-        div[class^="css-"] {display: none !important;} /* Fallback for older versions */
-        iframe {border: none !important;}
-    </style>
-""", unsafe_allow_html=True)
-
-#--- FULL SCREEN MAP OVERRIDE ---
-st.markdown("""
-    <style>
+        
+        /* Full Screen Map Override */
         .block-container {
             padding: 0rem !important;
             margin: 0rem !important;
             max-width: 100vw !important;
             width: 100vw !important;
+            height: 100vh !important;
         }
         .stApp {
-            background-color: #0a1628 !important; /* Match Midnight Blue */
+            background-color: #0a1628 !important;
+            padding: 0rem !important;
+            margin: 0rem !important;
+        }
+        iframe {
+            border: none !important;
+            overflow: hidden !important;
         }
     </style>
 """, unsafe_allow_html=True)
+
 
 # ------------------------------------------------------------------------
 # ROBUST OVERPASS API QUERY FUNCTION (PYTHON)
