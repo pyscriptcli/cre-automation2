@@ -4275,6 +4275,7 @@ function processGeoJSON(geojson) {
                 shape: 'pin',
                 color: '#1e40af',
                 iconSize: 0.9,
+                sizeMode: 'static',
                 iconKey: getIconKey('pin', '#1e40af'),
                 osmTags: props
             });
@@ -4291,7 +4292,10 @@ function processGeoJSON(geojson) {
                 addFeatureRecord('polyline', geom, {});
             }
         } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-            addFeatureRecord('polygon', geom, {});
+            const kind = (props.extrusionHeight || props.extrusion_height || props.height) ? 'polygon3d' : 'polygon';
+            addFeatureRecord(kind, geom, {
+                extrusionHeight: props.extrusionHeight || props.extrusion_height || props.height || 25
+            });
         }
     });
 }
