@@ -7,68 +7,6 @@ import logging
 import time
 import random
 
-st.set_page_config(
-    page_title="Project Atlas",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
-#--- HIDE STREAMLIT CHROME & WATERMARK ---
-st.markdown("""
-    <style>
-        /* Hide main menu, footer, and header */
-        #MainMenu {visibility: hidden !important;}
-        footer {visibility: hidden !important;}
-        header {visibility: hidden !important;}
-        
-        /* Hide Streamlit decoration/watermark - multiple selectors */
-        [data-testid="stDecoration"] {display: none !important;}
-        .stDecoration {display: none !important;}
-        div[data-testid="stDecoration"] {display: none !important;}
-        
-        /* Hide deploy button */
-        .stDeployButton {display: none !important;}
-        [data-testid="stDeployButton"] {display: none !important;}
-        
-        /* Hide sidebar completely */
-        [data-testid="stSidebar"] {display: none !important;}
-        section[data-testid="stSidebar"] {display: none !important;}
-        div[data-testid="stSidebar"] {display: none !important;}
-        .css-1d391kg {display: none !important;}
-        
-        /* Hide header elements */
-        [data-testid="stHeader"] {display: none !important;}
-        .css-145kmo2 {display: none !important;}
-        
-        /* Hide iframe borders */
-        iframe {border: none !important;}
-        
-        /* Full screen overrides */
-        .block-container {
-            padding: 0rem !important;
-            margin: 0rem !important;
-            max-width: 100vw !important;
-            width: 100vw !important;
-            height: 100vh !important;
-        }
-        .stApp {
-            background-color: #0a1628 !important;
-            padding: 0rem !important;
-            margin: 0rem !important;
-        }
-        html, body {
-            overflow: hidden !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-        
-        /* Additional Streamlit 2.x selectors */
-        .main-header {display: none !important;}
-        .viewer-badge {display: none !important;}
-        [data-testid="stSidebarUserContent"] {display: none !important;}
-    </style>
-""", unsafe_allow_html=True)
-
 # ------------------------------------------------------------------------
 # ROBUST OVERPASS API QUERY FUNCTION (PYTHON)
 # ------------------------------------------------------------------------
@@ -170,10 +108,111 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
         return []
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & ROOT OVERRIDES
+# 1. PAGE CONFIGURATION & BRANDING REMOVAL
 # ------------------------------------------------------------------------
+st.set_page_config(
+    page_title="Project Atlas",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
+def remove_streamlit_branding():
+    """
+    Completely removes Streamlit watermarks, headers, footers, deploy buttons,
+    status widgets, and profile/avatar previews using both CSS and MutationObserver JS.
+    """
+    css_injection = """
+    <style>
+    /* 1. Hide core header, decoration, toolbars, and footer */
+    header[data-testid="stHeader"],
+    div[data-testid="stDecoration"],
+    footer,
+    [data-testid="stToolbar"],
+    [data-testid="stStatusWidget"],
+    #MainMenu,
+    .viewerBadge_container__1QSob,
+    .styles_viewerBadge__1yB5_,
+    [data-testid="stDeployButton"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
 
+    /* 2. Hide any streamlit.io links */
+    a[href*="streamlit.io"] {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    /* 3. Hide avatar and profile preview elements */
+    img[src*="avatar"],
+    [data-testid="stAvatar"],
+    [data-testid="stProfile"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    </style>
+    """
+    st.markdown(css_injection, unsafe_allow_html=True)
+
+    js_injection = """
+    <script>
+    (function() {
+        const targetSelectors = [
+            'header[data-testid="stHeader"]',
+            'div[data-testid="stDecoration"]',
+            'footer',
+            '[data-testid="stToolbar"]',
+            '[data-testid="stStatusWidget"]',
+            '#MainMenu',
+            '[data-testid="stDeployButton"]',
+            'a[href*="streamlit.io"]',
+            'img[src*="avatar"]',
+            '[data-testid="stAvatar"]'
+        ];
+
+        function cleanElements(root) {
+            targetSelectors.forEach(selector => {
+                const elements = root.querySelectorAll(selector);
+                elements.forEach(el => {
+                    el.style.setProperty('display', 'none', 'important');
+                    el.style.setProperty('visibility', 'hidden', 'important');
+                });
+            });
+        }
+
+        // Run on parent window/document if accessible
+        const doc = window.parent ? window.parent.document : document;
+        cleanElements(doc);
+
+        // Continuous removal using MutationObserver for dynamically inserted nodes
+        const observer = new MutationObserver(mutations => {
+            cleanElements(doc);
+        });
+
+        observer.observe(doc.body, {
+            childList: true,
+            subtree: true
+        });
+
+        // Intercept and prevent clicks to streamlit.io links
+        doc.addEventListener('click', function(e) {
+            const link = e.target.closest('a[href*="streamlit.io"]');
+            if (link) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+    })();
+    </script>
+    """
+    components.html(js_injection, height=0, width=0)
+
+remove_streamlit_branding()
 
 st.markdown(
     """
@@ -1455,6 +1494,23 @@ $('seg-btn-new').onclick = () => {
     $('new-proj-name').focus();
 };
 
+function formatProjectDate(dateStr) {
+    if (!dateStr) return 'Recently updated';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return 'Recently updated';
+        return d.toLocaleString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch(e) {
+        return 'Recently updated';
+    }
+}
+
 function renderProjectsList() {
     const container = $('existing-projects-container');
     if (!ALL_PROJECTS || !ALL_PROJECTS.length) {
@@ -1465,7 +1521,7 @@ function renderProjectsList() {
         <div class="ios26-proj-item">
             <div style="display:flex; flex-direction:column; gap:2px; flex:1; cursor:pointer;" onclick="loadProjectDirectly('${p.id}')">
                 <span style="font-weight:700; font-size:13px; color:#ffffff;">${p.name || 'Untitled Project'}</span>
-                <span style="font-size:11px; color:rgba(255,255,255,0.5);">${p.basemap || 'Midnight Blue'} · ${p.features ? p.features.length : 0} layers</span>
+                <span style="font-size:11px; color:rgba(255,255,255,0.5);">${formatProjectDate(p.updated_at)} · ${p.features ? p.features.length : 0} layers</span>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
                 <button class="card-btn" onclick="renameProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" title="Rename">
@@ -1516,7 +1572,10 @@ window.renameProjectFromLauncher = async function(e, projectId, oldName) {
     const newName = prompt('Rename workspace:', oldName);
     if (!newName || !newName.trim() || newName.trim() === oldName) return;
     const target = ALL_PROJECTS.find(x => x.id === projectId);
-    if (target) target.name = newName.trim();
+    if (target) {
+        target.name = newName.trim();
+        target.updated_at = new Date().toISOString();
+    }
     if (currentProjectId === projectId) {
         currentProjectName = newName.trim();
         $('project-name-display').textContent = currentProjectName;
@@ -1612,8 +1671,9 @@ async function saveProjectToSupabase(showToast = false) {
     }
     setSaveBadgeStatus('saving');
     const c = map.getCenter();
+    const nowIso = new Date().toISOString();
     const payload = {
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
         name: currentProjectName,
         center: [c.lng, c.lat],
         zoom: map.getZoom(),
@@ -1638,6 +1698,8 @@ async function saveProjectToSupabase(showToast = false) {
         if (res.ok) {
             isDirty = false;
             setSaveBadgeStatus('saved');
+            const targetProj = ALL_PROJECTS.find(x => x.id === currentProjectId);
+            if (targetProj) targetProj.updated_at = nowIso;
             if (showToast) hint('Project Saved!');
         } else {
             setSaveBadgeStatus('unsaved');
@@ -3971,57 +4033,6 @@ map.on('error', e => console.warn('Map Notice:', e));
 } catch (e) {
     console.error('App init error:', e);
 }
-<script>
-// Hide Streamlit Cloud branding (crown badge & profile avatar)
-(function hideStreamlitBranding() {
-    const hideBranding = () => {
-        // Target the profile preview container
-        const profilePreview = document.querySelector('[data-testid="appCreatorAvatar"]')?.closest('div[class*="profilePreview"]');
-        if (profilePreview) {
-            profilePreview.style.display = 'none';
-            profilePreview.parentElement?.style.setProperty('display', 'none', 'important');
-        }
-        
-        // Target the link containing the crown (Streamlit red background #FF4B4B)
-        const links = document.querySelectorAll('a[href*="streamlit.io"]');
-        links.forEach(link => {
-            if (link.querySelector('img[src*="avatars.githubusercontent"]') || 
-                link.textContent.includes('streamlit.io')) {
-                link.style.display = 'none';
-                link.parentElement?.style.setProperty('display', 'none', 'important');
-            }
-        });
-        
-        // Target elements with Streamlit red background
-        const allElements = document.querySelectorAll('div, a, span');
-        allElements.forEach(el => {
-            const style = window.getComputedStyle(el);
-            if (style.backgroundColor === 'rgb(255, 75, 75)' || 
-                style.backgroundColor === '#FF4B4B') {
-                if (el.querySelector('svg') || el.textContent.trim().length < 50) {
-                    el.style.display = 'none';
-                }
-            }
-        });
-        
-        // Hide the status page iframe
-        const statusIframe = document.querySelector('iframe[src*="statuspage.io"]');
-        if (statusIframe) {
-            statusIframe.style.display = 'none';
-        }
-    };
-    
-    // Run immediately
-    hideBranding();
-    
-    // Run again after a delay (elements might be injected later)
-    setTimeout(hideBranding, 1000);
-    setTimeout(hideBranding, 3000);
-    
-    // Use MutationObserver to catch dynamically injected elements
-    const observer = new MutationObserver(hideBranding);
-    observer.observe(document.body, { childList: true, subtree: true });
-})();
 </script>
 </body>
 </html>"""
