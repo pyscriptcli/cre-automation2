@@ -21,7 +21,7 @@ st.markdown("""
         footer {visibility: hidden !important;}
         header {visibility: hidden !important;}
         
-        /* Hide Streamlit decoration/watermark - multiple selectors for coverage */
+        /* Hide Streamlit decoration/watermark - multiple selectors */
         [data-testid="stDecoration"] {display: none !important;}
         .stDecoration {display: none !important;}
         div[data-testid="stDecoration"] {display: none !important;}
