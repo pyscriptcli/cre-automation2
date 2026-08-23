@@ -1,16 +1,32 @@
 import json
 import re
 import streamlit as st
-import streamlit.components.v1 as components
 import requests
 import logging
 import time
 import random
 
 # ------------------------------------------------------------------------
-# ROBUST OVERPASS API QUERY FUNCTION (PYTHON)
+# ROBUST OVERPASS API QUERY FUNCTION & NOMINATIM GEOCODER (PYTHON)
 # ------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def geocode_nominatim(address: str) -> dict:
+    """
+    Performs forward geocoding using Nominatim API with rate limiting and error handling.
+    """
+    url = f"https://nominatim.openstreetmap.org/search?format=json&q={requests.utils.quote(address)}"
+    headers = {"User-Agent": "ProjectAtlas/1.0"}
+    try:
+        time.sleep(1)
+        res = requests.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        data = res.json()
+        if data and len(data) > 0:
+            return {"lat": float(data[0]["lat"]), "lon": float(data[0]["lon"]), "display_name": data[0]["display_name"]}
+    except Exception as e:
+        logging.error(f"Nominatim geocoding failed: {e}")
+    return None
 
 def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 90) -> list:
     """
@@ -108,13 +124,108 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
         return []
 
 # ------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & ROOT OVERRIDES
+# 1. PAGE CONFIGURATION & BRANDING REMOVAL
 # ------------------------------------------------------------------------
 st.set_page_config(
     page_title="Project Atlas",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+def hide_streamlit_branding():
+    """
+    Completely removes Streamlit watermarks, headers, footers, deploy buttons,
+    status widgets, and profile/avatar previews using both CSS and MutationObserver JS.
+    """
+    css_injection = """
+    <style>
+    /* 1. Hide core header, decoration, toolbars, and footer */
+    header[data-testid="stHeader"],
+    div[data-testid="stDecoration"],
+    footer,
+    [data-testid="stToolbar"],
+    [data-testid="stStatusWidget"],
+    #MainMenu,
+    .viewerBadge_container__1QSob,
+    .styles_viewerBadge__1yB5_,
+    [data-testid="stDeployButton"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        width: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    /* 2. Hide any streamlit.io links */
+    a[href*="streamlit.io"] {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    /* 3. Hide avatar and profile preview elements */
+    img[src*="avatar"],
+    [data-testid="stAvatar"],
+    [data-testid="stProfile"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    </style>
+    """
+    st.markdown(css_injection, unsafe_allow_html=True)
+
+    js_injection = """
+    <script>
+    (function() {
+        const targetSelectors = [
+            'header[data-testid="stHeader"]',
+            'div[data-testid="stDecoration"]',
+            'footer',
+            '[data-testid="stToolbar"]',
+            '[data-testid="stStatusWidget"]',
+            '#MainMenu',
+            '[data-testid="stDeployButton"]',
+            'a[href*="streamlit.io"]',
+            'img[src*="avatar"]',
+            '[data-testid="stAvatar"]'
+        ];
+
+        function cleanElements(root) {
+            targetSelectors.forEach(selector => {
+                const elements = root.querySelectorAll(selector);
+                elements.forEach(el => {
+                    el.style.setProperty('display', 'none', 'important');
+                    el.style.setProperty('visibility', 'hidden', 'important');
+                });
+            });
+        }
+
+        const doc = window.parent ? window.parent.document : document;
+        cleanElements(doc);
+
+        const observer = new MutationObserver(mutations => {
+            cleanElements(doc);
+        });
+
+        observer.observe(doc.body, {
+            childList: true,
+            subtree: true
+        });
+
+        doc.addEventListener('click', function(e) {
+            const link = e.target.closest('a[href*="streamlit.io"]');
+            if (link) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+    })();
+    </script>
+    """
+    st.iframe(js_injection, height=0, width=0)
+
+hide_streamlit_branding()
 
 st.markdown(
     """
@@ -334,10 +445,10 @@ def vector_style(p):
             {"id": "water", "type": "fill", "source": "omt", "source-layer": "water", "paint": {"fill-color": p["water"]}},
             {"id": "waterway", "type": "line", "source": "omt", "source-layer": "waterway", "paint": {"line-color": p["waterway"], "line-width": w((9, 1), (20, 6))}},
             {"id": "aeroway", "type": "line", "source": "omt", "source-layer": "aeroway", "paint": {"line-color": p["aeroway"], "line-width": w((11, 1), (20, 12))}},
-            {"id": "building-2d", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
+            {"id": "building-2d", "type": "fill", "source": "omt", "source-layer": "building", "minzoom": 13, "layout": {"visibility": "none"}, "paint": {"fill-color": p["buildings"], "fill-opacity": p["building_opacity"], "fill-outline-color": p["buildings"]}},
             {
                 "id": "building-3d", "type": "fill-extrusion", "source": "omt", "source-layer": "building", "minzoom": 14,
-                "layout": {"visibility": "none"},
+                "layout": {"visibility": "visible"},
                 "paint": {
                     "fill-extrusion-color": p["buildings"],
                     "fill-extrusion-height": ["coalesce", ["get", "render_height"], ["get", "height"], 12],
@@ -386,7 +497,6 @@ ALL_STYLES = {
     "Satellite": raster_style(["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "#000000", 19),
 }
 
-# ----------------- Color Palette Hierarchy (Primary, Secondary, Tertiary) -----------------
 COLOR_PALETTES = [
     {"name": "Primary", "colors": ["#1e40af", "#dc2626", "#16a34a", "#ca8a04", "#0a1628", "#ffffff"]},
     {"name": "Secondary", "colors": ["#38bdf8", "#3fb950", "#f85149", "#a371f7", "#fb923c", "#f43f5e"]},
@@ -396,7 +506,7 @@ COLOR_PALETTES = [
 # ------------------------------------------------------------------------
 # 4. SINGLE-PAGE ARCHITECTURE (PROJECT ATLAS ENGINE)
 # ------------------------------------------------------------------------
-HTML_TEMPLATE = """<!DOCTYPE html>
+HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
@@ -548,7 +658,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none; font-weight:600;
 }
 #map-context-menu {
-    position: absolute; z-index: 3000; display: none; min-width: 200px;
+    position: absolute; z-index: 3000; display: none; min-width: 220px;
     background: rgba(9, 16, 24, 0.98); border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 10px; padding: 4px; box-shadow: 0 12px 32px rgba(0,0,0,0.7);
 }
@@ -645,7 +755,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .attr-img-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: block; }
 .attr-img-placeholder { width: 80px; height: 80px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 10px; color: #adbac7; cursor: pointer; text-align: center; }
 
-/* Color picker full control styles (Primary, Secondary, Tertiary) */
+/* Color picker full control styles */
 .color-ctrl-cluster { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .palette-group { display: flex; flex-direction: column; gap: 2px; }
 .palette-label { font-size: 9px; font-weight: 700; color: #768390; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -697,12 +807,15 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <button class="tb-btn" id="btn-search" title="Search Place">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
     </button>
-    <button class="tb-btn" id="btn-import-toolbar" title="Import Spatial Data (KML, KMZ, GeoJSON, SHP)">
+    <button class="tb-btn" id="btn-import-toolbar" title="Import Spatial Data (KML, KMZ, GeoJSON, SHP, CSV)">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
     </button>
     <div class="tb-sep"></div>
     <button class="tb-btn tool" data-tool="polygon" title="Draw Polygon">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path></svg>
+    </button>
+    <button class="tb-btn tool" data-tool="polygon3d" title="Draw 3D Polygon">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path><path d="M12 3v10"></path></svg>
     </button>
     <button class="tb-btn tool" data-tool="rectangle" title="Draw Rectangle">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"></rect></svg>
@@ -746,13 +859,13 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <div style="margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
             <button id="btn-import" class="trade-btn" style="width:100%; display:flex; justify-content:center; align-items:center; gap:6px;">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                Import Spatial Data (KML, GeoJSON, SHP)
+                Import Spatial Data (KML, GeoJSON, SHP, CSV)
             </button>
-            <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip" style="display:none;"/>
+            <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip,.csv" style="display:none;"/>
         </div>
         <div class="dimension-mode-bar">
-            <button class="dimension-mode-btn active" id="btn2DMode">2D MAP</button>
-            <button class="dimension-mode-btn" id="btn3DMode">3D BUILDINGS</button>
+            <button class="dimension-mode-btn" id="btn2DMode">2D MAP</button>
+            <button class="dimension-mode-btn active" id="btn3DMode">3D BUILDINGS</button>
         </div>
         <div class="acc-item" id="btnOpenTradeAreaPopup" style="cursor:pointer;">
             <div class="acc-header" style="justify-content:flex-start; gap:8px; color:#38bdf8;">
@@ -790,8 +903,8 @@ select option:hover, select option:checked { background-color: #2563eb !importan
                 <span>Buildings</span> <span>▸</span>
             </div>
             <div class="acc-body hidden" id="body-buildings">
-                <label class="layer-row"> <span>2D Buildings</span> <input type="checkbox" data-g="building2d" checked></label>
-                <label class="layer-row"> <span>3D Buildings</span> <input type="checkbox" data-g="building3d"></label>
+                <label class="layer-row"> <span>2D Buildings</span> <input type="checkbox" data-g="building2d"></label>
+                <label class="layer-row"> <span>3D Buildings</span> <input type="checkbox" data-g="building3d" checked></label>
             </div>
         </div>
         <div class="acc-item">
@@ -837,6 +950,9 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <div style="display:flex; align-items:center; gap:4px;">
                 <button class="icon-action-btn" id="btnSelectAllGlobal" title="Select / Deselect All Layers">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                </button>
+                <button class="icon-action-btn" id="btnDeleteSelectedGlobal" title="Delete Selected Layers" style="color:#ff7b72;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 </button>
                 <button id="btnAddCustomGroup" class="trade-btn" style="padding:2px 6px; font-size:10px;">+ GROUP</button>
                 <button id="btnHideSelected" class="trade-btn" style="padding:2px 6px; font-size:10px; background:#22272e; border:1px solid #2d333b; color:#adbac7;">Hide/Unhide</button>
@@ -964,6 +1080,13 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <button id="eRecalcRoute" class="trade-btn" style="width:100%; margin-top:6px; font-size:10px;">Recalculate Route</button>
     </div>
 
+    <!-- 3D Polygon Controls -->
+    <div id="polygon3dEditorControls" style="display:none; border-top:1px solid rgba(255,255,255,0.1); margin-top:8px; padding-top:8px;">
+        <div class="f-row"> <span>3D Extrusion</span> <input type="checkbox" id="eIs3D" style="accent-color:#316dca;"></div>
+        <div class="f-row"> <span>Height (m)</span> <input type="range" id="eHeight" min="0" max="200" step="5" value="20"></div>
+        <div class="f-row"> <span>Base Height (m)</span> <input type="range" id="eBaseHeight" min="0" max="200" step="5" value="0"></div>
+    </div>
+
     <div style="display:flex; justify-content:space-between; margin-top:8px;">
         <button id="eDeleteBtn" style="color:#f85149; border:1px solid #da36334d; background:#da36331a; padding:6px 12px; border-radius:6px; cursor:pointer;">Delete</button>
         <button id="eDoneBtn" style="background:#316dca; color:#fff; border:none; padding:6px 16px; border-radius:6px; cursor:pointer;">Done</button>
@@ -1044,7 +1167,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </div>
 </div>
 
-<!-- Attribute Table Modal (#popup-attribute-table) -->
+<!-- Attribute Table Modal -->
 <div id="popup-attribute-table" class="float-card">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <span style="font-weight:700; color:#f0f6fc;" id="attrTableTitle">Attributes</span>
@@ -1085,6 +1208,22 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="ctx-item" id="ctx-streetview">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
         Open in Streetview
+    </div>
+    <div class="ctx-item" id="ctx-bring-front">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg>
+        Bring to Front
+    </div>
+    <div class="ctx-item" id="ctx-bring-forward">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+        Bring Forward
+    </div>
+    <div class="ctx-item" id="ctx-send-backward">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        Send Backward
+    </div>
+    <div class="ctx-item" id="ctx-send-to-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg>
+        Send to Back
     </div>
     <div class="ctx-item" id="ctx-delete" style="display:none; color:#ff7b72;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -1136,11 +1275,12 @@ const map = new maplibregl.Map({
     zoom: __ZOOM__,
     attributionControl: false,
     fadeDuration: 0,
-    preserveDrawingBuffer: true
+    preserveDrawingBuffer: true,
+    pitch: 55,
+    bearing: -15
 });
 map.getCanvas().addEventListener('contextmenu', e => e.preventDefault());
 
-// ----------------- Debounce Utility -----------------
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -1153,7 +1293,6 @@ function debounce(func, wait) {
     };
 }
 
-// ----------------- State Machine -----------------
 let features = __INITIAL_FEATURES__;
 let fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
 let customGroups = __INITIAL_CUSTOM_GROUPS__ || {"Trade Area Scan": {collapsed: false, ids: []}};
@@ -1166,25 +1305,17 @@ let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
 let isDirty = false;
 
-// Undo/Redo State Stacks
 let undoStack = [];
 let redoStack = [];
 
-// Vertex dragging state
 let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null, isRadiusHandle = false;
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
-
-// Rotation dragging state
 let isDraggingRotation = false, rotatingPolyId = null, rotCenter = null, rotStartAngle = 0, rotOriginalCoords = null;
 
-// Context menu state
 let ctxLngLat = null;
 let ctxFeatureId = null;
-
-// Attribute Table State
 let currentTableFeatureId = null;
 
-// Route State
 let currentRouteMode = 'driving';
 let currentRouteColor = '#38bdf8';
 
@@ -1260,7 +1391,7 @@ const vis = {
     poi_icons: true, poi_labels: true,
     road_exp: true, road_main: true, road_sec: true, road_ter: true, rd_rail: true,
     bound_prov: false, bound_city: false, bound_brgy: false,
-    building2d: true, building3d: false, water: true, waterway: true
+    building2d: false, building3d: true, water: true, waterway: true
 };
 
 const VIS_MAP = {
@@ -1355,7 +1486,6 @@ const resetActiveTools = () => {
     hint('');
 };
 
-// ----------------- Project Auto-Naming Calculation -----------------
 function getNextUntitledProjectName() {
     const untitledRegex = /^Untitled Project (\d+)$/i;
     let maxN = 0;
@@ -1369,7 +1499,6 @@ function getNextUntitledProjectName() {
     return `Untitled Project ${maxN + 1}`;
 }
 
-// ----------------- Launcher Modal UI -----------------
 function openHomeDialog() {
     closeFloatingCards();
     $('launcher-modal-scrim').classList.add('visible');
@@ -1396,6 +1525,23 @@ $('seg-btn-new').onclick = () => {
     $('new-proj-name').focus();
 };
 
+function formatProjectDate(dateStr) {
+    if (!dateStr) return 'Recently updated';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return 'Recently updated';
+        return d.toLocaleString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch(e) {
+        return 'Recently updated';
+    }
+}
+
 function renderProjectsList() {
     const container = $('existing-projects-container');
     if (!ALL_PROJECTS || !ALL_PROJECTS.length) {
@@ -1406,7 +1552,7 @@ function renderProjectsList() {
         <div class="ios26-proj-item">
             <div style="display:flex; flex-direction:column; gap:2px; flex:1; cursor:pointer;" onclick="loadProjectDirectly('${p.id}')">
                 <span style="font-weight:700; font-size:13px; color:#ffffff;">${p.name || 'Untitled Project'}</span>
-                <span style="font-size:11px; color:rgba(255,255,255,0.5);">${p.basemap || 'Midnight Blue'} · ${p.features ? p.features.length : 0} layers</span>
+                <span style="font-size:11px; color:rgba(255,255,255,0.5);">Last updated: ${formatProjectDate(p.updated_at)} · ${p.features ? p.features.length : 0} layers</span>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
                 <button class="card-btn" onclick="renameProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" title="Rename">
@@ -1457,7 +1603,10 @@ window.renameProjectFromLauncher = async function(e, projectId, oldName) {
     const newName = prompt('Rename workspace:', oldName);
     if (!newName || !newName.trim() || newName.trim() === oldName) return;
     const target = ALL_PROJECTS.find(x => x.id === projectId);
-    if (target) target.name = newName.trim();
+    if (target) {
+        target.name = newName.trim();
+        target.updated_at = new Date().toISOString();
+    }
     if (currentProjectId === projectId) {
         currentProjectName = newName.trim();
         $('project-name-display').textContent = currentProjectName;
@@ -1501,8 +1650,8 @@ $('btn-create-project-submit').onclick = async () => {
         basemap: "Midnight Blue",
         center: centerLL,
         zoom: 14,
-        pitch: 0,
-        bearing: 0,
+        pitch: 55,
+        bearing: -15,
         features: [],
         custom_groups: {"Trade Area Scan": {collapsed: false, ids: []}},
         layer_visibilities: {}
@@ -1546,15 +1695,15 @@ $('project-name-display').onclick = () => {
     }
 };
 
-// ----------------- Supabase Sync & Autosave Engine -----------------
 async function saveProjectToSupabase(showToast = false) {
     if (!currentProjectId || currentProjectId === "local-temp" || !SUPABASE_URL || !SUPABASE_KEY) {
         return;
     }
     setSaveBadgeStatus('saving');
     const c = map.getCenter();
+    const nowIso = new Date().toISOString();
     const payload = {
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
         name: currentProjectName,
         center: [c.lng, c.lat],
         zoom: map.getZoom(),
@@ -1579,6 +1728,8 @@ async function saveProjectToSupabase(showToast = false) {
         if (res.ok) {
             isDirty = false;
             setSaveBadgeStatus('saved');
+            const targetProj = ALL_PROJECTS.find(x => x.id === currentProjectId);
+            if (targetProj) targetProj.updated_at = nowIso;
             if (showToast) hint('Project Saved!');
         } else {
             setSaveBadgeStatus('unsaved');
@@ -1615,7 +1766,6 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ----------------- Marker Icon Pipeline -----------------
 function renderIconCanvas(shape, color) {
     const c = document.createElement('canvas');
     c.width = 64; c.height = 64;
@@ -1731,7 +1881,6 @@ $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
 });
 $('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); markDirty(); };
 
-// ----------------- Vector Layers Pipeline -----------------
 const fc = list => ({
     type: 'FeatureCollection',
     features: list.map(f => ({
@@ -1747,10 +1896,21 @@ function addDrawStack() {
 
         map.addLayer({
             id: 'draw-fill', type: 'fill', source: 'draw',
-            filter: ['==', ['geometry-type'], 'Polygon'],
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['coalesce', ['get', 'is3D'], false], true]],
             paint: {
                 'fill-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
                 'fill-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.35], ['get', 'visible']]
+            }
+        });
+
+        map.addLayer({
+            id: 'draw-fill-extrusion', type: 'fill-extrusion', source: 'draw',
+            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['coalesce', ['get', 'is3D'], false], true]],
+            paint: {
+                'fill-extrusion-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
+                'fill-extrusion-height': ['coalesce', ['get', 'height'], 20],
+                'fill-extrusion-base': ['coalesce', ['get', 'baseHeight'], 0],
+                'fill-extrusion-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.85], ['get', 'visible']]
             }
         });
 
@@ -2014,14 +2174,14 @@ function renderDraft() {
     });
     const ln = c => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: {} });
     draft.forEach((p, i) => {
-        const isOrigin = i === 0 && activeTool === 'polygon';
+        const isOrigin = i === 0 && (activeTool === 'polygon' || activeTool === 'polygon3d');
         const isLastPoint = i === draft.length - 1 && activeTool === 'route' && draft.length > 0;
         f.push(pt(p, isOrigin, isLastPoint));
     });
     if ((activeTool === 'polyline' || activeTool === 'route') && draft.length) {
         f.push(ln(cursorLL ? [...draft, cursorLL] : draft));
     }
-    if (activeTool === 'polygon' && draft.length) {
+    if ((activeTool === 'polygon' || activeTool === 'polygon3d') && draft.length) {
         const pts = cursorLL ? [...draft, cursorLL] : draft;
         if (pts.length > 1) f.push(ln([...pts, pts[0]]));
     }
@@ -2059,7 +2219,6 @@ map.on('load', () => {
     renderProjectsList();
     populateTradeAreaCheckboxes();
     
-    // Init Color Pickers
     setupColorPicker('mColorCtrl', '#1e40af', col => { markerColor = col; markDirty(); });
     setupColorPicker('tColorCtrl', '#d9b451', col => { $('tColorCtrl').dataset.val = col; markDirty(); });
     setupColorPicker('eBorderColorCtrl', '#38bdf8', col => {
@@ -2075,7 +2234,6 @@ map.on('load', () => {
         if (f) { f.props.fillColor = col; syncDraw(); markDirty(); }
     });
     
-    // Basemap Color Pickers
     setupColorPicker('cBgColorCtrl', '#0a1628', col => { setMapPaint('bg', 'background-color', col); markDirty(); });
     setupColorPicker('cExpColorCtrl', '#ffaa00', col => { setMapPaint('rd_express', 'line-color', col); markDirty(); });
     setupColorPicker('cMainColorCtrl', '#e8b84a', col => { setMapPaint('rd_major', 'line-color', col); markDirty(); });
@@ -2087,7 +2245,6 @@ map.on('load', () => {
     setupColorPicker('cWaterColorCtrl', '#0a1424', col => { setMapPaint('water', 'fill-color', col); setMapPaint('waterway', 'line-color', col); markDirty(); });
 });
 
-// ----------------- Dimension Switcher -----------------
 $('btn2DMode').onclick = () => {
     $('btn2DMode').classList.add('active');
     $('btn3DMode').classList.remove('active');
@@ -2109,7 +2266,6 @@ $('btn3DMode').onclick = () => {
     markDirty();
 };
 
-// ----------------- Geometry Utilities -----------------
 function haversineDist(a, b) {
     const R = 6371000, dLa = (b[1]-a[1]) * Math.PI/180, dLo = (b[0]-a[0]) * Math.PI/180;
     const s = Math.sin(dLa/2)**2 + Math.cos(a[1]*Math.PI/180) * Math.cos(b[1]*Math.PI/180) * Math.sin(dLo/2)**2;
@@ -2157,7 +2313,6 @@ function rotateGeometry(f, angleRad, center) {
     }
 }
 
-// ----------------- Routing Engine (OSRM) -----------------
 let rerouteTimeout = null;
 function fetchMultiPointRoute(pts, updateId = null, mode = null) {
     hint('Calculating route…');
@@ -2271,7 +2426,6 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
     return feat;
 }
 
-// ----------------- Feature Popup on Left-Click -----------------
 function showFeaturePopup(f, clickLngLat) {
     let popupCoords = clickLngLat;
     if (!popupCoords) {
@@ -2281,9 +2435,13 @@ function showFeaturePopup(f, clickLngLat) {
     }
     
     let primaryImageHtml = '';
+    let heightInfoHtml = '';
     let tableRowsHtml = '';
 
-    // Check if there is an image in attributes / attrRows
+    if (f.props.is3D) {
+        heightInfoHtml = `<tr><th>Height</th><td>${f.props.height || 20} m (Base: ${f.props.baseHeight || 0} m)</td></tr>`;
+    }
+
     if (f.props.attrRows && f.props.attrRows.length > 0 && f.props.attrTypes) {
         for (const row of f.props.attrRows) {
             for (const col in f.props.attrTypes) {
@@ -2317,6 +2475,7 @@ function showFeaturePopup(f, clickLngLat) {
         <div style="font-weight:700; margin-bottom:6px; color:#38bdf8; font-size:13px;">${f.name}</div>
         ${primaryImageHtml}
         <table class="tag-table">
+            ${heightInfoHtml}
             ${tableRowsHtml}
         </table>
         <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:8px; border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
@@ -2331,7 +2490,6 @@ function showFeaturePopup(f, clickLngLat) {
         .addTo(map);
 }
 
-// ----------------- Trade Area POI Scanner -----------------
 function populateTradeAreaCheckboxes() {
     const container = $('poiCategoryCheckboxes');
     let html = '';
@@ -2471,7 +2629,6 @@ $('btnScanTradeArea').onclick = async () => {
     hint(`Added ${filtered.length} POIs to "Trade Area Scan"!`);
 };
 
-// ----------------- Custom Overpass Query -----------------
 $('customQueryToggle').onclick = () => {
     const body = $('customQueryBody');
     const toggleIcon = $('customQueryToggle').querySelector('span:last-child');
@@ -2521,7 +2678,6 @@ $('btnRunOverpass').onclick = async () => {
     hint(`Added ${elements.length} features from query`);
 };
 
-// ----------------- Selective Boundary Autocomplete -----------------
 let boundaryResults = [];
 const boundaryInput = $('boundarySearchInput');
 const boundaryList = $('boundaryAutocompleteList');
@@ -2589,10 +2745,9 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ----------------- Right-Click Context Menu -----------------
 map.on('contextmenu', e => {
     ctxLngLat = e.lngLat;
-    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-fill-extrusion','draw-line','draw-outline','draw-marker','draw-text'] });
     ctxFeatureId = fs.length && fs[0].properties.id != null ? parseInt(fs[0].properties.id, 10) : null;
     
     const menu = $('map-context-menu');
@@ -2609,7 +2764,7 @@ map.on('contextmenu', e => {
     }
 
     const maxX = window.innerWidth - 220;
-    const maxY = window.innerHeight - 180;
+    const maxY = window.innerHeight - 240;
     menu.style.left = Math.min(e.point.x, maxX) + 'px';
     menu.style.top = Math.min(e.point.y, maxY) + 'px';
     menu.style.display = 'block';
@@ -2647,6 +2802,29 @@ $('ctx-delete').onclick = (e) => {
     $('map-context-menu').style.display = 'none';
 };
 
+function reorderLayer(featureId, action) {
+    const idx = features.findIndex(f => f.id === featureId);
+    if (idx === -1) return;
+    const [feat] = features.splice(idx, 1);
+    if (action === 'front') {
+        features.push(feat);
+    } else if (action === 'forward') {
+        features.splice(Math.min(features.length, idx + 1), 0, feat);
+    } else if (action === 'backward') {
+        features.splice(Math.max(0, idx - 1), 0, feat);
+    } else if (action === 'back') {
+        features.unshift(feat);
+    }
+    syncDraw();
+    renderMyLayers();
+    markDirty();
+}
+
+$('ctx-bring-front').onclick = (e) => { e.stopPropagation(); if (ctxFeatureId) reorderLayer(ctxFeatureId, 'front'); $('map-context-menu').style.display = 'none'; };
+$('ctx-bring-forward').onclick = (e) => { e.stopPropagation(); if (ctxFeatureId) reorderLayer(ctxFeatureId, 'forward'); $('map-context-menu').style.display = 'none'; };
+$('ctx-send-backward').onclick = (e) => { e.stopPropagation(); if (ctxFeatureId) reorderLayer(ctxFeatureId, 'backward'); $('map-context-menu').style.display = 'none'; };
+$('ctx-send-to-back').onclick = (e) => { e.stopPropagation(); if (ctxFeatureId) reorderLayer(ctxFeatureId, 'back'); $('map-context-menu').style.display = 'none'; };
+
 $('ctx-copy').onclick = (e) => {
     e.stopPropagation();
     if (ctxLngLat) {
@@ -2676,7 +2854,6 @@ $('ctx-streetview').onclick = (e) => {
     $('map-context-menu').style.display = 'none';
 };
 
-// ----------------- Search Place -----------------
 const searchInput = $('searchInput');
 const searchResultsList = $('searchResultsList');
 let searchResults = [];
@@ -2716,7 +2893,6 @@ function renderSearchResults(results) {
             const coords = [parseFloat(selected.lon), parseFloat(selected.lat)];
             pulseFeature({geometry: {type: 'Point', coordinates: coords}});
             
-            // Temporary marker element (#38bdf8, size 1.2)
             const el = document.createElement('div');
             el.className = 'temp-search-marker';
             el.style.width = '20px';
@@ -2751,7 +2927,6 @@ $('btn-search').onclick = () => {
     if (willOpen) { p.classList.add('open'); searchInput.focus(); }
 };
 
-// Route Settings Card Presets & Handlers
 document.querySelectorAll('#popup-route-settings .swatch').forEach(sw => {
     sw.onclick = () => {
         currentRouteColor = sw.dataset.rcol;
@@ -2765,7 +2940,6 @@ $('btnStartRouteDraw').onclick = () => {
 };
 $('closeRouteSettingsBtn').onclick = () => { $('popup-route-settings').classList.remove('open'); resetActiveTools(); };
 
-// ----------------- Tool Handlers & Drawing Engine -----------------
 document.querySelectorAll('.tool').forEach(btn => {
     btn.onclick = () => {
         const t = btn.dataset.tool;
@@ -2789,7 +2963,7 @@ document.querySelectorAll('.tool').forEach(btn => {
                 $('popup-route-settings').classList.add('open');
             }
             if (t === 'polyline') hint('Click points · Double-click or click last point to finish');
-            if (t === 'polygon') hint('Click vertices · Double-click or click origin to close');
+            if (t === 'polygon' || t === 'polygon3d') hint('Click vertices · Double-click or click origin to close');
             if (t === 'rectangle') hint('Click corner 1, then click opposite corner');
             if (t === 'circle') hint('Click center, then outer edge');
         }
@@ -2859,7 +3033,7 @@ map.on('mousemove', e => {
 map.on('click', e => {
     if (!activeTool) {
         if (!editMode) {
-            const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+            const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-fill-extrusion','draw-line','draw-outline','draw-marker','draw-text'] });
             if (fs.length && fs[0].properties.id != null) {
                 const id = parseInt(fs[0].properties.id, 10);
                 const f = features.find(x => x.id === id);
@@ -2906,13 +3080,18 @@ map.on('click', e => {
             }
         }
         draft.push(ll);
-    } else if (activeTool === 'polygon') {
+    } else if (activeTool === 'polygon' || activeTool === 'polygon3d') {
         if (draft.length >= 3) {
             const pScreen = map.project(ll);
             for (const pt of draft) {
                 const vScreen = map.project(pt);
                 if (Math.hypot(pScreen.x - vScreen.x, pScreen.y - vScreen.y) < 18) {
-                    const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
+                    const is3D = (activeTool === 'polygon3d');
+                    const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, {
+                        is3D: is3D,
+                        height: is3D ? 20 : 0,
+                        baseHeight: 0
+                    });
                     resetActiveTools();
                     showFeaturePopup(feat, ll);
                     return;
@@ -2958,7 +3137,6 @@ map.on('dblclick', e => {
         return;
     }
     if (editMode) {
-        // Midpoint insertion for route
         const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-line'] });
         if (fs.length && fs[0].properties.id != null) {
             const f = features.find(x => x.id === parseInt(fs[0].properties.id, 10));
@@ -2980,7 +3158,6 @@ map.on('dblclick', e => {
     }
 });
 
-// ----------------- Edit Mode & Dragging -----------------
 map.on('mousedown', e => {
     if (editMode) {
         const vHits = map.queryRenderedFeatures(e.point, { layers: ['vertex-points'] });
@@ -3003,7 +3180,7 @@ map.on('mousedown', e => {
             map.dragPan.disable();
             return;
         }
-        const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
+        const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-fill-extrusion','draw-line','draw-outline','draw-marker','draw-text'] });
         if (fs.length && fs[0].properties.id != null) {
             isDragging = true;
             dragFeatureId = parseInt(fs[0].properties.id, 10);
@@ -3044,7 +3221,6 @@ map.on('mouseup', () => {
     }
 });
 
-// ----------------- Shape Editor / Customizer -----------------
 function openShapeEditor(id) {
     const f = features.find(x => x.id === id);
     if (!f) return;
@@ -3078,13 +3254,20 @@ function openShapeEditor(id) {
         $('eFontSize').value = f.props.fontSize || 16;
     }
     
-    // Route Specifics
     const isRoute = f.kind === 'route';
     $('routeEditorControls').style.display = isRoute ? 'block' : 'none';
     if (isRoute) {
         $('eRouteMode').value = f.props.routeMode || 'driving';
         $('eRouteStats').textContent = f.props.description || '-';
         renderWaypointEditor(f);
+    }
+
+    const isPoly3D = f.kind === 'polygon';
+    $('polygon3dEditorControls').style.display = isPoly3D ? 'block' : 'none';
+    if (isPoly3D) {
+        $('eIs3D').checked = !!f.props.is3D;
+        $('eHeight').value = f.props.height != null ? f.props.height : 20;
+        $('eBaseHeight').value = f.props.baseHeight != null ? f.props.baseHeight : 0;
     }
 
     $('popup-shape-editor').classList.add('open');
@@ -3131,7 +3314,6 @@ $('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selected
 $('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); markDirty(); } };
 $('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); markDirty(); } };
 
-// Route Editor Controls
 $('eRouteMode').onchange = e => {
     const f = features.find(x => x.id === selectedId);
     if (f && f.kind === 'route' && f.props.waypoints) {
@@ -3147,6 +3329,10 @@ $('eRecalcRoute').onclick = () => {
     }
 };
 
+$('eIs3D').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.is3D = e.target.checked; syncDraw(); markDirty(); } };
+$('eHeight').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.height = parseFloat(e.target.value); syncDraw(); markDirty(); } };
+$('eBaseHeight').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.baseHeight = parseFloat(e.target.value); syncDraw(); markDirty(); } };
+
 $('eDeleteBtn').onclick = () => {
     features = features.filter(x => x.id !== selectedId);
     for (const g in customGroups) { customGroups[g].ids = customGroups[g].ids.filter(id => id !== selectedId); }
@@ -3160,671 +3346,6 @@ $('eDeleteBtn').onclick = () => {
 $('eDoneBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); selectedId = null; editMode = false; syncVertexHandles(); };
 $('closeEditorBtn').onclick = () => { $('popup-shape-editor').classList.remove('open'); selectedId = null; editMode = false; syncVertexHandles(); };
 
-// ----------------- My Layers Panel -----------------
-$('btnAddCustomGroup').onclick = () => {
-    const gName = prompt("Enter new Group name:", `Group ${Object.keys(customGroups).length + 1}`);
-    if (gName && gName.trim() && !customGroups[gName]) {
-        customGroups[gName.trim()] = { collapsed: false, ids: [] };
-        renderMyLayers();
-        markDirty();
-    }
-};
-
-$('btnSelectAllGlobal').onclick = () => {
-    if (selectedLayerIds.size === features.length && features.length > 0) {
-        selectedLayerIds.clear();
-    } else {
-        features.forEach(f => selectedLayerIds.add(f.id));
-    }
-    renderMyLayers();
-};
-
-$('btnHideSelected').onclick = () => {
-    if (selectedLayerIds.size === 0) {
-        hint('Select at least one layer first');
-        return;
-    }
-    const allHidden = Array.from(selectedLayerIds).every(id => {
-        const f = features.find(x => x.id === id);
-        return f && f.props.visible === 0;
-    });
-    const newVis = allHidden ? 1 : 0;
-    selectedLayerIds.forEach(id => {
-        const f = features.find(x => x.id === id);
-        if (f) f.props.visible = newVis;
-    });
-    syncDraw();
-    renderMyLayers();
-    markDirty();
-    hint(allHidden ? 'Layers shown' : 'Layers hidden');
-};
-
-function renderLayerCardHtml(f) {
-    let subInfo = f.kind;
-    if (f.kind === 'circle' && f.props.radiusMeters) {
-        subInfo = `Radius: ${f.props.radiusMeters > 1000 ? (f.props.radiusMeters/1000).toFixed(2)+' km' : Math.round(f.props.radiusMeters)+' m'}`;
-    } else if (f.kind === 'route' && f.props.description) {
-        subInfo = f.props.description;
-    }
-    const isSelected = selectedLayerIds.has(f.id);
-    const posOptions = ['center','top','bottom','left','right']
-        .map(p => `<option value="${p}" ${(f.props.labelPos || 'center') === p ? 'selected' : ''}>${p}</option>`)
-        .join('');
-    return `
-        <div class="layer-card" draggable="true" data-id="${f.id}">
-            <div class="layer-card-top">
-                <input type="checkbox" class="layer-select-check" data-id="${f.id}" ${isSelected ? 'checked' : ''} style="width:14px;height:14px;accent-color:#316dca;cursor:pointer;"/>
-                <input class="layer-name-input" data-id="${f.id}" value="${f.name}" title="Click to rename"/>
-                <button class="card-btn" data-act="table" data-id="${f.id}" title="View/Edit Attributes">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-                </button>
-                <button class="card-btn" data-act="eye" data-id="${f.id}" title="Toggle Visibility">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                </button>
-                <button class="card-btn" data-act="zoom" data-id="${f.id}" title="Zoom To">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                </button>
-                <button class="card-btn" data-act="del" data-id="${f.id}" title="Delete" style="color:#ff7b72;">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#768390; padding:0 4px; gap:4px;">
-                <span>${subInfo}</span>
-                <span style="display:flex; align-items:center; gap:4px;">
-                    <label style="display:flex; align-items:center; gap:3px; cursor:pointer;">
-                        <input type="checkbox" data-act="labelToggle" data-id="${f.id}" ${f.props.showLabel ? 'checked' : ''} style="width:10px;height:10px;accent-color:#316dca;"/> Label
-                    </label>
-                    <select data-act="labelPos" data-id="${f.id}" title="Label Position" style="font-size:9px; background:rgba(0,0,0,0.4); color:#adbac7; border:1px solid rgba(255,255,255,0.12); border-radius:4px; padding:1px 2px;">
-                        ${posOptions}
-                    </select>
-                </span>
-            </div>
-        </div>
-    `;
-}
-
-function renderMyLayers() {
-    const container = $('my-layers-list');
-    $('layer-badge-count').textContent = features.length;
-    const polyList = features.filter(f => ['polygon', 'rectangle', 'circle'].includes(f.kind));
-    $('tradePolygonSelect').innerHTML = '<option value="">-- Choose --</option>' + polyList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    if (!features.length && !Object.keys(customGroups).length) {
-        container.innerHTML = '<div style="font-size:12px; color:#768390; padding:6px 0;">No drawings yet. Use the tools to create shapes.</div>';
-        return;
-    }
-    let html = '';
-    const groupedIds = new Set();
-    for (const gName in customGroups) {
-        const grp = customGroups[gName];
-        const groupFeats = features.filter(f => grp.ids.includes(f.id));
-        grp.ids.forEach(id => groupedIds.add(id));
-        html += `
-            <div class="group-container" data-group="${gName}">
-                <div class="group-header" data-group="${gName}">
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <span class="card-btn" data-act="groupToggleCollapse" data-group="${gName}">
-                            <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="${grp.collapsed ? '9 18 15 12 9 6' : '6 9 12 15 18 9'}"></polyline></svg>
-                        </span>
-                        <input class="group-title-input" data-oldname="${gName}" value="${gName}" title="Click to rename Group"/>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:2px;">
-                        <button class="card-btn" data-act="groupSelectAll" data-group="${gName}" title="Select All in Group">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-                        </button>
-                        <button class="card-btn" data-act="groupStyle" data-group="${gName}" title="Style Group">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                        </button>
-                        <button class="card-btn" data-act="groupEye" data-group="${gName}" title="Toggle Group">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                        </button>
-                        <button class="card-btn" data-act="groupDel" data-group="${gName}" title="Delete Group" style="color:#ff7b72;">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="group-styling-panel" data-group="${gName}">
-                    <div style="font-size:10px; font-weight:700; color:#768390; margin-bottom:6px;">BULK APPLY TO MARKERS IN GROUP</div>
-                    <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Color</span> <input type="color" class="grp-style-color" value="#003366" style="width:24px; height:24px; border:none; background:transparent;"></div>
-                    <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Shape</span>
-                        <select class="grp-style-shape" style="flex:1; font-size:10px;">
-                            <option value="">-- No Change --</option>
-                            <option value="pin">Pin</option>
-                            <option value="star">Star</option>
-                            <option value="circle">Circle</option>
-                            <option value="square">Square</option>
-                            <option value="flag">Flag</option>
-                            <option value="heart">Heart</option>
-                            <option value="pinball">Pinball</option>
-                        </select>
-                    </div>
-                    <div class="f-row" style="margin-bottom:4px;"> <span style="font-size:11px;">Size</span> <input type="range" class="grp-style-size" min="0.4" max="2.0" step="0.1" value="0.9" style="flex:1;"></div>
-                    <button class="trade-btn grp-style-apply" style="font-size:10px; padding:4px;">Apply Styling</button>
-                </div>
-                <div class="group-items ${grp.collapsed ? 'hidden' : ''}">
-                    ${groupFeats.length ? groupFeats.map(f => renderLayerCardHtml(f)).join('') : '<div style="font-size:10px; color:#768390; padding:4px;">Empty group — drag layers here</div>'}
-                </div>
-            </div>
-        `;
-    }
-    const looseFeats = features.filter(f => !groupedIds.has(f.id));
-    html += '<div id="ungrouped-zone">';
-    if (looseFeats.length) {
-        html += '<div style="font-size:11px; font-weight:700; color:#adbac7; margin-top:8px; display:flex; justify-content:space-between; align-items:center;"><span>Ungrouped Layers</span> <button class="card-btn" id="btnSelectAllUngrouped" title="Select All Ungrouped"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></button></div>';
-        html += looseFeats.slice().reverse().map(f => renderLayerCardHtml(f)).join('');
-    }
-    html += '</div>';
-    container.innerHTML = html;
-
-    const btnSelAllUng = container.querySelector('#btnSelectAllUngrouped');
-    if (btnSelAllUng) {
-        btnSelAllUng.onclick = () => {
-            const allSelected = looseFeats.every(f => selectedLayerIds.has(f.id));
-            looseFeats.forEach(f => {
-                if (allSelected) selectedLayerIds.delete(f.id);
-                else selectedLayerIds.add(f.id);
-            });
-            renderMyLayers();
-        };
-    }
-
-    container.querySelectorAll('.group-container').forEach(gc => {
-        const gName = gc.dataset.group;
-        gc.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            gc.classList.add('drop-hover');
-        });
-        gc.addEventListener('dragleave', () => {
-            gc.classList.remove('drop-hover');
-        });
-        gc.addEventListener('drop', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            gc.classList.remove('drop-hover');
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            if (isNaN(draggedId)) return;
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-            }
-            if (!customGroups[gName].ids.includes(draggedId)) {
-                customGroups[gName].ids.push(draggedId);
-            }
-            renderMyLayers();
-            markDirty();
-            hint(`Layer added to "${gName}"`);
-        });
-    });
-
-    const uz = container.querySelector('#ungrouped-zone');
-    if (uz) {
-        uz.addEventListener('dragover', e => {
-            e.preventDefault();
-            uz.classList.add('drop-hover');
-        });
-        uz.addEventListener('dragleave', () => {
-            uz.classList.remove('drop-hover');
-        });
-        uz.addEventListener('drop', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            uz.classList.remove('drop-hover');
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            if (isNaN(draggedId)) return;
-            for (const g in customGroups) {
-                customGroups[g].ids = customGroups[g].ids.filter(id => id !== draggedId);
-            }
-            renderMyLayers();
-            markDirty();
-            hint('Layer moved to Ungrouped');
-        });
-    }
-
-    container.querySelectorAll('.layer-card').forEach(card => {
-        card.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/plain', card.dataset.id);
-            e.dataTransfer.effectAllowed = 'move';
-        });
-        card.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        });
-        card.addEventListener('drop', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            const draggedId = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            const targetId = parseInt(card.dataset.id, 10);
-            if (draggedId !== targetId) {
-                reorderFeatures(draggedId, targetId);
-            }
-        });
-    });
-
-    container.querySelectorAll('.layer-select-check').forEach(cb => {
-        cb.addEventListener('change', e => {
-            const id = parseInt(e.target.dataset.id, 10);
-            if (e.target.checked) selectedLayerIds.add(id);
-            else selectedLayerIds.delete(id);
-        });
-    });
-    
-    container.querySelectorAll('[data-act="groupSelectAll"]').forEach(btn => {
-        btn.onclick = () => {
-            const gName = btn.dataset.group;
-            const grp = customGroups[gName];
-            if (grp) {
-                const allSelected = grp.ids.every(id => selectedLayerIds.has(id));
-                grp.ids.forEach(id => {
-                    if (allSelected) selectedLayerIds.delete(id);
-                    else selectedLayerIds.add(id);
-                });
-                renderMyLayers();
-            }
-        };
-    });
-
-    container.querySelectorAll('.group-title-input').forEach(inp => {
-        inp.onchange = e => {
-            const oldN = e.target.dataset.oldname;
-            const newN = e.target.value.trim();
-            if (newN && newN !== oldN) {
-                customGroups[newN] = customGroups[oldN];
-                delete customGroups[oldN];
-                renderMyLayers();
-                markDirty();
-            }
-        };
-    });
-
-    container.querySelectorAll('.layer-name-input').forEach(inp => {
-        inp.onchange = e => {
-            const id = parseInt(e.target.dataset.id, 10);
-            const f = features.find(x => x.id === id);
-            if (f) {
-                f.name = e.target.value;
-                if (!f.props.attributes) f.props.attributes = {};
-                f.props.attributes.name = e.target.value;
-                syncDraw(); markDirty();
-            }
-        };
-    });
-
-    container.querySelectorAll('button[data-act], input[data-act], span[data-act], select[data-act]').forEach(b => {
-        b.onchange = b.onclick = (e) => {
-            if (b.tagName === 'INPUT' && e.type !== 'change') return;
-            if (b.tagName === 'BUTTON' && e.type !== 'click') return;
-            if (b.tagName === 'SPAN' && e.type !== 'click') return;
-            if (b.tagName === 'SELECT' && e.type !== 'change') return;
-            const act = b.dataset.act;
-            if (act === 'groupToggleCollapse') {
-                const g = b.dataset.group;
-                customGroups[g].collapsed = !customGroups[g].collapsed;
-                renderMyLayers();
-                return;
-            }
-            if (act === 'groupStyle') {
-                const g = b.dataset.group;
-                const panel = container.querySelector(`.group-styling-panel[data-group="${g}"]`);
-                if (panel) panel.classList.toggle('open');
-                return;
-            }
-            if (act === 'groupEye') {
-                const g = b.dataset.group;
-                const ids = customGroups[g].ids || [];
-                const anyVis = features.some(f => ids.includes(f.id) && f.props.visible);
-                features.forEach(f => { if (ids.includes(f.id)) f.props.visible = anyVis ? 0 : 1; });
-                syncDraw(); renderMyLayers(); markDirty();
-                return;
-            }
-            if (act === 'groupDel') {
-                const g = b.dataset.group;
-                delete customGroups[g];
-                renderMyLayers();
-                markDirty();
-                return;
-            }
-            const id = parseInt(b.dataset.id, 10);
-            const f = features.find(x => x.id === id);
-            if (!f) return;
-            if (act === 'table') {
-                openAttributeTable(id);
-                return;
-            }
-            if (act === 'labelToggle') { f.props.showLabel = b.checked; syncDraw(); markDirty(); }
-            if (act === 'labelPos') { f.props.labelPos = b.value; syncDraw(); markDirty(); }
-            if (act === 'eye') {
-                f.props.visible = f.props.visible ? 0 : 1;
-                syncDraw();
-                renderMyLayers();
-                markDirty();
-            }
-            if (act === 'del') {
-                features = features.filter(x => x.id !== id);
-                for (const g in customGroups) customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== id);
-                selectedLayerIds.delete(id);
-                if (selectedId === id) selectedId = null;
-                syncDraw(); renderMyLayers(); markDirty();
-            }
-            if (act === 'zoom') {
-                const bnd = calcBounds(f);
-                if (bnd) {
-                    map.fitBounds(bnd, { padding: 60, maxZoom: 18 });
-                    pulseFeature(f);
-                }
-            }
-        };
-    });
-
-    container.querySelectorAll('.grp-style-apply').forEach(btn => {
-        btn.onclick = () => {
-            const panel = btn.closest('.group-styling-panel');
-            const gName = panel.dataset.group;
-            const color = panel.querySelector('.grp-style-color').value;
-            const shape = panel.querySelector('.grp-style-shape').value;
-            const size = parseFloat(panel.querySelector('.grp-style-size').value);
-            const grp = customGroups[gName];
-            if (!grp) return;
-            grp.ids.forEach(id => {
-                const f = features.find(x => x.id === id);
-                if (f && f.kind === 'marker') {
-                    f.props.color = color;
-                    f.props.borderColor = color;
-                    if (shape) f.props.shape = shape;
-                    f.props.iconSize = size;
-                    f.props.iconKey = getIconKey(f.props.shape || 'pin', color);
-                }
-            });
-            syncDraw();
-            renderMyLayers();
-            markDirty();
-            hint(`Styling applied to "${gName}"`);
-        };
-    });
-}
-
-function reorderFeatures(draggedId, targetId) {
-    const draggedIndex = features.findIndex(f => f.id === draggedId);
-    const targetIndex = features.findIndex(f => f.id === targetId);
-    if (draggedIndex === -1 || targetIndex === -1) return;
-    const [draggedItem] = features.splice(draggedIndex, 1);
-    features.splice(targetIndex, 0, draggedItem);
-    syncDraw();
-    renderMyLayers();
-    markDirty();
-}
-
-function calcBounds(f) {
-    let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, ok = false;
-    const walk = c => {
-        if (typeof c[0] === 'number') {
-            ok = true;
-            minX = Math.min(minX, c[0]); maxX = Math.max(maxX, c[0]);
-            minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]);
-        } else c.forEach(walk);
-    };
-    walk(f.geometry.coordinates);
-    if (!ok) return null;
-    if (minX === maxX && minY === maxY) return [[minX - 0.005, minY - 0.005], [maxX + 0.005, maxY + 0.005]];
-    return [[minX, minY], [maxX, maxY]];
-}
-
-// ----------------- Attribute Table Modal & Logic -----------------
-function openAttributeTable(featureId) {
-    currentTableFeatureId = featureId;
-    const f = features.find(x => x.id === featureId);
-    if (!f) return;
-    
-    closeFloatingCards();
-    $('attrTableTitle').textContent = `Attributes: ${f.name}`;
-    $('popup-attribute-table').classList.add('open');
-    
-    if (!f.props.attributes) {
-        f.props.attributes = {
-            name: f.name || '',
-            description: f.props.description || ''
-        };
-    }
-    if (!f.props.attrTypes) {
-        f.props.attrTypes = { name: 'text', description: 'text' };
-    }
-    if (!f.props.attrRows) {
-        f.props.attrRows = [{ ...f.props.attributes }];
-    }
-    
-    renderAttributeTable(f);
-}
-
-function renderAttributeTable(f) {
-    const headerRow = $('attrTableHeader');
-    const bodyRow = $('attrTableBody');
-    const types = f.props.attrTypes || { name: 'text', description: 'text' };
-    const cols = Object.keys(types);
-    const rows = f.props.attrRows || [{ ...f.props.attributes }];
-    
-    headerRow.innerHTML = `<tr>` + cols.map(c => `
-        <th>
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
-                <span>${c}</span>
-                <select onchange="changeColType('${c}', this.value)" style="font-size:9px; padding:1px 2px; border-radius:3px;">
-                    <option value="text" ${types[c] === 'text' ? 'selected' : ''}>Text</option>
-                    <option value="image" ${types[c] === 'image' ? 'selected' : ''}>Image</option>
-                </select>
-            </div>
-        </th>
-    `).join('') + `<th style="width:40px;">DEL</th></tr>`;
-    
-    let html = '';
-    rows.forEach((r, rIdx) => {
-        html += `<tr>`;
-        cols.forEach(c => {
-            const val = r[c] || '';
-            const t = types[c] || 'text';
-            if (t === 'image') {
-                if (val && typeof val === 'string' && val.startsWith('data:image')) {
-                    html += `<td><img src="${val}" class="attr-img-preview" onclick="triggerAttrImageUpload(${rIdx}, '${c}')" oncontextmenu="clearAttrImage(${rIdx}, '${c}'); return false;" title="Click to replace, Right-click to clear"></td>`;
-                } else {
-                    html += `<td><div class="attr-img-placeholder" onclick="triggerAttrImageUpload(${rIdx}, '${c}')">+ Upload Image</div></td>`;
-                }
-            } else {
-                html += `<td><input type="text" value="${val}" onchange="updateAttrCell(${rIdx}, '${c}', this.value)"></td>`;
-            }
-        });
-        html += `<td><button class="card-btn" onclick="removeAttrRow(${rIdx})" title="Delete row" style="color:#ff7b72;">✕</button></td></tr>`;
-    });
-    bodyRow.innerHTML = html;
-}
-
-window.changeColType = (colName, newType) => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (!f) return;
-    f.props.attrTypes[colName] = newType;
-    renderAttributeTable(f);
-    markDirty();
-};
-
-window.updateAttrCell = (rIdx, key, val) => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (!f) return;
-    if (!f.props.attrRows[rIdx]) f.props.attrRows[rIdx] = {};
-    f.props.attrRows[rIdx][key] = val;
-    if (rIdx === 0) {
-        f.props.attributes[key] = val;
-        if (key === 'name') {
-            f.name = val;
-            renderMyLayers();
-        }
-        if (key === 'description') {
-            f.props.description = val;
-        }
-    }
-    syncDraw();
-    markDirty();
-};
-
-window.triggerAttrImageUpload = (rIdx, key) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = e => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = ev => {
-                const f = features.find(x => x.id === currentTableFeatureId);
-                if (f) {
-                    if (!f.props.attrRows[rIdx]) f.props.attrRows[rIdx] = {};
-                    f.props.attrRows[rIdx][key] = ev.target.result;
-                    if (rIdx === 0) f.props.attributes[key] = ev.target.result;
-                    renderAttributeTable(f);
-                    markDirty();
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-    input.click();
-};
-
-window.clearAttrImage = (rIdx, key) => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (f && f.props.attrRows[rIdx]) {
-        f.props.attrRows[rIdx][key] = '';
-        if (rIdx === 0) f.props.attributes[key] = '';
-        renderAttributeTable(f);
-        markDirty();
-    }
-};
-
-window.removeAttrRow = (rIdx) => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (!f || f.props.attrRows.length <= 1) {
-        hint('Cannot remove the primary row');
-        return;
-    }
-    f.props.attrRows.splice(rIdx, 1);
-    renderAttributeTable(f);
-    markDirty();
-};
-
-$('btnAddAttrRow').onclick = () => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (!f) return;
-    const newRow = {};
-    Object.keys(f.props.attrTypes).forEach(k => newRow[k] = '');
-    f.props.attrRows.push(newRow);
-    renderAttributeTable(f);
-    markDirty();
-};
-
-$('btnAddAttrCol').onclick = () => {
-    const f = features.find(x => x.id === currentTableFeatureId);
-    if (!f) return;
-    const name = prompt("Enter new column name:");
-    if (name && name.trim()) {
-        const c = name.trim();
-        const type = confirm("Is this column for Images? (Click Cancel for standard Text)") ? "image" : "text";
-        if (!f.props.attrTypes[c]) {
-            f.props.attrTypes[c] = type;
-            f.props.attrRows.forEach(r => r[c] = '');
-            f.props.attributes[c] = '';
-            renderAttributeTable(f);
-            markDirty();
-        }
-    }
-};
-
-$('attrTableSearch').oninput = e => {
-    const term = e.target.value.toLowerCase();
-    const rows = $('attrTableBody').querySelectorAll('tr');
-    rows.forEach(tr => {
-        const text = tr.innerText.toLowerCase() + Array.from(tr.querySelectorAll('input')).map(i => i.value.toLowerCase()).join(' ');
-        tr.style.display = text.includes(term) ? '' : 'none';
-    });
-};
-
-$('closeAttrTableBtn').onclick = () => {
-    $('popup-attribute-table').classList.remove('open');
-    currentTableFeatureId = null;
-    markDirty();
-    syncDraw();
-};
-
-// ----------------- Direct Export Engine -----------------
-$('btn-export-direct').onclick = () => {
-    hint('Exporting high-quality snapshot...');
-    map.once('render', () => {
-        try {
-            const srcCanvas = map.getCanvas();
-            const a = document.createElement('a');
-            a.download = `Project_Atlas_${Date.now()}.png`;
-            a.href = srcCanvas.toDataURL('image/png', 0.98);
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            hint('Export complete!');
-        } catch(e) {
-            hint('Export failed.');
-        }
-    });
-    map.triggerRepaint();
-};
-
-// ----------------- UI Panel Toggles -----------------
-$('btn-browser-toggle').onclick = () => {
-    const p = $('browser-panel');
-    const willOpen = !p.classList.contains('open');
-    closeFloatingCards();
-    if (willOpen) p.classList.add('open');
-};
-$('btn-close-browser').onclick = () => { $('browser-panel').classList.remove('open'); };
-
-$('btn-mylayers-toggle').onclick = () => {
-    const p = $('mylayers-panel');
-    const willOpen = !p.classList.contains('open');
-    closeFloatingCards();
-    if (willOpen) p.classList.add('open');
-};
-$('btn-close-mylayers').onclick = () => { $('mylayers-panel').classList.remove('open'); };
-
-document.querySelectorAll('.acc-header').forEach(h => {
-    h.onclick = () => {
-        const body = $(h.dataset.target);
-        if (body) {
-            body.classList.toggle('hidden');
-            const chev = h.querySelector('span:last-child');
-            if (chev) chev.textContent = body.classList.contains('hidden') ? '▸' : '▾';
-        }
-    };
-});
-
-document.querySelectorAll('#browser-panel input[data-g]').forEach(cb => {
-    cb.onchange = () => {
-        vis[cb.dataset.g] = cb.checked;
-        applyVis();
-        markDirty();
-    };
-});
-
-$('btn-custom-map').onclick = () => {
-    const p = $('popup-custom-map');
-    const willOpen = !p.classList.contains('open');
-    closeFloatingCards();
-    if (willOpen) p.classList.add('open');
-};
-$('closeCustomMapBtn').onclick = () => { $('popup-custom-map').classList.remove('open'); };
-
-$('presetBtnList').innerHTML = Object.keys(ALL_STYLES).map(n =>
-    `<button style="border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#adbac7; border-radius:6px; padding:5px 8px; font-size:11px; cursor:pointer;" data-n="${n}">${n}</button>`
-).join('');
-
-$('presetBtnList').querySelectorAll('button').forEach(b => {
-    b.onclick = () => {
-        currentStyleName = b.dataset.n;
-        map.setStyle(ALL_STYLES[currentStyleName]);
-        map.once('idle', () => { addDrawStack(); applyVis(); });
-        markDirty();
-    };
-});
-
 const setMapPaint = (id, prop, val) => { if (map.getLayer(id)) map.setPaintProperty(id, prop, val); };
 $('cMainWidth').oninput = e => { setMapPaint('rd_major', 'line-width', parseFloat(e.target.value)); markDirty(); };
 $('cMainOp').oninput = e => { setMapPaint('rd_major', 'line-opacity', parseFloat(e.target.value)); markDirty(); };
@@ -3835,7 +3356,6 @@ $('cTerOp').oninput = e => { ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].f
 $('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('building-3d', 'fill-extrusion-opacity', parseFloat(e.target.value)); markDirty(); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
-// ----------------- Import -----------------
 $('btn-import').onclick = () => { $('importFileInput').click(); };
 $('btn-import-toolbar').onclick = () => { $('importFileInput').click(); };
 $('importFileInput').onchange = async function(e) {
@@ -3867,6 +3387,9 @@ $('importFileInput').onchange = async function(e) {
             const arrayBuffer = await file.arrayBuffer();
             const geojson = await shp(arrayBuffer);
             processGeoJSON(geojson);
+        } else if (ext === 'csv') {
+            const text = await file.text();
+            processCSV(text);
         }
         hint('Import successful');
     } catch(err) {
@@ -3874,12 +3397,50 @@ $('importFileInput').onchange = async function(e) {
     }
 };
 
+function processCSV(text) {
+    const lines = text.split(/\r\n|\n/).filter(l => l.trim() !== '');
+    if (lines.length < 2) return;
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    let latIdx = headers.findIndex(h => h === 'lat' || h === 'latitude' || h === 'y');
+    let lonIdx = headers.findIndex(h => h === 'lon' || h === 'lng' || h === 'longitude' || h === 'x');
+    if (latIdx === -1 || lonIdx === -1) {
+        throw new Error('CSV must contain lat/lon or latitude/longitude columns');
+    }
+    for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim());
+        if (cols.length <= Math.max(latIdx, lonIdx)) continue;
+        const lat = parseFloat(cols[latIdx]);
+        const lon = parseFloat(cols[lonIdx]);
+        if (isNaN(lat) || isNaN(lon)) continue;
+        const props = {};
+        headers.forEach((h, hIdx) => {
+            if (hIdx < cols.length && hIdx !== latIdx && hIdx !== lonIdx) {
+                props[h] = cols[hIdx];
+            }
+        });
+        const name = props['name'] || `CSV Point ${i}`;
+        addFeatureRecord('marker', { type: 'Point', coordinates: [lon, lat] }, {
+            shape: 'pin',
+            color: '#1e40af',
+            iconSize: 0.9,
+            iconKey: getIconKey('pin', '#1e40af'),
+            attributes: props,
+            osmTags: props
+        }, null, name);
+    }
+}
+
 function processGeoJSON(geojson) {
     const feats = geojson.features || [];
     feats.forEach(f => {
         if (!f.geometry) return;
         const geom = f.geometry;
         const props = f.properties || {};
+        const name = props.name || props.NAME || 'Imported Feature';
+        const height = props.height || props.render_height || 20;
+        const baseHeight = props.baseHeight || props.render_min_height || 0;
+        const is3D = props.is3D || height > 0;
+        
         if (geom.type === 'Point') {
             addFeatureRecord('marker', geom, {
                 shape: 'pin',
@@ -3887,7 +3448,7 @@ function processGeoJSON(geojson) {
                 iconSize: 0.9,
                 iconKey: getIconKey('pin', '#1e40af'),
                 osmTags: props
-            });
+            }, null, name);
         } else if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
             if (props.route_mode || props.routeMode) {
                 addFeatureRecord('route', geom, {
@@ -3896,12 +3457,16 @@ function processGeoJSON(geojson) {
                     color: props.color || '#38bdf8',
                     borderColor: props.color || '#38bdf8',
                     waypoints: geom.coordinates
-                });
+                }, null, name);
             } else {
-                addFeatureRecord('polyline', geom, {});
+                addFeatureRecord('polyline', geom, {}, null, name);
             }
         } else if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
-            addFeatureRecord('polygon', geom, {});
+            addFeatureRecord('polygon', geom, {
+                is3D: is3D,
+                height: height,
+                baseHeight: baseHeight
+            }, null, name);
         }
     });
 }
@@ -3914,7 +3479,8 @@ map.on('error', e => console.warn('Map Notice:', e));
 }
 </script>
 </body>
-</html>"""
+</html>
+"""
 
 # ------------------------------------------------------------------------
 # 5. INITIAL STATE & COMPONENT MOUNTING
@@ -3954,6 +3520,6 @@ try:
         .replace("__ZOOM__", str(initial_zoom))
         .replace("__BG__", THEMES.get(initial_theme, THEMES["Midnight Blue"])["overlay"])
     )
-    components.html(html, height=1000, scrolling=False)
+    st.iframe(html, height=1000, scrolling=False)
 except Exception as e:
     st.error(f"Failed to load application: {e}")
