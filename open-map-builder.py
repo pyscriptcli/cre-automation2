@@ -13,26 +13,23 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-#--- HIDE STREAMLIT CHROME & WATERMARK ---
 st.markdown("""
     <style>
-        /* Hide main menu, footer, and header */
+        /* 1. Hide Standard Streamlit Chrome */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
         
-        /* Hide sidebar */
+        /* 2. Hide Sidebar */
         [data-testid="stSidebar"] {display: none !important;}
         section[data-testid="stSidebar"] {display: none !important;}
         
-        /* Hide Streamlit decoration/watermark */
-        div[data-testid="stDecoration"] {display: none !important;}
+        /* 3. HIDE THE "HOSTED WITH STREAMLIT" BADGE & DECORATION */
         .stDeployButton {display: none !important;}
+        div[data-testid="stDecoration"] {display: none !important;}
+        div[data-testid="stDeployButton"] {display: none !important;}
         
-        /* Hide iframe borders */
-        iframe {border: none !important;}
-        
-        /* Full screen overrides */
+        /* 4. Full Screen Map Overrides */
         .block-container {
             padding: 0rem !important;
             margin: 0rem !important;
@@ -49,6 +46,9 @@ st.markdown("""
             overflow: hidden !important;
             margin: 0 !important;
             padding: 0 !important;
+        }
+        iframe {
+            border: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
