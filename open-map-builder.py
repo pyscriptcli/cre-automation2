@@ -524,7 +524,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 #popup-shape-editor { width: 330px; }
 #popup-custom-map { width: 310px; }
 #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
-#popup-route-settings { width: 360px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
+#popup-route-settings { width: 320px; }
 #popup-attribute-table { width: 600px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
 .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
@@ -670,22 +670,14 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .btn-eyedropper { width: 24px; height: 24px; display: grid; place-items: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #adbac7; cursor: pointer; padding: 0; }
 .btn-eyedropper:hover { color: #fff; background: rgba(255,255,255,0.2); }
 
-/* Drag handle for stops */
-.drag-handle {
-    cursor: grab;
-    padding: 0 4px;
-    color: #768390;
-}
-.drag-handle:active { cursor: grabbing; }
-.stop-item {
-    display: flex; align-items: center; gap: 6px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 11px;
-}
-.stop-item.dragging { opacity: 0.5; }
-.stop-list { display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; }
+/* Multi-Stop Routing Styles */
+.route-stops-container { display: flex; flex-direction: column; gap: 6px; max-height: 170px; overflow-y: auto; margin-top: 4px; }
+.route-stop-row { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.04); padding: 4px 6px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
+.route-stop-row.drag-over { border-color: #38bdf8; background: rgba(56, 189, 248, 0.12); }
+.route-stop-input { flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #f0f6fc; font-size: 11px; padding: 4px 8px; outline: none; }
+.route-stop-input:focus { border-color: #38bdf8; }
+.route-drag-handle { cursor: grab; color: #768390; display: grid; place-items: center; }
+.route-drag-handle:active { cursor: grabbing; }
 </style>
 </head>
 <body>
@@ -721,9 +713,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <button class="tb-btn" id="btn-search" title="Search Place">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
     </button>
-    <button class="tb-btn" id="btn-import-toolbar" title="Import Spatial Data (KML, KMZ, GeoJSON, SHP)">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-    </button>
     <div class="tb-sep"></div>
     <button class="tb-btn tool" data-tool="polygon" title="Draw Polygon">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 6-3 10H7L4 9z"></path></svg>
@@ -737,10 +726,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <button class="tb-btn tool" data-tool="polyline" title="Draw Polyline">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"></path></svg>
     </button>
-    <button class="tb-btn tool" data-tool="polygon3d" title="Draw 3D Polygon">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 6-3 10H7L4 9z"></path><path d="M12 2v20"></path><line x1="4" y1="9" x2="20" y2="9"></line></svg>
-    </button>
-    <button class="tb-btn tool" data-tool="route" title="Route A to B">
+    <button class="tb-btn tool" data-tool="route" title="Route Engine (Click or Address-Based)">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="19" r="2.5"></circle><circle cx="19" cy="5" r="2.5"></circle><path d="M7 17c4-1 3-8 8-9"></path></svg>
     </button>
     <button class="tb-btn tool" data-tool="marker" title="Place Marker Pin">
@@ -897,12 +883,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <div id="mColorCtrl" class="color-ctrl-cluster"></div>
     </div>
     <div class="f-row"> <span>Icon Size</span> <input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"></div>
-    <div class="f-row"> <span>Sizing Mode</span>
-        <select id="markerSizingMode" style="width:110px;">
-            <option value="dynamic">Dynamic (zoom)</option>
-            <option value="static">Static</option>
-        </select>
-    </div>
 </div>
 
 <div id="popup-text-settings" class="float-card right-card">
@@ -924,44 +904,57 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="f-row"> <span>Opacity</span> <input type="range" id="tOp" min="0.1" max="1" step="0.05" value="1"></div>
 </div>
 
-<div id="popup-route-settings" class="float-card">
+<div id="popup-route-settings" class="float-card right-card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:700; color:#f0f6fc;">Route</span>
+        <span style="font-weight:700; color:#f0f6fc;">Route Planner</span>
         <button class="card-btn" id="closeRouteSettingsBtn">✕</button>
     </div>
-    <div class="f-row"><span>Mode</span>
-        <select id="rProfile" style="width:130px;">
-            <option value="driving" selected>Driving</option>
-            <option value="walking">Walking</option>
-            <option value="cycling">Cycling</option>
-        </select>
+    <div class="dimension-mode-bar" style="margin-top:2px;">
+        <button class="dimension-mode-btn active" id="routeModeClickTab">Point & Click</button>
+        <button class="dimension-mode-btn" id="routeModeAddressTab">Multi-Stop Address</button>
     </div>
-    <div style="font-weight:600; font-size:11px; color:#768390; margin-top:4px;">Address-based Multi-Stop</div>
-    <div style="display:flex; flex-direction:column; gap:4px;">
-        <div class="f-row"><span>From</span><input type="text" id="routeStartAddr" placeholder="Start address" style="flex:1;"></div>
-        <div class="f-row"><span>To</span><input type="text" id="routeEndAddr" placeholder="End address" style="flex:1;"></div>
-        <div style="display:flex; gap:4px;">
-            <button id="btnAddStop" class="trade-btn" style="padding:4px 8px; font-size:10px;">+ Add Stop</button>
-            <button id="btnCalcRoute" class="trade-btn" style="padding:4px 8px; font-size:10px;">Calculate</button>
+    
+    <!-- Mode 1: Manual Click -->
+    <div id="routeManualTabBody" style="display:flex; flex-direction:column; gap:6px;">
+        <div class="f-row"><span>Travel Profile</span>
+            <select id="rProfile" style="width:130px;">
+                <option value="driving" selected>Driving</option>
+                <option value="walking">Walking</option>
+                <option value="cycling">Cycling</option>
+            </select>
         </div>
-        <div id="stopListContainer" class="stop-list"></div>
-    </div>
-    <div style="border-top:1px solid rgba(255,255,255,0.1); margin:6px 0; padding-top:6px;">
-        <div style="font-weight:600; font-size:11px; color:#768390;">Manual Waypoint Drawing</div>
         <div class="f-row"><span>Auto-Finish</span>
             <label style="display:flex; align-items:center; gap:4px; font-size:11px; cursor:pointer;">
                 <input type="checkbox" id="rAutoFinish" checked style="accent-color:#316dca;"/> On double-click
             </label>
         </div>
-        <button id="btnStartRouteDraw" class="trade-btn" style="width:100%; font-size:11px;">Start Drawing Route</button>
     </div>
-    <div style="font-weight:600; font-size:11px; color:#768390;">Style Presets</div>
-    <div style="display:flex; gap:6px; margin-top:2px;">
+
+    <!-- Mode 2: Multi-Stop Address -->
+    <div id="routeAddressTabBody" style="display:none; flex-direction:column; gap:6px;">
+        <div class="f-row"><span>Travel Profile</span>
+            <select id="rProfileAddress" style="width:130px;">
+                <option value="driving" selected>Driving</option>
+                <option value="walking">Walking</option>
+                <option value="cycling">Cycling</option>
+            </select>
+        </div>
+        <div style="font-size:10px; color:#768390;">Drag stops to reorder. Routes recalculate automatically.</div>
+        <div class="route-stops-container" id="routeStopsList"></div>
+        <div style="display:flex; gap:6px;">
+            <button class="trade-btn" id="btnAddRouteStop" style="flex:1; font-size:10px; background:#22272e; border:1px solid #2d333b;">+ Add Stop</button>
+            <button class="trade-btn" id="btnComputeAddressRoute" style="flex:1; font-size:10px;">Build Route</button>
+        </div>
+    </div>
+
+    <div style="font-weight:600; font-size:11px; color:#768390; margin-top:4px;">ROUTE COLOR</div>
+    <div style="display:flex; gap:6px;">
         <button class="swatch" data-rcol="#38bdf8" style="background:#38bdf8; width:28px; height:24px; border-radius:4px;"></button>
         <button class="swatch" data-rcol="#3fb950" style="background:#3fb950; width:28px; height:24px; border-radius:4px;"></button>
         <button class="swatch" data-rcol="#f85149" style="background:#f85149; width:28px; height:24px; border-radius:4px;"></button>
         <button class="swatch" data-rcol="#a371f7" style="background:#a371f7; width:28px; height:24px; border-radius:4px;"></button>
     </div>
+    <button id="btnStartRouteDraw" class="trade-btn" style="margin-top:4px; font-size:11px;">Start Drawing Mode</button>
 </div>
 
 <div id="popup-shape-editor" class="float-card right-card">
@@ -971,7 +964,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </div>
     <div class="f-row"> <span>Name</span> <input type="text" id="eName" style="width:140px;"></div>
     <div id="eBorderColorRowContainer" class="f-row" style="flex-direction:column; align-items:stretch;">
-        <span style="font-size:11px; margin-bottom:2px;">Border Color</span>
+        <span style="font-size:11px; margin-bottom:2px;">Border / Stroke Color</span>
         <div id="eBorderColorCtrl" class="color-ctrl-cluster"></div>
     </div>
     <div class="f-row" id="eBorderOpRow"> <span>Border Opacity</span> <input type="range" id="eBorderOp" min="0" max="1" step="0.05"></div>
@@ -981,8 +974,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <div id="eFillColorCtrl" class="color-ctrl-cluster"></div>
     </div>
     <div class="f-row" id="eFillOpRow"> <span>Fill Opacity</span> <input type="range" id="eFillOp" min="0" max="1" step="0.05"></div>
-    <!-- 3D Polygon Extrusion Height -->
-    <div id="eExtrusionRow" style="display:none;" class="f-row"> <span>Extrusion Height (m)</span> <input type="range" id="eExtrusionHeight" min="0" max="200" step="1" value="10"></div>
     <div class="f-row" id="eLabelToggleRow" style="display:none;"> <span>Show Label</span> <input type="checkbox" id="eShowLabel"></div>
     <div class="f-row" id="eLabelPosRow" style="display:none;"> <span>Label Position</span>
         <select id="eLabelPos" style="width:110px;">
@@ -993,7 +984,16 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <option value="right">Right</option>
         </select>
     </div>
-    <div class="f-row" id="eMarkerSizeRow" style="display:none;"> <span>Icon Size</span> <input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
+    
+    <!-- Marker Specific Options -->
+    <div class="f-row" id="eMarkerSizeModeRow" style="display:none;"> <span>Icon Sizing</span>
+        <select id="eMarkerSizeMode" style="width:110px;">
+            <option value="dynamic">Dynamic Size</option>
+            <option value="static">Static Size</option>
+        </select>
+    </div>
+    <div class="f-row" id="eMarkerSizeRow" style="display:none;"> <span>Icon Scale</span> <input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
+    
     <div class="f-row" id="eTextRow" style="display:none;"> <span>Text</span> <input type="text" id="eTextVal" style="width:140px;"></div>
     <div class="f-row" id="eFontSizeRow" style="display:none;"> <span>Font Size</span> <input type="range" id="eFontSize" min="10" max="42" step="1"></div>
     
@@ -1096,8 +1096,8 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 <div id="project-edit-modal" class="modal-scrim" style="display: none;">
     <div class="ios26-card" style="max-width: 380px;">
         <div class="ios26-header">
-            <div class="ios26-title" style="font-size: 17px;">Edit Workspace</div>
-            <div class="ios26-subtitle">Modify workspace name and view timestamps</div>
+            <div class="ios26-title" style="font-size: 17px;">Workspace Details</div>
+            <div class="ios26-subtitle">Modify workspace name and inspect project history</div>
         </div>
         <div class="ios26-body">
             <div class="ios26-input-group">
@@ -1105,16 +1105,16 @@ select option:hover, select option:checked { background-color: #2563eb !importan
                 <input class="ios26-input" id="edit-proj-modal-name" placeholder="Workspace Name"/>
             </div>
             <div class="ios26-input-group">
-                <label class="ios26-label">Last Updated</label>
-                <input class="ios26-input" id="edit-proj-modal-updated" readonly style="opacity: 0.7; cursor: default;"/>
+                <label class="ios26-label">Created At (Read-Only)</label>
+                <input class="ios26-input" id="edit-proj-modal-created" readonly style="opacity: 0.7; cursor: default;"/>
             </div>
             <div class="ios26-input-group">
-                <label class="ios26-label">Created At</label>
-                <input class="ios26-input" id="edit-proj-modal-created" readonly style="opacity: 0.7; cursor: default;"/>
+                <label class="ios26-label">Updated At (Read-Only)</label>
+                <input class="ios26-input" id="edit-proj-modal-updated" readonly style="opacity: 0.7; cursor: default;"/>
             </div>
             <div style="display: flex; gap: 8px; margin-top: 8px;">
                 <button class="trade-btn" id="btn-cancel-edit-project" style="flex: 1; background: #22272e; border: 1px solid #2d333b;">Cancel</button>
-                <button class="ios26-action-btn" id="btn-save-edit-project" style="flex: 1;">Save</button>
+                <button class="ios26-action-btn" id="btn-save-edit-project" style="flex: 1;">Save Changes</button>
             </div>
         </div>
     </div>
@@ -1148,11 +1148,11 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </div>
     <div class="ctx-item" id="ctx-bring-front" style="display:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
-        Bring Front
+        Bring to Front
     </div>
     <div class="ctx-item" id="ctx-send-back" style="display:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        Send Back
+        Send to Back
     </div>
     <div class="ctx-item" id="ctx-datatable" style="display:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
@@ -1246,7 +1246,6 @@ let customGroups = __INITIAL_CUSTOM_GROUPS__ || {"Trade Area Scan": {collapsed: 
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
 let markerShape = 'pin', markerColor = '#1e40af', markerIconSize = 0.9;
-let markerSizingMode = 'dynamic'; // 'dynamic' or 'static'
 let customMarkerImageKey = null;
 let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
@@ -1266,16 +1265,23 @@ let currentTableFeatureId = null;
 
 let currentRouteMode = 'driving';
 let currentRouteColor = '#38bdf8';
-// Address-based route stops
-let routeStops = []; // array of {address: string, lat: number, lng: number} or null if not geocoded
-
+let addressStops = [{ id: 1, text: '', coords: null }, { id: 2, text: '', coords: null }];
+let stopIdCounter = 2;
 function formatDateTime(dtStr) {
     if (!dtStr) return 'N/A';
     try {
         const d = new Date(dtStr);
         if (isNaN(d.getTime())) return dtStr;
         const pad = n => String(n).padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const year = d.getFullYear();
+        let hours = d.getHours();
+        const minutes = pad(d.getMinutes());
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        return `${month}-${day}-${year}, ${hours}:${minutes} ${ampm}`;
     } catch(e) {
         return dtStr;
     }
@@ -1498,11 +1504,12 @@ function renderProjectsList() {
         <div class="ios26-proj-item">
             <div style="display:flex; flex-direction:column; gap:2px; flex:1; cursor:pointer;" onclick="loadProjectDirectly('${p.id}')">
                 <span style="font-weight:700; font-size:13px; color:#ffffff;">${p.name || 'Untitled Project'}</span>
-                <span style="font-size:11px; color:rgba(255,255,255,0.5);">Updated: ${formatDateTime(p.updated_at || p.created_at)}</span>
+                <span style="font-size:11px; color:rgba(255,255,255,0.5);">${formatDateTime(p.updated_at || p.created_at)}</span>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
-                <button class="card-btn" onclick="openProjectEditModal(event, '${p.id}')" title="Edit Workspace Details">
+                <button class="card-btn" onclick="openProjectEditModal(event, '${p.id}')" title="Details & Edit" style="display:flex; align-items:center; gap:4px; padding:4px 8px; background:rgba(255,255,255,0.08); font-size:11px; border-radius:6px; color:#38bdf8;">
                     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+                    Details
                 </button>
                 <button class="card-btn" onclick="deleteProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" title="Delete" style="color:#ff7b72;">
                     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -1534,9 +1541,8 @@ window.loadProjectDirectly = function(projectId) {
             const sh = f.props.shape || 'pin';
             const col = f.props.color || '#1e40af';
             f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
+            if (!f.props.sizeMode) f.props.sizeMode = 'dynamic';
         }
-        // ensure 3D polygon props
-        if (f.kind === 'polygon3d' && !f.props.extrusionHeight) f.props.extrusionHeight = 10;
     });
     map.once('idle', () => {
         addDrawStack();
@@ -1554,8 +1560,8 @@ window.openProjectEditModal = function(e, projectId) {
     if (!p) return;
     editingProjectId = projectId;
     $('edit-proj-modal-name').value = p.name || 'Untitled Project';
-    $('edit-proj-modal-updated').value = formatDateTime(p.updated_at || p.created_at);
     $('edit-proj-modal-created').value = formatDateTime(p.created_at || p.updated_at);
+    $('edit-proj-modal-updated').value = formatDateTime(p.updated_at || p.created_at);
     $('project-edit-modal').style.display = 'flex';
 };
 
@@ -1802,6 +1808,40 @@ function getIconKey(shape, color) {
     return key;
 }
 
+function registerRotationIcon() {
+    const key = 'icon_rot_handle';
+    if (!map.hasImage(key)) {
+        const c = document.createElement('canvas');
+        c.width = 48; c.height = 48;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(24, 24, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#e8b84a';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(24, 24, 11, -Math.PI * 0.8, Math.PI * 0.4);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(33, 28);
+        ctx.lineTo(38, 20);
+        ctx.lineTo(28, 20);
+        ctx.closePath();
+        ctx.fill();
+
+        const imgData = ctx.getImageData(0, 0, 48, 48);
+        try { map.addImage(key, imgData, { pixelRatio: 2 }); } catch(e) {}
+    }
+}
+
 $('customMarkerFileInput').onchange = function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -1854,39 +1894,6 @@ $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
     markDirty();
 });
 $('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); markDirty(); };
-$('markerSizingMode').onchange = e => {
-    markerSizingMode = e.target.value;
-    // update all marker layers' icon-size expression based on mode
-    updateMarkerSizing();
-    markDirty();
-};
-
-function updateMarkerSizing() {
-    // This will be called when sizing mode changes or zoom changes.
-    // We'll update the draw-marker layer paint property icon-size.
-    // For dynamic, use a zoom interpolation; for static, use a constant value.
-    if (!map.getLayer('draw-marker')) return;
-    if (markerSizingMode === 'dynamic') {
-        // Example: interpolate between 0.4 at zoom 8 and 2.0 at zoom 20
-        map.setLayoutProperty('draw-marker', 'icon-size', [
-            'interpolate', ['exponential', 1.5], ['zoom'],
-            8, 0.4,
-            20, 2.0
-        ]);
-    } else {
-        // static: use the current markerIconSize value, but we need to apply to each feature individually
-        // For simplicity, we'll set a constant expression.
-        map.setLayoutProperty('draw-marker', 'icon-size', markerIconSize);
-    }
-}
-// Listen to zoom changes to update dynamic sizing
-map.on('zoom', () => {
-    if (markerSizingMode === 'dynamic' && map.getLayer('draw-marker')) {
-        // The expression will auto-update because it's based on zoom, no need to call update.
-        // But we need to ensure the property is set to the expression.
-        // We'll set it once in addDrawStack and when mode changes.
-    }
-});
 
 const fc = list => ({
     type: 'FeatureCollection',
@@ -1898,23 +1905,22 @@ const fc = list => ({
 });
 
 function addDrawStack() {
+    registerRotationIcon();
     if (!map.getSource('draw')) {
         map.addSource('draw', { type: 'geojson', data: fc(features) });
 
-        // 2D polygon fill
         map.addLayer({
             id: 'draw-fill', type: 'fill', source: 'draw',
-            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
+            filter: ['==', ['geometry-type'], 'Polygon'],
             paint: {
                 'fill-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
                 'fill-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.35], ['get', 'visible']]
             }
         });
 
-        // 2D polygon outline
         map.addLayer({
             id: 'draw-outline', type: 'line', source: 'draw',
-            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!=', ['get', 'kind'], 'polygon3d']],
+            filter: ['==', ['geometry-type'], 'Polygon'],
             paint: {
                 'line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#e8b84a'],
                 'line-width': ['coalesce', ['get', 'width'], 3],
@@ -1922,21 +1928,6 @@ function addDrawStack() {
             }
         });
 
-        // 3D Polygon extrusion layer
-        map.addLayer({
-            id: 'draw-extrusion', type: 'fill-extrusion', source: 'draw',
-            filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['==', ['get', 'kind'], 'polygon3d']],
-            paint: {
-                'fill-extrusion-color': ['coalesce', ['get', 'fillColor'], ['get', 'color'], '#e8b84a'],
-                'fill-extrusion-height': ['coalesce', ['get', 'extrusionHeight'], 10],
-                'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': ['*', ['coalesce', ['get', 'fillOpacity'], 0.85], ['get', 'visible']],
-                'fill-extrusion-line-width': ['coalesce', ['get', 'width'], 2],
-                'fill-extrusion-line-color': ['coalesce', ['get', 'borderColor'], ['get', 'color'], '#e8b84a']
-            }
-        });
-
-        // Polyline/route lines
         map.addLayer({
             id: 'draw-line', type: 'line', source: 'draw',
             filter: ['==', ['geometry-type'], 'LineString'],
@@ -1949,26 +1940,28 @@ function addDrawStack() {
             }
         });
 
-        // Markers (with dynamic sizing based on mode)
-        let iconSizeExpr;
-        if (markerSizingMode === 'dynamic') {
-            iconSizeExpr = ['interpolate', ['exponential', 1.5], ['zoom'], 8, 0.4, 20, 2.0];
-        } else {
-            iconSizeExpr = markerIconSize;
-        }
         map.addLayer({
             id: 'draw-marker', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
             layout: {
                 'icon-image': ['get', 'iconKey'],
-                'icon-size': iconSizeExpr,
+                'icon-size': [
+                    'case',
+                    ['==', ['coalesce', ['get', 'sizeMode'], 'dynamic'], 'dynamic'],
+                    [
+                        'interpolate', ['exponential', 1.5], ['zoom'],
+                        8, ['*', ['coalesce', ['get', 'iconSize'], 0.9], 0.35],
+                        14, ['coalesce', ['get', 'iconSize'], 0.9],
+                        18, ['*', ['coalesce', ['get', 'iconSize'], 0.9], 1.8]
+                    ],
+                    ['coalesce', ['get', 'iconSize'], 0.9]
+                ],
                 'icon-allow-overlap': true,
                 'icon-anchor': 'bottom'
             },
             paint: { 'icon-opacity': ['get', 'visible'] }
         });
 
-        // Text labels
         map.addLayer({
             id: 'draw-text', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'text']],
@@ -2040,13 +2033,26 @@ function addDrawStack() {
 
     if (!map.getSource('vertex-handles')) {
         map.addSource('vertex-handles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        
         map.addLayer({
             id: 'vertex-points', type: 'circle', source: 'vertex-handles',
+            filter: ['!=', ['get', 'isRotHandle'], true],
             paint: {
-                'circle-color': ['case', ['boolean', ['get', 'isRotHandle'], false], '#e8b84a', ['case', ['boolean', ['get', 'isRadiusHandle'], false], '#3fb950', '#38bdf8']],
+                'circle-color': ['case', ['boolean', ['get', 'isRadiusHandle'], false], '#3fb950', '#38bdf8'],
                 'circle-radius': 6,
                 'circle-stroke-color': '#ffffff',
                 'circle-stroke-width': 2
+            }
+        });
+
+        map.addLayer({
+            id: 'rotation-handle-symbol', type: 'symbol', source: 'vertex-handles',
+            filter: ['==', ['get', 'isRotHandle'], true],
+            layout: {
+                'icon-image': 'icon_rot_handle',
+                'icon-size': 0.8,
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true
             }
         });
     }
@@ -2151,7 +2157,7 @@ function syncVertexHandles() {
                     properties: { polyId: f.id, isRadiusHandle: true }
                 });
             }
-        } else if (['polygon','rectangle','polygon3d'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+        } else if (['polygon','rectangle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
             const coords = f.geometry.coordinates[0];
             for (let i = 0; i < coords.length - 1; i++) {
                 handleFeats.push({
@@ -2206,10 +2212,6 @@ function renderDraft() {
         const pts = cursorLL ? [...draft, cursorLL] : draft;
         if (pts.length > 1) f.push(ln([...pts, pts[0]]));
     }
-    if (activeTool === 'polygon3d' && draft.length) {
-        const pts = cursorLL ? [...draft, cursorLL] : draft;
-        if (pts.length > 1) f.push(ln([...pts, pts[0]]));
-    }
     if (activeTool === 'rectangle' && draft.length === 1 && cursorLL) {
         f.push(ln(rectCoords(draft[0], cursorLL)[0]));
     }
@@ -2236,15 +2238,15 @@ map.on('load', () => {
             const sh = f.props.shape || 'pin';
             const col = f.props.color || '#1e40af';
             f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
+            if (!f.props.sizeMode) f.props.sizeMode = 'dynamic';
         }
-        if (f.kind === 'polygon3d' && !f.props.extrusionHeight) f.props.extrusionHeight = 10;
     });
     addDrawStack();
     applyVis();
     renderMyLayers();
     renderProjectsList();
     populateTradeAreaCheckboxes();
-    updateMarkerSizing(); // set initial sizing mode
+    renderRouteStops();
     
     setupColorPicker('mColorCtrl', '#1e40af', col => { markerColor = col; markDirty(); });
     setupColorPicker('tColorCtrl', '#d9b451', col => { $('tColorCtrl').dataset.val = col; markDirty(); });
@@ -2418,10 +2420,125 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
     });
 }
 
+// ----------------- Multi-Stop Address Engine -----------------
+$('routeModeClickTab').onclick = () => {
+    $('routeModeClickTab').classList.add('active');
+    $('routeModeAddressTab').classList.remove('active');
+    $('routeManualTabBody').style.display = 'flex';
+    $('routeAddressTabBody').style.display = 'none';
+    $('btnStartRouteDraw').style.display = 'block';
+};
+$('routeModeAddressTab').onclick = () => {
+    $('routeModeAddressTab').classList.add('active');
+    $('routeModeClickTab').classList.remove('active');
+    $('routeManualTabBody').style.display = 'none';
+    $('routeAddressTabBody').style.display = 'flex';
+    $('btnStartRouteDraw').style.display = 'none';
+};
+
+function renderRouteStops() {
+    const list = $('routeStopsList');
+    if (!list) return;
+    list.innerHTML = addressStops.map((stop, i) => {
+        const label = i === 0 ? 'From' : (i === addressStops.length - 1 ? 'To' : `Stop ${i}`);
+        return `
+            <div class="route-stop-row" draggable="true" data-index="${i}">
+                <div class="route-drag-handle" title="Drag to reorder">⋮⋮</div>
+                <span style="font-size:10px; font-weight:700; width:30px; color:#38bdf8;">${label}</span>
+                <input type="text" class="route-stop-input" data-index="${i}" placeholder="Enter address or landmark..." value="${stop.text}"/>
+                ${addressStops.length > 2 ? `<button class="card-btn" onclick="removeRouteStop(${i})" style="color:#ff7b72;">✕</button>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    list.querySelectorAll('.route-stop-input').forEach(inp => {
+        inp.onchange = e => {
+            const idx = parseInt(e.target.dataset.index, 10);
+            addressStops[idx].text = e.target.value.trim();
+            addressStops[idx].coords = null;
+        };
+    });
+
+    list.querySelectorAll('.route-stop-row').forEach(row => {
+        row.ondragstart = e => {
+            e.dataTransfer.setData('text/plain', row.dataset.index);
+            e.dataTransfer.effectAllowed = 'move';
+        };
+        row.ondragover = e => {
+            e.preventDefault();
+            row.classList.add('drag-over');
+        };
+        row.ondragleave = () => row.classList.remove('drag-over');
+        row.ondrop = e => {
+            e.preventDefault();
+            row.classList.remove('drag-over');
+            const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+            const toIdx = parseInt(row.dataset.index, 10);
+            if (fromIdx !== toIdx) {
+                const [moved] = addressStops.splice(fromIdx, 1);
+                addressStops.splice(toIdx, 0, moved);
+                renderRouteStops();
+                computeAndDrawAddressRoute();
+            }
+        };
+    });
+}
+
+window.removeRouteStop = function(idx) {
+    if (addressStops.length > 2) {
+        addressStops.splice(idx, 1);
+        renderRouteStops();
+        computeAndDrawAddressRoute();
+    }
+};
+
+$('btnAddRouteStop').onclick = () => {
+    stopIdCounter++;
+    addressStops.splice(addressStops.length - 1, 0, { id: stopIdCounter, text: '', coords: null });
+    renderRouteStops();
+};
+
+async function geocodeAddress(query) {
+    if (!query) return null;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.length > 0) {
+            return [parseFloat(data[0].lon), parseFloat(data[0].lat)];
+        }
+    } catch(e) {}
+    return null;
+}
+
+async function computeAndDrawAddressRoute() {
+    const validInputs = addressStops.filter(s => s.text && s.text.trim().length > 0);
+    if (validInputs.length < 2) return;
+    hint('Geocoding addresses & calculating route...');
+    
+    for (const stop of addressStops) {
+        if (stop.text && !stop.coords) {
+            stop.coords = await geocodeAddress(stop.text);
+        }
+    }
+    
+    const validCoords = addressStops.map(s => s.coords).filter(c => c != null);
+    if (validCoords.length < 2) {
+        hint('Could not find location for one or more addresses');
+        return;
+    }
+
+    const profile = $('rProfileAddress').value || 'driving';
+    fetchMultiPointRoute(validCoords, null, profile);
+}
+
+$('btnComputeAddressRoute').onclick = () => {
+    computeAndDrawAddressRoute();
+};
+
 function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, explicitName = null) {
     const newId = ++fid;
     const isRoute = kind === 'route';
-    const is3DPoly = kind === 'polygon3d';
     const defaultBorder = isRoute ? (customProps.borderColor || currentRouteColor) : '#e8b84a';
     const assignedName = explicitName || `${kind.charAt(0).toUpperCase() + kind.slice(1)} ${newId}`;
     const feat = {
@@ -2435,17 +2552,17 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
             borderOpacity: 0.9,
             width: 3,
             fillColor: '#e8b84a',
-            fillOpacity: is3DPoly ? 0.85 : 0.35,
+            fillOpacity: 0.35,
             showLabel: false,
             labelPos: 'center',
             iconSize: markerIconSize,
+            sizeMode: 'dynamic',
             visible: 1,
             rotation: 0,
             attributes: { name: assignedName, description: isRoute ? (customProps.description || '') : '' },
             ...customProps
         }
     };
-    if (is3DPoly && !feat.props.extrusionHeight) feat.props.extrusionHeight = 10;
     features.push(feat);
     if (targetGroup && customGroups[targetGroup]) {
         customGroups[targetGroup].ids.push(newId);
@@ -2643,6 +2760,7 @@ $('btnScanTradeArea').onclick = async () => {
             shape: 'pin',
             color: '#1e40af',
             iconSize: 0.85,
+            sizeMode: 'dynamic',
             iconKey: getIconKey('pin', '#1e40af'),
             osmTags: el.tags || { name: poiName, type: 'custom' }
         }, "Trade Area Scan", poiName);
@@ -2682,6 +2800,7 @@ $('btnRunOverpass').onclick = async () => {
                 shape: 'pin',
                 color: '#1e40af',
                 iconSize: 0.9,
+                sizeMode: 'dynamic',
                 iconKey: getIconKey('pin', '#1e40af'),
                 osmTags: el.tags || {}
             });
@@ -2691,6 +2810,7 @@ $('btnRunOverpass').onclick = async () => {
                     shape: 'pin',
                     color: '#1e40af',
                     iconSize: 0.9,
+                    sizeMode: 'dynamic',
                     iconKey: getIconKey('pin', '#1e40af'),
                     osmTags: el.tags || {}
                 });
@@ -2983,96 +3103,6 @@ $('btnStartRouteDraw').onclick = () => {
 };
 $('closeRouteSettingsBtn').onclick = () => { $('popup-route-settings').classList.remove('open'); resetActiveTools(); };
 
-// Address-based routing
-let stopItems = []; // array of {id: unique, address: string, lat: number, lng: number}
-
-function renderStopList() {
-    const container = $('stopListContainer');
-    if (!stopItems.length) {
-        container.innerHTML = '<div style="font-size:10px; color:#768390;">Add stops above</div>';
-        return;
-    }
-    let html = '';
-    stopItems.forEach((item, idx) => {
-        html += `
-            <div class="stop-item" draggable="true" data-idx="${idx}">
-                <span class="drag-handle">⠿</span>
-                <span style="flex:1; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    ${item.address || (item.lat && item.lng ? `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}` : 'Unknown')}
-                </span>
-                <button class="card-btn" onclick="removeStop(${idx})" style="color:#ff7b72;">✕</button>
-            </div>
-        `;
-    });
-    container.innerHTML = html;
-    // Add drag events for reordering
-    container.querySelectorAll('.stop-item').forEach(el => {
-        el.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/plain', el.dataset.idx);
-            el.classList.add('dragging');
-        });
-        el.addEventListener('dragend', () => el.classList.remove('dragging'));
-        el.addEventListener('dragover', e => e.preventDefault());
-        el.addEventListener('drop', e => {
-            e.preventDefault();
-            const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            const toIdx = parseInt(el.dataset.idx, 10);
-            if (fromIdx !== toIdx) {
-                const [moved] = stopItems.splice(fromIdx, 1);
-                stopItems.splice(toIdx, 0, moved);
-                renderStopList();
-            }
-        });
-    });
-}
-
-window.removeStop = function(idx) {
-    stopItems.splice(idx, 1);
-    renderStopList();
-};
-
-$('btnAddStop').onclick = () => {
-    stopItems.push({ id: Date.now() + Math.random(), address: '', lat: null, lng: null });
-    renderStopList();
-};
-
-$('btnCalcRoute').onclick = async () => {
-    const startAddr = $('routeStartAddr').value.trim();
-    const endAddr = $('routeEndAddr').value.trim();
-    if (!startAddr || !endAddr) {
-        hint('Please fill in both "From" and "To" addresses.');
-        return;
-    }
-    // Build list of stops: start, intermediates, end
-    const addresses = [startAddr, ...stopItems.map(s => s.address || ''), endAddr].filter(a => a.trim() !== '');
-    if (addresses.length < 2) { hint('Need at least two addresses.'); return; }
-    hint('Geocoding addresses...');
-    // Geocode each address
-    const geocoded = [];
-    for (const addr of addresses) {
-        try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`);
-            const data = await res.json();
-            if (data && data[0]) {
-                geocoded.push([parseFloat(data[0].lon), parseFloat(data[0].lat)]);
-            } else {
-                hint(`Failed to geocode: ${addr}`);
-                return;
-            }
-        } catch(e) {
-            hint(`Geocoding error for ${addr}`);
-            return;
-        }
-    }
-    // Now compute route
-    fetchMultiPointRoute(geocoded, null, currentRouteMode);
-    // Optionally clear fields
-    $('routeStartAddr').value = '';
-    $('routeEndAddr').value = '';
-    stopItems = [];
-    renderStopList();
-};
-
 // Tool Handlers
 document.querySelectorAll('.tool').forEach(btn => {
     btn.onclick = () => {
@@ -3098,7 +3128,6 @@ document.querySelectorAll('.tool').forEach(btn => {
             }
             if (t === 'polyline') hint('Click points · Double-click or click last point to finish');
             if (t === 'polygon') hint('Click vertices · Double-click or click origin to close');
-            if (t === 'polygon3d') hint('Click vertices for 3D polygon · Double-click or click origin to close');
             if (t === 'rectangle') hint('Click corner 1, then click opposite corner');
             if (t === 'circle') hint('Click center, then outer edge');
         }
@@ -3149,7 +3178,7 @@ map.on('mousemove', e => {
                 f.geometry.coordinates = circleCoords(c, cursorLL).coords;
                 const distText = newRadius > 1000 ? `${(newRadius/1000).toFixed(2)} km` : `${Math.round(newRadius)} m`;
                 hint(`Circle Radius: ${distText}`);
-            } else if (['polygon','rectangle','polygon3d'].includes(f.kind) && f.geometry.coordinates[0]) {
+            } else if (['polygon','rectangle'].includes(f.kind) && f.geometry.coordinates[0]) {
                 const coords = f.geometry.coordinates[0];
                 coords[draggedVertexIdx] = cursorLL;
                 if (draggedVertexIdx === 0) coords[coords.length - 1] = cursorLL;
@@ -3189,8 +3218,8 @@ map.on('click', e => {
             shape: markerShape,
             color: markerColor,
             iconSize: markerIconSize,
-            iconKey: iconKey,
-            sizingMode: markerSizingMode // store mode
+            sizeMode: 'dynamic',
+            iconKey: iconKey
         });
         resetActiveTools();
         closeFloatingCards();
@@ -3225,20 +3254,6 @@ map.on('click', e => {
                 const vScreen = map.project(pt);
                 if (Math.hypot(pScreen.x - vScreen.x, pScreen.y - vScreen.y) < 18) {
                     const feat = addFeatureRecord('polygon', { type: 'Polygon', coordinates: [[...draft, draft[0]]] });
-                    resetActiveTools();
-                    showFeaturePopup(feat, ll);
-                    return;
-                }
-            }
-        }
-        draft.push(ll);
-    } else if (activeTool === 'polygon3d') {
-        if (draft.length >= 3) {
-            const pScreen = map.project(ll);
-            for (const pt of draft) {
-                const vScreen = map.project(pt);
-                if (Math.hypot(pScreen.x - vScreen.x, pScreen.y - vScreen.y) < 18) {
-                    const feat = addFeatureRecord('polygon3d', { type: 'Polygon', coordinates: [[...draft, draft[0]]] }, { extrusionHeight: 10 });
                     resetActiveTools();
                     showFeaturePopup(feat, ll);
                     return;
@@ -3302,51 +3317,27 @@ map.on('dblclick', e => {
                 }
             }
         }
-        // Vertex insertion on double-click for polygons: find edge closest to click and insert a vertex
-        if (selectedId) {
-            const f = features.find(x => x.id === selectedId);
-            if (f && ['polygon','rectangle','polygon3d'].includes(f.kind)) {
-                const coords = f.geometry.coordinates[0];
-                if (coords.length < 3) return;
-                const ll = [e.lngLat.lng, e.lngLat.lat];
-                let bestEdge = -1, bestDist = Infinity;
-                for (let i = 0; i < coords.length - 1; i++) {
-                    const a = coords[i], b = coords[i+1];
-                    // distance from point to segment
-                    const dx = b[0]-a[0], dy = b[1]-a[1];
-                    const t = Math.max(0, Math.min(1, ((ll[0]-a[0])*dx + (ll[1]-a[1])*dy) / (dx*dx+dy*dy)));
-                    const projX = a[0]+t*dx, projY = a[1]+t*dy;
-                    const d = Math.hypot(ll[0]-projX, ll[1]-projY);
-                    if (d < bestDist) { bestDist = d; bestEdge = i; }
-                }
-                if (bestEdge !== -1 && bestDist < 0.0005) {
-                    coords.splice(bestEdge+1, 0, ll);
-                    syncDraw();
-                    markDirty();
-                    syncVertexHandles();
-                    hint('Vertex inserted');
-                }
-            }
-        }
     }
 });
 
 // Edit Mode Dragging
 map.on('mousedown', e => {
     if (editMode) {
+        const rHits = map.queryRenderedFeatures(e.point, { layers: ['rotation-handle-symbol'] });
+        if (rHits.length && rHits[0].properties.polyId != null) {
+            isDraggingRotation = true;
+            rotatingPolyId = parseInt(rHits[0].properties.polyId, 10);
+            const f = features.find(x => x.id === rotatingPolyId);
+            const b = calcBounds(f);
+            rotCenter = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
+            rotStartAngle = Math.atan2(cursorLL[1] - rotCenter[1], cursorLL[0] - rotCenter[0]);
+            map.dragPan.disable();
+            return;
+        }
+
         const vHits = map.queryRenderedFeatures(e.point, { layers: ['vertex-points'] });
         if (vHits.length && vHits[0].properties.polyId != null) {
             const prop = vHits[0].properties;
-            if (prop.isRotHandle) {
-                isDraggingRotation = true;
-                rotatingPolyId = parseInt(prop.polyId, 10);
-                const f = features.find(x => x.id === rotatingPolyId);
-                const b = calcBounds(f);
-                rotCenter = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
-                rotStartAngle = Math.atan2(cursorLL[1] - rotCenter[1], cursorLL[0] - rotCenter[0]);
-                map.dragPan.disable();
-                return;
-            }
             isDraggingVertex = true;
             draggedPolyId = parseInt(prop.polyId, 10);
             draggedVertexIdx = prop.vIdx != null ? parseInt(prop.vIdx, 10) : -1;
@@ -3354,6 +3345,7 @@ map.on('mousedown', e => {
             map.dragPan.disable();
             return;
         }
+
         const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
         if (fs.length && fs[0].properties.id != null) {
             isDragging = true;
@@ -3409,25 +3401,22 @@ function openShapeEditor(id) {
     $('eWidth').value = f.props.width || 3;
     $('eFillOp').value = f.props.fillOpacity != null ? f.props.fillOpacity : 0.35;
     
-    const isPolygon = ['polygon', 'rectangle', 'circle', 'polygon3d'].includes(f.kind);
+    const isPolygon = ['polygon', 'rectangle', 'circle'].includes(f.kind);
     $('eFillColorRowContainer').style.display = isPolygon ? 'flex' : 'none';
     $('eFillOpRow').style.display = isPolygon ? 'flex' : 'none';
     $('eLabelToggleRow').style.display = 'flex';
     $('eLabelPosRow').style.display = 'flex';
     
-    // Show extrusion only for 3D polygons
-    const is3DPoly = f.kind === 'polygon3d';
-    $('eExtrusionRow').style.display = is3DPoly ? 'flex' : 'none';
-    if (is3DPoly) {
-        $('eExtrusionHeight').value = f.props.extrusionHeight || 10;
-    }
-
     $('eShowLabel').checked = !!f.props.showLabel;
     $('eLabelPos').value = f.props.labelPos || 'center';
 
     const isMarker = f.kind === 'marker';
+    $('eMarkerSizeModeRow').style.display = isMarker ? 'flex' : 'none';
     $('eMarkerSizeRow').style.display = isMarker ? 'flex' : 'none';
-    if (isMarker) $('eMarkerSize').value = f.props.iconSize || 0.9;
+    if (isMarker) {
+        $('eMarkerSizeMode').value = f.props.sizeMode || 'dynamic';
+        $('eMarkerSize').value = f.props.iconSize || 0.9;
+    }
     
     const isText = f.kind === 'text';
     $('eTextRow').style.display = isText ? 'flex' : 'none';
@@ -3485,17 +3474,17 @@ $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); 
 $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); markDirty(); } };
 $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); markDirty(); } };
-$('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); markDirty(); } };
-$('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); markDirty(); } };
-$('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); markDirty(); } };
-$('eExtrusionHeight').oninput = e => {
+$('eMarkerSizeMode').onchange = e => {
     const f = features.find(x => x.id === selectedId);
-    if (f && f.kind === 'polygon3d') {
-        f.props.extrusionHeight = parseFloat(e.target.value);
+    if (f) {
+        f.props.sizeMode = e.target.value;
         syncDraw();
         markDirty();
     }
 };
+$('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); markDirty(); } };
+$('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); markDirty(); } };
+$('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); markDirty(); } };
 
 $('eRouteMode').onchange = e => {
     const f = features.find(x => x.id === selectedId);
@@ -3570,8 +3559,6 @@ function renderLayerCardHtml(f) {
         subInfo = `Radius: ${f.props.radiusMeters > 1000 ? (f.props.radiusMeters/1000).toFixed(2)+' km' : Math.round(f.props.radiusMeters)+' m'}`;
     } else if (f.kind === 'route' && f.props.description) {
         subInfo = f.props.description;
-    } else if (f.kind === 'polygon3d') {
-        subInfo = `Height: ${f.props.extrusionHeight || 10}m`;
     }
     const isSelected = selectedLayerIds.has(f.id);
     const posOptions = ['center','top','bottom','left','right']
@@ -4202,9 +4189,8 @@ $('cTerOp').oninput = e => { ['rd_tertiary','rd_min_md','rd_min_lo','rd_path'].f
 $('cBldOp').oninput = e => { setMapPaint('building-2d', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('building-3d', 'fill-extrusion-opacity', parseFloat(e.target.value)); markDirty(); };
 $('cWaterOp').oninput = e => { setMapPaint('water', 'fill-opacity', parseFloat(e.target.value)); setMapPaint('waterway', 'line-opacity', parseFloat(e.target.value)); };
 
-// Import Logic
+// Import Logic (inside Data Browser)
 $('btn-import').onclick = () => { $('importFileInput').click(); };
-$('btn-import-toolbar').onclick = () => { $('importFileInput').click(); };
 $('importFileInput').onchange = async function(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -4252,6 +4238,7 @@ function processGeoJSON(geojson) {
                 shape: 'pin',
                 color: '#1e40af',
                 iconSize: 0.9,
+                sizeMode: 'dynamic',
                 iconKey: getIconKey('pin', '#1e40af'),
                 osmTags: props
             });
@@ -4283,7 +4270,6 @@ map.on('error', e => console.warn('Map Notice:', e));
 </body>
 </html>"""
 
-# Part 1 complete. Reply with **'continue'** to receive Part 2.
 # ------------------------------------------------------------------------
 # 5. INITIAL STATE & COMPONENT MOUNTING
 # ------------------------------------------------------------------------
