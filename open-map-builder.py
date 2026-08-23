@@ -13,23 +13,37 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+#--- HIDE STREAMLIT CHROME & WATERMARK ---
 st.markdown("""
     <style>
-        /* 1. Hide Standard Streamlit Chrome */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
+        /* Hide main menu, footer, and header */
+        #MainMenu {visibility: hidden !important;}
+        footer {visibility: hidden !important;}
+        header {visibility: hidden !important;}
         
-        /* 2. Hide Sidebar */
+        /* Hide Streamlit decoration/watermark - multiple selectors for coverage */
+        [data-testid="stDecoration"] {display: none !important;}
+        .stDecoration {display: none !important;}
+        div[data-testid="stDecoration"] {display: none !important;}
+        
+        /* Hide deploy button */
+        .stDeployButton {display: none !important;}
+        [data-testid="stDeployButton"] {display: none !important;}
+        
+        /* Hide sidebar completely */
         [data-testid="stSidebar"] {display: none !important;}
         section[data-testid="stSidebar"] {display: none !important;}
+        div[data-testid="stSidebar"] {display: none !important;}
+        .css-1d391kg {display: none !important;}
         
-        /* 3. HIDE THE "HOSTED WITH STREAMLIT" BADGE & DECORATION */
-        .stDeployButton {display: none !important;}
-        div[data-testid="stDecoration"] {display: none !important;}
-        div[data-testid="stDeployButton"] {display: none !important;}
+        /* Hide header elements */
+        [data-testid="stHeader"] {display: none !important;}
+        .css-145kmo2 {display: none !important;}
         
-        /* 4. Full Screen Map Overrides */
+        /* Hide iframe borders */
+        iframe {border: none !important;}
+        
+        /* Full screen overrides */
         .block-container {
             padding: 0rem !important;
             margin: 0rem !important;
@@ -47,9 +61,11 @@ st.markdown("""
             margin: 0 !important;
             padding: 0 !important;
         }
-        iframe {
-            border: none !important;
-        }
+        
+        /* Additional Streamlit 2.x selectors */
+        .main-header {display: none !important;}
+        .viewer-badge {display: none !important;}
+        [data-testid="stSidebarUserContent"] {display: none !important;}
     </style>
 """, unsafe_allow_html=True)
 
