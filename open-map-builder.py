@@ -2753,34 +2753,55 @@ document.addEventListener('click', (e) => {
 
 // ----------------- Right-Click Context Menu (Bring Front / Send Back) -----------------
 map.on('contextmenu', e => {
-    ctxLngLat = e.lngLat;
-    const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-3d-extrusion','draw-line','draw-outline','draw-marker','draw-text'] });
-    ctxFeatureId = fs.length && fs[0].properties.id != null ? parseInt(fs[0].properties.id, 10) : null;
-    
-    const menu = $('map-context-menu');
-    $('ctx-coords-label').textContent = `${e.lngLat.lat.toFixed(6)}, ${e.lngLat.lng.toFixed(6)}`;
-    
-    if (ctxFeatureId) {
-        $('ctx-edit').style.display = 'flex';
-        $('ctx-bring-front').style.display = 'flex';
-        $('ctx-send-back').style.display = 'flex';
-        $('ctx-datatable').style.display = 'flex';
-        $('ctx-delete').style.display = 'flex';
-        $('ctx-divider-feat').style.display = 'block';
-    } else {
-        $('ctx-edit').style.display = 'none';
-        $('ctx-bring-front').style.display = 'none';
-        $('ctx-send-back').style.display = 'none';
-        $('ctx-datatable').style.display = 'none';
-        $('ctx-delete').style.display = 'none';
-        $('ctx-divider-feat').style.display = 'none';
-    }
+    try {
+        ctxLngLat = e.lngLat;
+        let fs = [];
+        try {
+            fs = map.queryRenderedFeatures(e.point, {
+                layers: ['draw-fill', 'draw-3d-extrusion', 'draw-line', 'draw-outline', 'draw-marker', 'draw-text']
+            });
+        } catch (queryErr) {
+            // Ignore query errors – no feature will be selected
+        }
+        ctxFeatureId = (fs.length && fs[0].properties && fs[0].properties.id != null)
+            ? parseInt(fs[0].properties.id, 10)
+            : null;
 
-    const maxX = window.innerWidth - 220;
-    const maxY = window.innerHeight - 240;
-    menu.style.left = Math.min(e.point.x, maxX) + 'px';
-    menu.style.top = Math.min(e.point.y, maxY) + 'px';
-    menu.style.display = 'block';
+        const menu = document.getElementById('map-context-menu');
+        if (!menu) return;
+
+        // Update coordinates label
+        const coordLabel = document.getElementById('ctx-coords-label');
+        if (coordLabel) {
+            coordLabel.textContent = `${e.lngLat.lat.toFixed(6)}, ${e.lngLat.lng.toFixed(6)}`;
+        }
+
+        // Show/hide feature-specific items
+        const hasFeature = ctxFeatureId !== null;
+        const items = ['ctx-edit', 'ctx-bring-front', 'ctx-send-back', 'ctx-datatable', 'ctx-delete'];
+        const divider = document.getElementById('ctx-divider-feat');
+        items.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = hasFeature ? 'flex' : 'none';
+        });
+        if (divider) divider.style.display = hasFeature ? 'block' : 'none';
+
+        // Position the menu within viewport
+        const maxX = window.innerWidth - 220;
+        const maxY = window.innerHeight - 240;
+        menu.style.left = Math.min(e.point.x, maxX) + 'px';
+        menu.style.top = Math.min(e.point.y, maxY) + 'px';
+        menu.style.display = 'block';
+    } catch (err) {
+        // Fallback: still try to show the menu with basic info
+        console.warn('Context menu error:', err);
+        const menu = document.getElementById('map-context-menu');
+        if (menu) {
+            const coordLabel = document.getElementById('ctx-coords-label');
+            if (coordLabel) coordLabel.textContent = `${e.lngLat.lat.toFixed(6)}, ${e.lngLat.lng.toFixed(6)}`;
+            menu.style.display = 'block';
+        }
+    }
 });
 
 map.on('movestart', () => { $('map-context-menu').style.display = 'none'; });
