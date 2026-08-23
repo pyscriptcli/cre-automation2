@@ -7,6 +7,51 @@ import logging
 import time
 import random
 
+st.set_page_config(
+    page_title="Project Atlas",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+#--- HIDE STREAMLIT CHROME & WATERMARK ---
+st.markdown("""
+    <style>
+        /* Hide main menu, footer, and header */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        
+        /* Hide sidebar */
+        [data-testid="stSidebar"] {display: none !important;}
+        section[data-testid="stSidebar"] {display: none !important;}
+        
+        /* Hide Streamlit decoration/watermark */
+        div[data-testid="stDecoration"] {display: none !important;}
+        .stDeployButton {display: none !important;}
+        
+        /* Hide iframe borders */
+        iframe {border: none !important;}
+        
+        /* Full screen overrides */
+        .block-container {
+            padding: 0rem !important;
+            margin: 0rem !important;
+            max-width: 100vw !important;
+            width: 100vw !important;
+            height: 100vh !important;
+        }
+        .stApp {
+            background-color: #0a1628 !important;
+            padding: 0rem !important;
+            margin: 0rem !important;
+        }
+        html, body {
+            overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------
 # ROBUST OVERPASS API QUERY FUNCTION (PYTHON)
@@ -112,51 +157,7 @@ def fetch_pois(lat: float, lon: float, radius: int, tags: list, timeout: int = 9
 # 1. PAGE CONFIGURATION & ROOT OVERRIDES
 # ------------------------------------------------------------------------
 
-st.set_page_config(
-    page_title="Project Atlas",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
 
-#--- HIDE STREAMLIT CHROME & WATERMARK ---
-st.markdown("""
-    <style>
-        /* Hide main menu, footer, and header */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        
-        /* Hide sidebar */
-        [data-testid="stSidebar"] {display: none !important;}
-        section[data-testid="stSidebar"] {display: none !important;}
-        
-        /* Hide Streamlit decoration/watermark */
-        div[data-testid="stDecoration"] {display: none !important;}
-        .stDeployButton {display: none !important;}
-        
-        /* Hide iframe borders */
-        iframe {border: none !important;}
-        
-        /* Full screen overrides */
-        .block-container {
-            padding: 0rem !important;
-            margin: 0rem !important;
-            max-width: 100vw !important;
-            width: 100vw !important;
-            height: 100vh !important;
-        }
-        .stApp {
-            background-color: #0a1628 !important;
-            padding: 0rem !important;
-            margin: 0rem !important;
-        }
-        html, body {
-            overflow: hidden !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
 
 st.markdown(
     """
