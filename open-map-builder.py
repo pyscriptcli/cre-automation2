@@ -524,7 +524,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 #popup-shape-editor { width: 330px; }
 #popup-custom-map { width: 310px; }
 #popup-trade-area { width: 400px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
-#popup-route-settings { width: 320px; }
+#popup-route-settings { width: 380px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; }
 #popup-attribute-table { width: 600px; left: 50%; transform: translateX(-50%); top: 68px; right: auto; max-height: 70vh; }
 .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .icon-grid button { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #adbac7; cursor: pointer; transition:0.2s;}
@@ -547,17 +547,9 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none; font-weight:600;
 }
 #map-context-menu {
-    position: fixed; 
-    z-index: 10050; 
-    display: none; 
-    min-width: 200px;
-    background: rgba(9, 16, 24, 0.98); 
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 10px; 
-    padding: 6px; 
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
-    pointer-events: auto;
-}
+    position: absolute; z-index: 3000; display: none; min-width: 200px;
+    background: rgba(9, 16, 24, 0.98); border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px; padding: 4px; box-shadow: 0 12px 32px rgba(0,0,0,0.7);
 }
 .ctx-item {
     display: flex; align-items: center; gap: 8px; padding: 8px 10px;
@@ -678,14 +670,44 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 .btn-eyedropper { width: 24px; height: 24px; display: grid; place-items: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #adbac7; cursor: pointer; padding: 0; }
 .btn-eyedropper:hover { color: #fff; background: rgba(255,255,255,0.2); }
 
-/* Multi-Stop Routing Styles */
-.route-stops-container { display: flex; flex-direction: column; gap: 6px; max-height: 170px; overflow-y: auto; margin-top: 4px; }
-.route-stop-row { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.04); padding: 4px 6px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
-.route-stop-row.drag-over { border-color: #38bdf8; background: rgba(56, 189, 248, 0.12); }
-.route-stop-input { flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #f0f6fc; font-size: 11px; padding: 4px 8px; outline: none; }
-.route-stop-input:focus { border-color: #38bdf8; }
-.route-drag-handle { cursor: grab; color: #768390; display: grid; place-items: center; }
-.route-drag-handle:active { cursor: grabbing; }
+/* Google Maps Mode Route Card UI */
+.gmaps-card {
+    display: flex; flex-direction: column; gap: 8px;
+    background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px; padding: 12px; margin-top: 4px;
+}
+.gmaps-mode-tabs {
+    display: flex; justify-content: space-around; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 6px; margin-bottom: 4px;
+}
+.gmaps-tab-btn {
+    background: transparent; border: none; color: #768390; cursor: pointer;
+    padding: 6px 12px; border-radius: 8px; display: flex; align-items: center; gap: 4px; font-weight: 600;
+}
+.gmaps-tab-btn.active { color: #38bdf8; background: rgba(56, 189, 248, 0.15); }
+.gmaps-inputs-box {
+    display: flex; gap: 8px; align-items: stretch; position: relative;
+}
+.gmaps-dots-col {
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 10px 0; width: 14px;
+}
+.gmaps-dot-origin { width: 8px; height: 8px; border-radius: 50%; border: 2px solid #38bdf8; background: transparent; }
+.gmaps-dot-line { width: 2px; flex: 1; background: rgba(255, 255, 255, 0.2); margin: 3px 0; }
+.gmaps-dot-dest { width: 8px; height: 8px; background: #f85149; border-radius: 1px; }
+.gmaps-input-fields {
+    flex: 1; display: flex; flex-direction: column; gap: 6px; position: relative;
+}
+.gmaps-input-wrapper { position: relative; width: 100%; }
+.gmaps-input-wrapper input {
+    width: 100%; background: rgba(0, 0, 0, 0.45); color: #f0f6fc;
+    border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 6px 10px; font-size: 11px;
+}
+.gmaps-swap-btn {
+    background: transparent; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 50%;
+    color: #adbac7; width: 24px; height: 24px; display: grid; place-items: center; cursor: pointer; align-self: center;
+}
+.gmaps-swap-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 </style>
 </head>
 <body>
@@ -734,7 +756,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <button class="tb-btn tool" data-tool="polyline" title="Draw Polyline">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3l4 4L7 21H3v-4z"></path></svg>
     </button>
-    <button class="tb-btn tool" data-tool="route" title="Route Engine (Click or Address-Based)">
+    <button class="tb-btn tool" data-tool="route" title="Route A to B">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="19" r="2.5"></circle><circle cx="19" cy="5" r="2.5"></circle><path d="M7 17c4-1 3-8 8-9"></path></svg>
     </button>
     <button class="tb-btn tool" data-tool="marker" title="Place Marker Pin">
@@ -767,7 +789,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <div style="margin-bottom: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
             <button id="btn-import" class="trade-btn" style="width:100%; display:flex; justify-content:center; align-items:center; gap:6px;">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                Import Spatial Data (KML, GeoJSON, SHP)
+                Import Spatial Data (KML, KMZ, GeoJSON, SHP)
             </button>
             <input type="file" id="importFileInput" accept=".kml,.kmz,.geojson,.json,.zip" style="display:none;"/>
         </div>
@@ -890,7 +912,6 @@ select option:hover, select option:checked { background-color: #2563eb !importan
         <span style="font-size:11px; margin-bottom:2px;">Icon Color</span>
         <div id="mColorCtrl" class="color-ctrl-cluster"></div>
     </div>
-    <div class="f-row"> <span>Icon Size</span> <input type="range" id="mSize" min="0.4" max="2.0" step="0.1" value="0.9"></div>
 </div>
 
 <div id="popup-text-settings" class="float-card right-card">
@@ -912,57 +933,59 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     <div class="f-row"> <span>Opacity</span> <input type="range" id="tOp" min="0.1" max="1" step="0.05" value="1"></div>
 </div>
 
-<div id="popup-route-settings" class="float-card right-card">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:700; color:#f0f6fc;">Route Planner</span>
+<div id="popup-route-settings" class="float-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">
+        <span style="font-weight:700; color:#38bdf8; font-size: 13px;">Directions</span>
         <button class="card-btn" id="closeRouteSettingsBtn">✕</button>
     </div>
-    <div class="dimension-mode-bar" style="margin-top:2px;">
-        <button class="dimension-mode-btn active" id="routeModeClickTab">Point & Click</button>
-        <button class="dimension-mode-btn" id="routeModeAddressTab">Multi-Stop Address</button>
-    </div>
     
-    <!-- Mode 1: Manual Click -->
-    <div id="routeManualTabBody" style="display:flex; flex-direction:column; gap:6px;">
-        <div class="f-row"><span>Travel Profile</span>
-            <select id="rProfile" style="width:130px;">
-                <option value="driving" selected>Driving</option>
-                <option value="walking">Walking</option>
-                <option value="cycling">Cycling</option>
-            </select>
+    <div class="gmaps-card">
+        <div class="gmaps-mode-tabs">
+            <button class="gmaps-tab-btn active" data-mode="driving" title="Driving">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="9" rx="2"></rect><path d="M5 11l2-6h10l2 6"></path><circle cx="7.5" cy="16.5" r="1.5"></circle><circle cx="16.5" cy="16.5" r="1.5"></circle></svg>
+                <span>Drive</span>
+            </button>
+            <button class="gmaps-tab-btn" data-mode="walking" title="Walking">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 4a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path><path d="M6 21l3-7 2-2 3 3v7"></path><path d="M17 11l-3-3-2 1-3-2"></path></svg>
+                <span>Walk</span>
+            </button>
+            <button class="gmaps-tab-btn" data-mode="cycling" title="Cycling">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5.5" cy="17.5" r="3.5"></circle><circle cx="18.5" cy="17.5" r="3.5"></circle><path d="M15 6h-3l-3 7h6l2-4h2"></path></svg>
+                <span>Bike</span>
+            </button>
         </div>
-        <div class="f-row"><span>Auto-Finish</span>
-            <label style="display:flex; align-items:center; gap:4px; font-size:11px; cursor:pointer;">
-                <input type="checkbox" id="rAutoFinish" checked style="accent-color:#316dca;"/> On double-click
-            </label>
-        </div>
-    </div>
 
-    <!-- Mode 2: Multi-Stop Address -->
-    <div id="routeAddressTabBody" style="display:none; flex-direction:column; gap:6px;">
-        <div class="f-row"><span>Travel Profile</span>
-            <select id="rProfileAddress" style="width:130px;">
-                <option value="driving" selected>Driving</option>
-                <option value="walking">Walking</option>
-                <option value="cycling">Cycling</option>
-            </select>
+        <div class="gmaps-inputs-box">
+            <div class="gmaps-dots-col">
+                <div class="gmaps-dot-origin"></div>
+                <div class="gmaps-dot-line"></div>
+                <div class="gmaps-dot-dest"></div>
+            </div>
+            <div class="gmaps-input-fields">
+                <div class="gmaps-input-wrapper">
+                    <input type="text" id="routeStartAddr" placeholder="Choose starting point..." autocomplete="off"/>
+                    <div class="autocomplete-list" id="routeStartList"></div>
+                </div>
+                <div class="gmaps-input-wrapper">
+                    <input type="text" id="routeEndAddr" placeholder="Choose destination..." autocomplete="off"/>
+                    <div class="autocomplete-list" id="routeEndList"></div>
+                </div>
+            </div>
+            <button class="gmaps-swap-btn" id="btnSwapRouteAddrs" title="Swap locations">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 3 21 7 17 11"></polyline><path d="M3 7h18"></path><polyline points="7 21 3 17 7 13"></polyline><path d="M21 17H3"></path></svg>
+            </button>
         </div>
-        <div style="font-size:10px; color:#768390;">Drag stops to reorder. Routes recalculate automatically.</div>
-        <div class="route-stops-container" id="routeStopsList"></div>
-        <div style="display:flex; gap:6px;">
-            <button class="trade-btn" id="btnAddRouteStop" style="flex:1; font-size:10px; background:#22272e; border:1px solid #2d333b;">+ Add Stop</button>
-            <button class="trade-btn" id="btnComputeAddressRoute" style="flex:1; font-size:10px;">Build Route</button>
-        </div>
-    </div>
 
-    <div style="font-weight:600; font-size:11px; color:#768390; margin-top:4px;">ROUTE COLOR</div>
-    <div style="display:flex; gap:6px;">
-        <button class="swatch" data-rcol="#38bdf8" style="background:#38bdf8; width:28px; height:24px; border-radius:4px;"></button>
-        <button class="swatch" data-rcol="#3fb950" style="background:#3fb950; width:28px; height:24px; border-radius:4px;"></button>
-        <button class="swatch" data-rcol="#f85149" style="background:#f85149; width:28px; height:24px; border-radius:4px;"></button>
-        <button class="swatch" data-rcol="#a371f7" style="background:#a371f7; width:28px; height:24px; border-radius:4px;"></button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+            <div style="display:flex; gap:4px;">
+                <button class="swatch" data-rcol="#38bdf8" style="background:#38bdf8; width:20px; height:20px; border-radius:4px;"></button>
+                <button class="swatch" data-rcol="#3fb950" style="background:#3fb950; width:20px; height:20px; border-radius:4px;"></button>
+                <button class="swatch" data-rcol="#f85149" style="background:#f85149; width:20px; height:20px; border-radius:4px;"></button>
+                <button class="swatch" data-rcol="#a371f7" style="background:#a371f7; width:20px; height:20px; border-radius:4px;"></button>
+            </div>
+            <button id="btnCalcRoute" class="trade-btn" style="padding:6px 14px;">Get Directions</button>
+        </div>
     </div>
-    <button id="btnStartRouteDraw" class="trade-btn" style="margin-top:4px; font-size:11px;">Start Drawing Mode</button>
 </div>
 
 <div id="popup-shape-editor" class="float-card right-card">
@@ -972,7 +995,7 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </div>
     <div class="f-row"> <span>Name</span> <input type="text" id="eName" style="width:140px;"></div>
     <div id="eBorderColorRowContainer" class="f-row" style="flex-direction:column; align-items:stretch;">
-        <span style="font-size:11px; margin-bottom:2px;">Border / Stroke Color</span>
+        <span style="font-size:11px; margin-bottom:2px;">Border Color</span>
         <div id="eBorderColorCtrl" class="color-ctrl-cluster"></div>
     </div>
     <div class="f-row" id="eBorderOpRow"> <span>Border Opacity</span> <input type="range" id="eBorderOp" min="0" max="1" step="0.05"></div>
@@ -992,16 +1015,13 @@ select option:hover, select option:checked { background-color: #2563eb !importan
             <option value="right">Right</option>
         </select>
     </div>
-    
-    <!-- Marker Specific Options -->
-    <div class="f-row" id="eMarkerSizeModeRow" style="display:none;"> <span>Icon Sizing</span>
-        <select id="eMarkerSizeMode" style="width:110px;">
-            <option value="dynamic">Dynamic Size</option>
-            <option value="static">Static Size</option>
+    <div class="f-row" id="eMarkerSizingModeRow" style="display:none;"> <span>Sizing Mode</span>
+        <select id="eMarkerSizingMode" style="width:110px;">
+            <option value="dynamic" selected>Dynamic (Zoom)</option>
+            <option value="static">Static</option>
         </select>
     </div>
-    <div class="f-row" id="eMarkerSizeRow" style="display:none;"> <span>Icon Scale</span> <input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
-    
+    <div class="f-row" id="eMarkerSizeRow" style="display:none;"> <span>Icon Size</span> <input type="range" id="eMarkerSize" min="0.4" max="2.0" step="0.1"></div>
     <div class="f-row" id="eTextRow" style="display:none;"> <span>Text</span> <input type="text" id="eTextVal" style="width:140px;"></div>
     <div class="f-row" id="eFontSizeRow" style="display:none;"> <span>Font Size</span> <input type="range" id="eFontSize" min="10" max="42" step="1"></div>
     
@@ -1104,8 +1124,8 @@ select option:hover, select option:checked { background-color: #2563eb !importan
 <div id="project-edit-modal" class="modal-scrim" style="display: none;">
     <div class="ios26-card" style="max-width: 380px;">
         <div class="ios26-header">
-            <div class="ios26-title" style="font-size: 17px;">Workspace Details</div>
-            <div class="ios26-subtitle">Modify workspace name and inspect project history</div>
+            <div class="ios26-title" style="font-size: 17px;">Edit Workspace</div>
+            <div class="ios26-subtitle">Modify workspace name and view timestamps</div>
         </div>
         <div class="ios26-body">
             <div class="ios26-input-group">
@@ -1113,16 +1133,16 @@ select option:hover, select option:checked { background-color: #2563eb !importan
                 <input class="ios26-input" id="edit-proj-modal-name" placeholder="Workspace Name"/>
             </div>
             <div class="ios26-input-group">
-                <label class="ios26-label">Created At (Read-Only)</label>
-                <input class="ios26-input" id="edit-proj-modal-created" readonly style="opacity: 0.7; cursor: default;"/>
+                <label class="ios26-label">Last Updated</label>
+                <input class="ios26-input" id="edit-proj-modal-updated" readonly style="opacity: 0.7; cursor: default;"/>
             </div>
             <div class="ios26-input-group">
-                <label class="ios26-label">Updated At (Read-Only)</label>
-                <input class="ios26-input" id="edit-proj-modal-updated" readonly style="opacity: 0.7; cursor: default;"/>
+                <label class="ios26-label">Created At</label>
+                <input class="ios26-input" id="edit-proj-modal-created" readonly style="opacity: 0.7; cursor: default;"/>
             </div>
             <div style="display: flex; gap: 8px; margin-top: 8px;">
                 <button class="trade-btn" id="btn-cancel-edit-project" style="flex: 1; background: #22272e; border: 1px solid #2d333b;">Cancel</button>
-                <button class="ios26-action-btn" id="btn-save-edit-project" style="flex: 1;">Save Changes</button>
+                <button class="ios26-action-btn" id="btn-save-edit-project" style="flex: 1;">Save</button>
             </div>
         </div>
     </div>
@@ -1147,152 +1167,43 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </div>
 </div>
 
-// ----------------- Right-Click Context Menu Fixed -----------------
-map.getCanvasContainer().addEventListener('contextmenu', e => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const rect = map.getCanvas().getBoundingClientRect();
-    const point = [e.clientX - rect.left, e.clientY - rect.top];
-    ctxLngLat = map.unproject(point);
-
-    const fs = map.queryRenderedFeatures(point, { 
-        layers: ['draw-fill', 'draw-line', 'draw-outline', 'draw-marker', 'draw-text'].filter(id => map.getLayer(id)) 
-    });
-    
-    ctxFeatureId = (fs.length && fs[0].properties && fs[0].properties.id != null) 
-        ? parseInt(fs[0].properties.id, 10) 
-        : null;
-
-    const menu = $('map-context-menu');
-    $('ctx-coords-label').textContent = `${ctxLngLat.lat.toFixed(6)}, ${ctxLngLat.lng.toFixed(6)}`;
-
-    const featDisplay = ctxFeatureId ? 'flex' : 'none';
-    $('ctx-edit').style.display = featDisplay;
-    $('ctx-bring-front').style.display = featDisplay;
-    $('ctx-send-back').style.display = featDisplay;
-    $('ctx-datatable').style.display = featDisplay;
-    $('ctx-delete').style.display = featDisplay;
-    $('ctx-divider-feat').style.display = ctxFeatureId ? 'block' : 'none';
-
-    menu.style.display = 'block';
-    
-    // Position menu within viewport bounds
-    const menuWidth = menu.offsetWidth || 210;
-    const menuHeight = menu.offsetHeight || 230;
-    const left = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
-    const top = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
-
-    menu.style.left = `${Math.max(10, left)}px`;
-    menu.style.top = `${Math.max(10, top)}px`;
-});
-
-// Close context menu on outside click or map move
-document.addEventListener('pointerdown', e => {
-    const menu = $('map-context-menu');
-    if (menu && menu.style.display === 'block' && !e.target.closest('#map-context-menu')) {
-        menu.style.display = 'none';
-    }
-});
-
-map.on('movestart', () => { 
-    $('map-context-menu').style.display = 'none'; 
-});
-
-$('ctx-edit').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxFeatureId) {
-        editMode = true;
-        selectedId = ctxFeatureId;
-        openShapeEditor(ctxFeatureId);
-        syncVertexHandles();
-        hint('Edit Mode active: Drag, edit vertices, or rotate via gold handle');
-    }
-    $('map-context-menu').style.display = 'none';
-};
-
-$('ctx-bring-front').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxFeatureId) {
-        const idx = features.findIndex(x => x.id === ctxFeatureId);
-        if (idx !== -1 && idx < features.length - 1) {
-            const [item] = features.splice(idx, 1);
-            features.push(item);
-            syncDraw();
-            renderMyLayers();
-            markDirty();
-            hint(`"${item.name}" brought to front`);
-        }
-    }
-    $('map-context-menu').style.display = 'none';
-};
-
-$('ctx-send-back').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxFeatureId) {
-        const idx = features.findIndex(x => x.id === ctxFeatureId);
-        if (idx > 0) {
-            const [item] = features.splice(idx, 1);
-            features.unshift(item);
-            syncDraw();
-            renderMyLayers();
-            markDirty();
-            hint(`"${item.name}" sent to back`);
-        }
-    }
-    $('map-context-menu').style.display = 'none';
-};
-
-$('ctx-datatable').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxFeatureId) openAttributeTable(ctxFeatureId);
-    $('map-context-menu').style.display = 'none';
-};
-
-$('ctx-delete').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxFeatureId) {
-        features = features.filter(x => x.id !== ctxFeatureId);
-        for (const g in customGroups) {
-            customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== ctxFeatureId);
-        }
-        selectedLayerIds.delete(ctxFeatureId);
-        if (selectedId === ctxFeatureId) selectedId = null;
-        syncDraw();
-        renderMyLayers();
-        markDirty();
-    }
-    $('map-context-menu').style.display = 'none';
-};
-
-$('ctx-copy').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxLngLat) {
-        const txt = `${ctxLngLat.lat.toFixed(6)}, ${ctxLngLat.lng.toFixed(6)}`;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(txt).then(() => hint('Copied: ' + txt)).catch(() => hint(txt));
-        } else {
-            hint(txt);
-        }
-    }
-    $('map-context-menu').style.display = 'none';
-};
-
-$('ctx-gmaps').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxLngLat) {
-        window.open(`https://www.google.com/maps?q=${ctxLngLat.lat},${ctxLngLat.lng}`, '_blank');
-    }
-    $('map-context-menu').style.display = 'none';
-};
-
-$('ctx-streetview').onclick = (e) => {
-    e.stopPropagation();
-    if (ctxLngLat) {
-        window.open(`https://www.google.com/maps/@${ctxLngLat.lat},${ctxLngLat.lng},3a,75y,90t/data=!3m6!1e1!3m4!1s!2e0!7i13312!8i6656`, '_blank');
-    }
-    $('map-context-menu').style.display = 'none';
-};
+<!-- Right-click context menu -->
+<div id="map-context-menu">
+    <div class="ctx-coords" id="ctx-coords-label">0.000000, 0.000000</div>
+    <div class="ctx-item" id="ctx-edit" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
+        Edit
+    </div>
+    <div class="ctx-item" id="ctx-bring-front" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+        Bring Front
+    </div>
+    <div class="ctx-item" id="ctx-send-back" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        Send Back
+    </div>
+    <div class="ctx-item" id="ctx-datatable" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+        Open Data Table
+    </div>
+    <div class="ctx-divider" id="ctx-divider-feat" style="display:none;"></div>
+    <div class="ctx-item" id="ctx-copy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        Copy Coordinates
+    </div>
+    <div class="ctx-item" id="ctx-gmaps">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
+        Open in Google Maps
+    </div>
+    <div class="ctx-item" id="ctx-streetview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        Open in Streetview
+    </div>
+    <div class="ctx-item" id="ctx-delete" style="display:none; color:#ff7b72;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        Delete
+    </div>
+</div>
 
 <div id="launcher-modal-scrim" class="visible">
     <div class="ios26-card">
@@ -1362,7 +1273,7 @@ let customGroups = __INITIAL_CUSTOM_GROUPS__ || {"Trade Area Scan": {collapsed: 
 
 let activeTool = null, editMode = false;
 let draft = [], cursorLL = null, selectedId = null;
-let markerShape = 'pin', markerColor = '#1e40af', markerIconSize = 0.9;
+let markerShape = 'pin', markerColor = '#1e40af';
 let customMarkerImageKey = null;
 let customMarkerDataUrl = null;
 let selectedLayerIds = new Set();
@@ -1373,7 +1284,7 @@ let redoStack = [];
 
 let isDraggingVertex = false, draggedVertexIdx = -1, draggedPolyId = null, isRadiusHandle = false;
 let isDragging = false, dragFeatureId = null, dragStartCoord = null, dragOriginalCoords = null;
-let isDraggingRotation = false, rotatingPolyId = null, rotCenter = null, rotStartAngle = 0, rotOriginalCoords = null;
+let isDraggingRotation = false, rotatingPolyId = null, rotCenter = null, rotStartAngle = 0;
 
 let ctxLngLat = null;
 let ctxFeatureId = null;
@@ -1382,8 +1293,9 @@ let currentTableFeatureId = null;
 
 let currentRouteMode = 'driving';
 let currentRouteColor = '#38bdf8';
-let addressStops = [{ id: 1, text: '', coords: null }, { id: 2, text: '', coords: null }];
-let stopIdCounter = 2;
+let startRouteCoord = null;
+let endRouteCoord = null;
+
 function formatDateTime(dtStr) {
     if (!dtStr) return 'N/A';
     try {
@@ -1394,10 +1306,10 @@ function formatDateTime(dtStr) {
         const day = pad(d.getDate());
         const year = d.getFullYear();
         let hours = d.getHours();
-        const minutes = pad(d.getMinutes());
         const ampm = hours >= 12 ? 'PM' : 'AM';
         hours = hours % 12;
         hours = hours ? hours : 12;
+        const minutes = pad(d.getMinutes());
         return `${month}-${day}-${year}, ${hours}:${minutes} ${ampm}`;
     } catch(e) {
         return dtStr;
@@ -1621,12 +1533,11 @@ function renderProjectsList() {
         <div class="ios26-proj-item">
             <div style="display:flex; flex-direction:column; gap:2px; flex:1; cursor:pointer;" onclick="loadProjectDirectly('${p.id}')">
                 <span style="font-weight:700; font-size:13px; color:#ffffff;">${p.name || 'Untitled Project'}</span>
-                <span style="font-size:11px; color:rgba(255,255,255,0.5);">${formatDateTime(p.updated_at || p.created_at)}</span>
+                <span style="font-size:11px; color:rgba(255,255,255,0.5);">Updated: ${formatDateTime(p.updated_at || p.created_at)}</span>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
-                <button class="card-btn" onclick="openProjectEditModal(event, '${p.id}')" title="Details & Edit" style="display:flex; align-items:center; gap:4px; padding:4px 8px; background:rgba(255,255,255,0.08); font-size:11px; border-radius:6px; color:#38bdf8;">
+                <button class="card-btn" onclick="openProjectEditModal(event, '${p.id}')" title="Edit Workspace Details">
                     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
-                    Details
                 </button>
                 <button class="card-btn" onclick="deleteProjectFromLauncher(event, '${p.id}', '${(p.name || '').replace(/'/g, "\\'")}')" title="Delete" style="color:#ff7b72;">
                     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -1642,7 +1553,7 @@ window.loadProjectDirectly = function(projectId) {
     currentProjectId = p.id;
     currentProjectName = p.name || 'Untitled Project';
     $('project-name-display').textContent = currentProjectName;
-    features = p.features || [];
+    features = (p.features || []).filter(f => f.kind !== 'polygon3d');
     fid = features.reduce((max, f) => Math.max(max, f.id || 0), 0);
     customGroups = p.custom_groups || {"Trade Area Scan": {collapsed: false, ids: []}};
     if (p.center) map.setCenter(p.center);
@@ -1658,7 +1569,8 @@ window.loadProjectDirectly = function(projectId) {
             const sh = f.props.shape || 'pin';
             const col = f.props.color || '#1e40af';
             f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
-            if (!f.props.sizeMode) f.props.sizeMode = 'dynamic';
+            if (!f.props.sizingMode) f.props.sizingMode = 'dynamic';
+            if (f.props.iconSize === undefined) f.props.iconSize = 0.9;
         }
     });
     map.once('idle', () => {
@@ -1677,8 +1589,8 @@ window.openProjectEditModal = function(e, projectId) {
     if (!p) return;
     editingProjectId = projectId;
     $('edit-proj-modal-name').value = p.name || 'Untitled Project';
-    $('edit-proj-modal-created').value = formatDateTime(p.created_at || p.updated_at);
     $('edit-proj-modal-updated').value = formatDateTime(p.updated_at || p.created_at);
+    $('edit-proj-modal-created').value = formatDateTime(p.created_at || p.updated_at);
     $('project-edit-modal').style.display = 'flex';
 };
 
@@ -1925,37 +1837,33 @@ function getIconKey(shape, color) {
     return key;
 }
 
-function registerRotationIcon() {
-    const key = 'icon_rot_handle';
-    if (!map.hasImage(key)) {
-        const c = document.createElement('canvas');
-        c.width = 48; c.height = 48;
-        const ctx = c.getContext('2d');
-        ctx.fillStyle = '#0f172a';
+function ensureRotateIcon() {
+    if (!map.hasImage('icon-rotate-handle')) {
+        const cv = document.createElement('canvas');
+        cv.width = 48; cv.height = 48;
+        const ctx = cv.getContext('2d');
+        ctx.clearRect(0, 0, 48, 48);
+        ctx.fillStyle = '#e8b84a';
         ctx.beginPath();
         ctx.arc(24, 24, 20, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#e8b84a';
         ctx.lineWidth = 3;
-        ctx.stroke();
-
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.arc(24, 24, 11, -Math.PI * 0.8, Math.PI * 0.4);
         ctx.stroke();
-
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(24, 24, 11, Math.PI * 0.15, Math.PI * 1.5, false);
+        ctx.stroke();
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.moveTo(33, 28);
-        ctx.lineTo(38, 20);
-        ctx.lineTo(28, 20);
+        ctx.moveTo(24, 7);
+        ctx.lineTo(31, 13);
+        ctx.lineTo(24, 19);
         ctx.closePath();
         ctx.fill();
-
         const imgData = ctx.getImageData(0, 0, 48, 48);
-        try { map.addImage(key, imgData, { pixelRatio: 2 }); } catch(e) {}
+        try { map.addImage('icon-rotate-handle', imgData, { pixelRatio: 2 }); } catch(e) {}
     }
 }
 
@@ -2010,7 +1918,6 @@ $('markerIconGrid').querySelectorAll('button').forEach(b => b.onclick = () => {
     customMarkerImageKey = null;
     markDirty();
 });
-$('mSize').oninput = e => { markerIconSize = parseFloat(e.target.value); markDirty(); };
 
 const fc = list => ({
     type: 'FeatureCollection',
@@ -2022,10 +1929,11 @@ const fc = list => ({
 });
 
 function addDrawStack() {
-    registerRotationIcon();
+    ensureRotateIcon();
     if (!map.getSource('draw')) {
         map.addSource('draw', { type: 'geojson', data: fc(features) });
 
+        // 2D polygon fill
         map.addLayer({
             id: 'draw-fill', type: 'fill', source: 'draw',
             filter: ['==', ['geometry-type'], 'Polygon'],
@@ -2035,6 +1943,7 @@ function addDrawStack() {
             }
         });
 
+        // 2D polygon outline
         map.addLayer({
             id: 'draw-outline', type: 'line', source: 'draw',
             filter: ['==', ['geometry-type'], 'Polygon'],
@@ -2045,6 +1954,7 @@ function addDrawStack() {
             }
         });
 
+        // Polyline/route lines
         map.addLayer({
             id: 'draw-line', type: 'line', source: 'draw',
             filter: ['==', ['geometry-type'], 'LineString'],
@@ -2057,6 +1967,7 @@ function addDrawStack() {
             }
         });
 
+        // Markers (Dynamic or Static per feature)
         map.addLayer({
             id: 'draw-marker', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['get', 'kind'], 'text']],
@@ -2064,13 +1975,8 @@ function addDrawStack() {
                 'icon-image': ['get', 'iconKey'],
                 'icon-size': [
                     'case',
-                    ['==', ['coalesce', ['get', 'sizeMode'], 'dynamic'], 'dynamic'],
-                    [
-                        'interpolate', ['exponential', 1.5], ['zoom'],
-                        8, ['*', ['coalesce', ['get', 'iconSize'], 0.9], 0.35],
-                        14, ['coalesce', ['get', 'iconSize'], 0.9],
-                        18, ['*', ['coalesce', ['get', 'iconSize'], 0.9], 1.8]
-                    ],
+                    ['==', ['coalesce', ['get', 'sizingMode'], 'dynamic'], 'dynamic'],
+                    ['interpolate', ['exponential', 1.2], ['zoom'], 4, ['*', ['coalesce', ['get', 'iconSize'], 0.9], 0.4], 14, ['coalesce', ['get', 'iconSize'], 0.9], 20, ['*', ['coalesce', ['get', 'iconSize'], 0.9], 1.8]],
                     ['coalesce', ['get', 'iconSize'], 0.9]
                 ],
                 'icon-allow-overlap': true,
@@ -2079,6 +1985,7 @@ function addDrawStack() {
             paint: { 'icon-opacity': ['get', 'visible'] }
         });
 
+        // Text labels
         map.addLayer({
             id: 'draw-text', type: 'symbol', source: 'draw',
             filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'text']],
@@ -2150,7 +2057,6 @@ function addDrawStack() {
 
     if (!map.getSource('vertex-handles')) {
         map.addSource('vertex-handles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        
         map.addLayer({
             id: 'vertex-points', type: 'circle', source: 'vertex-handles',
             filter: ['!=', ['get', 'isRotHandle'], true],
@@ -2161,13 +2067,12 @@ function addDrawStack() {
                 'circle-stroke-width': 2
             }
         });
-
         map.addLayer({
             id: 'rotation-handle-symbol', type: 'symbol', source: 'vertex-handles',
             filter: ['==', ['get', 'isRotHandle'], true],
             layout: {
-                'icon-image': 'icon_rot_handle',
-                'icon-size': 0.8,
+                'icon-image': 'icon-rotate-handle',
+                'icon-size': 0.85,
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': true
             }
@@ -2271,7 +2176,7 @@ function syncVertexHandles() {
                 handleFeats.push({
                     type: 'Feature',
                     geometry: { type: 'Point', coordinates: edgeCoord },
-                    properties: { polyId: f.id, isRadiusHandle: true }
+                    properties: { polyId: f.id, isRadiusHandle: true, isRotHandle: false }
                 });
             }
         } else if (['polygon','rectangle'].includes(f.kind) && f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
@@ -2280,7 +2185,7 @@ function syncVertexHandles() {
                 handleFeats.push({
                     type: 'Feature',
                     geometry: { type: 'Point', coordinates: coords[i] },
-                    properties: { polyId: f.id, vIdx: i }
+                    properties: { polyId: f.id, vIdx: i, isRotHandle: false }
                 });
             }
         } else if ((f.kind === 'polyline' || f.kind === 'route') && f.geometry && f.geometry.coordinates) {
@@ -2289,7 +2194,7 @@ function syncVertexHandles() {
                 handleFeats.push({
                     type: 'Feature',
                     geometry: { type: 'Point', coordinates: coords[i] },
-                    properties: { polyId: f.id, vIdx: i, isWaypoint: true }
+                    properties: { polyId: f.id, vIdx: i, isWaypoint: true, isRotHandle: false }
                 });
             }
         }
@@ -2355,7 +2260,8 @@ map.on('load', () => {
             const sh = f.props.shape || 'pin';
             const col = f.props.color || '#1e40af';
             f.props.iconKey = f.props.iconKey || getIconKey(sh, col);
-            if (!f.props.sizeMode) f.props.sizeMode = 'dynamic';
+            if (!f.props.sizingMode) f.props.sizingMode = 'dynamic';
+            if (f.props.iconSize === undefined) f.props.iconSize = 0.9;
         }
     });
     addDrawStack();
@@ -2363,7 +2269,6 @@ map.on('load', () => {
     renderMyLayers();
     renderProjectsList();
     populateTradeAreaCheckboxes();
-    renderRouteStops();
     
     setupColorPicker('mColorCtrl', '#1e40af', col => { markerColor = col; markDirty(); });
     setupColorPicker('tColorCtrl', '#d9b451', col => { $('tColorCtrl').dataset.val = col; markDirty(); });
@@ -2497,7 +2402,11 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
                     }
                 }
             } else {
-                addFeatureRecord('route', geom, { 
+                const startLabel = $('routeStartAddr').value.trim() || 'Origin';
+                const endLabel = $('routeEndAddr').value.trim() || 'Destination';
+                const assignedName = `${startLabel} to ${endLabel}`;
+
+                const feat = addFeatureRecord('route', geom, { 
                     color: currentRouteColor, borderColor: currentRouteColor, width: 4, borderOpacity: 0.9,
                     description: desc,
                     routeMode: profile,
@@ -2505,7 +2414,10 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
                     routingFailed: false,
                     metadata: { distance: dist, duration: dur },
                     showLabel: true
-                });
+                }, null, assignedName);
+                
+                const b = calcBounds(feat);
+                if (b) map.fitBounds(b, { padding: 80 });
             }
         } else {
             throw new Error("No route found");
@@ -2537,122 +2449,6 @@ function fetchMultiPointRoute(pts, updateId = null, mode = null) {
     });
 }
 
-// ----------------- Multi-Stop Address Engine -----------------
-$('routeModeClickTab').onclick = () => {
-    $('routeModeClickTab').classList.add('active');
-    $('routeModeAddressTab').classList.remove('active');
-    $('routeManualTabBody').style.display = 'flex';
-    $('routeAddressTabBody').style.display = 'none';
-    $('btnStartRouteDraw').style.display = 'block';
-};
-$('routeModeAddressTab').onclick = () => {
-    $('routeModeAddressTab').classList.add('active');
-    $('routeModeClickTab').classList.remove('active');
-    $('routeManualTabBody').style.display = 'none';
-    $('routeAddressTabBody').style.display = 'flex';
-    $('btnStartRouteDraw').style.display = 'none';
-};
-
-function renderRouteStops() {
-    const list = $('routeStopsList');
-    if (!list) return;
-    list.innerHTML = addressStops.map((stop, i) => {
-        const label = i === 0 ? 'From' : (i === addressStops.length - 1 ? 'To' : `Stop ${i}`);
-        return `
-            <div class="route-stop-row" draggable="true" data-index="${i}">
-                <div class="route-drag-handle" title="Drag to reorder">⋮⋮</div>
-                <span style="font-size:10px; font-weight:700; width:30px; color:#38bdf8;">${label}</span>
-                <input type="text" class="route-stop-input" data-index="${i}" placeholder="Enter address or landmark..." value="${stop.text}"/>
-                ${addressStops.length > 2 ? `<button class="card-btn" onclick="removeRouteStop(${i})" style="color:#ff7b72;">✕</button>` : ''}
-            </div>
-        `;
-    }).join('');
-
-    list.querySelectorAll('.route-stop-input').forEach(inp => {
-        inp.onchange = e => {
-            const idx = parseInt(e.target.dataset.index, 10);
-            addressStops[idx].text = e.target.value.trim();
-            addressStops[idx].coords = null;
-        };
-    });
-
-    list.querySelectorAll('.route-stop-row').forEach(row => {
-        row.ondragstart = e => {
-            e.dataTransfer.setData('text/plain', row.dataset.index);
-            e.dataTransfer.effectAllowed = 'move';
-        };
-        row.ondragover = e => {
-            e.preventDefault();
-            row.classList.add('drag-over');
-        };
-        row.ondragleave = () => row.classList.remove('drag-over');
-        row.ondrop = e => {
-            e.preventDefault();
-            row.classList.remove('drag-over');
-            const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
-            const toIdx = parseInt(row.dataset.index, 10);
-            if (fromIdx !== toIdx) {
-                const [moved] = addressStops.splice(fromIdx, 1);
-                addressStops.splice(toIdx, 0, moved);
-                renderRouteStops();
-                computeAndDrawAddressRoute();
-            }
-        };
-    });
-}
-
-window.removeRouteStop = function(idx) {
-    if (addressStops.length > 2) {
-        addressStops.splice(idx, 1);
-        renderRouteStops();
-        computeAndDrawAddressRoute();
-    }
-};
-
-$('btnAddRouteStop').onclick = () => {
-    stopIdCounter++;
-    addressStops.splice(addressStops.length - 1, 0, { id: stopIdCounter, text: '', coords: null });
-    renderRouteStops();
-};
-
-async function geocodeAddress(query) {
-    if (!query) return null;
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
-    try {
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data && data.length > 0) {
-            return [parseFloat(data[0].lon), parseFloat(data[0].lat)];
-        }
-    } catch(e) {}
-    return null;
-}
-
-async function computeAndDrawAddressRoute() {
-    const validInputs = addressStops.filter(s => s.text && s.text.trim().length > 0);
-    if (validInputs.length < 2) return;
-    hint('Geocoding addresses & calculating route...');
-    
-    for (const stop of addressStops) {
-        if (stop.text && !stop.coords) {
-            stop.coords = await geocodeAddress(stop.text);
-        }
-    }
-    
-    const validCoords = addressStops.map(s => s.coords).filter(c => c != null);
-    if (validCoords.length < 2) {
-        hint('Could not find location for one or more addresses');
-        return;
-    }
-
-    const profile = $('rProfileAddress').value || 'driving';
-    fetchMultiPointRoute(validCoords, null, profile);
-}
-
-$('btnComputeAddressRoute').onclick = () => {
-    computeAndDrawAddressRoute();
-};
-
 function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, explicitName = null) {
     const newId = ++fid;
     const isRoute = kind === 'route';
@@ -2672,8 +2468,8 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
             fillOpacity: 0.35,
             showLabel: false,
             labelPos: 'center',
-            iconSize: markerIconSize,
-            sizeMode: 'dynamic',
+            iconSize: 0.9,
+            sizingMode: 'dynamic',
             visible: 1,
             rotation: 0,
             attributes: { name: assignedName, description: isRoute ? (customProps.description || '') : '' },
@@ -2690,7 +2486,7 @@ function addFeatureRecord(kind, geometry, customProps = {}, targetGroup = null, 
     return feat;
 }
 
-// ----------------- Feature Popup on Left-Click (No Edit Button) -----------------
+// ----------------- Feature Popup on Left-Click -----------------
 function showFeaturePopup(f, clickLngLat) {
     let popupCoords = clickLngLat;
     if (!popupCoords) {
@@ -2877,7 +2673,7 @@ $('btnScanTradeArea').onclick = async () => {
             shape: 'pin',
             color: '#1e40af',
             iconSize: 0.85,
-            sizeMode: 'dynamic',
+            sizingMode: 'dynamic',
             iconKey: getIconKey('pin', '#1e40af'),
             osmTags: el.tags || { name: poiName, type: 'custom' }
         }, "Trade Area Scan", poiName);
@@ -2917,7 +2713,7 @@ $('btnRunOverpass').onclick = async () => {
                 shape: 'pin',
                 color: '#1e40af',
                 iconSize: 0.9,
-                sizeMode: 'dynamic',
+                sizingMode: 'dynamic',
                 iconKey: getIconKey('pin', '#1e40af'),
                 osmTags: el.tags || {}
             });
@@ -2927,7 +2723,7 @@ $('btnRunOverpass').onclick = async () => {
                     shape: 'pin',
                     color: '#1e40af',
                     iconSize: 0.9,
-                    sizeMode: 'dynamic',
+                    sizingMode: 'dynamic',
                     iconKey: getIconKey('pin', '#1e40af'),
                     osmTags: el.tags || {}
                 });
@@ -3006,9 +2802,15 @@ document.addEventListener('click', (e) => {
     if (!e.target.closest('#map-context-menu')) {
         $('map-context-menu').style.display = 'none';
     }
+    if (!e.target.closest('#routeStartAddr') && !e.target.closest('#routeStartList')) {
+        $('routeStartList').style.display = 'none';
+    }
+    if (!e.target.closest('#routeEndAddr') && !e.target.closest('#routeEndList')) {
+        $('routeEndList').style.display = 'none';
+    }
 });
 
-// ----------------- Right-Click Context Menu (Bring Front / Send Back) -----------------
+// ----------------- Right-Click Context Menu -----------------
 map.on('contextmenu', e => {
     ctxLngLat = e.lngLat;
     const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-fill','draw-line','draw-outline','draw-marker','draw-text'] });
@@ -3207,18 +3009,103 @@ $('btn-search').onclick = () => {
     if (willOpen) { p.classList.add('open'); searchInput.focus(); }
 };
 
+// ----------------- Google-Maps Styled Address Routing -----------------
 document.querySelectorAll('#popup-route-settings .swatch').forEach(sw => {
     sw.onclick = () => {
         currentRouteColor = sw.dataset.rcol;
         hint(`Route color set to ${currentRouteColor}`);
     };
 });
-$('rProfile').onchange = e => { currentRouteMode = e.target.value; };
-$('btnStartRouteDraw').onclick = () => {
-    $('popup-route-settings').classList.remove('open');
-    hint('Click waypoints along roads · Double-click or click endpoint to finalize');
+
+document.querySelectorAll('.gmaps-tab-btn').forEach(btn => {
+    btn.onclick = () => {
+        document.querySelectorAll('.gmaps-tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentRouteMode = btn.dataset.mode;
+    };
+});
+
+function setupNominatimAutocomplete(inputId, listId, onSelect) {
+    const input = $(inputId);
+    const list = $(listId);
+    let results = [];
+
+    input.addEventListener('input', debounce(async () => {
+        const q = input.value.trim();
+        if (q.length < 2) { list.style.display = 'none'; return; }
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`);
+            results = await res.json();
+            if (!results.length) { list.style.display = 'none'; return; }
+            list.innerHTML = results.map((r, i) => `
+                <div class="autocomplete-item" data-i="${i}">
+                    <div style="font-weight:600; color:#f0f6fc;">${r.name || r.display_name.split(',')[0]}</div>
+                    <div style="font-size:10px; color:#8b949e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${r.display_name}</div>
+                </div>
+            `).join('');
+            list.style.display = 'block';
+            list.querySelectorAll('.autocomplete-item').forEach(item => {
+                item.onclick = () => {
+                    const sel = results[parseInt(item.dataset.i, 10)];
+                    input.value = sel.display_name;
+                    list.style.display = 'none';
+                    onSelect([parseFloat(sel.lon), parseFloat(sel.lat)]);
+                };
+            });
+        } catch(e) {}
+    }, 350));
+}
+
+setupNominatimAutocomplete('routeStartAddr', 'routeStartList', coord => { startRouteCoord = coord; });
+setupNominatimAutocomplete('routeEndAddr', 'routeEndList', coord => { endRouteCoord = coord; });
+
+$('btnSwapRouteAddrs').onclick = () => {
+    const sInput = $('routeStartAddr');
+    const eInput = $('routeEndAddr');
+    const tmpVal = sInput.value;
+    sInput.value = eInput.value;
+    eInput.value = tmpVal;
+    const tmpCoord = startRouteCoord;
+    startRouteCoord = endRouteCoord;
+    endRouteCoord = tmpCoord;
 };
-$('closeRouteSettingsBtn').onclick = () => { $('popup-route-settings').classList.remove('open'); resetActiveTools(); };
+
+$('btnCalcRoute').onclick = async () => {
+    const sVal = $('routeStartAddr').value.trim();
+    const eVal = $('routeEndAddr').value.trim();
+    if (!sVal || !eVal) {
+        hint('Please specify both start and destination locations');
+        return;
+    }
+    
+    hint('Finding route coordinates…');
+    if (!startRouteCoord) {
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(sVal)}`);
+            const data = await res.json();
+            if (data[0]) startRouteCoord = [parseFloat(data[0].lon), parseFloat(data[0].lat)];
+        } catch(e) {}
+    }
+    if (!endRouteCoord) {
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(eVal)}`);
+            const data = await res.json();
+            if (data[0]) endRouteCoord = [parseFloat(data[0].lon), parseFloat(data[0].lat)];
+        } catch(e) {}
+    }
+
+    if (!startRouteCoord || !endRouteCoord) {
+        hint('Could not find one or both locations. Please select from dropdown.');
+        return;
+    }
+
+    fetchMultiPointRoute([startRouteCoord, endRouteCoord], null, currentRouteMode);
+};
+
+$('closeRouteSettingsBtn').onclick = () => {
+    $('popup-route-settings').classList.remove('open');
+    resetActiveTools();
+};
 
 // Tool Handlers
 document.querySelectorAll('.tool').forEach(btn => {
@@ -3334,8 +3221,8 @@ map.on('click', e => {
         const feat = addFeatureRecord('marker', { type: 'Point', coordinates: ll }, {
             shape: markerShape,
             color: markerColor,
-            iconSize: markerIconSize,
-            sizeMode: 'dynamic',
+            iconSize: 0.9,
+            sizingMode: 'dynamic',
             iconKey: iconKey
         });
         resetActiveTools();
@@ -3393,28 +3280,11 @@ map.on('click', e => {
             resetActiveTools();
             showFeaturePopup(feat, ll);
         }
-    } else if (activeTool === 'route') {
-        if (draft.length >= 2) {
-            const pScreen = map.project(ll);
-            const lastPtScreen = map.project(draft[draft.length - 1]);
-            if (Math.hypot(pScreen.x - lastPtScreen.x, pScreen.y - lastPtScreen.y) < 22) {
-                fetchMultiPointRoute(draft);
-                resetActiveTools();
-                return;
-            }
-        }
-        draft.push(ll);
     }
     renderDraft();
 });
 
 map.on('dblclick', e => {
-    if (activeTool === 'route' && $('rAutoFinish') && $('rAutoFinish').checked && draft.length >= 2) {
-        e.preventDefault();
-        fetchMultiPointRoute(draft);
-        resetActiveTools();
-        return;
-    }
     if (editMode) {
         const fs = map.queryRenderedFeatures(e.point, { layers: ['draw-line'] });
         if (fs.length && fs[0].properties.id != null) {
@@ -3434,16 +3304,40 @@ map.on('dblclick', e => {
                 }
             }
         }
+        if (selectedId) {
+            const f = features.find(x => x.id === selectedId);
+            if (f && ['polygon','rectangle'].includes(f.kind)) {
+                const coords = f.geometry.coordinates[0];
+                if (coords.length < 3) return;
+                const ll = [e.lngLat.lng, e.lngLat.lat];
+                let bestEdge = -1, bestDist = Infinity;
+                for (let i = 0; i < coords.length - 1; i++) {
+                    const a = coords[i], b = coords[i+1];
+                    const dx = b[0]-a[0], dy = b[1]-a[1];
+                    const t = Math.max(0, Math.min(1, ((ll[0]-a[0])*dx + (ll[1]-a[1])*dy) / (dx*dx+dy*dy)));
+                    const projX = a[0]+t*dx, projY = a[1]+t*dy;
+                    const d = Math.hypot(ll[0]-projX, ll[1]-projY);
+                    if (d < bestDist) { bestDist = d; bestEdge = i; }
+                }
+                if (bestEdge !== -1 && bestDist < 0.0005) {
+                    coords.splice(bestEdge+1, 0, ll);
+                    syncDraw();
+                    markDirty();
+                    syncVertexHandles();
+                    hint('Vertex inserted');
+                }
+            }
+        }
     }
 });
 
 // Edit Mode Dragging
 map.on('mousedown', e => {
     if (editMode) {
-        const rHits = map.queryRenderedFeatures(e.point, { layers: ['rotation-handle-symbol'] });
-        if (rHits.length && rHits[0].properties.polyId != null) {
+        const rotHits = map.queryRenderedFeatures(e.point, { layers: ['rotation-handle-symbol'] });
+        if (rotHits.length && rotHits[0].properties.polyId != null) {
             isDraggingRotation = true;
-            rotatingPolyId = parseInt(rHits[0].properties.polyId, 10);
+            rotatingPolyId = parseInt(rotHits[0].properties.polyId, 10);
             const f = features.find(x => x.id === rotatingPolyId);
             const b = calcBounds(f);
             rotCenter = [(b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2];
@@ -3528,11 +3422,11 @@ function openShapeEditor(id) {
     $('eLabelPos').value = f.props.labelPos || 'center';
 
     const isMarker = f.kind === 'marker';
-    $('eMarkerSizeModeRow').style.display = isMarker ? 'flex' : 'none';
     $('eMarkerSizeRow').style.display = isMarker ? 'flex' : 'none';
+    $('eMarkerSizingModeRow').style.display = isMarker ? 'flex' : 'none';
     if (isMarker) {
-        $('eMarkerSizeMode').value = f.props.sizeMode || 'dynamic';
-        $('eMarkerSize').value = f.props.iconSize || 0.9;
+        $('eMarkerSize').value = f.props.iconSize != null ? f.props.iconSize : 0.9;
+        $('eMarkerSizingMode').value = f.props.sizingMode || 'dynamic';
     }
     
     const isText = f.kind === 'text';
@@ -3591,15 +3485,24 @@ $('eWidth').oninput = e => { const f = features.find(x => x.id === selectedId); 
 $('eFillOp').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fillOpacity = parseFloat(e.target.value); syncDraw(); markDirty(); } };
 $('eShowLabel').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.showLabel = e.target.checked; syncDraw(); renderMyLayers(); markDirty(); } };
 $('eLabelPos').onchange = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.labelPos = e.target.value; syncDraw(); markDirty(); } };
-$('eMarkerSizeMode').onchange = e => {
+
+$('eMarkerSize').oninput = e => { 
+    const f = features.find(x => x.id === selectedId); 
+    if (f) { 
+        f.props.iconSize = parseFloat(e.target.value); 
+        syncDraw(); 
+        markDirty(); 
+    } 
+};
+$('eMarkerSizingMode').onchange = e => {
     const f = features.find(x => x.id === selectedId);
     if (f) {
-        f.props.sizeMode = e.target.value;
+        f.props.sizingMode = e.target.value;
         syncDraw();
         markDirty();
     }
 };
-$('eMarkerSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.iconSize = parseFloat(e.target.value); syncDraw(); markDirty(); } };
+
 $('eTextVal').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.text = e.target.value; syncDraw(); renderMyLayers(); markDirty(); } };
 $('eFontSize').oninput = e => { const f = features.find(x => x.id === selectedId); if (f) { f.props.fontSize = parseInt(e.target.value, 10); syncDraw(); markDirty(); } };
 
@@ -4355,7 +4258,7 @@ function processGeoJSON(geojson) {
                 shape: 'pin',
                 color: '#1e40af',
                 iconSize: 0.9,
-                sizeMode: 'dynamic',
+                sizingMode: 'dynamic',
                 iconKey: getIconKey('pin', '#1e40af'),
                 osmTags: props
             });
@@ -4406,7 +4309,7 @@ try:
         initial_theme = latest.get("basemap", "Midnight Blue")
         initial_center = latest.get("center", [120.9842, 14.5995])
         initial_zoom = latest.get("zoom", 14)
-        initial_features = latest.get("features", [])
+        initial_features = [f for f in latest.get("features", []) if f.get("kind") != "polygon3d"]
         initial_custom_groups = latest.get("custom_groups", {"Trade Area Scan": {"collapsed": False, "ids": []}})
 
     html = (
