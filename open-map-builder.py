@@ -547,9 +547,17 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: none; font-weight:600;
 }
 #map-context-menu {
-    position: absolute; z-index: 3000; display: none; min-width: 200px;
-    background: rgba(9, 16, 24, 0.98); border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 10px; padding: 4px; box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+    position: fixed; 
+    z-index: 10050; 
+    display: none; 
+    min-width: 200px;
+    background: rgba(9, 16, 24, 0.98); 
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px; 
+    padding: 6px; 
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+    pointer-events: auto;
+}
 }
 .ctx-item {
     display: flex; align-items: center; gap: 8px; padding: 8px 10px;
@@ -1139,43 +1147,152 @@ select option:hover, select option:checked { background-color: #2563eb !importan
     </div>
 </div>
 
-<!-- Right-click context menu -->
-<div id="map-context-menu">
-    <div class="ctx-coords" id="ctx-coords-label">0.000000, 0.000000</div>
-    <div class="ctx-item" id="ctx-edit" style="display:none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"></path><path d="M18 2l4 4-10 10H8v-4z"></path></svg>
-        Edit
-    </div>
-    <div class="ctx-item" id="ctx-bring-front" style="display:none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
-        Bring to Front
-    </div>
-    <div class="ctx-item" id="ctx-send-back" style="display:none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        Send to Back
-    </div>
-    <div class="ctx-item" id="ctx-datatable" style="display:none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
-        Open Data Table
-    </div>
-    <div class="ctx-divider" id="ctx-divider-feat" style="display:none;"></div>
-    <div class="ctx-item" id="ctx-copy">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-        Copy Coordinates
-    </div>
-    <div class="ctx-item" id="ctx-gmaps">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
-        Open in Google Maps
-    </div>
-    <div class="ctx-item" id="ctx-streetview">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-        Open in Streetview
-    </div>
-    <div class="ctx-item" id="ctx-delete" style="display:none; color:#ff7b72;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        Delete
-    </div>
-</div>
+// ----------------- Right-Click Context Menu Fixed -----------------
+map.getCanvasContainer().addEventListener('contextmenu', e => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = map.getCanvas().getBoundingClientRect();
+    const point = [e.clientX - rect.left, e.clientY - rect.top];
+    ctxLngLat = map.unproject(point);
+
+    const fs = map.queryRenderedFeatures(point, { 
+        layers: ['draw-fill', 'draw-line', 'draw-outline', 'draw-marker', 'draw-text'].filter(id => map.getLayer(id)) 
+    });
+    
+    ctxFeatureId = (fs.length && fs[0].properties && fs[0].properties.id != null) 
+        ? parseInt(fs[0].properties.id, 10) 
+        : null;
+
+    const menu = $('map-context-menu');
+    $('ctx-coords-label').textContent = `${ctxLngLat.lat.toFixed(6)}, ${ctxLngLat.lng.toFixed(6)}`;
+
+    const featDisplay = ctxFeatureId ? 'flex' : 'none';
+    $('ctx-edit').style.display = featDisplay;
+    $('ctx-bring-front').style.display = featDisplay;
+    $('ctx-send-back').style.display = featDisplay;
+    $('ctx-datatable').style.display = featDisplay;
+    $('ctx-delete').style.display = featDisplay;
+    $('ctx-divider-feat').style.display = ctxFeatureId ? 'block' : 'none';
+
+    menu.style.display = 'block';
+    
+    // Position menu within viewport bounds
+    const menuWidth = menu.offsetWidth || 210;
+    const menuHeight = menu.offsetHeight || 230;
+    const left = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+    const top = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+
+    menu.style.left = `${Math.max(10, left)}px`;
+    menu.style.top = `${Math.max(10, top)}px`;
+});
+
+// Close context menu on outside click or map move
+document.addEventListener('pointerdown', e => {
+    const menu = $('map-context-menu');
+    if (menu && menu.style.display === 'block' && !e.target.closest('#map-context-menu')) {
+        menu.style.display = 'none';
+    }
+});
+
+map.on('movestart', () => { 
+    $('map-context-menu').style.display = 'none'; 
+});
+
+$('ctx-edit').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) {
+        editMode = true;
+        selectedId = ctxFeatureId;
+        openShapeEditor(ctxFeatureId);
+        syncVertexHandles();
+        hint('Edit Mode active: Drag, edit vertices, or rotate via gold handle');
+    }
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-bring-front').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) {
+        const idx = features.findIndex(x => x.id === ctxFeatureId);
+        if (idx !== -1 && idx < features.length - 1) {
+            const [item] = features.splice(idx, 1);
+            features.push(item);
+            syncDraw();
+            renderMyLayers();
+            markDirty();
+            hint(`"${item.name}" brought to front`);
+        }
+    }
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-send-back').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) {
+        const idx = features.findIndex(x => x.id === ctxFeatureId);
+        if (idx > 0) {
+            const [item] = features.splice(idx, 1);
+            features.unshift(item);
+            syncDraw();
+            renderMyLayers();
+            markDirty();
+            hint(`"${item.name}" sent to back`);
+        }
+    }
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-datatable').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) openAttributeTable(ctxFeatureId);
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-delete').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxFeatureId) {
+        features = features.filter(x => x.id !== ctxFeatureId);
+        for (const g in customGroups) {
+            customGroups[g].ids = customGroups[g].ids.filter(xId => xId !== ctxFeatureId);
+        }
+        selectedLayerIds.delete(ctxFeatureId);
+        if (selectedId === ctxFeatureId) selectedId = null;
+        syncDraw();
+        renderMyLayers();
+        markDirty();
+    }
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-copy').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxLngLat) {
+        const txt = `${ctxLngLat.lat.toFixed(6)}, ${ctxLngLat.lng.toFixed(6)}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(txt).then(() => hint('Copied: ' + txt)).catch(() => hint(txt));
+        } else {
+            hint(txt);
+        }
+    }
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-gmaps').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxLngLat) {
+        window.open(`https://www.google.com/maps?q=${ctxLngLat.lat},${ctxLngLat.lng}`, '_blank');
+    }
+    $('map-context-menu').style.display = 'none';
+};
+
+$('ctx-streetview').onclick = (e) => {
+    e.stopPropagation();
+    if (ctxLngLat) {
+        window.open(`https://www.google.com/maps/@${ctxLngLat.lat},${ctxLngLat.lng},3a,75y,90t/data=!3m6!1e1!3m4!1s!2e0!7i13312!8i6656`, '_blank');
+    }
+    $('map-context-menu').style.display = 'none';
+};
 
 <div id="launcher-modal-scrim" class="visible">
     <div class="ios26-card">
