@@ -3971,6 +3971,57 @@ map.on('error', e => console.warn('Map Notice:', e));
 } catch (e) {
     console.error('App init error:', e);
 }
+<script>
+// Hide Streamlit Cloud branding (crown badge & profile avatar)
+(function hideStreamlitBranding() {
+    const hideBranding = () => {
+        // Target the profile preview container
+        const profilePreview = document.querySelector('[data-testid="appCreatorAvatar"]')?.closest('div[class*="profilePreview"]');
+        if (profilePreview) {
+            profilePreview.style.display = 'none';
+            profilePreview.parentElement?.style.setProperty('display', 'none', 'important');
+        }
+        
+        // Target the link containing the crown (Streamlit red background #FF4B4B)
+        const links = document.querySelectorAll('a[href*="streamlit.io"]');
+        links.forEach(link => {
+            if (link.querySelector('img[src*="avatars.githubusercontent"]') || 
+                link.textContent.includes('streamlit.io')) {
+                link.style.display = 'none';
+                link.parentElement?.style.setProperty('display', 'none', 'important');
+            }
+        });
+        
+        // Target elements with Streamlit red background
+        const allElements = document.querySelectorAll('div, a, span');
+        allElements.forEach(el => {
+            const style = window.getComputedStyle(el);
+            if (style.backgroundColor === 'rgb(255, 75, 75)' || 
+                style.backgroundColor === '#FF4B4B') {
+                if (el.querySelector('svg') || el.textContent.trim().length < 50) {
+                    el.style.display = 'none';
+                }
+            }
+        });
+        
+        // Hide the status page iframe
+        const statusIframe = document.querySelector('iframe[src*="statuspage.io"]');
+        if (statusIframe) {
+            statusIframe.style.display = 'none';
+        }
+    };
+    
+    // Run immediately
+    hideBranding();
+    
+    // Run again after a delay (elements might be injected later)
+    setTimeout(hideBranding, 1000);
+    setTimeout(hideBranding, 3000);
+    
+    // Use MutationObserver to catch dynamically injected elements
+    const observer = new MutationObserver(hideBranding);
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
 </script>
 </body>
 </html>"""
