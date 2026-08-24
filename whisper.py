@@ -1,474 +1,746 @@
 import streamlit as st
 import requests
-import pandas as pd
 import json
-import io
-import re
+import pandas as pd
+from io import BytesIO
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.oxml import parse_xml, OxmlElement
+from docx.oxml.ns import nsdecls, qn
 from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
 
-# --- Configuration ---
-GROQ_API_KEY = "gsk_YOUR_API_KEY_HERE"
-WHISPER_MODEL = "whisper-large-v3-turbo"
-LLM_MODEL = "llama-3.3-70b-versatile"
+# ==================== STREAMLIT CONFIGURATION ====================
+st.set_page_config(
+    page_title="Project Eco",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# --- CSS Design System (Corporate Crimson) ---
-st.set_page_config(page_title="Project Echo", page_icon="🎙️", layout="wide")
+GROQ_API_KEY = "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"
+GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+# ==================== LIGHT MODE / PRIME PHILIPPINES DESIGN SYSTEM ====================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600;700&display=swap');
+    /* Clean Light Mode Reset & Grid Background */
+    :root, html, body, [data-testid="stAppViewContainer"], .stApp {
+        color-scheme: light !important;
+        background-color: #f8fafc !important;
+        background-image: 
+            linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px) !important;
+        background-size: 44px 44px !important;
+        color: #0f172a !important;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif !important;
+        -webkit-font-smoothing: antialiased;
+    }
 
-:root {
-    --primary-accent: #990000;
-    --primary-hover: #7F1D1D;
-    --accent-light: #FEE2E2;
-    --surface-base: #FFFFFF;
-    --surface-alt: #F8FAFC;
-    --text-primary: #0F172A;
-    --text-body: #475569;
-    --border-color: #E2E8F0;
-}
+    /* Remove Streamlit Header / Footers / Badges */
+    header[data-testid="stHeader"],
+    div[data-testid="stDecoration"],
+    #MainMenu,
+    footer,
+    .stDeployButton {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0px !important;
+    }
 
-.main .block-container {
-    max-width: 1280px;
-    background-color: var(--surface-alt);
-    padding: 2rem;
-    border-radius: 8px;
-}
+    .block-container {
+        padding-top: 2.2rem !important;
+        padding-bottom: 4rem !important;
+        max-width: 1080px !important;
+        margin: 0 auto;
+    }
 
-h1, h2, h3, h4, h5, h6 {
-    color: var(--text-primary);
-    font-family: 'Montserrat', system-ui, sans-serif;
-    letter-spacing: -0.02em;
-}
+    /* Header & Badge Styling */
+    .header-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 2px;
+    }
 
-p, span, div {
-    font-family: 'Inter', system-ui, sans-serif;
-    color: var(--text-body);
-}
+    .app-title {
+        font-size: 1.55rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        color: #0f172a;
+    }
+    
+    .app-badge {
+        background: #ecfdf5;
+        color: #059669;
+        font-size: 0.68rem;
+        padding: 3px 9px;
+        border-radius: 20px;
+        font-weight: 600;
+        border: 1px solid #a7f3d0;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    
+    .open-note {
+        font-size: 0.85rem;
+        color: #64748b;
+        letter-spacing: 0.01em;
+        margin-bottom: 1.8rem;
+        font-weight: 400;
+    }
 
-.eyebrow {
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--primary-accent);
-    font-size: 0.75rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-}
+    /* Light Theme Tab Bar */
+    .stTabs [data-baseweb="tab-list"] {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        padding: 4px !important;
+        gap: 6px !important;
+        width: fit-content;
+        margin-bottom: 1.2rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        padding: 6px 18px !important;
+        font-size: 0.82rem !important;
+        font-weight: 500 !important;
+        color: #64748b !important;
+        background-color: transparent !important;
+        border: none !important;
+        border-radius: 6px !important;
+        transition: all 0.15s ease-in-out !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        color: #0f172a !important;
+        background: #f1f5f9 !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+        border-bottom: none !important;
+    }
 
-.card {
-    background-color: var(--surface-base);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    margin-bottom: 1.5rem;
-    transition: box-shadow 0.3s ease;
-}
-.card:hover {
-    box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.08);
-}
+    /* Light Mode File Uploader */
+    [data-testid="stFileUploader"],
+    [data-testid="stFileUploader"] > div,
+    [data-testid="stFileUploaderDropzone"] {
+        background-color: #ffffff !important;
+        border: 1px dashed #cbd5e1 !important;
+        border-radius: 10px !important;
+        color: #64748b !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
 
-div.stButton>button {
-    border-radius: 6px;
-    font-weight: 600;
-    font-family: 'Inter', system-ui, sans-serif;
-    transition: all 0.2s ease;
-}
-div.stButton>button:first-child {
-    background-color: var(--primary-accent);
-    color: white;
-    border: 1px solid var(--primary-accent);
-}
-div.stButton>button:first-child:hover {
-    background-color: var(--primary-hover);
-    border-color: var(--primary-hover);
-}
+    [data-testid="stFileUploaderDropzone"]:hover {
+        border-color: #10b981 !important;
+        background-color: #f8fafc !important;
+    }
 
-.stDataFrame {
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    overflow: hidden;
-}
+    [data-testid="stFileUploaderDropzone"] button {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 6px !important;
+        font-weight: 500 !important;
+    }
 
-.footer {
-    background-color: #0F172A;
-    color: #94A3B8;
-    padding: 3rem 2rem 1.5rem 2rem;
-    margin-top: 4rem;
-    font-family: 'Inter', system-ui, sans-serif;
-}
-.footer-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 2rem;
-    max-width: 1280px;
-    margin: 0 auto;
-}
-.footer h4 {
-    color: #FFFFFF;
-    font-size: 0.875rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-.footer ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-.footer li {
-    margin-bottom: 0.5rem;
-}
-.footer a {
-    color: #94A3B8;
-    text-decoration: none;
-}
-.footer a:hover {
-    color: #FFFFFF;
-}
-.copyright {
-    text-align: center;
-    border-top: 1px solid #1E293B;
-    margin-top: 2rem;
-    padding-top: 1.5rem;
-    color: #64748B;
-    font-size: 0.75rem;
-}
+    [data-testid="stFileUploaderDropzone"] span,
+    [data-testid="stFileUploaderDropzone"] small,
+    [data-testid="stFileUploaderDropzone"] div {
+        color: #64748b !important;
+    }
+
+    /* Audio Input Frame */
+    [data-testid="stAudioInput"] {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        padding: 10px 14px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Tactile Buttons */
+    .stButton > button {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        font-size: 0.83rem !important;
+        font-weight: 500 !important;
+        letter-spacing: -0.01em !important;
+        padding: 0.45rem 1.15rem !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        transition: all 0.15s ease-in-out !important;
+    }
+    
+    .stButton > button:hover {
+        background: #f8fafc !important;
+        border-color: #94a3b8 !important;
+        color: #000000 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    .stButton > button[kind="primary"] {
+        background: #10b981 !important;
+        color: #ffffff !important;
+        border: 1px solid #059669 !important;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25) !important;
+        font-weight: 600 !important;
+    }
+    
+    .stButton > button[kind="primary"]:hover {
+        background: #059669 !important;
+        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
+    }
+
+    /* Expander Container */
+    .streamlit-expanderHeader {
+        background-color: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        color: #1e293b !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+    }
+
+    /* Structured Matrix & Overview Cards */
+    .summary-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    }
+    
+    .summary-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #059669;
+        margin-bottom: 6px;
+    }
+
+    .summary-content {
+        font-size: 0.88rem;
+        line-height: 1.55;
+        color: #334155;
+    }
+
+    /* Data Editor */
+    [data-testid="stDataEditor"] {
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        background-color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+    }
+
+    .stTextArea textarea {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        font-size: 0.86rem !important;
+        line-height: 1.6 !important;
+    }
+
+    .stTextArea textarea:focus {
+        border-color: #10b981 !important;
+        box-shadow: 0 0 0 1px #10b981 !important;
+    }
+
+    hr {
+        border: none !important;
+        border-top: 1px solid #e2e8f0 !important;
+        margin: 1.6rem 0 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- State Management ---
-if 'transcript' not in st.session_state:
-    st.session_state.transcript = ""
-if 'extracted_data' not in st.session_state:
-    st.session_state.extracted_data = {}
-if 'action_df' not in st.session_state:
-    st.session_state.action_df = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
+# ==================== STATE MANAGEMENT ====================
+if "transcript" not in st.session_state:
+    st.session_state["transcript"] = ""
+if "summary" not in st.session_state:
+    st.session_state["summary"] = ""
+if "decisions" not in st.session_state:
+    st.session_state["decisions"] = ""
+if "df" not in st.session_state:
+    st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
 
-# --- Core Functions ---
-def transcribe_audio(file_bytes: bytes, filename: str) -> str:
-    """Transcribes audio using Groq Whisper API."""
-    url = "https://api.groq.com/openai/v1/audio/transcriptions"
+# ==================== BACKEND SERVICES ====================
+def transcribe_audio(audio_bytes):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    files = {"file": (filename, file_bytes)}
-    data = {"model": WHISPER_MODEL}
-    
+    files = {
+        "file": ("audio.wav", audio_bytes),
+        "model": (None, "whisper-large-v3-turbo"),
+        "response_format": (None, "json")
+    }
     try:
-        response = requests.post(url, headers=headers, files=files, data=data)
-        response.raise_for_status()
-        return response.json()["text"]
-    except requests.exceptions.RequestException as e:
-        st.error(f"Transcription failed: {e}")
-        return ""
+        resp = requests.post(GROQ_TRANSCRIPTION_URL, headers=headers, files=files, timeout=60)
+        if resp.status_code == 200:
+            return resp.json().get("text", "")
+        else:
+            st.error(f"Engine status: {resp.status_code}")
+            return None
+    except Exception as e:
+        st.error(f"Transcription error: {e}")
+        return None
 
-def extract_meeting_intelligence(transcript: str) -> dict:
-    """Extracts structured meeting minutes using Groq LLM API."""
-    url = "https://api.groq.com/openai/v1/chat/completions"
+def extract_summary_and_actions(text):
+    """
+    Robustly sends transcript to Groq Llama 3.3 70B Versatile.
+    Uses strict system prompting and JSON schema enforcement to ensure 
+    high-quality, professional executive minutes, handling messy transcripts.
+    """
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
     
     system_prompt = (
-        "You are a Senior Executive Assistant with 15 years of experience. "
-        "Extract structured meeting minutes. Extract assignees only if explicitly mentioned, do not guess. "
-        "Return ONLY valid JSON matching the requested schema."
+        "You are a highly capable executive meeting intelligence engine for Project Eco. "
+        "Your task is to thoroughly analyze the provided meeting transcript, filter out small talk, filler words, "
+        "and tangents, and extract a structured, highly professional set of meeting minutes.\n\n"
+        "You MUST respond strictly with a valid JSON object matching the exact structure below. "
+        "Do not include markdown blocks (e.g., ```json) or any conversational text.\n\n"
+        "{\n"
+        '  "summary": "A concise, professional executive summary of the meeting\'s main objectives, discussions, and overall outcomes.",\n'
+        '  "decisions": "A clear, bulleted list (using •) of all formal decisions, approvals, or consensus reached. If none, write \'No formal decisions recorded.\'",\n'
+        '  "records": [\n'
+        "    {\n"
+        '      "Key Point": "The core topic, project phase, or specific deliverable discussed.",\n'
+        '      "Action Plan": "Clear, actionable steps to be taken. Use bullet points (•) for multiple steps. If purely an informational discussion, summarize the key takeaway here.",\n'
+        '      "Assigned": "The specific person, team, or department responsible. Resolve vague pronouns to actual names if contextually obvious. Use \'Unassigned\' if unclear."\n'
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Guidelines:\n"
+        "- Synthesize rambling, disorganized discussions into crisp, professional business language.\n"
+        "- Ensure the JSON is flawlessly well-formed and valid."
     )
-    
-    user_prompt = f"""
-    Transcript: {transcript}
-    
-    Return ONLY valid JSON matching this exact schema:
-    {{
-      "summary": "string",
-      "key_points": ["string"],
-      "deliverables": ["string"],
-      "action_items": [
-        {{"description": "string", "assigned_to": "string or null", "deadline": "string or null"}}
-      ],
-      "decisions": ["string"]
-    }}
-    """
-    
+
     payload = {
-        "model": LLM_MODEL,
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": f"Transcript:\n{text}"}
         ],
-        "temperature": 0.1,
-        "top_p": 0.9,
-        "response_format": {"type": "json_object"}
+        "response_format": {"type": "json_object"},
+        "temperature": 0.15 # Lower temperature for strictly deterministic formatting and formal tone
     }
-    
+
     try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        return json.loads(response.json()["choices"][0]["message"]["content"])
+        resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=90)
+        if resp.status_code == 200:
+            content = resp.json()["choices"][0]["message"]["content"].strip()
+            
+            # Robust JSON cleaning step
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.lower().startswith("json"):
+                    content = content[4:]
+                content = content.strip()
+                
+            data = json.loads(content)
+            
+            summary = data.get("summary", "No summary could be extracted.")
+            decisions = data.get("decisions", "No formal decisions recorded.")
+            records = data.get("records", [])
+            
+            # Ensure robust mapping into DataFrame format even if LLM misses a key
+            valid_records = []
+            for r in records:
+                valid_records.append({
+                    "Key Point": r.get("Key Point", "Unspecified Topic"),
+                    "Action Plan": r.get("Action Plan", "No specific actions noted."),
+                    "Assigned": r.get("Assigned", "Unassigned")
+                })
+                
+            return summary, decisions, pd.DataFrame(valid_records)
+        else:
+            return fallback_parse(text)
     except Exception as e:
-        st.warning("API extraction failed. Applying fallback extractive summarization.")
-        sentences = re.split(r'(?<=[.!?])\s+', transcript)
-        return {
-            "summary": transcript[:500] + ("..." if len(transcript) > 500 else ""),
-            "key_points": sentences[:3] if len(sentences) >= 3 else [transcript],
-            "deliverables": [],
-            "action_items": [],
-            "decisions": []
-        }
+        st.warning(f"Advanced extraction encountered an error: {e}. Falling back to default parsing.")
+        return fallback_parse(text)
 
-def build_initial_dataframe(extracted_data: dict) -> pd.DataFrame:
-    """Builds the initial action DataFrame from extracted data."""
+def fallback_parse(text):
+    import re
+    # A slightly more robust fallback parsing mechanism
+    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if len(s.strip()) > 10]
     rows = []
-    for kp in extracted_data.get("key_points", []):
-        rows.append({"Key Point": kp, "Action Plan": "", "Assigned": ""})
-    for ai in extracted_data.get("action_items", []):
+    for s in sentences[:5]:
         rows.append({
-            "Key Point": ai.get("description", ""),
-            "Action Plan": ai.get("description", ""),
-            "Assigned": ai.get("assigned_to", "") or ""
+            "Key Point": s,
+            "Action Plan": "• Review topic internally\n• Define next steps based on recording",
+            "Assigned": "Project Team"
         })
-    
-    if not rows:
-        rows.append({"Key Point": "", "Action Plan": "", "Assigned": ""})
-        
-    return pd.DataFrame(rows, columns=["Key Point", "Action Plan", "Assigned"])
+    df = pd.DataFrame(rows if rows else [{"Key Point": "General Discussion", "Action Plan": "• Review full transcript for details", "Assigned": "Unassigned"}])
+    return "Executive meeting overview derived from fallback analysis.", "Review full transcript for pending decisions.", df
 
-# --- Export Functions ---
-def export_to_docx(transcript: str, summary: str, df: pd.DataFrame) -> bytes:
-    """Generates a Word document."""
+# ==================== EXPORT UTILITIES ====================
+def set_cell_margins(cell, top=140, bottom=140, start=160, end=160):
+    tcPr = cell._tc.get_or_add_tcPr()
+    tcMar = OxmlElement('w:tcMar')
+    for m, val in [('top', top), ('bottom', bottom), ('left', start), ('right', end)]:
+        node = OxmlElement(f'w:{m}')
+        node.set(qn('w:w'), str(val))
+        node.set(qn('w:type'), 'dxa')
+        tcMar.append(node)
+    tcPr.append(tcMar)
+
+def export_docx(df, summary, decisions, transcript):
     doc = Document()
-    
-    # Title
-    title = doc.add_heading('Project Echo - Meeting Report', 0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    # Executive Summary
-    doc.add_heading('Executive Summary', level=1)
-    doc.add_paragraph(summary)
-    
-    # Full Transcript
-    doc.add_heading('Full Transcript', level=1)
-    doc.add_paragraph(transcript)
-    
-    # Action Items Table
-    doc.add_heading('Action Items', level=1)
-    table = doc.add_table(rows=1, cols=3)
-    table.style = 'Table Grid'
-    hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = 'Key Point'
-    hdr_cells[1].text = 'Action Plan'
-    hdr_cells[2].text = 'Assigned'
-    
-    for _, row in df.iterrows():
-        row_cells = table.add_row().cells
-        row_cells[0].text = str(row['Key Point'])
-        row_cells[1].text = str(row['Action Plan'])
-        row_cells[2].text = str(row['Assigned'])
-        
-    bio = io.BytesIO()
-    doc.save(bio)
-    return bio.getvalue()
+    section = doc.sections[0]
+    section.top_margin = Inches(1.0)
+    section.bottom_margin = Inches(1.0)
+    section.left_margin = Inches(1.0)
+    section.right_margin = Inches(1.0)
+    section.page_width = Inches(8.5)
+    section.page_height = Inches(11.0)
 
-def export_to_pdf(transcript: str, summary: str, df: pd.DataFrame) -> bytes:
-    """Generates a PDF document."""
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
-    styles = getSampleStyleSheet()
+    # Title
+    h1 = doc.add_heading("PROJECT ECO // MINUTES OF THE MEETING", level=1)
+    h1.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    for r in h1.runs:
+        r.font.name = "Segoe UI"
+        r.font.size = Pt(15)
+        r.font.bold = True
+        r.font.color.rgb = RGBColor(5, 150, 105)
+
+    # Executive Summary
+    if summary:
+        h2 = doc.add_heading("Executive Summary", level=2)
+        for r in h2.runs:
+            r.font.name = "Segoe UI"
+            r.font.size = Pt(11)
+            r.font.color.rgb = RGBColor(15, 23, 42)
+        p_sum = doc.add_paragraph(summary)
+        for r in p_sum.runs:
+            r.font.name = "Segoe UI"
+            r.font.size = Pt(9)
+            r.font.color.rgb = RGBColor(51, 65, 85)
+
+    # Decisions
+    if decisions:
+        h2_dec = doc.add_heading("Key Decisions", level=2)
+        for r in h2_dec.runs:
+            r.font.name = "Segoe UI"
+            r.font.size = Pt(11)
+            r.font.color.rgb = RGBColor(15, 23, 42)
+        p_dec = doc.add_paragraph(decisions)
+        for r in p_dec.runs:
+            r.font.name = "Segoe UI"
+            r.font.size = Pt(9)
+            r.font.color.rgb = RGBColor(51, 65, 85)
+
+    # Action Items Table
+    doc.add_heading("Action Items & Deliverables", level=2)
+    table = doc.add_table(rows=len(df) + 1, cols=3)
+    table.autofit = False
+    col_widths = [Inches(2.5), Inches(2.9), Inches(1.1)]
+    headers = ["Key Point", "Action Plan", "Assigned"]
     
-    # Custom styles
-    title_style = ParagraphStyle(name='Title', fontSize=18, alignment=1, spaceAfter=12, textColor=colors.HexColor('#0F172A'))
-    heading_style = ParagraphStyle(name='Heading1', fontSize=14, spaceBefore=12, spaceAfter=6, textColor=colors.HexColor('#990000'), fontName='Helvetica-Bold')
+    hdr_row = table.rows[0]
+    trPr = hdr_row._tr.get_or_add_trPr()
+    trPr.append(parse_xml(r'<w:tblHeader %s/>' % nsdecls('w')))
     
-    story = []
-    story.append(Paragraph("Project Echo - Meeting Report", title_style))
-    story.append(Spacer(1, 12))
-    
-    story.append(Paragraph("Executive Summary", heading_style))
-    story.append(Paragraph(summary, styles['Normal']))
-    story.append(Spacer(1, 12))
-    
-    story.append(Paragraph("Full Transcript", heading_style))
-    story.append(Paragraph(transcript, styles['Normal']))
-    story.append(Spacer(1, 12))
-    
-    story.append(Paragraph("Action Items", heading_style))
-    
-    # Table data
-    data = [["Key Point", "Action Plan", "Assigned"]]
-    for _, row in df.iterrows():
-        data.append([str(row['Key Point']), str(row['Action Plan']), str(row['Assigned'])])
+    for idx, name in enumerate(headers):
+        cell = hdr_row.cells[idx]
+        cell.width = col_widths[idx]
+        set_cell_margins(cell, top=160, bottom=160)
+        shading = parse_xml(r'<w:shd {} w:fill="F1F5F9"/>'.format(nsdecls('w')))
+        cell._tc.get_or_add_tcPr().append(shading)
         
-    t = Table(data, colWidths=[200, 200, 150])
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        run = p.add_run(name)
+        run.bold = True
+        run.font.name = "Segoe UI"
+        run.font.size = Pt(9)
+        run.font.color.rgb = RGBColor(15, 23, 42)
+
+    for row_idx, data in df.iterrows():
+        row_cells = table.rows[row_idx + 1].cells
+        for col_idx, col_name in enumerate(headers):
+            cell = row_cells[col_idx]
+            cell.width = col_widths[col_idx]
+            set_cell_margins(cell)
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.TOP
+            
+            raw_text = str(data[col_name]) if pd.notna(data[col_name]) else ""
+            lines = raw_text.split("\n")
+            
+            for l_idx, line in enumerate(lines):
+                p = cell.paragraphs[0] if l_idx == 0 else cell.add_paragraph()
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                p.paragraph_format.space_after = Pt(2)
+                p.paragraph_format.space_before = Pt(0)
+                run = p.add_run(line)
+                run.font.name = "Segoe UI"
+                run.font.size = Pt(8.5)
+                run.font.color.rgb = RGBColor(30, 41, 59)
+
+    if transcript:
+        doc.add_paragraph().paragraph_format.space_before = Pt(16)
+        h3 = doc.add_heading("Session Transcript", level=2)
+        for r in h3.runs:
+            r.font.name = "Segoe UI"
+            r.font.size = Pt(11)
+            r.font.color.rgb = RGBColor(15, 23, 42)
+            
+        p_trans = doc.add_paragraph(transcript)
+        p_trans.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        for r in p_trans.runs:
+            r.font.name = "Segoe UI"
+            r.font.size = Pt(8)
+            r.font.color.rgb = RGBColor(100, 116, 139)
+
+    bio = BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    return bio
+
+def export_pdf(df, summary, decisions, transcript):
+    bio = BytesIO()
+    doc = SimpleDocTemplate(
+        bio,
+        pagesize=letter,
+        leftMargin=54,
+        rightMargin=54,
+        topMargin=54,
+        bottomMargin=54
+    )
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        textColor=colors.HexColor('#059669'),
+        spaceAfter=12
+    )
+    section_style = ParagraphStyle(
+        'DocSection',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=10.5,
+        textColor=colors.HexColor('#0F172A'),
+        spaceBefore=10,
+        spaceAfter=6
+    )
+    body_style = ParagraphStyle(
+        'DocBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=12,
+        textColor=colors.HexColor('#334155'),
+        spaceAfter=6
+    )
+    header_cell_style = ParagraphStyle(
+        'HeaderCell',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        textColor=colors.HexColor('#0F172A')
+    )
+    body_cell_style = ParagraphStyle(
+        'BodyCell',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor('#1E293B')
+    )
+    transcript_style = ParagraphStyle(
+        'TranscriptText',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=10.5,
+        textColor=colors.HexColor('#64748B')
+    )
+    
+    story = [Paragraph("PROJECT ECO // MINUTES OF THE MEETING", title_style)]
+    
+    if summary:
+        story.append(Paragraph("Executive Summary", section_style))
+        story.append(Paragraph(summary.replace('\n', '<br/>'), body_style))
+        
+    if decisions:
+        story.append(Paragraph("Key Decisions", section_style))
+        story.append(Paragraph(decisions.replace('\n', '<br/>'), body_style))
+
+    story.append(Paragraph("Action Items & Deliverables", section_style))
+    table_data = [[
+        Paragraph("Key Point", header_cell_style),
+        Paragraph("Action Plan", header_cell_style),
+        Paragraph("Assigned", header_cell_style)
+    ]]
+    
+    for _, row in df.iterrows():
+        kp_text = str(row["Key Point"]).replace('\n', '<br/>') if pd.notna(row["Key Point"]) else ""
+        ap_text = str(row["Action Plan"]).replace('\n', '<br/>') if pd.notna(row["Action Plan"]) else ""
+        as_text = str(row["Assigned"]).replace('\n', '<br/>') if pd.notna(row["Assigned"]) else ""
+        
+        table_data.append([
+            Paragraph(kp_text, body_cell_style),
+            Paragraph(ap_text, body_cell_style),
+            Paragraph(as_text, body_cell_style)
+        ])
+        
+    t = Table(table_data, colWidths=[185, 230, 89])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#990000')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F8FAFC')),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#E2E8F0')),
-        ('FONTSIZE', (0, 0), (-1, -1), 9)
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
     ]))
     story.append(t)
     
+    if transcript:
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("Session Transcript", section_style))
+        story.append(Paragraph(transcript.replace('\n', '<br/>'), transcript_style))
+        
     doc.build(story)
-    return buffer.getvalue()
+    bio.seek(0)
+    return bio
 
-def export_to_json(transcript: str, summary: str, df: pd.DataFrame) -> bytes:
-    """Generates a JSON file."""
-    data = {
-        "transcript": transcript,
-        "summary": summary,
-        "action_table": df.to_dict(orient='records')
-    }
-    return json.dumps(data, indent=2).encode('utf-8')
+# ==================== APPLICATION CANVAS ====================
+st.markdown("""
+    <div class="header-group">
+        <div class="app-title">Project Eco</div>
+        <span class="app-badge">PRIME CORE</span>
+    </div>
+    <div class="open-note">Open architecture for intelligence capture, structured directives, and operational agility.</div>
+""", unsafe_allow_html=True)
 
-# --- UI Layout ---
-st.markdown('<div class="eyebrow">Enterprise Voice Intelligence</div>', unsafe_allow_html=True)
-st.title("Project Echo")
-st.markdown("Upload audio to generate structured meeting minutes, action items, and exportable reports.")
+tab_rec, tab_up = st.tabs(["Record", "Upload"])
+audio_payload = None
 
-# Upload Section
-with st.container():
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    uploaded_file = st.file_uploader(
-        "Upload Audio File", 
-        type=['wav', 'mp3', 'm4a', 'ogg', 'flac', 'mp4', 'webm'],
-        help="Supported formats: WAV, MP3, M4A, OGG, FLAC, MP4, WebM"
+with tab_rec:
+    rec_buffer = st.audio_input("Record Audio Stream", label_visibility="collapsed")
+    if rec_buffer:
+        audio_payload = rec_buffer.read()
+
+with tab_up:
+    up_buffer = st.file_uploader(
+        "Upload Audio",
+        type=["wav", "mp3", "m4a", "ogg", "flac", "webm"],
+        label_visibility="collapsed"
     )
+    if up_buffer:
+        audio_payload = up_buffer.read()
+
+if audio_payload:
+    st.write("")
+    if st.button("Transcribe", type="primary"):
+        with st.spinner("Processing speech transcription..."):
+            res = transcribe_audio(audio_payload)
+        if res:
+            st.session_state["transcript"] = res
+            st.session_state["summary"] = ""
+            st.session_state["decisions"] = ""
+            st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
+            st.rerun()
+
+if st.session_state["transcript"]:
+    st.markdown("---")
+    with st.expander("Session Transcript", expanded=False):
+        st.session_state["transcript"] = st.text_area(
+            "Session Transcript",
+            st.session_state["transcript"],
+            height=120,
+            label_visibility="collapsed"
+        )
     
-    if uploaded_file is not None:
-        st.success(f"File loaded: **{uploaded_file.name}** ({uploaded_file.size / 1024 / 1024:.2f} MB)")
-        
-        if st.button("Transcribe Audio", type="primary"):
-            with st.spinner("Transcribing audio via Groq Whisper..."):
-                file_bytes = uploaded_file.getvalue()
-                st.session_state.transcript = transcribe_audio(file_bytes, uploaded_file.name)
-                
-            if st.session_state.transcript:
-                st.success("Transcription complete!")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# Extraction Section
-if st.session_state.transcript:
-    with st.container():
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Transcript Preview")
-        with st.expander("View Full Transcript", expanded=False):
-            st.text_area("Transcript", value=st.session_state.transcript, height=200, disabled=True)
-            
+    col_btn, _ = st.columns([2.5, 4.5])
+    with col_btn:
         if st.button("Extract Summary & Actions", type="primary"):
-            with st.spinner("Analyzing transcript via Groq Llama 3.3..."):
-                st.session_state.extracted_data = extract_meeting_intelligence(st.session_state.transcript)
-                st.session_state.action_df = build_initial_dataframe(st.session_state.extracted_data)
-            st.success("Intelligence extracted successfully!")
-        st.markdown('</div>', unsafe_allow_html=True)
+            with st.spinner("Synthesizing directives with Llama 3.3 70B..."):
+                sum_text, dec_text, structured_df = extract_summary_and_actions(st.session_state["transcript"])
+            st.session_state["summary"] = sum_text
+            st.session_state["decisions"] = dec_text
+            if not structured_df.empty:
+                st.session_state["df"] = structured_df
+                st.rerun()
 
-# Action Table Section
-if not st.session_state.action_df.empty:
-    with st.container():
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Action Items & Key Points")
-        st.markdown("Edit the table below to refine action plans and assignees before exporting.")
-        
-        edited_df = st.data_editor(
-            st.session_state.action_df,
-            num_rows="dynamic",
-            use_container_width=True,
-            column_config={
-                "Key Point": st.column_config.TextColumn("Key Point", width="large"),
-                "Action Plan": st.column_config.TextColumn("Action Plan", width="large"),
-                "Assigned": st.column_config.TextColumn("Assigned", width="medium")
-            }
+if st.session_state["summary"] or not st.session_state["df"].empty:
+    st.markdown("---")
+    
+    if st.session_state["summary"]:
+        st.markdown(f"""
+        <div class="summary-card">
+            <div class="summary-title">Executive Summary</div>
+            <div class="summary-content">{st.session_state["summary"]}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    if st.session_state["decisions"]:
+        st.markdown(f"""
+        <div class="summary-card">
+            <div class="summary-title">Key Decisions</div>
+            <div class="summary-content">{st.session_state["decisions"]}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    column_config = {
+        "Key Point": st.column_config.TextColumn(
+            "Key Point",
+            required=True,
+            width="large"
+        ),
+        "Action Plan": st.column_config.TextColumn(
+            "Action Plan",
+            required=False,
+            width="large"
+        ),
+        "Assigned": st.column_config.TextColumn(
+            "Assigned",
+            required=False,
+            width="medium"
+        ),
+    }
+
+    edited = st.data_editor(
+        st.session_state["df"],
+        column_config=column_config,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        key="project_eco_light_editor"
+    )
+    st.session_state["df"] = edited
+
+    st.write("")
+    col_word, col_pdf, _ = st.columns([1.5, 1.5, 4])
+    
+    with col_word:
+        doc_data = export_docx(st.session_state["df"], st.session_state["summary"], st.session_state["decisions"], st.session_state["transcript"])
+        st.download_button(
+            label="Export Word",
+            data=doc_data,
+            file_name="Project_Eco_Minutes.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
         
-        # Update state with edited data
-        st.session_state.action_df = edited_df
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# Export Section
-if not st.session_state.action_df.empty and st.session_state.transcript:
-    with st.container():
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Export Report")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            docx_data = export_to_docx(st.session_state.transcript, st.session_state.extracted_data.get("summary", ""), st.session_state.action_df)
-            st.download_button(
-                label="Download .DOCX",
-                data=docx_data,
-                file_name="project_echo_report.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
-            
-        with col2:
-            pdf_data = export_to_pdf(st.session_state.transcript, st.session_state.extracted_data.get("summary", ""), st.session_state.action_df)
-            st.download_button(
-                label="Download .PDF",
-                data=pdf_data,
-                file_name="project_echo_report.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-            
-        with col3:
-            json_data = export_to_json(st.session_state.transcript, st.session_state.extracted_data.get("summary", ""), st.session_state.action_df)
-            st.download_button(
-                label="Download .JSON",
-                data=json_data,
-                file_name="project_echo_report.json",
-                mime="application/json",
-                use_container_width=True
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# Footer
-st.markdown("""
-<div class="footer">
-    <div class="footer-grid">
-        <div class="footer-col">
-            <h4>Project Echo</h4>
-            <ul>
-                <li>Enterprise Voice Intelligence</li>
-                <li>Powered by Groq AI</li>
-            </ul>
-        </div>
-        <div class="footer-col">
-            <h4>Features</h4>
-            <ul>
-                <li><a href="#">Audio Transcription</a></li>
-                <li><a href="#">Smart Extraction</a></li>
-                <li><a href="#">Multi-format Export</a></li>
-            </ul>
-        </div>
-        <div class="footer-col">
-            <h4>Support</h4>
-            <ul>
-                <li><a href="#">Documentation</a></li>
-                <li><a href="#">API Status</a></li>
-                <li><a href="#">Contact IT</a></li>
-            </ul>
-        </div>
-        <div class="footer-col">
-            <h4>Legal</h4>
-            <ul>
-                <li><a href="#">Privacy Policy</a></li>
-                <li><a href="#">Terms of Service</a></li>
-                <li><a href="#">Data Security</a></li>
-            </ul>
-        </div>
-    </div>
-    <div class="copyright">
-        &copy; 2026 Corporate Crimson Enterprise. All rights reserved.
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    with col_pdf:
+        pdf_data = export_pdf(st.session_state["df"], st.session_state["summary"], st.session_state["decisions"], st.session_state["transcript"])
+        st.download_button(
+            label="Export PDF",
+            data=pdf_data,
+            file_name="Project_Eco_Minutes.pdf",
+            mime="application/pdf"
+        )
