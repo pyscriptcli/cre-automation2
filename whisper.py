@@ -14,9 +14,9 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-# ==================== CORE CONFIGURATION ====================
+# ==================== STREAMLIT CONFIGURATION ====================
 st.set_page_config(
-    page_title="Project Eco / Meeting Intelligence",
+    page_title="Project Eco",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -25,22 +25,24 @@ GROQ_API_KEY = "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"
 GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 PUTER_CHAT_URL = "https://api.puter.com/v1/ai/chat"
 
-# ==================== PROJECT ECO / DESIGN SYSTEM ====================
+# ==================== ADVANCED DARK MODE iOS / GLASSMORPHIC UI ====================
 st.markdown("""
 <style>
-    /* Global Reset & Grid Background */
+    /* Full Viewport Reset & Smooth Antialiasing */
     :root, html, body, [data-testid="stAppViewContainer"], .stApp {
         color-scheme: dark !important;
-        background-color: #121316 !important;
+        background-color: #07080b !important;
         background-image: 
-            linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px) !important;
-        background-size: 48px 48px !important;
-        color: #e5e7eb !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px) !important;
+        background-size: 52px 52px !important;
+        color: #f1f5f9 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, sans-serif !important;
+        -webkit-font-smoothing: antialiased;
+        letter-spacing: -0.01em;
     }
 
-    /* Complete removal of default headers & decoration */
+    /* Remove Streamlit Header / Status / Footers */
     header[data-testid="stHeader"],
     div[data-testid="stDecoration"],
     #MainMenu,
@@ -52,144 +54,191 @@ st.markdown("""
     }
 
     .block-container {
-        padding-top: 2.2rem !important;
-        padding-bottom: 3.5rem !important;
-        max-width: 1100px !important;
+        padding-top: 2.8rem !important;
+        padding-bottom: 4rem !important;
+        max-width: 1060px !important;
         margin: 0 auto;
     }
 
-    /* Typography */
-    .app-title {
-        font-size: 1.4rem;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        color: #ffffff;
+    /* iOS Glassmorphic Panel Cards */
+    .ios-card {
+        background: rgba(22, 26, 35, 0.65);
+        backdrop-filter: blur(28px) saturate(190%);
+        -webkit-backdrop-filter: blur(28px) saturate(190%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        padding: 22px 24px;
+        margin-bottom: 1.25rem;
+    }
+
+    /* Header & Badge Styling */
+    .header-group {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 12px;
+        margin-bottom: 4px;
+    }
+
+    .app-title {
+        font-size: 1.55rem;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        color: #ffffff;
     }
     
     .app-badge {
-        background: rgba(16, 185, 129, 0.15);
-        color: #10b981;
-        font-size: 0.65rem;
-        padding: 2px 8px;
-        border-radius: 4px;
+        background: rgba(16, 185, 129, 0.12);
+        color: #34d399;
+        font-size: 0.68rem;
+        padding: 3px 9px;
+        border-radius: 20px;
         font-weight: 600;
-        border: 1px solid rgba(16, 185, 129, 0.3);
+        border: 1px solid rgba(16, 185, 129, 0.28);
+        letter-spacing: 0.06em;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
     }
     
     .open-note {
-        font-size: 0.82rem;
-        color: #9ca3af;
+        font-size: 0.85rem;
+        color: #8b949e;
         letter-spacing: 0.01em;
-        margin-top: 0.25rem;
-        margin-bottom: 1.8rem;
+        margin-bottom: 2rem;
         font-weight: 400;
     }
 
-    /* Architectural Tabs */
+    /* iOS Segmented Pill Tabs */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: transparent !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-        gap: 28px;
+        background: rgba(15, 18, 26, 0.7) !important;
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 12px !important;
+        padding: 4px !important;
+        gap: 4px !important;
+        width: fit-content;
+        margin-bottom: 1rem;
     }
     
     .stTabs [data-baseweb="tab"] {
-        padding: 8px 0px 12px 0px !important;
-        font-size: 0.85rem !important;
+        padding: 6px 20px !important;
+        font-size: 0.82rem !important;
         font-weight: 500 !important;
-        color: #6b7280 !important;
+        color: #8b949e !important;
         background-color: transparent !important;
         border: none !important;
+        border-radius: 8px !important;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
     
     .stTabs [aria-selected="true"] {
         color: #ffffff !important;
-        border-bottom: 2px solid #10b981 !important;
+        background: rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+        border-bottom: none !important;
     }
 
-    /* Dark Grid-Aligned File Uploader */
+    /* Clean Dark Audio Recorder / Uploader */
+    [data-testid="stAudioInput"] {
+        background: rgba(18, 22, 31, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 14px !important;
+        padding: 10px 16px !important;
+        backdrop-filter: blur(20px) !important;
+    }
+
     [data-testid="stFileUploader"],
     [data-testid="stFileUploader"] > div,
     [data-testid="stFileUploaderDropzone"] {
-        background-color: rgba(18, 20, 26, 0.85) !important;
-        border: 1px dashed rgba(255, 255, 255, 0.12) !important;
-        border-radius: 6px !important;
-        color: #9ca3af !important;
-        backdrop-filter: blur(8px);
+        background-color: rgba(18, 22, 31, 0.5) !important;
+        border: 1px dashed rgba(255, 255, 255, 0.14) !important;
+        border-radius: 14px !important;
+        color: #94a3b8 !important;
+        backdrop-filter: blur(20px) !important;
     }
 
     [data-testid="stFileUploaderDropzone"]:hover {
         border-color: #10b981 !important;
-        background-color: rgba(24, 27, 35, 0.9) !important;
+        background-color: rgba(24, 30, 42, 0.65) !important;
     }
 
     [data-testid="stFileUploaderDropzone"] button {
-        background-color: #1f2430 !important;
-        color: #f3f4f6 !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        color: #f1f5f9 !important;
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 4px !important;
+        border-radius: 8px !important;
+        font-weight: 500 !important;
     }
 
     [data-testid="stFileUploaderDropzone"] span,
     [data-testid="stFileUploaderDropzone"] small,
     [data-testid="stFileUploaderDropzone"] div {
-        color: #9ca3af !important;
+        color: #8b949e !important;
     }
 
-    /* Audio Input Frame */
-    [data-testid="stAudioInput"] {
-        background-color: rgba(18, 20, 26, 0.85) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 6px !important;
-        padding: 12px !important;
-        backdrop-filter: blur(8px);
-    }
-
-    /* Solid Precision Buttons */
+    /* iOS Precision Tactile Buttons */
     .stButton > button {
-        background: #181b22 !important;
-        color: #e5e7eb !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        border-radius: 4px !important;
-        font-size: 0.82rem !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 10px !important;
+        font-size: 0.84rem !important;
         font-weight: 500 !important;
-        letter-spacing: 0.02em !important;
-        padding: 0.45rem 1.1rem !important;
-        transition: all 0.15s ease-in-out !important;
+        letter-spacing: -0.01em !important;
+        padding: 0.5rem 1.25rem !important;
+        backdrop-filter: blur(16px);
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
     
     .stButton > button:hover {
-        background: #232834 !important;
+        background: rgba(255, 255, 255, 0.12) !important;
+        border-color: rgba(255, 255, 255, 0.22) !important;
         color: #ffffff !important;
-        border-color: rgba(255, 255, 255, 0.25) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
     }
 
     .stButton > button[kind="primary"] {
-        background: #10b981 !important;
-        color: #060709 !important;
-        border: 1px solid #10b981 !important;
+        background: linear-gradient(180deg, #10b981 0%, #059669 100%) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.25) !important;
+        box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
         font-weight: 600 !important;
     }
     
     .stButton > button[kind="primary"]:hover {
-        background: #059669 !important;
-        border-color: #059669 !important;
-        color: #ffffff !important;
-        box-shadow: 0 0 16px rgba(16, 185, 129, 0.3) !important;
+        background: linear-gradient(180deg, #34d399 0%, #059669 100%) !important;
+        box-shadow: 0 6px 24px rgba(16, 185, 129, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+        transform: translateY(-1px);
     }
 
-    /* Text Inputs & Areas */
-    .stTextArea textarea {
-        background-color: #141720 !important;
-        color: #e5e7eb !important;
+    /* Fully Darkened & Border-Free Expander Container */
+    .streamlit-expanderHeader {
+        background-color: rgba(18, 22, 31, 0.6) !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 6px !important;
+        border-radius: 12px !important;
+        color: #e2e8f0 !important;
         font-size: 0.85rem !important;
-        line-height: 1.6 !important;
+        font-weight: 500 !important;
+        backdrop-filter: blur(20px) !important;
+    }
+
+    /* Pure Dark Streamlit Data Editor */
+    [data-testid="stDataEditor"] {
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 14px !important;
+        background-color: rgba(14, 17, 24, 0.95) !important;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+        overflow: hidden !important;
+    }
+
+    .stTextArea textarea {
+        background-color: rgba(14, 17, 24, 0.8) !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 12px !important;
+        font-size: 0.86rem !important;
+        line-height: 1.65 !important;
+        backdrop-filter: blur(16px);
     }
 
     .stTextArea textarea:focus {
@@ -197,25 +246,9 @@ st.markdown("""
         box-shadow: 0 0 0 1px #10b981 !important;
     }
 
-    /* Data Editor Glass Table */
-    [data-testid="stDataEditor"] {
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 6px !important;
-        background-color: #141720 !important;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5) !important;
-    }
-
-    .streamlit-expanderHeader {
-        background-color: rgba(18, 20, 26, 0.85) !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
-        border-radius: 4px !important;
-        color: #d1d5db !important;
-        font-size: 0.84rem !important;
-    }
-
     hr {
         border: none !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
         margin: 1.8rem 0 !important;
     }
 </style>
@@ -227,7 +260,7 @@ if "transcript" not in st.session_state:
 if "df" not in st.session_state:
     st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
 
-# ==================== ENGINE BACKENDS ====================
+# ==================== BACKEND SERVICES ====================
 def transcribe_audio(audio_bytes):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
     files = {
@@ -248,12 +281,14 @@ def transcribe_audio(audio_bytes):
 
 def generate_minutes(text):
     system_prompt = (
-        "You are an executive meeting intelligence engine for Project Eco. Parse the transcript into key points, "
-        "corresponding detailed action plans, and assignees.\n"
-        "Rules:\n"
-        "- Action Plan must cleanly format multiline lists (bullets with '•' or numbering '1.', '2.').\n"
-        "- Output strictly a JSON array of objects with keys: 'Key Point', 'Action Plan', 'Assigned'.\n"
-        "- Output raw JSON only."
+        "You are an executive intelligence engine for Project Eco. Thoroughly analyze the meeting transcript "
+        "and produce a comprehensive breakdown of key points, actionable plans, and assignees.\n\n"
+        "Output Format Rules:\n"
+        "- Return ONLY a valid JSON array of objects.\n"
+        "- Schema: [{\"Key Point\": \"...\", \"Action Plan\": \"...\", \"Assigned\": \"...\"}]\n"
+        "- 'Action Plan' should contain multiline bullet points (•) or numbers (1., 2.) where appropriate.\n"
+        "- Accurately capture specific names, teams, and deliverables mentioned in the audio.\n"
+        "- Do not include markdown ticks (```json), commentary, or extra keys."
     )
     
     payload = {
@@ -296,10 +331,10 @@ def parse_fallback(text):
     for s in sentences[:4]:
         rows.append({
             "Key Point": s,
-            "Action Plan": "• Align with project milestones\n• Execute operational review",
+            "Action Plan": "• Align deliverables with project scope\n• Execute milestone tracking",
             "Assigned": "Project Team"
         })
-    return pd.DataFrame(rows if rows else [{"Key Point": "Strategic Directives", "Action Plan": "• Follow up on agenda items", "Assigned": "Unassigned"}])
+    return pd.DataFrame(rows if rows else [{"Key Point": "Discussion points", "Action Plan": "• Conduct follow-up review", "Assigned": "Unassigned"}])
 
 # ==================== EXPORT UTILITIES ====================
 def set_cell_margins(cell, top=140, bottom=140, start=160, end=160):
@@ -322,7 +357,7 @@ def export_docx(df, transcript):
     section.page_width = Inches(8.5)
     section.page_height = Inches(11.0)
 
-    # Header
+    # Document Title
     h1 = doc.add_heading("PROJECT ECO // MINUTES OF THE MEETING", level=1)
     h1.alignment = WD_ALIGN_PARAGRAPH.LEFT
     for r in h1.runs:
@@ -494,12 +529,14 @@ def export_pdf(df, transcript):
 
 # ==================== APPLICATION CANVAS ====================
 st.markdown("""
-    <div class="app-title">
-        Project Eco <span class="app-badge">PRIME CORE</span>
+    <div class="header-group">
+        <div class="app-title">Project Eco</div>
+        <span class="app-badge">PRIME CORE</span>
     </div>
     <div class="open-note">Open architecture for intelligence capture, structured directives, and operational agility.</div>
 """, unsafe_allow_html=True)
 
+# Input Section Card
 tab_rec, tab_up = st.tabs(["Record", "Upload"])
 audio_payload = None
 
@@ -527,6 +564,7 @@ if audio_payload:
             st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
             st.rerun()
 
+# Workspace Section Card
 if st.session_state["transcript"]:
     st.markdown("---")
     with st.expander("Session Transcript", expanded=False):
@@ -537,7 +575,7 @@ if st.session_state["transcript"]:
             label_visibility="collapsed"
         )
     
-    col_btn, _ = st.columns([2, 5])
+    col_btn, _ = st.columns([2.5, 4.5])
     with col_btn:
         if st.button("Generate Minutes of the Meeting", type="primary"):
             with st.spinner("Compiling decisions and execution matrix..."):
@@ -546,6 +584,7 @@ if st.session_state["transcript"]:
                 st.session_state["df"] = structured_df
                 st.rerun()
 
+# Matrix Editor & Exports
 if not st.session_state["df"].empty:
     st.markdown("---")
     
@@ -567,7 +606,6 @@ if not st.session_state["df"].empty:
         ),
     }
 
-    # Data editor supporting full wrapped multiline text editing, row insertion, and deletions
     edited = st.data_editor(
         st.session_state["df"],
         column_config=column_config,
