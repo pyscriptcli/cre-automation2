@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import requests
 import json
@@ -9,8 +10,7 @@ from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # ========== CONFIG ==========
-st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
-
+st.set_page_config(page_title="Project Echo | Voice App", layout="wide", initial_sidebar_state="collapsed")
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -171,7 +171,7 @@ CUSTOM_CSS = """
         border-radius: 8px 8px 0 0;
         align-items: center;
         border-bottom: none;
-        justify-content: space-between; /* Spreads out the standard icons from the delete icon */
+        justify-content: space-between;
     }
     .toolbar-left, .toolbar-right {
         display: flex;
@@ -184,7 +184,7 @@ CUSTOM_CSS = """
         transition: stroke 0.2s ease;
     }
     .toolbar-icon:hover { stroke: #D4AF37; }
-    .toolbar-icon.delete-icon:hover { stroke: #D9534F; } /* Red hover for delete */
+    .toolbar-icon.delete-icon:hover { stroke: #D9534F; }
     .toolbar-divider {
         width: 1px;
         height: 20px;
@@ -315,7 +315,7 @@ def export_to_pdf(df, transcript):
 # ========== STREAMLIT UI SETUP ==========
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# Full-width Fixed Topbar (White Text, Gold Span with internal grid)
+# Full-width Fixed Topbar
 topbar_html = """
 <div class="echo-topbar">
     <div class="logo-wrapper">
@@ -434,7 +434,6 @@ if not st.session_state["df"].empty:
             unsafe_allow_html=True
         )
         
-        # Toolbar with grouped left icons and delete SVG icon on the right
         toolbar_html = """
         <div class="editor-toolbar">
             <div class="toolbar-left">
