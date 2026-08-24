@@ -21,22 +21,26 @@ CUSTOM_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Playfair+Display:ital,wght@1,400;1,500&display=swap');
 
-    /* Global Font & Light Background */
+    /* Global Font & Background with Low-Opacity Gridlines */
     html, body, [class*="css"] {
         font-family: 'Montserrat', sans-serif !important;
     }
     
     .stApp {
         background-color: #F4F2EC; 
+        background-image: 
+            linear-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+        background-size: 30px 30px;
         color: #333333;
     }
     
-    /* Hide default Streamlit header to make room for our custom topbar */
+    /* Hide default Streamlit header */
     .stApp > header {
         display: none !important;
     }
 
-    /* Adjust main container padding to accommodate top bar */
+    /* Adjust main container padding */
     .block-container {
         padding-top: 6rem !important;
     }
@@ -61,6 +65,8 @@ CUSTOM_CSS = """
         align-items: center;
         gap: 0.75rem;
     }
+    
+    /* Enforce White Text for 'Project' and Gold for 'Echo' */
     .echo-topbar h1 {
         font-family: 'Playfair Display', serif !important;
         font-style: italic !important;
@@ -71,7 +77,7 @@ CUSTOM_CSS = """
         padding: 0 !important;
     }
     .echo-topbar h1 span {
-        color: #D4AF37; /* Gold */
+        color: #D4AF37 !important; 
     }
 
     /* Headings */
@@ -94,12 +100,12 @@ CUSTOM_CSS = """
         margin-bottom: 2rem !important;
     }
 
-    /* Dark Pill-Shaped Buttons (Matched to image) */
-    .stButton > button {
-        background-color: #222222 !important; /* Dark Grey */
+    /* Dark Pill-Shaped Buttons (Applies to regular and download buttons) */
+    .stButton > button, .stDownloadButton > button {
+        background-color: #222222 !important; 
         color: #FFFFFF !important;
         border: 1px solid #444444 !important;
-        border-radius: 50px !important; /* Pill Shape */
+        border-radius: 50px !important; 
         font-family: 'Montserrat', sans-serif !important;
         font-weight: 500 !important;
         letter-spacing: 0.5px;
@@ -108,9 +114,10 @@ CUSTOM_CSS = """
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        width: 100% !important; /* Forces buttons to fill their column smoothly */
     }
-    .stButton > button:hover {
-        border-color: #D4AF37 !important; /* Gold border on hover */
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        border-color: #D4AF37 !important; 
         color: #D4AF37 !important;
         background-color: #1A1A1A !important;
         box-shadow: 0 4px 15px rgba(212, 175, 55, 0.15) !important;
@@ -288,7 +295,7 @@ def export_to_pdf(df, transcript):
 # ========== STREAMLIT UI SETUP ==========
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# Full-width Fixed Topbar
+# Full-width Fixed Topbar (White Text, Gold Span)
 topbar_html = """
 <div class="echo-topbar">
     <div class="logo-wrapper">
@@ -312,7 +319,6 @@ if "df" not in st.session_state:
 
 # ---- Step 1: Input Card ----
 with st.container(border=True):
-    # Using raw HTML for header prevents anchor generation (no /#upload-audio in URL)
     st.markdown(
         """<h3 style="display: flex; align-items: center; margin-bottom: 1.5rem;">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 12px;">
@@ -323,9 +329,7 @@ with st.container(border=True):
         unsafe_allow_html=True
     )
     
-    # Removed Emojis from tabs
     tab1, tab2 = st.tabs(["Upload File", "Record Audio"])
-    
     audio_data = None
     
     with tab1:
@@ -338,23 +342,28 @@ with st.container(border=True):
         recorded_audio = st.audio_input("Record Audio", label_visibility="collapsed")
         if recorded_audio:
             audio_data = recorded_audio.read()
-            st.download_button(
-                label="Save Audio File",
-                data=audio_data,
-                file_name="Echo_Recording.wav",
-                mime="audio/wav"
-            )
+            # Buttons are styled full-width for columns, so wrapping in a smaller column keeps it neat
+            col_rec, _ = st.columns([2, 8])
+            with col_rec:
+                st.download_button(
+                    label="Save Audio File",
+                    data=audio_data,
+                    file_name="Echo_Recording.wav",
+                    mime="audio/wav"
+                )
             
     if audio_data:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Transcribe Audio"):
-            with st.spinner("Processing audio with Groq Whisper..."):
-                transcript = transcribe_audio(audio_data)
-            if transcript:
-                st.session_state["transcript"] = transcript
-                st.session_state["key_points"] = []
-                st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
-                st.rerun()
+        col_btn, _ = st.columns([2, 8])
+        with col_btn:
+            if st.button("Transcribe Audio"):
+                with st.spinner("Processing audio with Groq Whisper..."):
+                    transcript = transcribe_audio(audio_data)
+                if transcript:
+                    st.session_state["transcript"] = transcript
+                    st.session_state["key_points"] = []
+                    st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
+                    st.rerun()
 
 # ---- Step 2: Transcript Card ----
 if st.session_state["transcript"]:
@@ -379,18 +388,20 @@ if st.session_state["transcript"]:
         
         if not st.session_state["key_points"]:
             st.write("")
-            if st.button("Generate Action Items"):
-                with st.spinner("Analyzing context..."):
-                    points = summarize_text(st.session_state["transcript"])
-                if points:
-                    st.session_state["key_points"] = points
-                    df = pd.DataFrame({
-                        "Key Point": points,
-                        "Action Plan": [""] * len(points),
-                        "Assigned": [""] * len(points)
-                    })
-                    st.session_state["df"] = df
-                    st.rerun()
+            col_gen, _ = st.columns([2, 8])
+            with col_gen:
+                if st.button("Generate Action Items"):
+                    with st.spinner("Analyzing context..."):
+                        points = summarize_text(st.session_state["transcript"])
+                    if points:
+                        st.session_state["key_points"] = points
+                        df = pd.DataFrame({
+                            "Key Point": points,
+                            "Action Plan": [""] * len(points),
+                            "Assigned": [""] * len(points)
+                        })
+                        st.session_state["df"] = df
+                        st.rerun()
 
 # ---- Step 3: Editor Card ----
 if not st.session_state["df"].empty:
@@ -416,23 +427,28 @@ if not st.session_state["df"].empty:
         """
         st.markdown(toolbar_html, unsafe_allow_html=True)
 
-        # Editor with wrapped text configurations
+        # Editor Setup
+        # hide_index is set to False so the checkbox appears. Selecting the checkbox reveals the native Delete/Trash icon.
         edited_df = st.data_editor(
             st.session_state["df"],
             num_rows="dynamic",
             use_container_width=True,
-            key="data_editor",
-            hide_index=True,
+            key="action_editor", 
+            hide_index=False, 
             column_config={
                 "Key Point": st.column_config.TextColumn("Key Point", width="large"),
                 "Action Plan": st.column_config.TextColumn("Action Plan", width="large"),
                 "Assigned": st.column_config.TextColumn("Assigned", width="medium")
             }
         )
+        
+        # Save dataframe cleanly
         st.session_state["df"] = edited_df
 
         st.write("")
-        col_exp1, col_exp2, _ = st.columns([2, 2, 8])
+        
+        # Group Export buttons closer together matching UI Pill Button styles
+        col_exp1, col_exp2, _ = st.columns([1.5, 1.5, 7])
         
         with col_exp1:
             doc_bio = export_to_word(st.session_state["df"], st.session_state["transcript"])
