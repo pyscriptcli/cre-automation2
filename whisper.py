@@ -20,23 +20,30 @@ GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 # ========== CUSTOM CSS INJECTION ==========
 CUSTOM_CSS = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    /* Fonts matching the uploaded image's style */
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Playfair+Display:ital,wght@1,500;1,600&display=swap');
 
-    /* Global Font & Background */
+    /* Global Font & Background Grid */
     html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        font-family: 'Montserrat', sans-serif !important;
     }
+    
     .stApp {
-        background-color: #0B1A2E;
-        background-image: radial-gradient(circle at 50% 0%, #13273F 0%, #0B1A2E 70%);
-        color: #B0C4DE;
+        background-color: #161616;
+        background-image: 
+            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        color: #E0E0E0;
     }
 
-    /* Headings */
+    /* Headings (Elegant Serif) */
     h1, h2, h3 {
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.02em;
+        font-family: 'Playfair Display', serif !important;
+        font-style: italic;
+        color: #F8F8F8 !important;
+        font-weight: 500 !important;
+        letter-spacing: 0.02em;
         margin-bottom: 0.5rem;
     }
 
@@ -46,115 +53,113 @@ CUSTOM_CSS = """
         justify-content: space-between;
         align-items: center;
         padding: 1.5rem 2rem;
-        background: rgba(19, 39, 63, 0.6);
+        background: rgba(22, 22, 22, 0.8);
         backdrop-filter: blur(12px);
-        border-radius: 20px;
+        border-radius: 12px;
         margin-bottom: 2rem;
         border: 1px solid rgba(255, 255, 255, 0.05);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     }
     .echo-logo {
-        font-size: 1.5rem;
-        font-weight: 800;
+        font-family: 'Playfair Display', serif;
+        font-size: 1.8rem;
+        font-style: italic;
         color: #FFFFFF;
         display: flex;
         align-items: center;
         gap: 0.5rem;
     }
-    .echo-logo span { color: #F5B041; }
+    .echo-logo span { color: #D4AF37; } /* Muted Gold */
 
     /* Primary Buttons (Gold) */
     .stButton > button {
-        background-color: #F5B041 !important;
-        color: #1A1A1A !important;
-        border: none !important;
-        border-radius: 50px !important;
-        font-weight: 700 !important;
-        padding: 0.6rem 2rem !important;
-        box-shadow: 0 4px 16px rgba(245, 176, 65, 0.2) !important;
+        background-color: transparent !important;
+        color: #D4AF37 !important;
+        border: 1px solid #D4AF37 !important;
+        border-radius: 4px !important;
+        font-family: 'Montserrat', sans-serif !important;
+        font-weight: 600 !important;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        padding: 0.5rem 2rem !important;
         transition: all 0.2s ease !important;
     }
     .stButton > button:hover {
-        background-color: #C79A2E !important;
-        box-shadow: 0 6px 24px rgba(245, 176, 65, 0.4) !important;
-        transform: translateY(-2px) !important;
-        color: #1A1A1A !important;
+        background-color: #D4AF37 !important;
+        color: #161616 !important;
+        box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2) !important;
     }
 
     /* File Uploader Dropzone */
     [data-testid="stFileUploadDropzone"] {
-        background-color: rgba(255, 255, 255, 0.03) !important;
-        border: 2px dashed #7A8DA0 !important;
-        border-radius: 24px !important;
+        background-color: rgba(255, 255, 255, 0.02) !important;
+        border: 1px dashed #555 !important;
+        border-radius: 8px !important;
         padding: 3rem !important;
         transition: all 0.2s ease !important;
     }
     [data-testid="stFileUploadDropzone"]:hover {
-        border-color: #F5B041 !important;
-        background-color: rgba(245, 176, 65, 0.05) !important;
+        border-color: #D4AF37 !important;
+        background-color: rgba(212, 175, 55, 0.05) !important;
     }
     [data-testid="stFileUploadDropzone"] * {
-        color: #FFFFFF !important;
+        color: #D4AF37 !important;
+        font-family: 'Montserrat', sans-serif !important;
     }
 
     /* Text Area (Transcript) */
     .stTextArea textarea {
-        background-color: #13273F !important;
-        border: 1px solid #1C3A5A !important;
-        color: #FFFFFF !important;
-        border-radius: 12px !important;
+        background-color: #1A1A1A !important;
+        border: 1px solid #333 !important;
+        color: #E0E0E0 !important;
+        border-radius: 8px !important;
         padding: 1rem !important;
-        box-shadow: inset 0 2px 8px rgba(0,0,0,0.2) !important;
         font-size: 0.95rem !important;
         line-height: 1.6 !important;
         transition: all 0.2s ease !important;
     }
     .stTextArea textarea:focus {
-        border-color: #F5B041 !important;
-        box-shadow: 0 0 0 1px #F5B041 !important;
+        border-color: #D4AF37 !important;
+        box-shadow: 0 0 0 1px #D4AF37 !important;
     }
 
     /* Dataframe / Table styling */
     [data-testid="stDataFrame"] {
-        border-radius: 12px;
+        border-radius: 0 0 8px 8px;
         overflow: hidden;
-        border: 1px solid #1C3A5A;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        border: 1px solid #333;
+        border-top: none;
+        background-color: #1A1A1A;
+    }
+
+    /* Toolbar Ribbon */
+    .editor-toolbar {
+        display: flex;
+        gap: 15px;
+        padding: 12px 20px;
+        background-color: #222;
+        border: 1px solid #333;
+        border-radius: 8px 8px 0 0;
+        align-items: center;
+    }
+    .toolbar-icon {
+        cursor: pointer;
+        stroke: #A0A0A0;
+        transition: stroke 0.2s ease;
+    }
+    .toolbar-icon:hover {
+        stroke: #D4AF37;
+    }
+    .toolbar-divider {
+        width: 1px;
+        height: 20px;
+        background-color: #444;
+        margin: 0 5px;
     }
 
     /* Spinners & Progress */
     .stSpinner > div > div {
-        border-color: #F5B041 transparent transparent transparent !important;
-    }
-
-    /* Info / Success Badges */
-    [data-testid="stAlert"] {
-        background-color: rgba(245, 176, 65, 0.1) !important;
-        color: #FDEBD0 !important;
-        border: 1px solid rgba(245, 176, 65, 0.2) !important;
-        border-radius: 12px !important;
-    }
-
-    /* Custom Footer */
-    .echo-footer {
-        margin-top: 4rem;
-        padding: 2rem;
-        background-color: #1A1A1A;
-        border-radius: 24px 24px 0 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        color: #7A8DA0;
-        font-size: 0.85rem;
-    }
-    .echo-footer-links a {
-        color: #F5B041;
-        text-decoration: none;
-        margin-left: 1rem;
-        transition: color 0.2s ease;
-    }
-    .echo-footer-links a:hover {
-        color: #FDEBD0;
+        border-color: #D4AF37 transparent transparent transparent !important;
     }
 </style>
 """
@@ -214,9 +219,7 @@ def fallback_summary(text):
 def export_to_word(df, transcript):
     doc = Document()
     doc.sections[0].orientation = 0
-    doc.sections[0].page_width = Inches(8.5)
-    doc.sections[0].page_height = Inches(11.0)
-
+    
     title = doc.add_heading("Project Echo: Meeting Summary", level=1)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
@@ -235,7 +238,7 @@ def export_to_word(df, transcript):
         hdr_cells[i].text = header
         run = hdr_cells[i].paragraphs[0].runs[0]
         run.font.bold = True
-        run.font.color.rgb = RGBColor(199, 154, 46)
+        run.font.color.rgb = RGBColor(212, 175, 55) # Gold
 
     for i, row in df.iterrows():
         cells = table.rows[i+1].cells
@@ -248,15 +251,45 @@ def export_to_word(df, transcript):
     bio.seek(0)
     return bio
 
+def export_to_pdf(df, transcript):
+    """Requires 'fpdf' library: pip install fpdf"""
+    try:
+        from fpdf import FPDF
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, "Project Echo: Meeting Summary", ln=True, align='C')
+        pdf.ln(5)
+        
+        if transcript:
+            pdf.set_font("Arial", 'B', 12)
+            pdf.cell(0, 10, "Full Transcript", ln=True)
+            pdf.set_font("Arial", '', 10)
+            pdf.multi_cell(0, 8, transcript.encode('latin-1', 'replace').decode('latin-1'))
+            pdf.ln(10)
+            
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, "Action Items & Key Points", ln=True)
+        pdf.ln(5)
+        
+        for i, row in df.iterrows():
+            pdf.set_font("Arial", 'B', 10)
+            pdf.multi_cell(0, 8, f"Key Point: {row['Key Point']}")
+            pdf.set_font("Arial", '', 10)
+            pdf.multi_cell(0, 8, f"Action: {row['Action Plan']} | Assigned: {row['Assigned']}")
+            pdf.ln(3)
+            
+        return pdf.output(dest='S').encode('latin-1')
+    except ImportError:
+        return b"Error: Please run 'pip install fpdf' to enable PDF export."
+
 # ========== STREAMLIT UI SETUP ==========
-# Inject CSS
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# Custom Header (Removed Navigation Tabs)
+# Custom Header
 header_html = """
 <div class="echo-header">
     <div class="echo-logo">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5B041" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
         Project <span>Echo</span>
     </div>
 </div>
@@ -274,7 +307,7 @@ if "df" not in st.session_state:
 # ---- Step 1: Upload & Transcribe ----
 st.markdown(
     """<h3 style="display: flex; align-items: center;">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5B041" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 10px;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 12px;">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
         <polyline points="17 8 12 3 7 8"></polyline>
         <line x1="12" y1="3" x2="12" y2="15"></line>
@@ -303,23 +336,18 @@ if uploaded:
 
 # ---- Step 2: Transcript Display & Summarize ----
 if st.session_state["transcript"]:
-    st.markdown("---")
-    
-    word_count = len(st.session_state["transcript"].split())
-    read_time = max(1, word_count // 200)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     
     col_title, col_meta = st.columns([3, 1])
     with col_title:
         st.markdown(
             """<h3 style="display: flex; align-items: center;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5B041" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 10px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 12px;">
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
             </svg> Full Transcript</h3>""", 
             unsafe_allow_html=True
         )
-    with col_meta:
-        st.markdown(f"<div style='text-align: right; color: #F5B041; font-size: 0.9rem; font-weight: 600; padding-top: 0.5rem;'>{word_count} words • ~{read_time} min read</div>", unsafe_allow_html=True)
     
     st.text_area("Transcript Content", st.session_state["transcript"], height=200, label_visibility="collapsed")
     
@@ -340,17 +368,29 @@ if st.session_state["transcript"]:
 
 # ---- Step 3: Table Editor & Export ----
 if not st.session_state["df"].empty:
-    st.markdown("---")
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown(
         """<h3 style="display: flex; align-items: center;">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5B041" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 10px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 12px;">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-        </svg> Action Plan Editor</h3>""", 
+        </svg> Editor</h3>""", 
         unsafe_allow_html=True
     )
     
-    st.markdown("<div style='padding: 1rem 0;'>", unsafe_allow_html=True)
+    # Minimalist Toolbar Ribbon
+    toolbar_html = """
+    <div class="editor-toolbar">
+        <svg class="toolbar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg>
+        <svg class="toolbar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg>
+        <svg class="toolbar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"></path><line x1="4" y1="21" x2="20" y2="21"></line></svg>
+        <div class="toolbar-divider"></div>
+        <svg class="toolbar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        <svg class="toolbar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+    </div>
+    """
+    st.markdown(toolbar_html, unsafe_allow_html=True)
+
     edited_df = st.data_editor(
         st.session_state["df"],
         num_rows="dynamic",
@@ -359,28 +399,24 @@ if not st.session_state["df"].empty:
         hide_index=True
     )
     st.session_state["df"] = edited_df
-    st.markdown("</div>", unsafe_allow_html=True)
 
     st.write("")
-    col_exp1, col_exp2 = st.columns([2, 8])
+    col_exp1, col_exp2, col_exp3 = st.columns([2, 2, 8])
+    
     with col_exp1:
         doc_bio = export_to_word(st.session_state["df"], st.session_state["transcript"])
         st.download_button(
-            label="Export to Word (.docx)",
+            label="Export to Word",
             data=doc_bio,
             file_name="Echo_Action_Report.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
-
-# ---- Footer ----
-footer_html = """
-<div class="echo-footer">
-    <div>&copy; 2026 Project Echo Enterprise. All rights reserved.</div>
-    <div class="echo-footer-links">
-        <a href="#">Documentation</a>
-        <a href="#">Privacy Policy</a>
-        <a href="#">Support</a>
-    </div>
-</div>
-"""
-st.markdown(footer_html, unsafe_allow_html=True)
+        
+    with col_exp2:
+        pdf_bytes = export_to_pdf(st.session_state["df"], st.session_state["transcript"])
+        st.download_button(
+            label="Export to PDF",
+            data=pdf_bytes,
+            file_name="Echo_Action_Report.pdf",
+            mime="application/pdf"
+        )
