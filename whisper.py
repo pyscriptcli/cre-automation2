@@ -21,12 +21,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-GROQ_API_KEY = "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"[cite: 1]
-GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions"[cite: 1]
-PUTER_CHAT_URL = "https://api.puter.com/v1/ai/chat"[cite: 1]
+GROQ_API_KEY = "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"
+GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+PUTER_CHAT_URL = "https://api.puter.com/v1/ai/chat"
 
-# ==================== PROJECT ECO / PRIME PHILIPPINES DESIGN SYSTEM ====================
-# Uses Prime Philippines signature corporate tones: Deep Obsidian, Subtle Grid Canvas, Emerald Accent (#10B981)
+# ==================== PROJECT ECO / DESIGN SYSTEM ====================
 st.markdown("""
 <style>
     /* Global Reset & Grid Background */
@@ -230,16 +229,16 @@ if "df" not in st.session_state:
 
 # ==================== ENGINE BACKENDS ====================
 def transcribe_audio(audio_bytes):
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}[cite: 1]
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
     files = {
-        "file": ("audio.wav", audio_bytes),[cite: 1]
-        "model": (None, "whisper-large-v3-turbo"),[cite: 1]
-        "response_format": (None, "json")[cite: 1]
+        "file": ("audio.wav", audio_bytes),
+        "model": (None, "whisper-large-v3-turbo"),
+        "response_format": (None, "json")
     }
     try:
-        resp = requests.post(GROQ_URL, headers=headers, files=files, timeout=60)[cite: 1]
-        if resp.status_code == 200:[cite: 1]
-            return resp.json().get("text", "")[cite: 1]
+        resp = requests.post(GROQ_URL, headers=headers, files=files, timeout=60)
+        if resp.status_code == 200:
+            return resp.json().get("text", "")
         else:
             st.error(f"Engine status: {resp.status_code}")
             return None
@@ -258,24 +257,24 @@ def generate_minutes(text):
     )
     
     payload = {
-        "model": "gpt-4o-mini",[cite: 1]
+        "model": "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Transcript:\n{text}"}[cite: 1]
+            {"role": "user", "content": f"Transcript:\n{text}"}
         ]
     }
     
     try:
-        resp = requests.post(PUTER_CHAT_URL, json=payload, timeout=45)[cite: 1]
-        if resp.status_code == 200:[cite: 1]
-            result = resp.json()[cite: 1]
+        resp = requests.post(PUTER_CHAT_URL, json=payload, timeout=45)
+        if resp.status_code == 200:
+            result = resp.json()
             content = ""
-            if "choices" in result:[cite: 1]
-                content = result["choices"][0]["message"]["content"].strip()[cite: 1]
-            elif "response" in result:[cite: 1]
-                content = result["response"].strip()[cite: 1]
+            if "choices" in result:
+                content = result["choices"][0]["message"]["content"].strip()
+            elif "response" in result:
+                content = result["response"].strip()
             else:
-                content = result.get("content", "").strip()[cite: 1]
+                content = result.get("content", "").strip()
 
             if content.startswith("```"):
                 content = content.split("```")[1]
@@ -292,7 +291,7 @@ def generate_minutes(text):
 
 def parse_fallback(text):
     import re
-    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()][cite: 1]
+    sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
     rows = []
     for s in sentences[:4]:
         rows.append({
@@ -315,13 +314,13 @@ def set_cell_margins(cell, top=140, bottom=140, start=160, end=160):
 
 def export_docx(df, transcript):
     doc = Document()
-    section = doc.sections[0][cite: 1]
+    section = doc.sections[0]
     section.top_margin = Inches(1.0)
     section.bottom_margin = Inches(1.0)
     section.left_margin = Inches(1.0)
     section.right_margin = Inches(1.0)
-    section.page_width = Inches(8.5)[cite: 1]
-    section.page_height = Inches(11.0)[cite: 1]
+    section.page_width = Inches(8.5)
+    section.page_height = Inches(11.0)
 
     # Header
     h1 = doc.add_heading("PROJECT ECO // MINUTES OF THE MEETING", level=1)
@@ -332,18 +331,18 @@ def export_docx(df, transcript):
         r.font.bold = True
         r.font.color.rgb = RGBColor(16, 185, 129)
 
-    table = doc.add_table(rows=len(df) + 1, cols=3)[cite: 1]
+    table = doc.add_table(rows=len(df) + 1, cols=3)
     table.autofit = False
     col_widths = [Inches(2.5), Inches(2.9), Inches(1.1)]
-    headers = ["Key Point", "Action Plan", "Assigned"][cite: 1]
+    headers = ["Key Point", "Action Plan", "Assigned"]
     
     # Table Header
-    hdr_row = table.rows[0][cite: 1]
+    hdr_row = table.rows[0]
     trPr = hdr_row._tr.get_or_add_trPr()
     trPr.append(parse_xml(r'<w:tblHeader %s/>' % nsdecls('w')))
     
     for idx, name in enumerate(headers):
-        cell = hdr_row.cells[idx][cite: 1]
+        cell = hdr_row.cells[idx]
         cell.width = col_widths[idx]
         set_cell_margins(cell, top=160, bottom=160)
         shading = parse_xml(r'<w:shd {} w:fill="181B22"/>'.format(nsdecls('w')))
@@ -351,22 +350,22 @@ def export_docx(df, transcript):
         
         p = cell.paragraphs[0]
         p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        run = p.add_run(name)[cite: 1]
+        run = p.add_run(name)
         run.bold = True
         run.font.name = "Segoe UI"
         run.font.size = Pt(9)
         run.font.color.rgb = RGBColor(255, 255, 255)
 
     # Table Body
-    for row_idx, data in df.iterrows():[cite: 1]
-        row_cells = table.rows[row_idx + 1].cells[cite: 1]
+    for row_idx, data in df.iterrows():
+        row_cells = table.rows[row_idx + 1].cells
         for col_idx, col_name in enumerate(headers):
-            cell = row_cells[col_idx][cite: 1]
+            cell = row_cells[col_idx]
             cell.width = col_widths[col_idx]
             set_cell_margins(cell)
             cell.vertical_alignment = WD_ALIGN_VERTICAL.TOP
             
-            raw_text = str(data[col_name]) if pd.notna(data[col_name]) else ""[cite: 1]
+            raw_text = str(data[col_name]) if pd.notna(data[col_name]) else ""
             lines = raw_text.split("\n")
             
             for l_idx, line in enumerate(lines):
@@ -381,22 +380,22 @@ def export_docx(df, transcript):
 
     if transcript:
         doc.add_paragraph().paragraph_format.space_before = Pt(20)
-        h2 = doc.add_heading("Session Transcript", level=2)[cite: 1]
+        h2 = doc.add_heading("Session Transcript", level=2)
         for r in h2.runs:
             r.font.name = "Segoe UI"
             r.font.size = Pt(11)
             r.font.color.rgb = RGBColor(16, 185, 129)
             
-        p_trans = doc.add_paragraph(transcript)[cite: 1]
+        p_trans = doc.add_paragraph(transcript)
         p_trans.alignment = WD_ALIGN_PARAGRAPH.LEFT
         for r in p_trans.runs:
             r.font.name = "Segoe UI"
             r.font.size = Pt(8)
             r.font.color.rgb = RGBColor(100, 116, 139)
 
-    bio = BytesIO()[cite: 1]
-    doc.save(bio)[cite: 1]
-    bio.seek(0)[cite: 1]
+    bio = BytesIO()
+    doc.save(bio)
+    bio.seek(0)
     return bio
 
 def export_pdf(df, transcript):
@@ -461,9 +460,9 @@ def export_pdf(df, transcript):
     ]]
     
     for _, row in df.iterrows():
-        kp_text = str(row["Key Point"]).replace('\n', '<br/>') if pd.notna(row["Key Point"]) else ""[cite: 1]
-        ap_text = str(row["Action Plan"]).replace('\n', '<br/>') if pd.notna(row["Action Plan"]) else ""[cite: 1]
-        as_text = str(row["Assigned"]).replace('\n', '<br/>') if pd.notna(row["Assigned"]) else ""[cite: 1]
+        kp_text = str(row["Key Point"]).replace('\n', '<br/>') if pd.notna(row["Key Point"]) else ""
+        ap_text = str(row["Action Plan"]).replace('\n', '<br/>') if pd.notna(row["Action Plan"]) else ""
+        as_text = str(row["Assigned"]).replace('\n', '<br/>') if pd.notna(row["Assigned"]) else ""
         
         table_data.append([
             Paragraph(kp_text, body_cell_style),
@@ -512,11 +511,11 @@ with tab_rec:
 with tab_up:
     up_buffer = st.file_uploader(
         "Upload Audio",
-        type=["wav", "mp3", "m4a", "ogg", "flac", "webm"],[cite: 1]
+        type=["wav", "mp3", "m4a", "ogg", "flac", "webm"],
         label_visibility="collapsed"
     )
     if up_buffer:
-        audio_payload = up_buffer.read()[cite: 1]
+        audio_payload = up_buffer.read()
 
 if audio_payload:
     st.write("")
@@ -524,16 +523,16 @@ if audio_payload:
         with st.spinner("Processing speech matrix..."):
             res = transcribe_audio(audio_payload)
         if res:
-            st.session_state["transcript"] = res[cite: 1]
-            st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])[cite: 1]
-            st.rerun()[cite: 1]
+            st.session_state["transcript"] = res
+            st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
+            st.rerun()
 
 if st.session_state["transcript"]:
     st.markdown("---")
     with st.expander("Session Transcript", expanded=False):
         st.session_state["transcript"] = st.text_area(
             "Session Transcript",
-            st.session_state["transcript"],[cite: 1]
+            st.session_state["transcript"],
             height=120,
             label_visibility="collapsed"
         )
@@ -570,14 +569,14 @@ if not st.session_state["df"].empty:
 
     # Data editor supporting full wrapped multiline text editing, row insertion, and deletions
     edited = st.data_editor(
-        st.session_state["df"],[cite: 1]
+        st.session_state["df"],
         column_config=column_config,
-        num_rows="dynamic",[cite: 1]
-        use_container_width=True,[cite: 1]
+        num_rows="dynamic",
+        use_container_width=True,
         hide_index=True,
         key="project_eco_editor"
     )
-    st.session_state["df"] = edited[cite: 1]
+    st.session_state["df"] = edited
 
     st.write("")
     col_word, col_pdf, _ = st.columns([1.5, 1.5, 4])
@@ -588,7 +587,7 @@ if not st.session_state["df"].empty:
             label="Export Word",
             data=doc_data,
             file_name="Project_Eco_Minutes.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"[cite: 1]
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
         
     with col_pdf:
