@@ -26,3 +26,4 @@ sortables
 streamlit
 requests
 supabase
+reportlab
