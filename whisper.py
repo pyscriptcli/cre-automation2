@@ -19,10 +19,9 @@ GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 # ========== CUSTOM CSS INJECTION ==========
 CUSTOM_CSS = """
 <style>
-    /* Fonts matching the uploaded image */
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Playfair+Display:ital,wght@1,400;1,500&display=swap');
 
-    /* Global Font & Light Background (Off-white/Cream from bottom half of image) */
+    /* Global Font & Light Background */
     html, body, [class*="css"] {
         font-family: 'Montserrat', sans-serif !important;
     }
@@ -31,56 +30,61 @@ CUSTOM_CSS = """
         background-color: #F4F2EC; 
         color: #333333;
     }
+    
+    /* Hide default Streamlit header to make room for our custom topbar */
+    .stApp > header {
+        display: none !important;
+    }
 
-    /* Headings (Elegant Serif, Not Bold) */
-    h1, h2, h3 {
+    /* Adjust main container padding to accommodate top bar */
+    .block-container {
+        padding-top: 6rem !important;
+    }
+
+    /* Custom Left-Aligned Topbar */
+    .echo-topbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 70px;
+        background-color: #161616;
+        border-bottom: 1px solid #333333;
+        display: flex;
+        align-items: center;
+        padding: 0 2rem;
+        z-index: 999999;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .echo-topbar .logo-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .echo-topbar h1 {
         font-family: 'Playfair Display', serif !important;
         font-style: italic !important;
-        font-weight: 400 !important; /* Forces normal/light weight */
-        color: #1A2B4C !important; /* Deep Navy from image */
+        font-weight: 400 !important;
+        font-size: 1.5rem !important;
+        color: #FFFFFF !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .echo-topbar h1 span {
+        color: #D4AF37; /* Gold */
+    }
+
+    /* Headings */
+    h3 {
+        font-family: 'Playfair Display', serif !important;
+        font-style: italic !important;
+        font-weight: 400 !important; 
+        color: #1A2B4C !important;
         letter-spacing: 0.02em;
         margin-bottom: 0.5rem;
     }
 
-    /* Top Dark Header Card (Mimicking Top half of image) */
-    .echo-header {
-        background-color: #161616;
-        background-image: 
-            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-        background-size: 40px 40px;
-        padding: 3rem 2rem;
-        border-radius: 16px;
-        margin-bottom: 2.5rem;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-        text-align: center;
-        border: 1px solid #222;
-    }
-    .echo-header .eyebrow {
-        color: #D4AF37; /* Gold */
-        font-family: 'Montserrat', sans-serif;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 3px;
-        text-transform: uppercase;
-        margin-bottom: 1rem;
-    }
-    .echo-header .eyebrow::after {
-        content: "";
-        display: block;
-        width: 40px;
-        height: 2px;
-        background-color: #D4AF37;
-        margin: 8px auto 0 auto;
-    }
-    .echo-header h1 {
-        font-size: 2.5rem;
-        color: #FFFFFF !important;
-        margin: 0;
-    }
-    .echo-header h1 span { color: #D4AF37; }
-
-    /* Container Cards (Depth) */
+    /* Container Cards */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important;
         border-radius: 16px !important;
@@ -90,23 +94,26 @@ CUSTOM_CSS = """
         margin-bottom: 2rem !important;
     }
 
-    /* Primary Buttons */
+    /* Dark Pill-Shaped Buttons (Matched to image) */
     .stButton > button {
-        background-color: transparent !important;
-        color: #1A2B4C !important;
-        border: 1px solid #1A2B4C !important;
-        border-radius: 6px !important;
+        background-color: #222222 !important; /* Dark Grey */
+        color: #FFFFFF !important;
+        border: 1px solid #444444 !important;
+        border-radius: 50px !important; /* Pill Shape */
         font-family: 'Montserrat', sans-serif !important;
         font-weight: 500 !important;
         letter-spacing: 0.5px;
-        text-transform: uppercase;
-        padding: 0.5rem 1.5rem !important;
+        padding: 0.5rem 1.75rem !important;
         transition: all 0.3s ease !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
     .stButton > button:hover {
-        background-color: #1A2B4C !important;
-        color: #FFFFFF !important;
-        box-shadow: 0 4px 15px rgba(26, 43, 76, 0.2) !important;
+        border-color: #D4AF37 !important; /* Gold border on hover */
+        color: #D4AF37 !important;
+        background-color: #1A1A1A !important;
+        box-shadow: 0 4px 15px rgba(212, 175, 55, 0.15) !important;
     }
 
     /* File Uploader Dropzone */
@@ -169,7 +176,7 @@ CUSTOM_CSS = """
     [data-baseweb="tab"] {
         font-family: 'Montserrat', sans-serif !important;
         font-weight: 500 !important;
-        letter-spacing: 1px !important;
+        letter-spacing: 0.5px !important;
     }
 </style>
 """
@@ -281,14 +288,19 @@ def export_to_pdf(df, transcript):
 # ========== STREAMLIT UI SETUP ==========
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# Image-Inspired Header
-header_html = """
-<div class="echo-header">
-    <div class="eyebrow">Project Input</div>
-    <h1>Project <span>Echo</span></h1>
+# Full-width Fixed Topbar
+topbar_html = """
+<div class="echo-topbar">
+    <div class="logo-wrapper">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line>
+        </svg>
+        <h1>Project <span>Echo</span></h1>
+    </div>
 </div>
 """
-st.markdown(header_html, unsafe_allow_html=True)
+st.markdown(topbar_html, unsafe_allow_html=True)
 
 # Session State
 if "transcript" not in st.session_state:
@@ -298,18 +310,21 @@ if "key_points" not in st.session_state:
 if "df" not in st.session_state:
     st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
 
-# ---- Step 1: Input Card (Upload or Record) ----
+# ---- Step 1: Input Card ----
 with st.container(border=True):
+    # Using raw HTML for header prevents anchor generation (no /#upload-audio in URL)
     st.markdown(
         """<h3 style="display: flex; align-items: center; margin-bottom: 1.5rem;">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 12px;">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line>
-        </svg> Input Audio Source</h3>""", 
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg> Upload Audio</h3>""", 
         unsafe_allow_html=True
     )
     
-    tab1, tab2 = st.tabs(["📁 Upload File", "🎙️ Record Audio"])
+    # Removed Emojis from tabs
+    tab1, tab2 = st.tabs(["Upload File", "Record Audio"])
     
     audio_data = None
     
@@ -323,7 +338,6 @@ with st.container(border=True):
         recorded_audio = st.audio_input("Record Audio", label_visibility="collapsed")
         if recorded_audio:
             audio_data = recorded_audio.read()
-            # Allow user to save the recorded audio file locally
             st.download_button(
                 label="Save Audio File",
                 data=audio_data,
