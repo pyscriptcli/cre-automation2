@@ -9,7 +9,7 @@ from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # ========== CONFIG ==========
-# Set page config must be the first Streamlit command
+# Page configuration
 st.set_page_config(page_title="Project Echo | Voice App", layout="wide", initial_sidebar_state="collapsed")
 
 # API Keys & Endpoints
@@ -18,12 +18,6 @@ GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # ========== CUSTOM CSS INJECTION ==========
-# Design Decisions:
-# - Typography: Plus Jakarta Sans for a modern, clean enterprise look.
-# - Color Palette: Dark Navy (#0B1A2E) base, Gold (#F5B041) accents.
-# - Depth: Radial gradients on the background and box-shadows on buttons/containers.
-# - Border Radius: 12px for standard elements, 24px for larger cards.
-# - Transitions: Smooth 0.2s ease on all interactive elements.
 CUSTOM_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -43,6 +37,7 @@ CUSTOM_CSS = """
         color: #FFFFFF !important;
         font-weight: 700 !important;
         letter-spacing: -0.02em;
+        margin-bottom: 0.5rem;
     }
 
     /* Custom Header */
@@ -67,29 +62,13 @@ CUSTOM_CSS = """
         gap: 0.5rem;
     }
     .echo-logo span { color: #F5B041; }
-    .echo-nav {
-        display: flex;
-        gap: 1.5rem;
-    }
-    .echo-nav-item {
-        color: #B0C4DE;
-        text-decoration: none;
-        font-weight: 500;
-        transition: all 0.2s ease;
-        cursor: pointer;
-    }
-    .echo-nav-item.active {
-        color: #FFFFFF;
-        border-bottom: 2px solid #F5B041;
-        padding-bottom: 4px;
-    }
 
     /* Primary Buttons (Gold) */
     .stButton > button {
         background-color: #F5B041 !important;
         color: #1A1A1A !important;
         border: none !important;
-        border-radius: 50px !important; /* Pill shape */
+        border-radius: 50px !important;
         font-weight: 700 !important;
         padding: 0.6rem 2rem !important;
         box-shadow: 0 4px 16px rgba(245, 176, 65, 0.2) !important;
@@ -135,7 +114,7 @@ CUSTOM_CSS = """
         box-shadow: 0 0 0 1px #F5B041 !important;
     }
 
-    /* Dataframe / Table overriding */
+    /* Dataframe / Table styling */
     [data-testid="stDataFrame"] {
         border-radius: 12px;
         overflow: hidden;
@@ -180,9 +159,8 @@ CUSTOM_CSS = """
 </style>
 """
 
-# ========== HELPER FUNCTIONS ==========
+# ========== CORE LOGIC ==========
 def transcribe_audio(audio_bytes):
-    """Transcribe using Groq Whisper."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
     files = {
         "file": ("audio.wav", audio_bytes),
@@ -197,7 +175,6 @@ def transcribe_audio(audio_bytes):
         return None
 
 def summarize_text(text):
-    """Generate key points using Groq Llama (Replacing Puter)."""
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
@@ -209,7 +186,7 @@ def summarize_text(text):
     {text}
     """
     payload = {
-        "model": "llama-3.1-8b-instant", 
+        "model": "llama-3.1-8b-instant",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3
     }
@@ -218,7 +195,6 @@ def summarize_text(text):
         resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload)
         if resp.status_code == 200:
             content = resp.json()["choices"][0]["message"]["content"]
-            # Parse bullet points
             lines = [line.strip() for line in content.split("\n") if line.strip().startswith("-")]
             if not lines:
                 sentences = re.split(r'(?<=[.!?])\s+', text)
@@ -232,22 +208,18 @@ def summarize_text(text):
         return fallback_summary(text)
 
 def fallback_summary(text):
-    """Simple fallback: extract first 3 sentences."""
     sentences = re.split(r'(?<=[.!?])\s+', text)
     return [s.strip() for s in sentences[:3] if s.strip()]
 
 def export_to_word(df, transcript):
-    """Generate a themed Word document with the table."""
     doc = Document()
     doc.sections[0].orientation = 0
     doc.sections[0].page_width = Inches(8.5)
     doc.sections[0].page_height = Inches(11.0)
 
-    # Document Styling
     title = doc.add_heading("Project Echo: Meeting Summary", level=1)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
-    # Add Transcript Optional Section
     if transcript:
         doc.add_heading("Full Transcript", level=2)
         p = doc.add_paragraph(transcript)
@@ -257,16 +229,14 @@ def export_to_word(df, transcript):
     table = doc.add_table(rows=len(df)+1, cols=3)
     table.style = "Table Grid"
 
-    # Header styling (Simulating the Gold theme in Word)
     hdr_cells = table.rows[0].cells
     headers = ["Key Point", "Action Plan", "Assigned"]
     for i, header in enumerate(headers):
         hdr_cells[i].text = header
         run = hdr_cells[i].paragraphs[0].runs[0]
         run.font.bold = True
-        run.font.color.rgb = RGBColor(199, 154, 46) # Gold Dark
+        run.font.color.rgb = RGBColor(199, 154, 46)
 
-    # Data population
     for i, row in df.iterrows():
         cells = table.rows[i+1].cells
         cells[0].text = str(row["Key Point"])
@@ -282,23 +252,18 @@ def export_to_word(df, transcript):
 # Inject CSS
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# Custom Header HTML
+# Custom Header (Removed Navigation Tabs)
 header_html = """
 <div class="echo-header">
     <div class="echo-logo">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5B041" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
         Project <span>Echo</span>
     </div>
-    <div class="echo-nav">
-        <a class="echo-nav-item active">Dashboard</a>
-        <a class="echo-nav-item">Reports</a>
-        <a class="echo-nav-item">Settings</a>
-    </div>
 </div>
 """
 st.markdown(header_html, unsafe_allow_html=True)
 
-# Initialize session state[cite: 1]
+# Initialize Session State
 if "transcript" not in st.session_state:
     st.session_state["transcript"] = ""
 if "key_points" not in st.session_state:
@@ -306,45 +271,61 @@ if "key_points" not in st.session_state:
 if "df" not in st.session_state:
     st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
 
-# ---- UI Layout: Main Content ----
-st.markdown("### 🎙️ Audio Processing Hub")
-st.markdown("<span style='color:#7A8DA0;'>Upload your meeting recording to automatically generate transcripts and actionable insights.</span>", unsafe_allow_html=True)
-st.write("") # Spacer
-
 # ---- Step 1: Upload & Transcribe ----
-uploaded = st.file_uploader("Drag and drop your audio file here", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"], label_visibility="collapsed")[cite: 1]
+st.markdown(
+    """<h3 style="display: flex; align-items: center;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5B041" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 10px;">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+    </svg> Upload Audio</h3>""", 
+    unsafe_allow_html=True
+)
+st.write("")
+
+uploaded = st.file_uploader(
+    "Drag and drop your audio file here",
+    type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
+    label_visibility="collapsed"
+)
 
 if uploaded:
     col_btn, _ = st.columns([2, 10])
     with col_btn:
-        if st.button("✨ Transcribe Audio"):
+        if st.button("Transcribe Audio"):
             with st.spinner("Processing audio with Groq Whisper..."):
-                transcript = transcribe_audio(uploaded.read())[cite: 1]
+                transcript = transcribe_audio(uploaded.read())
             if transcript:
                 st.session_state["transcript"] = transcript
                 st.session_state["key_points"] = []
-                st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])[cite: 1]
+                st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
                 st.rerun()
 
 # ---- Step 2: Transcript Display & Summarize ----
 if st.session_state["transcript"]:
     st.markdown("---")
     
-    # Extra Credit: Word Count & Reading Time calculation
     word_count = len(st.session_state["transcript"].split())
     read_time = max(1, word_count // 200)
     
     col_title, col_meta = st.columns([3, 1])
     with col_title:
-        st.markdown(f"### 📋 Full Transcript")
+        st.markdown(
+            """<h3 style="display: flex; align-items: center;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5B041" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 10px;">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+            </svg> Full Transcript</h3>""", 
+            unsafe_allow_html=True
+        )
     with col_meta:
         st.markdown(f"<div style='text-align: right; color: #F5B041; font-size: 0.9rem; font-weight: 600; padding-top: 0.5rem;'>{word_count} words • ~{read_time} min read</div>", unsafe_allow_html=True)
     
-    st.text_area("Transcript Content", st.session_state["transcript"], height=200, label_visibility="collapsed")[cite: 1]
+    st.text_area("Transcript Content", st.session_state["transcript"], height=200, label_visibility="collapsed")
     
     if not st.session_state["key_points"]:
         st.write("")
-        if st.button("📝 Generate Action Items"):
+        if st.button("Generate Action Items"):
             with st.spinner("Analyzing context with Groq Llama..."):
                 points = summarize_text(st.session_state["transcript"])
             if points:
@@ -353,17 +334,22 @@ if st.session_state["transcript"]:
                     "Key Point": points,
                     "Action Plan": [""] * len(points),
                     "Assigned": [""] * len(points)
-                })[cite: 1]
+                })
                 st.session_state["df"] = df
                 st.rerun()
 
 # ---- Step 3: Table Editor & Export ----
 if not st.session_state["df"].empty:
     st.markdown("---")
-    st.markdown("### 🎯 Action Plan Editor")
-    st.markdown("<span style='color:#B0C4DE; font-size: 0.95rem;'>Double-click cells below to assign tasks and define action plans. Changes are saved automatically.</span>", unsafe_allow_html=True)
+    st.markdown(
+        """<h3 style="display: flex; align-items: center;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F5B041" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 10px;">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg> Action Plan Editor</h3>""", 
+        unsafe_allow_html=True
+    )
     
-    # Styled Data Editor Wrapper
     st.markdown("<div style='padding: 1rem 0;'>", unsafe_allow_html=True)
     edited_df = st.data_editor(
         st.session_state["df"],
@@ -371,21 +357,20 @@ if not st.session_state["df"].empty:
         use_container_width=True,
         key="data_editor",
         hide_index=True
-    )[cite: 1]
-    st.session_state["df"] = edited_df[cite: 1]
+    )
+    st.session_state["df"] = edited_df
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Export Section
     st.write("")
     col_exp1, col_exp2 = st.columns([2, 8])
     with col_exp1:
-        doc_bio = export_to_word(st.session_state["df"], st.session_state["transcript"])[cite: 1]
+        doc_bio = export_to_word(st.session_state["df"], st.session_state["transcript"])
         st.download_button(
-            label="⬇️ Export to Word (.docx)",
+            label="Export to Word (.docx)",
             data=doc_bio,
             file_name="Echo_Action_Report.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )[cite: 1]
+        )
 
 # ---- Footer ----
 footer_html = """
