@@ -9,7 +9,16 @@ from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # ========== CONFIG ==========
-st.set_page_config(page_title="Project Echo | Voice App", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
+
+
+# --- PROGRAMMATIC LIGHT MODE LOCK ---
+_config_dir = ".streamlit"
+_config_file = os.path.join(_config_dir, "config.toml")
+if not os.path.exists(_config_file):
+    os.makedirs(_config_dir, exist_ok=True)
+    with open(_config_file, "w", encoding="utf-8") as f:
+        f.write("[theme]\nbase=\"light\"\n")
 
 # API Keys & Endpoints
 GROQ_API_KEY = "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"
