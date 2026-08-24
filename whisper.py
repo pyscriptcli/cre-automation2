@@ -10,7 +10,7 @@ from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.oxml import parse_xml, OxmlElement
 from docx.oxml.ns import nsdecls, qn
 
-# ==================== CORE CONFIGURATION ====================
+# ==================== CONFIGURATION ====================
 st.set_page_config(
     page_title="Chronicle / Open Audio Core",
     layout="wide",
@@ -21,95 +21,130 @@ GROQ_API_KEY = "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"
 GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 PUTER_CHAT_URL = "https://api.puter.com/v1/ai/chat"
 
-# ==================== SOPHISTICATED DARK DESIGN SYSTEM ====================
+# ==================== FORCED PERSISTENT DARK MODE STYLING ====================
 st.markdown("""
 <style>
-    /* Full viewport reset & removal of default Streamlit top bar/footer */
-    header[data-testid="stHeader"], footer, #MainMenu, .stDeployButton {
+    /* Force pure dark mode variables across root and all components */
+    :root, html, body, [data-testid="stAppViewContainer"], .stApp {
+        color-scheme: dark !important;
+        background-color: #07080b !important;
+        background: radial-gradient(circle at 50% 0%, #11141c 0%, #06070a 100%) !important;
+        color: #e2e8f0 !important;
+    }
+
+    /* Complete removal of Streamlit top header, decoration line, and default footers */
+    header[data-testid="stHeader"],
+    div[data-testid="stDecoration"],
+    #MainMenu,
+    footer,
+    .stDeployButton {
         display: none !important;
         visibility: hidden !important;
-    }
-    
-    /* Background Canvas */
-    .stApp {
-        background: radial-gradient(circle at 50% 0%, #14161b 0%, #090a0f 100%) !important;
-        color: #e2e8f0;
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
+        height: 0px !important;
     }
 
     .block-container {
-        padding-top: 2.5rem !important;
+        padding-top: 2.2rem !important;
         padding-bottom: 3.5rem !important;
         max-width: 1100px !important;
         margin: 0 auto;
     }
 
-    /* Minimal Header Typography */
+    /* Typography */
     .app-title {
         font-size: 1.35rem;
         font-weight: 600;
         letter-spacing: -0.03em;
         color: #f8fafc;
-        display: flex;
-        align-items: center;
-        gap: 8px;
     }
     
     .open-note {
         font-size: 0.82rem;
         color: #64748b;
         letter-spacing: 0.01em;
-        margin-top: 0.15rem;
+        margin-top: 0.2rem;
+        margin-bottom: 1.8rem;
         font-weight: 400;
     }
 
-    /* Architectural Tabs */
+    /* Fix Tabs for dark theme */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: transparent;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        gap: 32px;
-        padding-bottom: 0px;
+        background-color: transparent !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        gap: 28px;
     }
     
     .stTabs [data-baseweb="tab"] {
-        padding: 8px 0px 12px 0px;
-        font-size: 0.84rem;
-        font-weight: 500;
-        letter-spacing: 0.02em;
-        color: #64748b;
+        padding: 8px 0px 10px 0px !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        color: #64748b !important;
         background-color: transparent !important;
         border: none !important;
     }
     
     .stTabs [aria-selected="true"] {
-        color: #f1f5f9 !important;
+        color: #f8fafc !important;
         border-bottom: 2px solid #38bdf8 !important;
     }
 
-    /* Precision Buttons */
+    /* Lock File Uploader to Dark Theme */
+    [data-testid="stFileUploader"],
+    [data-testid="stFileUploader"] > div,
+    [data-testid="stFileUploaderDropzone"] {
+        background-color: #0d1117 !important;
+        border: 1px dashed rgba(255, 255, 255, 0.12) !important;
+        border-radius: 8px !important;
+        color: #94a3b8 !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"]:hover {
+        border-color: rgba(255, 255, 255, 0.25) !important;
+        background-color: #111620 !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] button {
+        background-color: #1a2234 !important;
+        color: #f1f5f9 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] span,
+    [data-testid="stFileUploaderDropzone"] small,
+    [data-testid="stFileUploaderDropzone"] div {
+        color: #94a3b8 !important;
+    }
+
+    /* Lock Audio Input to Dark Theme */
+    [data-testid="stAudioInput"] {
+        background-color: #0d1117 !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 8px !important;
+        padding: 10px !important;
+    }
+
+    /* Buttons */
     .stButton > button {
         background: #0f172a !important;
         color: #cbd5e1 !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
         border-radius: 6px !important;
         font-size: 0.83rem !important;
         font-weight: 500 !important;
         letter-spacing: 0.02em !important;
         padding: 0.45rem 1.1rem !important;
-        transition: all 0.18s ease-in-out !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+        transition: all 0.15s ease-in-out !important;
     }
     
     .stButton > button:hover {
         background: #1e293b !important;
         color: #ffffff !important;
         border-color: rgba(255, 255, 255, 0.25) !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
     }
 
     .stButton > button[kind="primary"] {
         background: #f8fafc !important;
-        color: #090a0f !important;
+        color: #06070a !important;
         border: 1px solid #ffffff !important;
         font-weight: 600 !important;
     }
@@ -120,24 +155,14 @@ st.markdown("""
         box-shadow: 0 0 16px rgba(255, 255, 255, 0.15) !important;
     }
 
-    /* Data Table Custom Glassmorphism Frame */
-    [data-testid="stDataEditor"] {
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        border-radius: 8px;
-        background: #0b0f17;
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-        overflow: hidden;
-    }
-
-    /* Ensure textareas/inputs match dark tone */
+    /* Text areas */
     .stTextArea textarea {
-        background-color: #0b0f17 !important;
-        color: #cbd5e1 !important;
+        background-color: #0a0d14 !important;
+        color: #e2e8f0 !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         border-radius: 6px !important;
         font-size: 0.85rem !important;
         line-height: 1.6 !important;
-        white-space: pre-wrap !important;
     }
 
     .stTextArea textarea:focus {
@@ -145,16 +170,32 @@ st.markdown("""
         box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4) !important;
     }
 
-    /* Divider */
+    /* Data Table / Editor Frame */
+    [data-testid="stDataEditor"] {
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 8px !important;
+        background-color: #0a0d14 !important;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background-color: #0d1117 !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        border-radius: 6px !important;
+        color: #cbd5e1 !important;
+        font-size: 0.85rem !important;
+    }
+
     hr {
-        border: none;
+        border: none !important;
         border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
-        margin: 2rem 0 !important;
+        margin: 1.8rem 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== STATE MANAGEMENT ====================
+# ==================== STATE ====================
 if "transcript" not in st.session_state:
     st.session_state["transcript"] = ""
 if "df" not in st.session_state:
@@ -173,7 +214,7 @@ def transcribe_audio(audio_bytes):
         if resp.status_code == 200:
             return resp.json().get("text", "")
         else:
-            st.error(f"Transcription failure: {resp.status_code}")
+            st.error(f"Engine response: {resp.status_code}")
             return None
     except Exception as e:
         st.error(f"Engine connection failed: {e}")
@@ -181,13 +222,12 @@ def transcribe_audio(audio_bytes):
 
 def generate_minutes(text):
     system_prompt = (
-        "You are an analytical meeting intelligence engine. Parse the discussion transcript "
-        "and produce a structured list of key decisions/points, concrete action steps, and assignees.\n"
+        "You are an analytical meeting intelligence engine. Parse the transcript into key points, "
+        "corresponding detailed action plans, and assignees.\n"
         "Rules:\n"
-        "- Action plans should naturally support multiline lists (bullets with '•' or numbers '1.', '2.').\n"
-        "- Output strictly valid JSON matching this schema: "
-        "[{\"Key Point\": \"...\", \"Action Plan\": \"...\", \"Assigned\": \"...\"}].\n"
-        "- Do not wrap inside code block notations if possible, or provide raw JSON only."
+        "- Action Plan must include structured points (e.g. '• Task' or '1. Task').\n"
+        "- Return strictly valid JSON array of objects with keys: 'Key Point', 'Action Plan', 'Assigned'.\n"
+        "- Output raw JSON only."
     )
     
     payload = {
@@ -290,7 +330,7 @@ def export_docx(df, transcript):
         run.font.size = Pt(9)
         run.font.color.rgb = RGBColor(15, 23, 42)
 
-    # Rows formatting
+    # Row Formatting
     for row_idx, data in df.iterrows():
         row_cells = table.rows[row_idx + 1].cells
         for col_idx, col_name in enumerate(headers):
@@ -332,13 +372,10 @@ def export_docx(df, transcript):
     bio.seek(0)
     return bio
 
-# ==================== INTERFACE ====================
+# ==================== APPLICATION CANVAS ====================
 st.markdown('<div class="app-title">Chronicle</div>', unsafe_allow_html=True)
 st.markdown('<div class="open-note">Open-source meeting transcription and decision orchestration kernel.</div>', unsafe_allow_html=True)
 
-st.write("")
-
-# Input Section
 tab_rec, tab_up = st.tabs(["Record", "Upload"])
 audio_payload = None
 
@@ -356,7 +393,6 @@ with tab_up:
     if up_buffer:
         audio_payload = up_buffer.read()
 
-# Action trigger
 if audio_payload:
     st.write("")
     if st.button("Transcribe", type="primary"):
@@ -367,7 +403,6 @@ if audio_payload:
             st.session_state["df"] = pd.DataFrame(columns=["Key Point", "Action Plan", "Assigned"])
             st.rerun()
 
-# Processing workspace
 if st.session_state["transcript"]:
     st.markdown("---")
     with st.expander("Raw Transcript", expanded=False):
@@ -381,38 +416,34 @@ if st.session_state["transcript"]:
     col_btn, _ = st.columns([2, 5])
     with col_btn:
         if st.button("Generate Minutes of the Meeting", type="primary"):
-            with st.spinner("Structuring discussions and action matrices..."):
+            with st.spinner("Structuring decisions and action matrices..."):
                 structured_df = generate_minutes(st.session_state["transcript"])
             if not structured_df.empty:
                 st.session_state["df"] = structured_df
                 st.rerun()
 
-# Structured Matrix Editor
 if not st.session_state["df"].empty:
     st.markdown("---")
     
     column_config = {
         "Key Point": st.column_config.TextColumn(
             "Key Point",
-            help="Discussion core item (supports wrapped multiline text)",
             required=True,
             width="large"
         ),
         "Action Plan": st.column_config.TextColumn(
             "Action Plan",
-            help="Direct actions, bullets, or numbered lists (supports wrapped multiline text)",
             required=False,
             width="large"
         ),
         "Assigned": st.column_config.TextColumn(
             "Assigned",
-            help="Designated owner or system",
             required=False,
             width="medium"
         ),
     }
 
-    # Data editor supporting full wrapped dynamic text editing, row insertion, and deletions
+    # Data editor allowing multiline bullets, numbering, row creation/deletion
     edited = st.data_editor(
         st.session_state["df"],
         column_config=column_config,
