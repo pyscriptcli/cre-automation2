@@ -43,6 +43,31 @@ GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
 
+# ========== DAILY AUDIO LIMIT CONFIGURATION ==========
+MAX_DAILY_AUDIO = 5  # Set maximum audio transcriptions per day
+USAGE_FILE = ".daily_audio_usage.json"
+
+def get_daily_audio_count():
+    today_str = datetime.date.today().isoformat()
+    if os.path.exists(USAGE_FILE):
+        try:
+            with open(USAGE_FILE, "r") as f:
+                data = json.load(f)
+                if data.get("date") == today_str:
+                    return data.get("count", 0)
+        except Exception:
+            pass
+    return 0
+
+def increment_daily_audio_count():
+    today_str = datetime.date.today().isoformat()
+    current = get_daily_audio_count()
+    try:
+        with open(USAGE_FILE, "w") as f:
+            json.dump({"date": today_str, "count": current + 1}, f)
+    except Exception:
+        pass
+
 CRD_MEMBERS = [
     "Sondi Tuazon",
     "Kristina Balajadia",
@@ -65,19 +90,22 @@ LOCATION_PRESETS = [
 ]
 
 # Initialize Session State Variables
-if "transcript" not in st.session_state: st.session_state["transcript"] = ""
-if "df" not in st.session_state: st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-if "other_discussions" not in st.session_state: st.session_state["other_discussions"] = ""
-if "show_settings" not in st.session_state: st.session_state["show_settings"] = False
-if "tokens_used" not in st.session_state: st.session_state["tokens_used"] = 0
-if "last_api_call" not in st.session_state: st.session_state["last_api_call"] = None
-if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "AI - DeepSeek"
-if "chat_history" not in st.session_state: st.session_state["chat_history"] = []
-
-# ========== SVG ICONS ==========
-SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
-SVG_CHECK = """<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>"""
-SVG_INFO = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2B4C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>"""
+if "transcript" not in st.session_state:
+    st.session_state["transcript"] = ""
+if "df" not in st.session_state:
+    st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+if "other_discussions" not in st.session_state:
+    st.session_state["other_discussions"] = ""
+if "show_settings" not in st.session_state:
+    st.session_state["show_settings"] = False
+if "tokens_used" not in st.session_state:
+    st.session_state["tokens_used"] = 0
+if "last_api_call" not in st.session_state:
+    st.session_state["last_api_call"] = None
+if "selected_engine" not in st.session_state:
+    st.session_state["selected_engine"] = "AI - DeepSeek"
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = []
 
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
@@ -142,6 +170,7 @@ h3 {
     background-color: #1A1A1A !important;
 }
 
+/* Small SVG-only Settings Icon Button in the Card Header */
 div[data-testid="stButton"]:has(button[key="card_settings_btn"]) {
     display: flex !important;
     justify-content: flex-end !important;
@@ -169,8 +198,8 @@ button[key="card_settings_btn"]::before {
     width: 17px;
     height: 17px;
     background-color: #C5A059;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -181,16 +210,19 @@ button[key="card_settings_btn"]::before {
     line-height: 1.6 !important;
 }
 
+/* Time Picker Clean Layout */
 [data-testid="column"] .stSelectbox {
     margin-bottom: 0 !important;
 }
 </style>
 """
 
+# ========== SVG ICONS ==========
+SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
+
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
     try:
-        uploaded_file.seek(0)
         if uploaded_file.name.endswith('.txt'):
             return uploaded_file.getvalue().decode("utf-8")
         elif uploaded_file.name.endswith('.pdf'):
@@ -212,129 +244,76 @@ def _call_openai_transcribe(audio_bytes, filename="audio.mp3"):
         st.error("OpenAI API Key is missing. Please add it to your Streamlit Cloud Secrets.")
         return None
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
-    files = {"file": (filename, audio_bytes, "audio/mpeg")}
-    data = {"model": "whisper-1", "response_format": "json"}
+    files = {"file": (filename, audio_bytes), "model": (None, "gpt-4o-mini-transcribe"), "response_format": (None, "json")}
     try:
-        resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, data=data, timeout=180)
+        resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, timeout=180)
         if resp.status_code == 200:
             return resp.json().get("text", "")
-        st.error(f"OpenAI transcription error ({resp.status_code}): {resp.text}")
+        st.error(f"OpenAI fallback error: {resp.text}")
         return None
     except Exception as e:
         st.error(f"OpenAI connection error: {e}")
         return None
 
 def _call_groq_whisper(audio_bytes, filename="audio.mp3"):
-    if not GROQ_API_KEY:
-        return None
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    files = {"file": (filename, audio_bytes, "audio/mpeg")}
-    data = {"model": "whisper-large-v3-turbo", "response_format": "json"}
+    files = {"file": (filename, audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
     try:
-        resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, data=data, timeout=60)
+        resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=60)
         if resp.status_code == 200:
             return resp.json().get("text", "")
         return None
-    except Exception:
+    except:
         return None
-
-def _transcribe_single_segment_task(idx, seg_path):
-    try:
-        with open(seg_path, "rb") as f:
-            seg_bytes = f.read()
-        res = _call_openai_transcribe(seg_bytes, f"part_{idx}.mp3")
-        return idx, res or ""
-    finally:
-        if os.path.exists(seg_path):
-            try: os.remove(seg_path)
-            except: pass
-
-def check_ffmpeg_available():
-    try:
-        res = subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return res.returncode == 0
-    except Exception:
-        return False
 
 def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, status_placeholder):
-    if not audio_bytes or len(audio_bytes) == 0:
-        st.error("Audio data is empty. Please check the file and try again.")
-        return None
-
-    raw_size_mb = len(audio_bytes) / (1024 * 1024)
-    ffmpeg_available = check_ffmpeg_available()
-
-    # Fast path: Under 25MB without requiring ffmpeg compression
-    if raw_size_mb <= 24.0:
-        progress_bar.progress(30, text="Evaluating transcription engine (30%)...")
-        
-        # Primary: Groq Whisper
-        if GROQ_API_KEY:
-            status_placeholder.markdown(f"{SVG_INFO} Routing via Groq Whisper Primary...", unsafe_allow_html=True)
-            progress_bar.progress(60, text="Transcribing via Groq Whisper (60%)...")
-            text = _call_groq_whisper(audio_bytes, original_filename)
-            if text and text.strip():
-                progress_bar.progress(100, text="Transcription completed (100%).")
-                status_placeholder.empty()
-                return text.strip()
-            status_placeholder.markdown(f"{SVG_ALERT} Groq unavailable. Falling back to OpenAI...", unsafe_allow_html=True)
-
-        # Fallback: OpenAI Direct
-        if OPENAI_API_KEY:
-            status_placeholder.markdown(f"{SVG_INFO} Transcribing via OpenAI...", unsafe_allow_html=True)
-            progress_bar.progress(70, text="Transcribing via OpenAI (70%)...")
-            text = _call_openai_transcribe(audio_bytes, original_filename)
-            if text and text.strip():
-                progress_bar.progress(100, text="Transcription completed (100%).")
-                status_placeholder.empty()
-                return text.strip()
-            return None
-        else:
-            st.error("Both Groq and OpenAI API keys are missing or invalid in st.secrets.")
-            return None
-
-    # Heavy path: Files > 25MB requiring compression / chunking
-    if not ffmpeg_available:
-        st.error(f"File size is {raw_size_mb:.1f}MB, which exceeds the 25MB API limit, and 'ffmpeg' is not installed on this system. Please upload a smaller audio file or install ffmpeg.")
-        return None
-
     progress_bar.progress(10, text="Preprocessing audio container (10%)...")
+    
     ext = os.path.splitext(original_filename)[1] or ".m4a"
     with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as src:
         src.write(audio_bytes)
         src_path = src.name
 
     compressed_mp3 = src_path + "_compressed.mp3"
-    progress_bar.progress(25, text="Compressing audio to 16kHz Mono MP3 (25%)...")
+    progress_bar.progress(25, text="Compressing audio to 16kHz Mono 24k MP3 (25%)...")
 
     try:
         cmd = [
-            "ffmpeg", "-y", "-threads", "1",
-            "-i", src_path, "-vn", "-ac", "1", "-ar", "16000",
-            "-c:a", "libmp3lame", "-b:a", "24k", compressed_mp3
+            "ffmpeg", "-y",
+            "-threads", "1",
+            "-i", src_path,
+            "-vn",
+            "-ac", "1",
+            "-ar", "16000",
+            "-c:a", "libmp3lame",
+            "-b:a", "24k",
+            compressed_mp3
         ]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if res.returncode != 0:
-            st.error(f"FFmpeg compression failed: {res.stderr[:200]}")
+            st.error(f"FFmpeg compression error: {res.stderr[:200]}")
             return None
 
         comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
+        progress_bar.progress(45, text="Evaluating audio duration & routing (45%)...")
 
-        if comp_size_mb <= 24.0 and GROQ_API_KEY:
-            status_placeholder.markdown(f"{SVG_INFO} Transcribing compressed audio via Groq Whisper...", unsafe_allow_html=True)
+        if comp_size_mb <= 10.0 and GROQ_API_KEY:
+            status_placeholder.info("⚡ Processing via Groq Whisper Primary...")
             progress_bar.progress(70, text="Transcribing via Groq Whisper (70%)...")
             with open(compressed_mp3, "rb") as f:
                 c_bytes = f.read()
             text = _call_groq_whisper(c_bytes, "audio.mp3")
-            if text and text.strip():
-                progress_bar.progress(100, text="Transcription completed (100%).")
+            if text:
+                progress_bar.progress(100, text="Transcription completed (100%)!")
                 status_placeholder.empty()
-                return text.strip()
+                increment_daily_audio_count()
+                return text
+            status_placeholder.warning("⚠️ Groq rate limit reached. Switching automatically to OpenAI...")
 
-        # Chunk and transcribe in parallel
-        status_placeholder.markdown(f"{SVG_INFO} Chunking and transcribing in parallel via OpenAI...", unsafe_allow_html=True)
-        progress_bar.progress(55, text="Chunking audio segments for parallel processing (55%)...")
+        status_placeholder.info("🚀 Processing recording via OpenAI...")
+        progress_bar.progress(55, text="Preparing audio segments for parallel OpenAI (55%)...")
         
+        # Segment the audio into 10-minute chunks
         segment_pattern = src_path + "_seg_%03d.mp3"
         subprocess.run([
             "ffmpeg", "-y", "-i", compressed_mp3,
@@ -346,43 +325,66 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         base_name = os.path.basename(src_path) + "_seg_"
         segments = sorted([os.path.join(seg_dir, f) for f in os.listdir(seg_dir) if f.startswith(base_name)])
 
+        full_transcript = []
         total_segs = len(segments)
-        if total_segs == 0:
-            st.error("Failed to generate audio segments.")
-            return None
 
-        transcript_parts = [None] * total_segs
-        completed_count = 0
-        max_workers = min(5, total_segs)
-
+        # Parallel processing with ThreadPoolExecutor
+        max_workers = min(5, total_segs)  # at most 5 workers
+        segment_results = {}
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_idx = {
-                executor.submit(_transcribe_single_segment_task, idx, seg): idx
-                for idx, seg in enumerate(segments)
-            }
-            for future in as_completed(future_to_idx):
-                idx, segment_transcript = future.result()
-                transcript_parts[idx] = segment_transcript
-                completed_count += 1
-                pct = int(55 + (completed_count / total_segs) * 40)
-                progress_bar.progress(pct, text=f"Transcribed {completed_count}/{total_segs} chunks ({pct}%)...")
+            future_to_idx = {}
+            for idx, seg in enumerate(segments):
+                with open(seg, "rb") as f:
+                    seg_bytes = f.read()
+                future = executor.submit(_call_openai_transcribe, seg_bytes, f"part_{idx}.mp3")
+                future_to_idx[future] = idx
 
-        progress_bar.progress(100, text="Transcription completed successfully (100%).")
+            # Update progress as futures complete
+            completed = 0
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                try:
+                    result = future.result()
+                    if result:
+                        segment_results[idx] = result
+                except Exception as e:
+                    st.error(f"Segment {idx} transcription error: {e}")
+                completed += 1
+                pct = int(55 + (completed / total_segs) * 40)
+                progress_bar.progress(pct, text=f"Transcribed {completed}/{total_segs} segments ({pct}%)...")
+
+        # Assemble transcript in original order
+        for idx in range(total_segs):
+            if idx in segment_results:
+                full_transcript.append(segment_results[idx])
+
+        # Clean up segment files
+        for seg in segments:
+            try:
+                os.remove(seg)
+            except:
+                pass
+
+        progress_bar.progress(100, text="Transcription completed successfully (100%)!")
         time.sleep(0.3)
         status_placeholder.empty()
-        full_res = " ".join([part for part in transcript_parts if part and part.strip()])
-        return full_res.strip() if full_res else None
+        increment_daily_audio_count()
+        return " ".join(full_transcript)
 
     except Exception as e:
         st.error(f"Audio processing failure: {e}")
         return None
     finally:
         if os.path.exists(src_path):
-            try: os.remove(src_path)
-            except: pass
+            try:
+                os.remove(src_path)
+            except:
+                pass
         if os.path.exists(compressed_mp3):
-            try: os.remove(compressed_mp3)
-            except: pass
+            try:
+                os.remove(compressed_mp3)
+            except:
+                pass
 
 def normalize_llm_json_to_df(data):
     items = None
@@ -426,7 +428,7 @@ def normalize_llm_json_to_df(data):
         if col not in df.columns:
             df[col] = ""
             
-    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates().reset_index(drop=True)
+    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
     return df, other_disc
 
 def extract_with_deepseek(transcript):
@@ -510,7 +512,8 @@ def heuristic_non_ai_extraction(transcript):
     
     for i in range(0, len(sentences), 3):
         chunk = sentences[i:i+3]
-        if not chunk: continue
+        if not chunk:
+            continue
         chunk_text = " ".join(chunk)
         
         has_action = any(kw in chunk_text.lower() for kw in action_keywords)
@@ -540,7 +543,7 @@ def heuristic_non_ai_extraction(transcript):
         if col not in df.columns:
             df[col] = ""
             
-    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].reset_index(drop=True)
+    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
     other_text = "\n\n".join(other_discussions[:4])
     return df, other_text
 
@@ -552,7 +555,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
     if engine == "Non-AI - Python Heuristic":
         time.sleep(0.5)
         res_df, res_other = heuristic_non_ai_extraction(transcript)
-        progress_bar.progress(100, text="Extraction completed (100%).")
+        progress_bar.progress(100, text="Extraction completed (100%)!")
         time.sleep(0.2)
         progress_bar.empty()
         return res_df, res_other
@@ -560,7 +563,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
     df, other = extract_with_deepseek(transcript)
     
     if df is not None and not df.empty:
-        progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%).")
+        progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%)...")
         time.sleep(0.3)
         progress_bar.empty()
         return df, other
@@ -570,42 +573,47 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
     st.markdown(f"{SVG_ALERT} AI completion request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
     return df_fb, other_fb
 
-def query_transcript_assistant(transcript, user_question, chat_history):
+def ask_deepseek_question(transcript, question, chat_history):
     if not DEEPSEEK_API_KEY:
-        return "DeepSeek API Key is missing. Please add it to your Streamlit secrets to use the assistant."
-    
+        return "⚠️ DeepSeek API key is missing."
+
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json"
     }
-    
+
     system_prompt = (
-        "You are an intelligent executive meeting assistant. "
-        "Answer the user's questions accurately based ONLY on the provided meeting transcript. "
-        "If something was not discussed or is unclear from the transcript, state that politely. "
-        "Provide direct, professional, and well-structured answers."
+        "You are an AI assistant helping the user understand a meeting transcript. "
+        "Answer questions based solely on the provided transcript. "
+        "If the answer is not in the transcript, say you don't know. "
+        "Be concise and helpful."
     )
-    
-    messages = [{"role": "system", "content": f"{system_prompt}\n\nTRANSCRIPT:\n{transcript[:28000]}"}]
+
+    messages = [{"role": "system", "content": system_prompt}]
+    # Add conversation history (last few exchanges to keep context manageable)
     for msg in chat_history[-6:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append({"role": "user", "content": user_question})
-    
+    messages.append({"role": "user", "content": f"Transcript:\n{transcript[:20000]}\n\nQuestion: {question}"})
+
     payload = {
         "model": "deepseek-chat",
         "messages": messages,
         "temperature": 0.2,
-        "max_tokens": 1000
+        "max_tokens": 500
     }
-    
+
     try:
         resp = requests.post(DEEPSEEK_CHAT_URL, headers=headers, json=payload, timeout=60)
         if resp.status_code == 200:
             res_json = resp.json()
+            usage = res_json.get("usage", {})
+            st.session_state["tokens_used"] += usage.get("total_tokens", 0)
+            st.session_state["last_api_call"] = datetime.datetime.now()
             return res_json["choices"][0]["message"]["content"].strip()
-        return f"Error ({resp.status_code}): {resp.text}"
+        else:
+            return f"⚠️ Error {resp.status_code}: {resp.text}"
     except Exception as e:
-        return f"Connection error: {e}"
+        return f"⚠️ Connection error: {e}"
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -665,11 +673,15 @@ def export_to_word(df, meeting_details, other_discussions):
     
     p_date = doc.add_paragraph(full_date)
     p_date.paragraph_format.space_after = Pt(2)
-    for r in p_date.runs: r.font.name = "Arial"; r.font.size = Pt(10)
+    for r in p_date.runs:
+        r.font.name = "Arial"
+        r.font.size = Pt(10)
 
     p_loc = doc.add_paragraph(f"Location: {meeting_details.get('location', '____________')}")
     p_loc.paragraph_format.space_after = Pt(2)
-    for r in p_loc.runs: r.font.name = "Arial"; r.font.size = Pt(10)
+    for r in p_loc.runs:
+        r.font.name = "Arial"
+        r.font.size = Pt(10)
 
     prime_atts = meeting_details.get("prime_attendees", [])
     ext_atts = meeting_details.get("external_attendees", [])
@@ -684,7 +696,8 @@ def export_to_word(df, meeting_details, other_discussions):
     first_attendee = True
     if ext_atts:
         for att in ext_atts:
-            if not att.strip(): continue
+            if not att.strip():
+                continue
             p = p_att if first_attendee else doc.add_paragraph()
             p.paragraph_format.space_after = Pt(2)
             if not first_attendee:
@@ -723,7 +736,9 @@ def export_to_word(df, meeting_details, other_discussions):
         f"met with {client_display} to discuss opportunities for collaboration."
     )
     p_intro.paragraph_format.space_after = Pt(10)
-    for r in p_intro.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
+    for r in p_intro.runs:
+        r.font.name = "Arial"
+        r.font.size = Pt(9.5)
 
     table = doc.add_table(rows=len(df)+1, cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -755,7 +770,8 @@ def export_to_word(df, meeting_details, other_discussions):
         for c_idx, cell in enumerate(cells):
             cell.width = col_widths[c_idx]
             p = cell.paragraphs[0]
-            if c_idx in [2, 3]: p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            if c_idx in [2, 3]:
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             if p.runs:
                 p.runs[0].font.size = Pt(8.5)
                 p.runs[0].font.name = "Arial"
@@ -778,12 +794,16 @@ def export_to_word(df, meeting_details, other_discussions):
         
         p_od = doc.add_paragraph(other_discussions)
         p_od.paragraph_format.space_after = Pt(12)
-        for r in p_od.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
+        for r in p_od.runs:
+            r.font.name = "Arial"
+            r.font.size = Pt(9.5)
 
     p_prep_label = doc.add_paragraph("Prepared by:")
     p_prep_label.paragraph_format.space_before = Pt(12)
     p_prep_label.paragraph_format.space_after = Pt(2)
-    p_prep_label.runs[0].font.name = "Arial"; p_prep_label.runs[0].font.bold = True; p_prep_label.runs[0].font.size = Pt(9.5)
+    p_prep_label.runs[0].font.name = "Arial"
+    p_prep_label.runs[0].font.bold = True
+    p_prep_label.runs[0].font.size = Pt(9.5)
 
     p_prep_line = doc.add_paragraph("_______________________________")
     p_prep_line.paragraph_format.space_after = Pt(2)
@@ -793,11 +813,15 @@ def export_to_word(df, meeting_details, other_discussions):
     prep_desig = meeting_details.get("prep_desig", "").strip() or "PRIME Philippines"
     p_prep_info = doc.add_paragraph(f"{prep_name}\n{prep_desig}")
     p_prep_info.paragraph_format.space_after = Pt(12)
-    for r in p_prep_info.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
+    for r in p_prep_info.runs:
+        r.font.name = "Arial"
+        r.font.size = Pt(9.5)
 
     p_conf_label = doc.add_paragraph("Confirmed by:")
     p_conf_label.paragraph_format.space_after = Pt(2)
-    p_conf_label.runs[0].font.name = "Arial"; p_conf_label.runs[0].font.bold = True; p_conf_label.runs[0].font.size = Pt(9.5)
+    p_conf_label.runs[0].font.name = "Arial"
+    p_conf_label.runs[0].font.bold = True
+    p_conf_label.runs[0].font.size = Pt(9.5)
 
     p_conf_line = doc.add_paragraph("_______________________________")
     p_conf_line.paragraph_format.space_after = Pt(2)
@@ -807,7 +831,9 @@ def export_to_word(df, meeting_details, other_discussions):
     conf_desig = meeting_details.get("conf_desig", "").strip() or (meeting_details.get("company_name", "").strip() or "Client")
     p_conf_info = doc.add_paragraph(f"{conf_name}\n{conf_desig}")
     p_conf_info.paragraph_format.space_after = Pt(6)
-    for r in p_conf_info.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
+    for r in p_conf_info.runs:
+        r.font.name = "Arial"
+        r.font.size = Pt(9.5)
 
     bio = BytesIO()
     doc.save(bio)
@@ -989,13 +1015,17 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# Fetch current daily count
+daily_audio_used = get_daily_audio_count()
+audio_quota_reached = daily_audio_used >= MAX_DAILY_AUDIO
+
 # ---- Meeting Details Card ----
 with st.container(border=True):
     head_col1, head_col2 = st.columns([9.3, 0.7])
     with head_col1:
         st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
     with head_col2:
-        if st.button("", key="card_settings_btn", help="Open MoM Generation Engine & Diagnostics"):
+        if st.button("", key="card_settings_btn", help="Open MoM Generation Engine & Token Diagnostics"):
             st.session_state["show_settings"] = not st.session_state["show_settings"]
             st.rerun()
 
@@ -1025,7 +1055,8 @@ with st.container(border=True):
                             st.rerun()
 
             with set_col2:
-                st.markdown("**Diagnostics & Usage**")
+                st.markdown("**Daily Quota & Diagnostics**")
+                st.write(f"• **Daily Audio Usage:** `{daily_audio_used} / {MAX_DAILY_AUDIO}` transcriptions")
                 st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
                 
                 if st.session_state["last_api_call"]:
@@ -1036,11 +1067,11 @@ with st.container(border=True):
                     st.write("• **Engine Status:** `Ready`")
         st.markdown("---")
     
-    # ROW 1
+    # ROW 1: Clean Date Picker, Blank Location with Presets, Simple Time Pickers, Prepared By
     r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.2, 2.0, 1.6, 1.6, 1.2, 1.2])
     
     with r1_c1:
-        meeting_date = st.date_input("Date", value=datetime.date.today())
+        meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
     
     with r1_c2:
         loc_preset = st.selectbox("Location Preset", options=LOCATION_PRESETS, index=0)
@@ -1070,83 +1101,76 @@ with st.container(border=True):
 
     # ROW 2
     r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
-    with r2_c1: client_name = st.text_input("Client / Company", value="", placeholder="XYZ Company")
-    with r2_c2: selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=[])
-    with r2_c3: ext_attendees_raw = st.text_input("External Attendees", value="", placeholder="e.g. Mr. ABCD, Jane Doe")
-    with r2_c4: conf_name = st.text_input("Confirmed By (Name)", value="", placeholder="e.g. Client Rep")
-    with r2_c5: conf_desig = st.text_input("Designation", value="", placeholder="e.g. Managing Director")
+    with r2_c1:
+        client_name = st.text_input("Client / Company", value="", placeholder="XYZ Company")
+    with r2_c2:
+        selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=[])
+    with r2_c3:
+        ext_attendees_raw = st.text_input("External Attendees", value="", placeholder="e.g. Mr. ABCD, Jane Doe")
+    with r2_c4:
+        conf_name = st.text_input("Confirmed By (Name)", value="", placeholder="e.g. Client Rep")
+    with r2_c5:
+        conf_desig = st.text_input("Designation", value="", placeholder="e.g. Managing Director")
 
     # Three Tabs
-    tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text"])
+    tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text (Unlimited)"])
 
-    # TAB 1: UPLOAD AUDIO
+    # TAB 1: UPLOAD AUDIO (RATE LIMITED)
     with tab_upload:
-        u_col1, u_col2 = st.columns([5, 1.5])
-        with u_col1:
-            uploaded_file = st.file_uploader(
-                "Upload audio file (200MB limit supported)",
-                type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
-                help="Audio uploads up to 200MB are supported."
-            )
-        with u_col2:
-            st.write("")
-            st.write("")
-            if st.button("Transcribe Audio", key="btn_tx_upload"):
-                if uploaded_file is not None:
-                    file_bytes = uploaded_file.getvalue()
-                    if file_bytes and len(file_bytes) > 0:
+        if audio_quota_reached:
+            st.warning(f"⚠️ Daily audio transcription quota ({MAX_DAILY_AUDIO}/{MAX_DAILY_AUDIO}) reached. You can still use the **Upload Text** tab without any limits!")
+        else:
+            st.caption(f"Audio transcription quota: **{daily_audio_used}/{MAX_DAILY_AUDIO}** used today.")
+            u_col1, u_col2 = st.columns([5, 1.5])
+            with u_col1:
+                uploaded_file = st.file_uploader(
+                    "Upload audio file (200MB limit supported)",
+                    type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
+                    help="Audio uploads up to 200MB are supported."
+                )
+            if uploaded_file:
+                with u_col2:
+                    st.write("")
+                    st.write("")
+                    if st.button("Transcribe Audio", key="btn_tx_upload"):
                         p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
                         p_status = st.empty()
-                        transcript = transcribe_audio_pipeline(file_bytes, uploaded_file.name, p_bar, p_status)
+                        transcript = transcribe_audio_pipeline(uploaded_file.read(), uploaded_file.name, p_bar, p_status)
                         p_bar.empty()
                         p_status.empty()
-                        if transcript and transcript.strip():
-                            st.session_state["transcript"] = transcript.strip()
+                        if transcript:
+                            st.session_state["transcript"] = transcript
                             st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                             st.session_state["other_discussions"] = ""
-                            st.session_state["chat_history"] = []
                             st.rerun()
-                        else:
-                            st.error("Transcription returned empty text. Please verify your audio file and API credentials.")
-                    else:
-                        st.warning("Uploaded file is empty. Please select a valid audio file.")
-                else:
-                    st.warning("Please select an audio file first.")
 
-    # TAB 2: RECORD AUDIO
+    # TAB 2: RECORD AUDIO (RATE LIMITED)
     with tab_record:
-        r_col1, r_col2, r_col3 = st.columns([4, 1.5, 1.5])
-        with r_col1:
-            recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
-        
-        rec_bytes = recorded_audio.getvalue() if recorded_audio is not None else None
+        if audio_quota_reached:
+            st.warning(f"⚠️ Daily audio transcription quota ({MAX_DAILY_AUDIO}/{MAX_DAILY_AUDIO}) reached. You can still use the **Upload Text** tab without any limits!")
+        else:
+            st.caption(f"Audio transcription quota: **{daily_audio_used}/{MAX_DAILY_AUDIO}** used today.")
+            r_col1, r_col2, r_col3 = st.columns([4, 1.5, 1.5])
+            with r_col1:
+                recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
+            if recorded_audio:
+                rec_bytes = recorded_audio.read()
+                with r_col2:
+                    st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
+                with r_col3:
+                    if st.button("Transcribe Audio", key="btn_tx_record"):
+                        p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
+                        p_status = st.empty()
+                        transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
+                        p_bar.empty()
+                        p_status.empty()
+                        if transcript:
+                            st.session_state["transcript"] = transcript
+                            st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+                            st.session_state["other_discussions"] = ""
+                            st.rerun()
 
-        with r_col2:
-            if rec_bytes:
-                st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
-            else:
-                st.button("Save Recording (.wav)", disabled=True)
-                
-        with r_col3:
-            if st.button("Transcribe Audio", key="btn_tx_record"):
-                if rec_bytes and len(rec_bytes) > 0:
-                    p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
-                    p_status = st.empty()
-                    transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
-                    p_bar.empty()
-                    p_status.empty()
-                    if transcript and transcript.strip():
-                        st.session_state["transcript"] = transcript.strip()
-                        st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-                        st.session_state["other_discussions"] = ""
-                        st.session_state["chat_history"] = []
-                        st.rerun()
-                    else:
-                        st.error("Transcription returned empty text. Please record again.")
-                else:
-                    st.warning("Please record audio before initiating transcription.")
-
-    # TAB 3: TEXT UPLOAD
+    # TAB 3: TEXT UPLOAD (UNLIMITED)
     with tab_text:
         text_col1, text_col2 = st.columns([5, 1.5])
         with text_col1:
@@ -1165,19 +1189,18 @@ with st.container(border=True):
                 if pasted_text and pasted_text.strip():
                     extracted_str += "\n" + pasted_text.strip()
                 
-                p_bar.progress(100, text="Document processed (100%).")
+                p_bar.progress(100, text="Document processed (100%)!")
                 time.sleep(0.2)
                 p_bar.empty()
                 if extracted_str.strip():
                     st.session_state["transcript"] = extracted_str.strip()
                     st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                     st.session_state["other_discussions"] = ""
-                    st.session_state["chat_history"] = []
                     st.rerun()
                 else:
                     st.warning("Please upload a file or paste text to proceed.")
 
-# ---- Step 2: Full Transcript UI ----
+# ---- Step 2: Full Transcript UI & AI Chatbot ----
 if st.session_state["transcript"]:
     with st.container(border=True):
         f_col1, f_col2, f_col3 = st.columns([7.6, 1.2, 1.2])
@@ -1219,7 +1242,7 @@ if st.session_state["transcript"]:
                 <script>
                 document.getElementById("copy-btn").addEventListener("click", function() {{
                     navigator.clipboard.writeText({json.dumps(st.session_state["transcript"])}).then(function() {{
-                        document.getElementById("copy-btn").innerHTML = 'Copied! {SVG_CHECK}';
+                        document.getElementById("copy-btn").innerText = "Copied! ✅";
                         setTimeout(() => document.getElementById("copy-btn").innerText = "Copy Text", 2000);
                     }});
                 }});
@@ -1238,7 +1261,7 @@ if st.session_state["transcript"]:
                 use_container_width=True
             )
 
-        st.text_area("Transcript Content", st.session_state["transcript"], height=300, label_visibility="collapsed")
+        st.text_area("Transcript Content", st.session_state["transcript"], height=350, label_visibility="collapsed")
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM", key="btn_gen_mom"):
@@ -1247,103 +1270,124 @@ if st.session_state["transcript"]:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
                     st.rerun()
-
-    # ---- Transcript Q&A Chatbot ----
-    with st.container(border=True):
-        st.markdown('<h3>Meeting Transcript Q&A Assistant</h3>', unsafe_allow_html=True)
-        st.caption("Ask questions, check specific discussions, or clarify details from the meeting transcript.")
         
+        # AI Chatbot Section
+        st.markdown("---")
+        st.markdown('<h4 style="margin-bottom:0.5rem;">Ask AI About the Transcript</h4>', unsafe_allow_html=True)
+        
+        # Display chat history
         for msg in st.session_state["chat_history"]:
-            with st.chat_message(msg["role"]):
-                st.write(msg["content"])
+            if msg["role"] == "user":
+                st.chat_message("user").markdown(msg["content"])
+            else:
+                st.chat_message("assistant").markdown(msg["content"])
+        
+        # Chat input
+        if prompt := st.chat_input("Ask a question about the meeting..."):
+            # Append user message
+            st.session_state["chat_history"].append({"role": "user", "content": prompt})
+            # Get answer
+            with st.spinner("Thinking..."):
+                answer = ask_deepseek_question(st.session_state["transcript"], prompt, st.session_state["chat_history"])
+            # Append assistant message
+            st.session_state["chat_history"].append({"role": "assistant", "content": answer})
+            st.rerun()
 
-        user_query = st.chat_input("Ask a question about this meeting transcript...")
-        if user_query:
-            st.session_state["chat_history"].append({"role": "user", "content": user_query})
-            with st.chat_message("user"):
-                st.write(user_query)
-            
-            with st.chat_message("assistant"):
-                with st.spinner("Analyzing transcript..."):
-                    bot_reply = query_transcript_assistant(
-                        st.session_state["transcript"],
-                        user_query,
-                        st.session_state["chat_history"]
-                    )
-                    st.write(bot_reply)
-            st.session_state["chat_history"].append({"role": "assistant", "content": bot_reply})
-
-# ---- Step 3: Minutes of Meeting Card/Row-Based Editor ----
+# ---- Step 3: Minutes of Meeting Editor ----
 if not st.session_state["df"].empty:
     with st.container(border=True):
         st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
-        st.caption("Review and edit each discussion point, deliverable, target date, and assignee below.")
-
-        records = st.session_state["df"].to_dict("records")
-        updated_records = []
-        item_to_delete = None
-
-        for idx, row in enumerate(records):
+        
+        st.markdown(
+            "<p style='font-size:0.85rem; color:#666; margin-bottom: 0.5rem;'>"
+            "<i>*Note: Each discussion point is displayed as a separate card. You can edit each field directly.</i></p>", 
+            unsafe_allow_html=True
+        )
+        
+        # Get current DataFrame
+        df = st.session_state["df"].copy()
+        
+        # Handle deletion
+        row_to_delete = None
+        for idx in range(len(df)):
+            # Create a container for each row
             with st.container(border=True):
-                r_top_left, r_top_right = st.columns([9, 1])
-                with r_top_left:
-                    st.markdown(f"**Discussion Item #{idx + 1}**")
-                with r_top_right:
-                    if st.button("Delete Item", key=f"del_{idx}", help="Remove this discussion item"):
-                        item_to_delete = idx
-
-                c1, c2 = st.columns([1.2, 1.2])
-                with c1:
-                    disc_val = st.text_area(
+                # Header with delete button
+                header_col, del_col = st.columns([9, 1])
+                with header_col:
+                    st.markdown(f"**Item {idx+1}**")
+                with del_col:
+                    if st.button("🗑️", key=f"del_{idx}", help="Delete this row"):
+                        row_to_delete = idx
+                        st.rerun()
+                
+                # Four fields in two columns
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    discussion = st.text_area(
                         "Discussion Points",
-                        value=str(row.get("Discussion Points", "")),
-                        key=f"disc_{idx}",
+                        value=df.at[idx, "Discussion Points"],
+                        key=f"dp_{idx}",
                         height=100
                     )
-                    act_val = st.text_area(
-                        "Action Plan",
-                        value=str(row.get("Action Plan", "")),
-                        key=f"act_{idx}",
-                        height=100
-                    )
-                with c2:
                     date_val = st.text_input(
                         "Indicative Delivery Date",
-                        value=str(row.get("Indicative Delivery Date", "")),
+                        value=df.at[idx, "Indicative Delivery Date"],
                         key=f"date_{idx}"
                     )
-                    pic_val = st.text_input(
+                with col2:
+                    action = st.text_area(
+                        "Action Plan",
+                        value=df.at[idx, "Action Plan"],
+                        key=f"ap_{idx}",
+                        height=100
+                    )
+                    pic = st.text_input(
                         "Person-in-charge",
-                        value=str(row.get("Person-in-charge", "")),
+                        value=df.at[idx, "Person-in-charge"],
                         key=f"pic_{idx}"
                     )
-
-                updated_records.append({
-                    "Discussion Points": disc_val,
-                    "Action Plan": act_val,
-                    "Indicative Delivery Date": date_val,
-                    "Person-in-charge": pic_val
-                })
-
-        if item_to_delete is not None:
-            updated_records.pop(item_to_delete)
-            st.session_state["df"] = pd.DataFrame(updated_records)
+        
+        # If a row needs to be deleted, remove it from df and update session state
+        if row_to_delete is not None:
+            df = df.drop(index=row_to_delete).reset_index(drop=True)
+            st.session_state["df"] = df
             st.rerun()
-        else:
-            st.session_state["df"] = pd.DataFrame(updated_records)
-
-        if st.button("Add New Discussion Item", key="btn_add_item"):
+        
+        # After rendering all rows, collect updated values from widgets and update df
+        updated_df = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+        for idx in range(len(df)):
+            # Retrieve values from widget keys
+            discussion = st.session_state.get(f"dp_{idx}", df.at[idx, "Discussion Points"])
+            action = st.session_state.get(f"ap_{idx}", df.at[idx, "Action Plan"])
+            date_val = st.session_state.get(f"date_{idx}", df.at[idx, "Indicative Delivery Date"])
+            pic = st.session_state.get(f"pic_{idx}", df.at[idx, "Person-in-charge"])
+            updated_df = updated_df.append({
+                "Discussion Points": discussion,
+                "Action Plan": action,
+                "Indicative Delivery Date": date_val,
+                "Person-in-charge": pic
+            }, ignore_index=True)
+        
+        st.session_state["df"] = updated_df
+        
+        # Add Row button
+        if st.button("➕ Add Row", key="add_row"):
             new_row = pd.DataFrame([{
                 "Discussion Points": "",
                 "Action Plan": "",
-                "Indicative Delivery Date": "TBD",
-                "Person-in-charge": "Unassigned"
+                "Indicative Delivery Date": "",
+                "Person-in-charge": ""
             }])
             st.session_state["df"] = pd.concat([st.session_state["df"], new_row], ignore_index=True)
             st.rerun()
-
-        st.markdown("---")
-        st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=100)
+        
+        # Other Discussions
+        st.session_state["other_discussions"] = st.text_area(
+            "Other Discussions",
+            value=st.session_state["other_discussions"],
+            height=100
+        )
 
         time_range_str = f"{start_str} to {end_str}"
 
@@ -1360,7 +1404,7 @@ if not st.session_state["df"].empty:
             "conf_desig": conf_desig.strip()
         }
 
-        # Dual Export Section
+        # Dual Export Section (Word DOCX and PDF)
         exp_col1, exp_col2 = st.columns(2)
         
         with exp_col1:
