@@ -32,9 +32,6 @@ with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
 # API Keys & Endpoints loaded via st.secrets with fallback defaults
-DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
-DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
-
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
