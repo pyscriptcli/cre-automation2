@@ -10,7 +10,7 @@ from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # ========== CONFIG ==========
-st.set_page_config(page_title="Project Echo | Voice App", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
