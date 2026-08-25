@@ -5,6 +5,7 @@ import json
 import pandas as pd
 import datetime
 import re
+import base64
 from io import BytesIO
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -13,7 +14,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml
 
 # ========== CONFIG ==========
-st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Project Echo | MOM Generator", layout="wide", initial_sidebar_state="collapsed")
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -119,92 +120,95 @@ def transcribe_audio(audio_bytes):
         st.error(f"Transcription failed: {resp.text}")
         return None
 
-def get_available_groq_model():
-    """Dynamically queries Groq to select the best available active chat model."""
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    priority_order = [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-70b-versatile",
-        "llama-3.1-8b-instant",
-        "llama3-8b-8192",
-        "gemma2-9b-it",
-        "qwen-2.5-32b",
-        "deepseek-r1-distill-llama-70b"
-    ]
-    try:
-        resp = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=10)
-        if resp.status_code == 200:
-            available_ids = [m["id"] for m in resp.json().get("data", [])]
-            for candidate in priority_order:
-                if candidate in available_ids:
-                    return candidate
-            chat_models = [m for m in available_ids if not m.startswith("whisper")]
-            if chat_models:
-                return chat_models[0]
-    except Exception:
-        pass
-    
-    return "llama-3.1-8b-instant"
+def chunk_text(text, max_chars=4000, overlap=300):
+    """Splits a long transcript into overlapping parts to preserve context without exceeding limits."""
+    if len(text) <= max_chars:
+        return [text]
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + max_chars
+        chunks.append(text[start:end])
+        start += max_chars - overlap
+    return chunks
+
+def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]):
+    """Executes chat completion with JSON mode and multi-model fallback."""
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are an executive assistant extracting Minutes of the Meeting. Respond ONLY with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1
+        }
+        try:
+            resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
+            if resp.status_code == 200:
+                raw_text = resp.json()["choices"][0]["message"]["content"].strip()
+                clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+                clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+                return json.loads(clean_text)
+        except Exception:
+            continue
+    return None
 
 def extract_structured_insights(transcript):
     """
-    Robust Groq MOM extraction using dynamic model discovery and regex cleanup.
+    Dynamically splits long transcripts into parts, extracts structured items from each part,
+    and merges the results seamlessly.
     """
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    selected_model = get_available_groq_model()
-    
-    prompt = f"""Extract Minutes of Meeting (MOM) from this transcript and output valid JSON ONLY with this schema:
+    chunks = chunk_text(transcript, max_chars=4000, overlap=300)
+    all_items = []
+    other_discussions = []
+
+    progress_bar = st.progress(0)
+    for idx, chunk in enumerate(chunks):
+        prompt = f"""Analyze Part {idx+1}/{len(chunks)} of this meeting transcript and extract discussion items into valid JSON:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Key discussion item or topic",
-      "Action Plan": "Action steps required",
-      "Indicative Delivery Date": "Timeframe/Date or TBD",
-      "Person-in-charge": "PRIME / Client name"
+      "Discussion Points": "Key point or project component discussed",
+      "Action Plan": "Concrete next step or deliverable",
+      "Indicative Delivery Date": "Specific date, quarter (e.g. Q1 2027), or 'TBD'",
+      "Person-in-charge": "Responsible entity (e.g. PRIME, Client name, or unassigned)"
     }}
   ],
-  "other_discussions": "Summary of other topics or informal points discussed"
+  "other_discussions": "Summary of informal or secondary points discussed in this part"
 }}
 
-Transcript:
-{transcript}"""
+Transcript Section:
+{chunk}"""
 
-    payload = {
-        "model": selected_model,
-        "messages": [
-            {"role": "system", "content": "You are an executive assistant that outputs strictly valid JSON without markdown formatting."},
-            {"role": "user", "content": prompt}
-        ],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.1
-    }
+        res = call_groq_json(prompt)
+        if res:
+            items = res.get("table_items", [])
+            if isinstance(items, list):
+                all_items.extend(items)
+            disc = res.get("other_discussions", "")
+            if disc and disc.strip():
+                other_discussions.append(disc.strip())
+        
+        progress_bar.progress((idx + 1) / len(chunks))
 
-    try:
-        resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
-        if resp.status_code == 200:
-            raw_text = resp.json()["choices"][0]["message"]["content"].strip()
-            clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-            data = json.loads(clean_text)
+    progress_bar.empty()
 
-            items = data.get("table_items", [])
-            df = pd.DataFrame(items)
-            for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                if col not in df.columns:
-                    df[col] = ""
-            df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
-            return df, data.get("other_discussions", "")
-        else:
-            st.error(f"Groq API Error ({resp.status_code}) using model '{selected_model}': {resp.text}")
-            return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
-
-    except Exception as e:
-        st.error(f"Extraction Error: {str(e)}")
+    if not all_items:
+        st.error("Could not extract structured data from the transcript.")
         return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+
+    # Build and deduplicate table
+    df = pd.DataFrame(all_items)
+    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+        if col not in df.columns:
+            df[col] = ""
+    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
+    
+    combined_other = "\n\n".join(other_discussions)
+    return df, combined_other
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -214,27 +218,31 @@ def export_to_word(df, meeting_details, other_discussions):
     doc = Document()
     
     for section in doc.sections:
-        section.top_margin = Inches(0.5)
-        section.bottom_margin = Inches(0.5)
+        section.top_margin = Inches(0.4)
+        section.bottom_margin = Inches(0.4)
         section.left_margin = Inches(0.8)
         section.right_margin = Inches(0.8)
         
+        # Load and place Header Image if available
         if os.path.exists("header.png"):
             hp = section.header.paragraphs[0]
             hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            hp.add_run().add_picture("header.png", width=Inches(6.9))
+            hp.add_run().add_picture("header.png", width=Inches(7.0))
             
+        # Load and place Footer Image if available
         if os.path.exists("footer.png"):
             fp = section.footer.paragraphs[0]
             fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            fp.add_run().add_picture("footer.png", width=Inches(6.9))
+            fp.add_run().add_picture("footer.png", width=Inches(7.0))
 
+    # MOM Title
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r_title = p_title.add_run("MINUTES OF THE MEETING")
     r_title.bold = True
     r_title.underline = True
     r_title.font.name = "Arial"
+    r_title.font.size = Pt(11)
 
     company = meeting_details.get("company_name", "CLIENT").strip().upper()
     p_sub = doc.add_paragraph()
@@ -242,6 +250,7 @@ def export_to_word(df, meeting_details, other_discussions):
     r_sub = p_sub.add_run(f"PRIME PHILIPPINES & {company}")
     r_sub.bold = True
     r_sub.font.name = "Arial"
+    r_sub.font.size = Pt(11)
 
     doc.add_paragraph()
 
@@ -411,7 +420,7 @@ if st.session_state["transcript"]:
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                with st.spinner("Extracting action items..."):
+                with st.spinner("Extracting action items across transcript parts..."):
                     extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
