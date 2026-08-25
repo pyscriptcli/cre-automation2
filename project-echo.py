@@ -39,7 +39,11 @@ GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "gsk_qRbl7H2zROrqX4guIr26WGdyb3FYB
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 # Directly embedded OpenAI Key to prevent Streamlit Cloud environment/secrets parsing mismatches
-OPENAI_API_KEY = ""
+# Safely pull OpenAI API Key from Streamlit Secrets with validation
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
+if not OPENAI_API_KEY and "OPENAI_API_KEY" in st.secrets:
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
 
 CRD_MEMBERS = [
