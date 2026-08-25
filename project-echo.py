@@ -25,11 +25,11 @@ if not os.path.exists(_config_file):
     with open(_config_file, "w", encoding="utf-8") as f:
         f.write('[theme]\nbase="light"\n')
 
-# API Keys & Endpoints
-DEEPSEEK_API_KEY = "sk-7b4c611f153f4fe0adc1a1cbd13a2930"
+# API Keys & Endpoints loaded via st.secrets with fallback defaults
+DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "sk-7b4c611f153f4fe0adc1a1cbd13a2930")
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
-GROQ_API_KEY = "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"
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "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")
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 CRD_MEMBERS = [
@@ -122,8 +122,21 @@ h3 {
     font-size: 0.95rem !important;
     line-height: 1.6 !important;
 }
+
+.settings-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
 </style>
 """
+
+# ========== SVG ICONS ==========
+SVG_SETTINGS = """<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>"""
+SVG_REFRESH = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>"""
+SVG_DOWNLOAD = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>"""
+SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
 
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
@@ -204,7 +217,6 @@ def normalize_llm_json_to_df(data):
     return df, other_disc
 
 def extract_with_deepseek(transcript):
-    """Primary Engine: DeepSeek-V3 Official API (High Context, Excellent Taglish Comprehension)."""
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json"
@@ -235,7 +247,7 @@ JSON Schema:
 }}
 
 Transcript:
-{transcript}"""
+{transcript[:35000]}"""
 
     payload = {
         "model": "deepseek-chat",
@@ -244,7 +256,8 @@ Transcript:
             {"role": "user", "content": user_prompt}
         ],
         "response_format": {"type": "json_object"},
-        "temperature": 0.2
+        "temperature": 0.2,
+        "max_tokens": 2048
     }
 
     try:
@@ -269,7 +282,6 @@ Transcript:
     return None, ""
 
 def heuristic_non_ai_extraction(transcript):
-    """Backup Engine: Regex and Keyword Heuristics (100% Offline Python Logic)."""
     sentences = re.split(r'(?<=[.!?]) +', transcript)
     
     action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'ipapasa', 'provide', 'target', 'ipresent', 'kukunin']
@@ -315,18 +327,15 @@ def heuristic_non_ai_extraction(transcript):
     return df, other_text
 
 def extract_structured_insights(transcript, engine="DeepSeek (Primary)"):
-    """Orchestration Pipeline: DeepSeek as Primary Engine with Python Heuristic Backup."""
     progress_container = st.empty()
     bar = progress_container.progress(0, text=f"Initializing {engine}...")
 
-    # Force Python Non-AI Engine
     if engine == "Python Heuristic (Non-AI)":
         bar.progress(100, text="Extracting with Rule-Based Heuristic...")
         time.sleep(0.5)
         progress_container.empty()
         return heuristic_non_ai_extraction(transcript)
 
-    # Primary Engine: DeepSeek API
     bar.progress(35, text="Translating Taglish & Extracting MOM via DeepSeek V3...")
     df, other = extract_with_deepseek(transcript)
     
@@ -336,11 +345,10 @@ def extract_structured_insights(transcript, engine="DeepSeek (Primary)"):
         progress_container.empty()
         return df, other
 
-    # Fallback to Python Non-AI
     bar.progress(90, text="DeepSeek unavailable. Running Non-AI Keyword Extraction...")
     df_fb, other_fb = heuristic_non_ai_extraction(transcript)
     progress_container.empty()
-    st.warning("⚠️ DeepSeek request could not be completed. The table below was populated using offline Keyword Heuristics.")
+    st.markdown(f"{SVG_ALERT} DeepSeek request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
     return df_fb, other_fb
 
 def set_cell_shading(cell, color_hex):
@@ -350,22 +358,41 @@ def set_cell_shading(cell, color_hex):
 def export_to_word(df, meeting_details, other_discussions):
     doc = Document()
     
+    # Configure 0.5-inch compact page margins for professional MOM templates
     for section in doc.sections:
-        section.top_margin = Inches(0.4)
-        section.bottom_margin = Inches(0.4)
-        section.left_margin = Inches(0.8)
-        section.right_margin = Inches(0.8)
+        section.top_margin = Inches(0.5)
+        section.bottom_margin = Inches(0.5)
+        section.left_margin = Inches(0.75)
+        section.right_margin = Inches(0.75)
         
+        # Apply Header Image
+        header = section.header
+        hp = header.paragraphs[0]
+        hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
         if os.path.exists("header.png"):
-            hp = section.header.paragraphs[0]
-            hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            hp.add_run().add_picture("header.png", width=Inches(7.0))
+            hp.add_run().add_picture("header.png", width=Inches(6.8))
+        else:
+            # Fallback Corporate Header Text
+            hrun = hp.add_run("PRIME PHILIPPINES | COMMERCIAL REAL ESTATE ADVISORY")
+            hrun.font.name = "Arial"
+            hrun.font.size = Pt(8.5)
+            hrun.font.color.rgb = RGBColor(128, 128, 128)
             
+        # Apply Footer Image
+        footer = section.footer
+        fp = footer.paragraphs[0]
+        fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
         if os.path.exists("footer.png"):
-            fp = section.footer.paragraphs[0]
-            fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            fp.add_run().add_picture("footer.png", width=Inches(7.0))
+            fp.add_run().add_picture("footer.png", width=Inches(6.8))
+        else:
+            # Fallback Corporate Footer Text
+            frun = fp.add_run("Confidential - For Internal and Client Collaboration Only")
+            frun.font.name = "Arial"
+            frun.font.size = Pt(8)
+            frun.font.italic = True
+            frun.font.color.rgb = RGBColor(150, 150, 150)
 
+    # Document Header Title
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r_title = p_title.add_run("MINUTES OF THE MEETING")
@@ -458,7 +485,12 @@ def export_to_word(df, meeting_details, other_discussions):
     p_note.runs[0].font.size = Pt(8.5)
 
     if other_discussions.strip():
-        doc.add_heading("Other Discussions:", level=2)
+        p_od_head = doc.add_paragraph()
+        p_od_head.paragraph_format.space_before = Pt(8)
+        r_od_head = p_od_head.add_run("Other Discussions:")
+        r_od_head.bold = True
+        r_od_head.font.size = Pt(10)
+        r_od_head.font.name = "Arial"
         doc.add_paragraph(other_discussions)
 
     doc.add_paragraph()
@@ -587,20 +619,24 @@ if st.session_state["transcript"]:
                     st.session_state["other_discussions"] = other_disc
                     st.rerun()
 
-# ---- Step 3: Minutes of Meeting Editor with Gear Settings ----
+# ---- Step 3: Minutes of Meeting Editor with SVG Settings ----
 if not st.session_state["df"].empty:
     with st.container(border=True):
-        h_col1, h_col2 = st.columns([9.5, 0.5])
+        h_col1, h_col2 = st.columns([9.4, 0.6])
         with h_col1:
             st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
         with h_col2:
-            if st.button("⚙️", key="btn_toggle_settings", help="Open Engine & Regeneration Settings"):
+            st.markdown(
+                f'<div style="text-align: right; padding-top: 5px;">{SVG_SETTINGS}</div>', 
+                unsafe_allow_html=True
+            )
+            if st.button("Settings", key="btn_toggle_settings", help="Open Engine & Regeneration Settings"):
                 st.session_state["show_settings"] = not st.session_state["show_settings"]
                 st.rerun()
 
         # Engine Settings & Usage Drawer
         if st.session_state["show_settings"]:
-            with st.expander("⚙️ Engine Configuration & Usage Statistics", expanded=True):
+            with st.expander("Engine Configuration & Usage Diagnostics", expanded=True):
                 set_col1, set_col2 = st.columns([1.5, 1.5])
                 
                 with set_col1:
@@ -615,7 +651,7 @@ if not st.session_state["df"].empty:
                     )
                     st.session_state["selected_engine"] = selected_eng
 
-                    if st.button("🔄 Regenerate MOM"):
+                    if st.button("Regenerate MOM", key="btn_regen_mom"):
                         if st.session_state["transcript"]:
                             extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng)
                             if not extracted_df.empty:
@@ -624,7 +660,7 @@ if not st.session_state["df"].empty:
                                 st.rerun()
 
                 with set_col2:
-                    st.markdown("**API & Token Usage Diagnostics**")
+                    st.markdown("**Token Usage Diagnostics**")
                     st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
                     
                     if st.session_state["last_api_call"]:
