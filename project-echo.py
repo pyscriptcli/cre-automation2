@@ -9,6 +9,7 @@ import pandas as pd
 import datetime
 import re
 from io import BytesIO
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import PyPDF2
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -43,7 +44,7 @@ OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
 
 # ========== DAILY AUDIO LIMIT CONFIGURATION ==========
-MAX_DAILY_AUDIO = 5  # Set maximum audio transcriptions per day
+MAX_DAILY_AUDIO = 5
 USAGE_FILE = ".daily_audio_usage.json"
 
 def get_daily_audio_count():
@@ -90,12 +91,13 @@ LOCATION_PRESETS = [
 
 # Initialize Session State Variables
 if "transcript" not in st.session_state: st.session_state["transcript"] = ""
-if "df" not in st.session_state: st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+if "mom_items" not in st.session_state: st.session_state["mom_items"] = []
 if "other_discussions" not in st.session_state: st.session_state["other_discussions"] = ""
 if "show_settings" not in st.session_state: st.session_state["show_settings"] = False
 if "tokens_used" not in st.session_state: st.session_state["tokens_used"] = 0
 if "last_api_call" not in st.session_state: st.session_state["last_api_call"] = None
 if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "AI - DeepSeek"
+if "chat_messages" not in st.session_state: st.session_state["chat_messages"] = []
 
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
@@ -160,10 +162,15 @@ h3 {
     background-color: #1A1A1A !important;
 }
 
-/* Small SVG-only Settings Icon Button in the Card Header */
-div[data-testid="stButton"]:has(button[key="card_settings_btn"]) {
-    display: flex !important;
-    justify-content: flex-end !important;
+/* Delete Item Button */
+button[key^="del_item_"] {
+    border-color: #d9534f !important;
+    color: #d9534f !important;
+    background: transparent !important;
+}
+button[key^="del_item_"]:hover {
+    background: #d9534f !important;
+    color: #ffffff !important;
 }
 
 button[key="card_settings_btn"] {
@@ -179,35 +186,15 @@ button[key="card_settings_btn"] {
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
-    box-shadow: none !important;
-}
-
-button[key="card_settings_btn"]::before {
-    content: "";
-    display: inline-block;
-    width: 17px;
-    height: 17px;
-    background-color: #C5A059;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-    transition: background-color 0.2s ease;
 }
 
 .stTextArea textarea {
     font-size: 0.95rem !important;
     line-height: 1.6 !important;
 }
-
-/* Time Picker Clean Layout */
-[data-testid="column"] .stSelectbox {
-    margin-bottom: 0 !important;
-}
 </style>
 """
 
-# ========== SVG ICONS ==========
 SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
 
 # ========== CORE LOGIC ==========
@@ -229,32 +216,28 @@ def extract_text_from_file(uploaded_file):
         st.error(f"Error reading file: {e}")
         return ""
 
-def _call_openai_transcribe(audio_bytes, filename="audio.mp3"):
-    if not OPENAI_API_KEY:
-        st.error("OpenAI API Key is missing. Please add it to your Streamlit Cloud Secrets.")
-        return None
-    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
-    files = {"file": (filename, audio_bytes), "model": (None, "gpt-4o-mini-transcribe"), "response_format": (None, "json")}
+def _transcribe_single_chunk(seg_info):
+    idx, seg_path = seg_info
     try:
-        resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, timeout=180)
-        if resp.status_code == 200:
-            return resp.json().get("text", "")
-        st.error(f"OpenAI fallback error: {resp.text}")
-        return None
-    except Exception as e:
-        st.error(f"OpenAI connection error: {e}")
-        return None
+        with open(seg_path, "rb") as f:
+            seg_bytes = f.read()
 
-def _call_groq_whisper(audio_bytes, filename="audio.mp3"):
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    files = {"file": (filename, audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
-    try:
-        resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=60)
-        if resp.status_code == 200:
-            return resp.json().get("text", "")
-        return None
-    except:
-        return None
+        if GROQ_API_KEY:
+            headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+            files = {"file": (f"chunk_{idx}.mp3", seg_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
+            resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=75)
+            if resp.status_code == 200:
+                return idx, resp.json().get("text", "")
+
+        if OPENAI_API_KEY:
+            headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+            files = {"file": (f"chunk_{idx}.mp3", seg_bytes), "model": (None, "gpt-4o-mini-transcribe"), "response_format": (None, "json")}
+            resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, timeout=120)
+            if resp.status_code == 200:
+                return idx, resp.json().get("text", "")
+    except Exception:
+        pass
+    return idx, ""
 
 def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, status_placeholder):
     progress_bar.progress(10, text="Preprocessing audio container (10%)...")
@@ -265,18 +248,12 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         src_path = src.name
 
     compressed_mp3 = src_path + "_compressed.mp3"
-    progress_bar.progress(25, text="Compressing audio to 16kHz Mono 24k MP3 (25%)...")
+    progress_bar.progress(25, text="Compressing audio to 16kHz Mono MP3 (25%)...")
 
     try:
         cmd = [
-            "ffmpeg", "-y",
-            "-threads", "1",
-            "-i", src_path,
-            "-vn",
-            "-ac", "1",
-            "-ar", "16000",
-            "-c:a", "libmp3lame",
-            "-b:a", "24k",
+            "ffmpeg", "-y", "-threads", "1", "-i", src_path,
+            "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "24k",
             compressed_mp3
         ]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -285,23 +262,20 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
             return None
 
         comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
-        progress_bar.progress(45, text="Evaluating audio duration & routing (45%)...")
 
-        if comp_size_mb <= 10.0 and GROQ_API_KEY:
-            status_placeholder.info("⚡ Processing via Groq Whisper Primary...")
-            progress_bar.progress(70, text="Transcribing via Groq Whisper (70%)...")
-            with open(compressed_mp3, "rb") as f:
-                c_bytes = f.read()
-            text = _call_groq_whisper(c_bytes, "audio.mp3")
+        if comp_size_mb <= 20.0:
+            status_placeholder.info("⚡ Processing directly in single pass...")
+            progress_bar.progress(70, text="Transcribing audio (70%)...")
+            _, text = _transcribe_single_chunk((0, compressed_mp3))
             if text:
                 progress_bar.progress(100, text="Transcription completed (100%)!")
                 status_placeholder.empty()
                 increment_daily_audio_count()
                 return text
-            status_placeholder.warning("⚠️ Groq rate limit reached. Switching automatically to OpenAI...")
 
-        status_placeholder.info("🚀 Processing recording via OpenAI...")
-        progress_bar.progress(55, text="Preparing audio segments for OpenAI (55%)...")
+        # Parallel Chunking for large files (splits into 600-second / 10-min parts)
+        status_placeholder.info("🚀 Splitting file into chunks & running parallel transcription workers...")
+        progress_bar.progress(40, text="Chunking audio into 10-minute segments (40%)...")
         
         segment_pattern = src_path + "_seg_%03d.mp3"
         subprocess.run([
@@ -313,44 +287,45 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         seg_dir = os.path.dirname(src_path)
         base_name = os.path.basename(src_path) + "_seg_"
         segments = sorted([os.path.join(seg_dir, f) for f in os.listdir(seg_dir) if f.startswith(base_name)])
-
-        full_transcript = []
         total_segs = len(segments)
-        
-        for idx, seg in enumerate(segments):
-            pct = int(55 + ((idx + 1) / total_segs) * 40)
-            progress_bar.progress(pct, text=f"Transcribing segment {idx + 1} of {total_segs} ({pct}%)...")
-            
-            with open(seg, "rb") as f:
-                seg_bytes = f.read()
-            t = _call_openai_transcribe(seg_bytes, f"part_{idx}.mp3")
-            if t:
-                full_transcript.append(t)
-            time.sleep(0.2)
+
+        progress_bar.progress(55, text=f"Launching {min(5, total_segs)} parallel workers for {total_segs} chunks...")
+
+        results = {}
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_idx = {executor.submit(_transcribe_single_chunk, (idx, seg)): idx for idx, seg in enumerate(segments)}
+            completed = 0
+            for future in as_completed(future_to_idx):
+                idx, text = future.result()
+                results[idx] = text
+                completed += 1
+                pct = int(55 + (completed / total_segs) * 40)
+                progress_bar.progress(pct, text=f"Completed chunk {completed}/{total_segs} ({pct}%)...")
+
+        # Clean segment files
+        for seg in segments:
             try: os.remove(seg)
             except: pass
 
-        progress_bar.progress(100, text="Transcription completed successfully (100%)!")
+        full_transcript = " ".join([results[i] for i in range(total_segs) if results.get(i)])
+        progress_bar.progress(100, text="Parallel transcription completed (100%)!")
         time.sleep(0.3)
         status_placeholder.empty()
         increment_daily_audio_count()
-        return " ".join(full_transcript)
+        return full_transcript
 
     except Exception as e:
-        st.error(f"Audio processing failure: {e}")
+        st.error(f"Audio pipeline error: {e}")
         return None
     finally:
-        if os.path.exists(src_path):
-            try: os.remove(src_path)
-            except: pass
-        if os.path.exists(compressed_mp3):
-            try: os.remove(compressed_mp3)
-            except: pass
+        for p in [src_path, compressed_mp3]:
+            if os.path.exists(p):
+                try: os.remove(p)
+                except: pass
 
-def normalize_llm_json_to_df(data):
+def parse_items_to_dict_list(data):
     items = None
     other_disc = ""
-    
     if isinstance(data, list):
         items = data
     elif isinstance(data, dict):
@@ -365,67 +340,44 @@ def normalize_llm_json_to_df(data):
                     break
             if items is None:
                 items = [data]
-                
         other_disc = str(data.get("other_discussions", "") or data.get("notes", "") or data.get("summary", ""))
 
     if not items or not isinstance(items, list):
-        return None, ""
+        return [], ""
 
-    df = pd.DataFrame(items)
-    col_mapping = {}
-    for c in df.columns:
-        c_clean = str(c).lower().replace("_", " ").replace("-", " ")
-        if any(k in c_clean for k in ["discuss", "point", "topic", "milestone"]):
-            col_mapping[c] = "Discussion Points"
-        elif any(k in c_clean for k in ["action", "plan", "step", "deliverable"]):
-            col_mapping[c] = "Action Plan"
-        elif any(k in c_clean for k in ["date", "time", "delivery", "deadline"]):
-            col_mapping[c] = "Indicative Delivery Date"
-        elif any(k in c_clean for k in ["person", "charge", "pic", "assign", "who", "responsible"]):
-            col_mapping[c] = "Person-in-charge"
-
-    df = df.rename(columns=col_mapping)
-    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-        if col not in df.columns:
-            df[col] = ""
-            
-    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
-    return df, other_disc
+    clean_items = []
+    for it in items:
+        clean_items.append({
+            "Discussion Points": it.get("Discussion Points") or it.get("topic") or it.get("discussion") or "",
+            "Action Plan": it.get("Action Plan") or it.get("action") or it.get("plan") or "None",
+            "Indicative Delivery Date": it.get("Indicative Delivery Date") or it.get("date") or it.get("deadline") or "TBD",
+            "Person-in-charge": it.get("Person-in-charge") or it.get("pic") or it.get("assigned") or "Unassigned"
+        })
+    return clean_items, other_disc
 
 def extract_with_deepseek(transcript):
     if not DEEPSEEK_API_KEY:
-        st.error("DeepSeek API Key is missing. Please add it to your Streamlit Cloud Secrets.")
-        return None, ""
+        st.error("DeepSeek API Key is missing.")
+        return [], ""
 
-    headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
+    headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
     system_prompt = (
-        "You are an expert executive assistant for PRIME Philippines tasked with producing comprehensive, "
-        "high-level executive Minutes of the Meeting (MOM). "
-        "The transcript contains Tagalog, English, and Taglish dialogue. "
-        "Analyze the full conversation context and translate all colloquial, informal, and mixed-language statements "
-        "into polished, high-level corporate English. "
-        "Synthesize all key agreements, status reports, core discussion points, definitive action plans, "
-        "indicative delivery timelines, and assigned persons-in-charge without omitting critical business context. "
-        "Output valid JSON only matching the exact schema provided."
+        "You are an expert executive assistant for PRIME Philippines tasked with producing high-level Minutes of Meeting (MOM). "
+        "The transcript contains Tagalog, English, and Taglish. Translate informal/colloquial speech into polished corporate English. "
+        "Synthesize key agreements, status reports, discussion points, action plans, timelines, and PICs. Output valid JSON matching the schema."
     )
-
-    user_prompt = f"""Synthesize the following meeting transcript into formal, high-level Minutes of Meeting (MOM) formatted as valid JSON:
-
+    user_prompt = f"""Synthesize this transcript into formal MOM JSON:
 Schema:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Formal summary of key milestones, operational updates, or strategic topics discussed",
-      "Action Plan": "Concrete, actionable executive deliverables and next steps (state 'None' if purely informational)",
+      "Discussion Points": "Summary of topic or discussion point",
+      "Action Plan": "Actionable deliverable (or 'None')",
       "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
-      "Person-in-charge": "Designated individual, department (e.g., PRIME Philippines, Client name), or 'Unassigned'"
+      "Person-in-charge": "Assigned entity or 'Unassigned'"
     }}
   ],
-  "other_discussions": "High-level summary of peripheral discussions, informal remarks, or general alignment"
+  "other_discussions": "Peripheral notes or alignments"
 }}
 
 Transcript:
@@ -433,10 +385,7 @@ Transcript:
 
     payload = {
         "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
+        "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
         "response_format": {"type": "json_object"},
         "temperature": 0.1,
         "max_tokens": 1800
@@ -446,119 +395,61 @@ Transcript:
         resp = requests.post(DEEPSEEK_CHAT_URL, headers=headers, json=payload, timeout=120)
         if resp.status_code == 200:
             res_json = resp.json()
-            usage = res_json.get("usage", {})
-            st.session_state["tokens_used"] += usage.get("total_tokens", len(transcript) // 4)
+            st.session_state["tokens_used"] += res_json.get("usage", {}).get("total_tokens", 0)
             st.session_state["last_api_call"] = datetime.datetime.now()
-
             raw_text = res_json["choices"][0]["message"]["content"].strip()
             clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
             clean_text = re.sub(r"\s*```$", "", clean_text).strip()
             match = re.search(r"\{.*\}", clean_text, re.DOTALL)
             data = json.loads(match.group(0)) if match else json.loads(clean_text)
-            return normalize_llm_json_to_df(data)
-        else:
-            st.warning(f"DeepSeek Notice ({resp.status_code}): {resp.text}")
+            return parse_items_to_dict_list(data)
     except Exception as e:
         st.warning(f"DeepSeek connection error: {e}")
-
-    return None, ""
+    return [], ""
 
 def heuristic_non_ai_extraction(transcript):
     sentences = re.split(r'(?<=[.!?]) +', transcript)
-    action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'ipapasa', 'provide', 'target', 'ipresent', 'kukunin']
-    date_keywords = ['tomorrow', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'q1', 'q2', 'q3', 'q4', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'bukas', 'deadline']
-    
-    table_items = []
-    other_discussions = []
-    
-    for i in range(0, len(sentences), 3):
-        chunk = sentences[i:i+3]
-        if not chunk: continue
-        chunk_text = " ".join(chunk)
-        
-        has_action = any(kw in chunk_text.lower() for kw in action_keywords)
-        has_date = any(kw in chunk_text.lower() for kw in date_keywords)
-        
-        if has_action or has_date:
-            action_text = " ".join([s for s in chunk if any(kw in s.lower() for kw in action_keywords)])
-            table_items.append({
-                "Discussion Points": chunk[0].strip() + "...",
-                "Action Plan": action_text.strip() if action_text else "Review discussion for actions",
-                "Indicative Delivery Date": "Check transcript (Date mentioned)" if has_date else "TBD",
+    action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'provide']
+    items = []
+    for i in range(0, min(len(sentences), 15), 3):
+        chunk = " ".join(sentences[i:i+3]).strip()
+        if chunk:
+            items.append({
+                "Discussion Points": chunk[:120] + "...",
+                "Action Plan": "Review transcript details",
+                "Indicative Delivery Date": "TBD",
                 "Person-in-charge": "Unassigned"
             })
-        else:
-            other_discussions.append(chunk_text)
-            
-    if not table_items:
-        table_items = [{
-            "Discussion Points": "Meeting Overview",
-            "Action Plan": "Please review transcript manually.",
-            "Indicative Delivery Date": "TBD",
-            "Person-in-charge": "Unassigned"
-        }]
-        
-    df = pd.DataFrame(table_items[:10])
-    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-        if col not in df.columns:
-            df[col] = ""
-            
-    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
-    other_text = "\n\n".join(other_discussions[:4])
-    return df, other_text
+    return items or [{"Discussion Points": "Meeting Overview", "Action Plan": "Review manually", "Indicative Delivery Date": "TBD", "Person-in-charge": "Unassigned"}], ""
 
-def extract_structured_insights(transcript, engine="AI - DeepSeek"):
-    progress_bar = st.progress(0, text="Initializing MOM extraction (0%)...")
-    time.sleep(0.2)
-    progress_bar.progress(40, text=f"Translating Taglish conversation & extracting with {engine} (40%)...")
+def query_meeting_chatbot(transcript, messages):
+    if not DEEPSEEK_API_KEY:
+        return "DeepSeek API key not found in secrets."
 
-    if engine == "Non-AI - Python Heuristic":
-        time.sleep(0.5)
-        res_df, res_other = heuristic_non_ai_extraction(transcript)
-        progress_bar.progress(100, text="Extraction completed (100%)!")
-        time.sleep(0.2)
-        progress_bar.empty()
-        return res_df, res_other
+    headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
+    sys_content = (
+        "You are an intelligent executive meeting assistant. Answer user queries strictly using the provided meeting transcript. "
+        "Provide direct, concise, and accurate answers based on what was discussed, agreed upon, or assigned.\n\n"
+        f"MEETING TRANSCRIPT:\n{transcript[:28000]}"
+    )
+    api_messages = [{"role": "system", "content": sys_content}]
+    for m in messages:
+        api_messages.append({"role": m["role"], "content": m["content"]})
 
-    df, other = extract_with_deepseek(transcript)
-    
-    if df is not None and not df.empty:
-        progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%)...")
-        time.sleep(0.3)
-        progress_bar.empty()
-        return df, other
-
-    df_fb, other_fb = heuristic_non_ai_extraction(transcript)
-    progress_bar.empty()
-    st.markdown(f"{SVG_ALERT} AI completion request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
-    return df_fb, other_fb
+    try:
+        resp = requests.post(DEEPSEEK_CHAT_URL, headers=headers, json={"model": "deepseek-chat", "messages": api_messages, "temperature": 0.2}, timeout=60)
+        if resp.status_code == 200:
+            return resp.json()["choices"][0]["message"]["content"]
+        return f"Chatbot error ({resp.status_code}): {resp.text}"
+    except Exception as e:
+        return f"Connection error: {e}"
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
     cell._tc.get_or_add_tcPr().append(shd)
 
-def export_to_word(df, meeting_details, other_discussions):
-    template_files = ["MOM_Template.docx", "MOM Template.docx"]
-    template_path = next((f for f in template_files if os.path.exists(f)), None)
-
-    if template_path:
-        doc = Document(template_path)
-    else:
-        doc = Document()
-        if os.path.exists("header.png"):
-            for section in doc.sections:
-                section.top_margin = Inches(0.4)
-                section.bottom_margin = Inches(0.4)
-                section.left_margin = Inches(0.75)
-                section.right_margin = Inches(0.75)
-                hp = section.header.paragraphs[0]
-                hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                hp.add_run().add_picture("header.png", width=Inches(7.0))
-                if os.path.exists("footer.png"):
-                    fp = section.footer.paragraphs[0]
-                    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    fp.add_run().add_picture("footer.png", width=Inches(7.0))
-
+def export_to_word(items, meeting_details, other_discussions):
+    doc = Document()
     for section in doc.sections:
         section.top_margin = Inches(0.4)
         section.bottom_margin = Inches(0.4)
@@ -567,339 +458,81 @@ def export_to_word(df, meeting_details, other_discussions):
 
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_title.paragraph_format.space_before = Pt(0)
-    p_title.paragraph_format.space_after = Pt(2)
     r_title = p_title.add_run("MINUTES OF THE MEETING")
     r_title.bold = True
     r_title.underline = True
     r_title.font.name = "Arial"
-    r_title.font.size = Pt(11)
 
-    company_target = meeting_details.get("external_attendees", [])
-    primary_client_rep = company_target[0] if company_target else meeting_details.get("company_name", "").strip() or "CLIENT"
+    primary_client_rep = meeting_details.get("external_attendees", ["CLIENT"])[0] if meeting_details.get("external_attendees") else "CLIENT"
     p_sub = doc.add_paragraph()
     p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_sub.paragraph_format.space_after = Pt(12)
     r_sub = p_sub.add_run(f"PRIME PHILIPPINES & {primary_client_rep.upper()}")
     r_sub.bold = True
     r_sub.font.name = "Arial"
-    r_sub.font.size = Pt(11)
 
-    date_str = meeting_details.get("date", "____________")
-    time_str = meeting_details.get("time_range", "")
-    full_date = f"Date: {date_str}" + (f", {time_str}" if time_str.strip() else "")
-    
-    p_date = doc.add_paragraph(full_date)
-    p_date.paragraph_format.space_after = Pt(2)
-    for r in p_date.runs: r.font.name = "Arial"; r.font.size = Pt(10)
+    doc.add_paragraph(f"Date: {meeting_details.get('date')} {meeting_details.get('time_range', '')}")
+    doc.add_paragraph(f"Location: {meeting_details.get('location')}")
 
-    p_loc = doc.add_paragraph(f"Location: {meeting_details.get('location', '____________')}")
-    p_loc.paragraph_format.space_after = Pt(2)
-    for r in p_loc.runs: r.font.name = "Arial"; r.font.size = Pt(10)
-
-    prime_atts = meeting_details.get("prime_attendees", [])
-    ext_atts = meeting_details.get("external_attendees", [])
-    
-    p_att = doc.add_paragraph()
-    p_att.paragraph_format.space_after = Pt(2)
-    p_att.paragraph_format.tab_stops.add_tab_stop(Inches(1.35), WD_TAB_ALIGNMENT.LEFT)
-    r_att_label = p_att.add_run("Attended by:")
-    r_att_label.font.name = "Arial"
-    r_att_label.font.size = Pt(10)
-    
-    first_attendee = True
-    if ext_atts:
-        for att in ext_atts:
-            if not att.strip(): continue
-            p = p_att if first_attendee else doc.add_paragraph()
-            p.paragraph_format.space_after = Pt(2)
-            if not first_attendee:
-                p.paragraph_format.left_indent = Inches(1.35)
-            else:
-                p.add_run("\t")
-            comp_label = f", {meeting_details.get('company_name')}" if meeting_details.get('company_name') else ""
-            r = p.add_run(f"{att}{comp_label}")
-            r.font.name = "Arial"
-            r.font.size = Pt(10)
-            first_attendee = False
-
-    if prime_atts:
-        for att in prime_atts:
-            p = p_att if first_attendee else doc.add_paragraph()
-            p.paragraph_format.space_after = Pt(2)
-            if not first_attendee:
-                p.paragraph_format.left_indent = Inches(1.35)
-            else:
-                p.add_run("\t")
-            r = p.add_run(f"{att} – PRIME Philippines")
-            r.font.name = "Arial"
-            r.font.size = Pt(10)
-            first_attendee = False
-
-    p_line = doc.add_paragraph()
-    p_line.paragraph_format.space_before = Pt(4)
-    p_line.paragraph_format.space_after = Pt(6)
-    r_line = p_line.add_run("_________________________________________________________________________________")
-    r_line.font.name = "Arial"
-    r_line.font.color.rgb = RGBColor(160, 160, 160)
-
-    client_display = meeting_details.get('company_name', '').strip() or "the Client"
-    p_intro = doc.add_paragraph(
-        f"During the meeting held last {date_str}, PRIME Philippines, represented by the attendee/s shown above, "
-        f"met with {client_display} to discuss opportunities for collaboration."
-    )
-    p_intro.paragraph_format.space_after = Pt(10)
-    for r in p_intro.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
-
-    table = doc.add_table(rows=len(df)+1, cols=4)
+    table = doc.add_table(rows=len(items)+1, cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.style = "Table Grid"
-    table.autofit = False
-    table.allow_autofit = False
-
-    col_widths = [Inches(2.5), Inches(2.2), Inches(1.1), Inches(1.2)]
-
     headers = ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]
     for i, header in enumerate(headers):
         cell = table.rows[0].cells[i]
-        cell.width = col_widths[i]
         cell.text = header
         set_cell_shading(cell, "FFFF00")
-        p = cell.paragraphs[0]
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        if p.runs:
-            p.runs[0].font.bold = True
-            p.runs[0].font.size = Pt(9)
-            p.runs[0].font.name = "Arial"
 
-    for i, row in df.iterrows():
+    for i, it in enumerate(items):
         cells = table.rows[i+1].cells
-        cells[0].text = f"{i+1}. {str(row.get('Discussion Points', ''))}"
-        cells[1].text = str(row.get("Action Plan", ""))
-        cells[2].text = str(row.get("Indicative Delivery Date", ""))
-        cells[3].text = str(row.get("Person-in-charge", ""))
-        for c_idx, cell in enumerate(cells):
-            cell.width = col_widths[c_idx]
-            p = cell.paragraphs[0]
-            if c_idx in [2, 3]: p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            if p.runs:
-                p.runs[0].font.size = Pt(8.5)
-                p.runs[0].font.name = "Arial"
-
-    doc.add_paragraph()
-    p_note = doc.add_paragraph("*Note: The indicative delivery date serves as reference point and still subject to changes. Furthermore, it depends on the progress of both parties.")
-    p_note.paragraph_format.space_after = Pt(8)
-    p_note.runs[0].font.italic = True
-    p_note.runs[0].font.name = "Arial"
-    p_note.runs[0].font.size = Pt(8)
+        cells[0].text = f"{i+1}. {it.get('Discussion Points', '')}"
+        cells[1].text = str(it.get('Action Plan', ''))
+        cells[2].text = str(it.get('Indicative Delivery Date', ''))
+        cells[3].text = str(it.get('Person-in-charge', ''))
 
     if other_discussions.strip():
-        p_od_head = doc.add_paragraph()
-        p_od_head.paragraph_format.space_before = Pt(6)
-        p_od_head.paragraph_format.space_after = Pt(4)
-        r_od_head = p_od_head.add_run("Other Discussions:")
-        r_od_head.bold = True
-        r_od_head.font.size = Pt(10)
-        r_od_head.font.name = "Arial"
-        
-        p_od = doc.add_paragraph(other_discussions)
-        p_od.paragraph_format.space_after = Pt(12)
-        for r in p_od.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
-
-    p_prep_label = doc.add_paragraph("Prepared by:")
-    p_prep_label.paragraph_format.space_before = Pt(12)
-    p_prep_label.paragraph_format.space_after = Pt(2)
-    p_prep_label.runs[0].font.name = "Arial"; p_prep_label.runs[0].font.bold = True; p_prep_label.runs[0].font.size = Pt(9.5)
-
-    p_prep_line = doc.add_paragraph("_______________________________")
-    p_prep_line.paragraph_format.space_after = Pt(2)
-    p_prep_line.runs[0].font.name = "Arial"
-
-    prep_name = meeting_details.get("prep_name", "").strip() or "____________________"
-    prep_desig = meeting_details.get("prep_desig", "").strip() or "PRIME Philippines"
-    p_prep_info = doc.add_paragraph(f"{prep_name}\n{prep_desig}")
-    p_prep_info.paragraph_format.space_after = Pt(12)
-    for r in p_prep_info.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
-
-    p_conf_label = doc.add_paragraph("Confirmed by:")
-    p_conf_label.paragraph_format.space_after = Pt(2)
-    p_conf_label.runs[0].font.name = "Arial"; p_conf_label.runs[0].font.bold = True; p_conf_label.runs[0].font.size = Pt(9.5)
-
-    p_conf_line = doc.add_paragraph("_______________________________")
-    p_conf_line.paragraph_format.space_after = Pt(2)
-    p_conf_line.runs[0].font.name = "Arial"
-
-    conf_name = meeting_details.get("conf_name", "").strip() or (ext_atts[0] if ext_atts else "____________________")
-    conf_desig = meeting_details.get("conf_desig", "").strip() or (meeting_details.get("company_name", "").strip() or "Client")
-    p_conf_info = doc.add_paragraph(f"{conf_name}\n{conf_desig}")
-    p_conf_info.paragraph_format.space_after = Pt(6)
-    for r in p_conf_info.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
+        doc.add_paragraph(f"\nOther Discussions:\n{other_discussions}")
 
     bio = BytesIO()
     doc.save(bio)
     bio.seek(0)
     return bio
 
-def export_to_pdf(df, meeting_details, other_discussions):
+def export_to_pdf(items, meeting_details, other_discussions):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        leftMargin=0.6 * inch,
-        rightMargin=0.6 * inch,
-        topMargin=0.5 * inch,
-        bottomMargin=0.5 * inch
-    )
+    doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=0.6*inch, rightMargin=0.6*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
     story = []
     styles = getSampleStyleSheet()
 
-    style_title = ParagraphStyle(
-        'DocTitle',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=11.5,
-        alignment=1,
-        spaceAfter=2
-    )
-    company_target = meeting_details.get("external_attendees", [])
-    primary_client_rep = company_target[0] if company_target else meeting_details.get("company_name", "").strip() or "CLIENT"
-    style_subtitle = ParagraphStyle(
-        'DocSubTitle',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=10.5,
-        alignment=1,
-        spaceAfter=10
-    )
-    style_body = ParagraphStyle(
-        'DocBody',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=9,
-        leading=12,
-        spaceAfter=3
-    )
-    style_th = ParagraphStyle(
-        'TableHead',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=10,
-        alignment=1
-    )
-    style_td = ParagraphStyle(
-        'TableData',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=8,
-        leading=10
-    )
-    style_td_center = ParagraphStyle(
-        'TableDataCenter',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=8,
-        leading=10,
-        alignment=1
-    )
-
-    if os.path.exists("header.png"):
-        story.append(Image("header.png", width=6.8 * inch, height=0.75 * inch))
-        story.append(Spacer(1, 6))
-
-    story.append(Paragraph("<u>MINUTES OF THE MEETING</u>", style_title))
-    story.append(Paragraph(f"PRIME PHILIPPINES & {primary_client_rep.upper()}", style_subtitle))
-
-    date_str = meeting_details.get("date", "____________")
-    time_str = meeting_details.get("time_range", "")
-    full_date = f"<b>Date:</b> {date_str}" + (f", {time_str}" if time_str.strip() else "")
-    story.append(Paragraph(full_date, style_body))
-    story.append(Paragraph(f"<b>Location:</b> {meeting_details.get('location', '____________')}", style_body))
-
-    prime_atts = meeting_details.get("prime_attendees", [])
-    ext_atts = meeting_details.get("external_attendees", [])
-    att_list = []
-    if ext_atts:
-        for att in ext_atts:
-            if att.strip():
-                comp_label = f", {meeting_details.get('company_name')}" if meeting_details.get('company_name') else ""
-                att_list.append(f"{att}{comp_label}")
-    if prime_atts:
-        for att in prime_atts:
-            att_list.append(f"{att} – PRIME Philippines")
-
-    if att_list:
-        story.append(Paragraph(f"<b>Attended by:</b>&nbsp;&nbsp;&nbsp;&nbsp;{att_list[0]}", style_body))
-        for a in att_list[1:]:
-            story.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{a}", style_body))
-
+    story.append(Paragraph("<u><b>MINUTES OF THE MEETING</b></u>", styles['Title']))
     story.append(Spacer(1, 4))
-    client_display = meeting_details.get('company_name', '').strip() or "the Client"
-    story.append(Paragraph(
-        f"During the meeting held last {date_str}, PRIME Philippines, represented by the attendee/s shown above, "
-        f"met with {client_display} to discuss opportunities for collaboration.",
-        style_body
-    ))
-    story.append(Spacer(1, 6))
+    story.append(Paragraph(f"<b>Date:</b> {meeting_details.get('date')} {meeting_details.get('time_range', '')}", styles['Normal']))
+    story.append(Paragraph(f"<b>Location:</b> {meeting_details.get('location')}", styles['Normal']))
+    story.append(Spacer(1, 8))
 
     table_data = [[
-        Paragraph("<b>Discussion Points</b>", style_th),
-        Paragraph("<b>Action Plan</b>", style_th),
-        Paragraph("<b>Indicative Delivery Date</b>", style_th),
-        Paragraph("<b>Person-in-charge</b>", style_th)
+        Paragraph("<b>Discussion Points</b>", styles['Normal']),
+        Paragraph("<b>Action Plan</b>", styles['Normal']),
+        Paragraph("<b>Indicative Delivery Date</b>", styles['Normal']),
+        Paragraph("<b>Person-in-charge</b>", styles['Normal'])
     ]]
-
-    for i, row in df.iterrows():
+    for i, it in enumerate(items):
         table_data.append([
-            Paragraph(f"{i+1}. {str(row.get('Discussion Points', ''))}", style_td),
-            Paragraph(str(row.get("Action Plan", "")), style_td),
-            Paragraph(str(row.get("Indicative Delivery Date", "")), style_td_center),
-            Paragraph(str(row.get("Person-in-charge", "")), style_td_center)
+            Paragraph(f"{i+1}. {it.get('Discussion Points','')}", styles['Normal']),
+            Paragraph(it.get('Action Plan',''), styles['Normal']),
+            Paragraph(it.get('Indicative Delivery Date',''), styles['Normal']),
+            Paragraph(it.get('Person-in-charge',''), styles['Normal'])
         ])
 
-    col_widths = [2.4 * inch, 2.3 * inch, 1.1 * inch, 1.0 * inch]
-    t = Table(table_data, colWidths=col_widths, repeatRows=1)
+    t = Table(table_data, colWidths=[2.4*inch, 2.3*inch, 1.1*inch, 1.0*inch])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FFFF00')),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#FFFF00')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('VALIGN', (0,0), (-1,-1), 'TOP')
     ]))
     story.append(t)
-
-    note_style = ParagraphStyle('Note', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=7.5, leading=9, spaceBefore=4)
-    story.append(Paragraph("*Note: The indicative delivery date serves as reference point and still subject to changes. Furthermore, it depends on the progress of both parties.", note_style))
-
     if other_discussions.strip():
-        story.append(Spacer(1, 6))
-        story.append(Paragraph("<b>Other Discussions:</b>", style_body))
-        story.append(Paragraph(other_discussions, style_body))
-
-    story.append(Spacer(1, 8))
-    prep_name = meeting_details.get("prep_name", "").strip() or "____________________"
-    prep_desig = meeting_details.get("prep_desig", "").strip() or "PRIME Philippines"
-    conf_name = meeting_details.get("conf_name", "").strip() or (ext_atts[0] if ext_atts else "____________________")
-    conf_desig = meeting_details.get("conf_desig", "").strip() or (meeting_details.get("company_name", "").strip() or "Client")
-
-    sign_data = [
-        [Paragraph("<b>Prepared by:</b>", style_body), Paragraph("<b>Confirmed by:</b>", style_body)],
-        [Paragraph("_______________________________", style_body), Paragraph("_______________________________", style_body)],
-        [Paragraph(f"{prep_name}<br/>{prep_desig}", style_body), Paragraph(f"{conf_name}<br/>{conf_desig}", style_body)]
-    ]
-    sign_table = Table(sign_data, colWidths=[3.4 * inch, 3.4 * inch])
-    sign_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-    ]))
-    story.append(sign_table)
-
-    if os.path.exists("footer.png"):
         story.append(Spacer(1, 8))
-        story.append(Image("footer.png", width=6.8 * inch, height=0.65 * inch))
+        story.append(Paragraph(f"<b>Other Discussions:</b><br/>{other_discussions}", styles['Normal']))
 
     doc.build(story)
     buffer.seek(0)
@@ -907,15 +540,8 @@ def export_to_pdf(df, meeting_details, other_discussions):
 
 # ========== STREAMLIT UI SETUP ==========
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+st.markdown("""<div class="echo-topbar-wrapper"><h1 class="echo-title">Project <span>Echo</span></h1></div>""", unsafe_allow_html=True)
 
-# Top Bar Fixed Header
-st.markdown("""
-<div class="echo-topbar-wrapper">
- <h1 class="echo-title">Project <span>Echo</span></h1>
-</div>
-""", unsafe_allow_html=True)
-
-# Fetch current daily count
 daily_audio_used = get_daily_audio_count()
 audio_quota_reached = daily_audio_used >= MAX_DAILY_AUDIO
 
@@ -925,318 +551,155 @@ with st.container(border=True):
     with head_col1:
         st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
     with head_col2:
-        if st.button("", key="card_settings_btn", help="Open MoM Generation Engine & Token Diagnostics"):
+        if st.button("⚙️", key="card_settings_btn", help="Settings & Token Diagnostics"):
             st.session_state["show_settings"] = not st.session_state["show_settings"]
             st.rerun()
 
-    # Settings Drawer
     if st.session_state["show_settings"]:
-        with st.expander("Settings & Engine Diagnostics", expanded=True):
-            set_col1, set_col2 = st.columns([1.5, 1.5])
-            
-            with set_col1:
-                engine_options = [
-                    "AI - DeepSeek",
-                    "Non-AI - Python Heuristic"
-                ]
-                selected_eng = st.selectbox(
-                    "MoM Generation Engine",
-                    options=engine_options,
-                    index=engine_options.index(st.session_state["selected_engine"]) if st.session_state["selected_engine"] in engine_options else 0
-                )
-                st.session_state["selected_engine"] = selected_eng
-
-                if st.button("Regenerate MOM", key="btn_regen_mom"):
-                    if st.session_state["transcript"]:
-                        extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng)
-                        if not extracted_df.empty:
-                            st.session_state["df"] = extracted_df
-                            st.session_state["other_discussions"] = other_disc
-                            st.rerun()
-
-            with set_col2:
-                st.markdown("**Daily Quota & Diagnostics**")
-                st.write(f"• **Daily Audio Usage:** `{daily_audio_used} / {MAX_DAILY_AUDIO}` transcriptions")
-                st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
-                
-                if st.session_state["last_api_call"]:
-                    last_call = st.session_state["last_api_call"]
-                    st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
-                    st.write(f"• **Engine Status ({selected_eng}):** `Active & Ready`")
-                else:
-                    st.write("• **Engine Status:** `Ready`")
+        with st.expander("Settings & Diagnostics", expanded=True):
+            s1, s2 = st.columns(2)
+            with s1:
+                st.session_state["selected_engine"] = st.selectbox("MoM Engine", ["AI - DeepSeek", "Non-AI - Python Heuristic"])
+            with s2:
+                st.write(f"• **Audio Quota:** `{daily_audio_used} / {MAX_DAILY_AUDIO}` used")
+                st.write(f"• **Tokens Processed:** `{st.session_state['tokens_used']:,}`")
         st.markdown("---")
-    
-    # ROW 1: Clean Date Picker, Blank Location with Presets, Simple Time Pickers, Prepared By
-    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.2, 2.0, 1.6, 1.6, 1.2, 1.2])
-    
-    with r1_c1:
-        meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
-    
+
+    r1_c1, r1_c2, r1_c3, r1_c4 = st.columns([1.5, 2.0, 1.5, 1.5])
+    with r1_c1: meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
     with r1_c2:
-        loc_preset = st.selectbox("Location Preset", options=LOCATION_PRESETS, index=0)
-        custom_loc = st.text_input("Location", value="", placeholder="e.g. Boardroom", label_visibility="collapsed")
-        meeting_location = custom_loc.strip() if custom_loc.strip() else ("" if loc_preset == LOCATION_PRESETS[0] else loc_preset)
+        loc_preset = st.selectbox("Preset Location", options=LOCATION_PRESETS, index=0)
+        meeting_location = loc_preset if loc_preset != LOCATION_PRESETS[0] else "Meeting Room"
+    with r1_c3: prep_name = st.text_input("Prepared By", placeholder="e.g. John Doe")
+    with r1_c4: client_name = st.text_input("Client / Company", placeholder="XYZ Company")
 
-    with r1_c3:
-        st.markdown("<p style='font-size:0.88rem; margin-bottom:0.2rem; color:#333; font-weight:500;'>Start Time</p>", unsafe_allow_html=True)
-        sc1, sc2, sc3 = st.columns([1, 1, 1.3])
-        sh = sc1.selectbox("SH", [f"{i:02d}" for i in range(1,13)], key="sh", label_visibility="collapsed")
-        sm = sc2.selectbox("SM", [f"{i:02d}" for i in range(0,60,5)], key="sm", label_visibility="collapsed")
-        sap = sc3.selectbox("SAP", ["AM", "PM"], key="sap", label_visibility="collapsed")
-        start_str = f"{sh}:{sm} {sap}"
-
-    with r1_c4:
-        st.markdown("<p style='font-size:0.88rem; margin-bottom:0.2rem; color:#333; font-weight:500;'>End Time</p>", unsafe_allow_html=True)
-        ec1, ec2, ec3 = st.columns([1, 1, 1.3])
-        eh = ec1.selectbox("EH", [f"{i:02d}" for i in range(1,13)], key="eh", label_visibility="collapsed")
-        em = ec2.selectbox("EM", [f"{i:02d}" for i in range(0,60,5)], key="em", label_visibility="collapsed")
-        eap = ec3.selectbox("EAP", ["AM", "PM"], key="eap", label_visibility="collapsed")
-        end_str = f"{eh}:{em} {eap}"
-
-    with r1_c5:
-        prep_name = st.text_input("Prepared By (Name)", value="", placeholder="e.g. John Doe")
-    with r1_c6:
-        prep_desig = st.text_input("Designation", value="", placeholder="e.g. Associate")
-
-    # ROW 2
-    r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
-    with r2_c1: client_name = st.text_input("Client / Company", value="", placeholder="XYZ Company")
-    with r2_c2: selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=[])
-    with r2_c3: ext_attendees_raw = st.text_input("External Attendees", value="", placeholder="e.g. Mr. ABCD, Jane Doe")
-    with r2_c4: conf_name = st.text_input("Confirmed By (Name)", value="", placeholder="e.g. Client Rep")
-    with r2_c5: conf_desig = st.text_input("Designation", value="", placeholder="e.g. Managing Director")
-
-    # Three Tabs
     tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text (Unlimited)"])
 
-    # TAB 1: UPLOAD AUDIO (RATE LIMITED)
     with tab_upload:
         if audio_quota_reached:
-            st.warning(f"⚠️ Daily audio transcription quota ({MAX_DAILY_AUDIO}/{MAX_DAILY_AUDIO}) reached. You can still use the **Upload Text** tab without any limits!")
+            st.warning("Daily audio transcription limit reached. Use Upload Text tab for unlimited use.")
         else:
-            st.caption(f"Audio transcription quota: **{daily_audio_used}/{MAX_DAILY_AUDIO}** used today.")
-            u_col1, u_col2 = st.columns([5, 1.5])
-            with u_col1:
-                uploaded_file = st.file_uploader(
-                    "Upload audio file (200MB limit supported)",
-                    type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
-                    help="Audio uploads up to 200MB are supported."
-                )
-            if uploaded_file:
-                with u_col2:
-                    st.write("")
-                    st.write("")
-                    if st.button("Transcribe Audio", key="btn_tx_upload"):
-                        p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
-                        p_status = st.empty()
-                        transcript = transcribe_audio_pipeline(uploaded_file.read(), uploaded_file.name, p_bar, p_status)
-                        p_bar.empty()
-                        p_status.empty()
-                        if transcript:
-                            st.session_state["transcript"] = transcript
-                            st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-                            st.session_state["other_discussions"] = ""
-                            st.rerun()
-
-    # TAB 2: RECORD AUDIO (RATE LIMITED)
-    with tab_record:
-        if audio_quota_reached:
-            st.warning(f"⚠️ Daily audio transcription quota ({MAX_DAILY_AUDIO}/{MAX_DAILY_AUDIO}) reached. You can still use the **Upload Text** tab without any limits!")
-        else:
-            st.caption(f"Audio transcription quota: **{daily_audio_used}/{MAX_DAILY_AUDIO}** used today.")
-            r_col1, r_col2, r_col3 = st.columns([4, 1.5, 1.5])
-            with r_col1:
-                recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
-            if recorded_audio:
-                rec_bytes = recorded_audio.read()
-                with r_col2:
-                    st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
-                with r_col3:
-                    if st.button("Transcribe Audio", key="btn_tx_record"):
-                        p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
-                        p_status = st.empty()
-                        transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
-                        p_bar.empty()
-                        p_status.empty()
-                        if transcript:
-                            st.session_state["transcript"] = transcript
-                            st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-                            st.session_state["other_discussions"] = ""
-                            st.rerun()
-
-    # TAB 3: TEXT UPLOAD (UNLIMITED)
-    with tab_text:
-        text_col1, text_col2 = st.columns([5, 1.5])
-        with text_col1:
-            uploaded_text_file = st.file_uploader("Upload Document (.txt, .docx, .pdf)", type=["txt", "docx", "pdf"])
-            pasted_text = st.text_area("Or Paste Transcript Here", height=100, placeholder="Paste transcript text directly here...")
-        with text_col2:
-            st.write("") 
-            st.write("") 
-            if st.button("Process Text", key="btn_tx_text"):
-                p_bar = st.progress(0, text="Extracting document text (0%)...")
-                time.sleep(0.2)
-                p_bar.progress(50, text="Reading document stream (50%)...")
-                extracted_str = ""
-                if uploaded_text_file:
-                    extracted_str = extract_text_from_file(uploaded_text_file)
-                if pasted_text and pasted_text.strip():
-                    extracted_str += "\n" + pasted_text.strip()
-                
-                p_bar.progress(100, text="Document processed (100%)!")
-                time.sleep(0.2)
-                p_bar.empty()
-                if extracted_str.strip():
-                    st.session_state["transcript"] = extracted_str.strip()
-                    st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-                    st.session_state["other_discussions"] = ""
+            up_file = st.file_uploader("Upload audio file", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4"])
+            if up_file and st.button("Transcribe Audio (Parallel Powered)", key="btn_tx_upload"):
+                p_bar, p_status = st.progress(0), st.empty()
+                txt = transcribe_audio_pipeline(up_file.read(), up_file.name, p_bar, p_status)
+                p_bar.empty(); p_status.empty()
+                if txt:
+                    st.session_state["transcript"] = txt
+                    st.session_state["mom_items"] = []
                     st.rerun()
-                else:
-                    st.warning("Please upload a file or paste text to proceed.")
+
+    with tab_record:
+        if not audio_quota_reached:
+            rec = st.audio_input("Record audio", label_visibility="collapsed")
+            if rec and st.button("Transcribe Recording", key="btn_tx_rec"):
+                p_bar, p_status = st.progress(0), st.empty()
+                txt = transcribe_audio_pipeline(rec.read(), "recording.wav", p_bar, p_status)
+                p_bar.empty(); p_status.empty()
+                if txt:
+                    st.session_state["transcript"] = txt
+                    st.session_state["mom_items"] = []
+                    st.rerun()
+
+    with tab_text:
+        doc_file = st.file_uploader("Upload Document", type=["txt", "docx", "pdf"])
+        paste_txt = st.text_area("Or Paste Transcript", height=80)
+        if st.button("Process Document / Text"):
+            extracted = ""
+            if doc_file: extracted = extract_text_from_file(doc_file)
+            if paste_txt: extracted += "\n" + paste_txt
+            if extracted.strip():
+                st.session_state["transcript"] = extracted.strip()
+                st.session_state["mom_items"] = []
+                st.rerun()
 
 # ---- Step 2: Full Transcript UI ----
 if st.session_state["transcript"]:
     with st.container(border=True):
-        f_col1, f_col2, f_col3 = st.columns([7.6, 1.2, 1.2])
-        with f_col1:
-            st.markdown('<h3 style="margin-top:0.3rem;">Full Transcript</h3>', unsafe_allow_html=True)
-            
-        with f_col2:
-            copy_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <style>
-            body {{ margin: 0; padding: 0; box-sizing: border-box; font-family: 'Montserrat', sans-serif; }}
-            button {{
-                width: 100%;
-                height: 41px;
-                background-color: #222222;
-                color: #FFFFFF;
-                border: 1px solid #444444;
-                border-radius: 50px;
-                font-size: 15px;
-                font-weight: 500;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 0;
-            }}
-            button:hover {{
-                border-color: #D4AF37;
-                color: #D4AF37;
-                background-color: #1A1A1A;
-            }}
-            </style>
-            </head>
-            <body>
-                <button id="copy-btn">Copy Text</button>
-                <script>
-                document.getElementById("copy-btn").addEventListener("click", function() {{
-                    navigator.clipboard.writeText({json.dumps(st.session_state["transcript"])}).then(function() {{
-                        document.getElementById("copy-btn").innerText = "Copied! ✅";
-                        setTimeout(() => document.getElementById("copy-btn").innerText = "Copy Text", 2000);
-                    }});
-                }});
-                </script>
-            </body>
-            </html>
-            """
-            components.html(copy_html, height=41)
-            
-        with f_col3:
-            st.download_button(
-                label="Download Text",
-                data=st.session_state["transcript"],
-                file_name=f"Transcript_{meeting_date.strftime('%Y%m%d')}.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
-
-        st.text_area("Transcript Content", st.session_state["transcript"], height=350, label_visibility="collapsed")
+        st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
+        st.text_area("Transcript Content", st.session_state["transcript"], height=200, label_visibility="collapsed")
         
-        if st.session_state["df"].empty:
-            if st.button("Generate MOM", key="btn_gen_mom"):
-                extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], st.session_state["selected_engine"])
-                if not extracted_df.empty:
-                    st.session_state["df"] = extracted_df
-                    st.session_state["other_discussions"] = other_disc
-                    st.rerun()
+        if not st.session_state["mom_items"]:
+            if st.button("Generate MOM Cards", key="btn_gen_mom"):
+                if st.session_state["selected_engine"] == "AI - DeepSeek":
+                    items, od = extract_with_deepseek(st.session_state["transcript"])
+                else:
+                    items, od = heuristic_non_ai_extraction(st.session_state["transcript"])
+                st.session_state["mom_items"] = items
+                st.session_state["other_discussions"] = od
+                st.rerun()
 
-# ---- Step 3: Minutes of Meeting Editor ----
-if not st.session_state["df"].empty:
+# ---- Step 3: Card-by-Card MoM Item Editor ----
+if st.session_state["mom_items"]:
     with st.container(border=True):
-        st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
+        st.markdown('<h3>Minutes of Meeting: Card Editor</h3>', unsafe_allow_html=True)
+        st.caption("Each discussion point is laid out as an individual editable card below.")
 
-        st.markdown(
-            "<p style='font-size:0.85rem; color:#666; margin-bottom: 0.5rem;'>"
-            "<i>*Note: Double-click any cell to view and edit its full wrapped text. "
-            "Streamlit's native grid editor limits visual multiline wrapping.</i></p>", 
-            unsafe_allow_html=True
-        )
+        del_index = None
+        for idx, item in enumerate(st.session_state["mom_items"]):
+            with st.container(border=True):
+                c_top1, c_top2 = st.columns([9, 1])
+                with c_top1:
+                    st.markdown(f"**Discussion Point #{idx+1}**")
+                with c_top2:
+                    if st.button("🗑️ Delete", key=f"del_item_{idx}"):
+                        del_index = idx
 
-        edited_df = st.data_editor(
-            st.session_state["df"],
-            num_rows="dynamic",
-            use_container_width=True,
-            hide_index=True,
-            key="mom_editor",
-            column_config={
-                "Discussion Points": st.column_config.TextColumn("Discussion Points", width="large"),
-                "Action Plan": st.column_config.TextColumn("Action Plan", width="medium"),
-                "Indicative Delivery Date": st.column_config.TextColumn("Indicative Delivery Date", width="small"),
-                "Person-in-charge": st.column_config.TextColumn("Person-in-charge", width="small")
-            }
-        )
-        st.session_state["df"] = edited_df
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    item["Discussion Points"] = st.text_area("Discussion Topic & Milestone", value=item.get("Discussion Points", ""), key=f"dp_{idx}", height=85)
+                    item["Action Plan"] = st.text_area("Action Plan", value=item.get("Action Plan", ""), key=f"ap_{idx}", height=75)
+                with col2:
+                    item["Indicative Delivery Date"] = st.text_input("Delivery Date", value=item.get("Indicative Delivery Date", "TBD"), key=f"date_{idx}")
+                    item["Person-in-charge"] = st.text_input("Person-in-charge", value=item.get("Person-in-charge", "Unassigned"), key=f"pic_{idx}")
 
-        st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=100)
+        if del_index is not None:
+            st.session_state["mom_items"].pop(del_index)
+            st.rerun()
 
-        time_range_str = f"{start_str} to {end_str}"
+        if st.button("➕ Add New Discussion Item"):
+            st.session_state["mom_items"].append({
+                "Discussion Points": "",
+                "Action Plan": "",
+                "Indicative Delivery Date": "TBD",
+                "Person-in-charge": "Unassigned"
+            })
+            st.rerun()
 
-        meeting_details = {
+        st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=80)
+
+        # Export Controls
+        m_details = {
             "date": meeting_date.strftime("%B %d, %Y"),
-            "time_range": time_range_str,
-            "location": meeting_location if meeting_location.strip() else "____________",
-            "company_name": client_name.strip() if client_name.strip() else "",
-            "prime_attendees": selected_crd,
-            "external_attendees": [x.strip() for x in ext_attendees_raw.split(",") if x.strip()],
-            "prep_name": prep_name.strip(),
-            "prep_desig": prep_desig.strip(),
-            "conf_name": conf_name.strip(),
-            "conf_desig": conf_desig.strip()
+            "location": meeting_location,
+            "company_name": client_name,
+            "prep_name": prep_name
         }
+        exp1, exp2 = st.columns(2)
+        with exp1:
+            docx_b = export_to_word(st.session_state["mom_items"], m_details, st.session_state["other_discussions"])
+            st.download_button("Download Word Document (.docx)", data=docx_b, file_name="MOM.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        with exp2:
+            pdf_b = export_to_pdf(st.session_state["mom_items"], m_details, st.session_state["other_discussions"])
+            st.download_button("Download PDF Document (.pdf)", data=pdf_b, file_name="MOM.pdf", mime="application/pdf")
 
-        # Dual Export Section (Word DOCX and PDF)
-        exp_col1, exp_col2 = st.columns(2)
-        
-        with exp_col1:
-            doc_bio = export_to_word(
-                st.session_state["df"],
-                meeting_details,
-                st.session_state["other_discussions"]
-            )
-            st.download_button(
-                label="Download Word Document (.docx)",
-                data=doc_bio,
-                file_name=f"MOM_{client_name.replace(' ', '_') if client_name else 'Report'}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                key="btn_download_docx"
-            )
+# ---- Step 4: AI Meeting Q&A Chatbot ----
+if st.session_state["transcript"]:
+    with st.container(border=True):
+        st.markdown('<h3>💬 Ask Questions About This Meeting</h3>', unsafe_allow_html=True)
+        st.caption("Ask questions about deliverables, attendee comments, deadlines, or specific points mentioned in the recording.")
 
-        with exp_col2:
-            pdf_bio = export_to_pdf(
-                st.session_state["df"],
-                meeting_details,
-                st.session_state["other_discussions"]
-            )
-            st.download_button(
-                label="Download PDF Document (.pdf)",
-                data=pdf_bio,
-                file_name=f"MOM_{client_name.replace(' ', '_') if client_name else 'Report'}.pdf",
-                mime="application/pdf",
-                key="btn_download_pdf"
-            )
+        for msg in st.session_state["chat_messages"]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        if user_prompt := st.chat_input("e.g., What were the agreed deadlines for the marketing deck?"):
+            st.session_state["chat_messages"].append({"role": "user", "content": user_prompt})
+            with st.chat_message("user"):
+                st.markdown(user_prompt)
+
+            with st.chat_message("assistant"):
+                with st.spinner("Analyzing transcript..."):
+                    reply = query_meeting_chatbot(st.session_state["transcript"], st.session_state["chat_messages"])
+                    st.markdown(reply)
+                    st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
