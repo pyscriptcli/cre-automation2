@@ -33,13 +33,13 @@ with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
 # API Keys loaded strictly from Streamlit Cloud Secrets
-DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_API_KEY = str(st.secrets.get("DEEPSEEK_API_KEY", "")).strip()
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
-GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
+GROQ_API_KEY = str(st.secrets.get("GROQ_API_KEY", "")).strip()
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
+OPENAI_API_KEY = str(st.secrets.get("OPENAI_API_KEY", "")).strip()
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
 
 CRD_MEMBERS = [
@@ -172,8 +172,8 @@ button[key="card_settings_btn"]::before {
     width: 17px;
     height: 17px;
     background-color: #C5A059;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -187,6 +187,47 @@ button[key="card_settings_btn"]::before {
 /* Time Picker Clean Layout */
 [data-testid="column"] .stSelectbox {
     margin-bottom: 0 !important;
+}
+
+/* Native Ask Echo Chat Bubbles */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 1rem 0;
+}
+
+.chat-bubble-user-wrap {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.chat-bubble-user {
+    background-color: #ECE9DF;
+    color: #1A1A1A;
+    padding: 0.65rem 1rem;
+    border-radius: 14px 14px 14px 2px;
+    max-width: 75%;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    border: 1px solid rgba(0,0,0,0.06);
+}
+
+.chat-bubble-ai-wrap {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.chat-bubble-ai {
+    background-color: #161616;
+    color: #FFFFFF;
+    padding: 0.75rem 1.1rem;
+    border-radius: 14px 14px 2px 14px;
+    max-width: 75%;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    border-left: 3px solid #D4AF37;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 </style>
 """
@@ -272,7 +313,7 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         progress_bar.progress(45, text="Evaluating audio duration & routing (45%)...")
 
         if comp_size_mb <= 10.0 and GROQ_API_KEY:
-            status_placeholder.info("⚡ Processing via Groq Whisper Primary...")
+            status_placeholder.info("Processing via Groq Whisper Primary...")
             progress_bar.progress(70, text="Transcribing via Groq Whisper (70%)...")
             with open(compressed_mp3, "rb") as f:
                 c_bytes = f.read()
@@ -281,12 +322,11 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
                 progress_bar.progress(100, text="Transcription completed (100%)!")
                 status_placeholder.empty()
                 return text
-            status_placeholder.warning("⚠️ Groq rate limit reached. Switching automatically to OpenAI...")
+            status_placeholder.warning("Groq rate limit reached. Switching automatically to OpenAI...")
 
-        status_placeholder.info("🚀 Processing recording via OpenAI...")
+        status_placeholder.info("Processing recording via OpenAI...")
         progress_bar.progress(55, text="Preparing audio segments for OpenAI (55%)...")
         
-        # Segment the audio into 10-minute chunks
         segment_pattern = src_path + "_seg_%03d.mp3"
         subprocess.run([
             "ffmpeg", "-y", "-i", compressed_mp3,
@@ -301,7 +341,6 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         full_transcript = []
         total_segs = len(segments)
 
-        # Sequential processing of segments
         for idx, seg in enumerate(segments):
             pct = int(55 + ((idx + 1) / total_segs) * 40)
             progress_bar.progress(pct, text=f"Transcribing segment {idx + 1} of {total_segs} ({pct}%)...")
@@ -526,7 +565,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
 
 def ask_deepseek_question(transcript, question, chat_history):
     if not DEEPSEEK_API_KEY:
-        return "⚠️ DeepSeek API key is missing."
+        return "DeepSeek API key is missing. Please check your configuration."
 
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
@@ -534,14 +573,13 @@ def ask_deepseek_question(transcript, question, chat_history):
     }
 
     system_prompt = (
-        "You are an AI assistant helping the user understand a meeting transcript. "
+        "You are Ask Echo, an authentic, concise AI assistant helping the team understand meeting transcripts. "
         "Answer questions based solely on the provided transcript. "
-        "If the answer is not in the transcript, say you don't know. "
-        "Be concise and helpful."
+        "If a specific detail is not in the transcript, state that it was not mentioned. "
+        "Keep responses concise, clear, and professional."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
-    # Add conversation history (last few exchanges to keep context manageable)
     for msg in chat_history[-6:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": f"Transcript:\n{transcript[:20000]}\n\nQuestion: {question}"})
@@ -562,9 +600,9 @@ def ask_deepseek_question(transcript, question, chat_history):
             st.session_state["last_api_call"] = datetime.datetime.now()
             return res_json["choices"][0]["message"]["content"].strip()
         else:
-            return f"⚠️ Error {resp.status_code}: {resp.text}"
+            return f"Service notice ({resp.status_code}): {resp.text}"
     except Exception as e:
-        return f"⚠️ Connection error: {e}"
+        return f"Connection error: {e}"
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -1047,16 +1085,11 @@ with st.container(border=True):
 
     # ROW 2
     r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
-    with r2_c1:
-        client_name = st.text_input("Client / Company", value="", placeholder="XYZ Company")
-    with r2_c2:
-        selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=[])
-    with r2_c3:
-        ext_attendees_raw = st.text_input("External Attendees", value="", placeholder="e.g. Mr. ABCD, Jane Doe")
-    with r2_c4:
-        conf_name = st.text_input("Confirmed By (Name)", value="", placeholder="e.g. Client Rep")
-    with r2_c5:
-        conf_desig = st.text_input("Designation", value="", placeholder="e.g. Managing Director")
+    with r2_c1: client_name = st.text_input("Client / Company", value="", placeholder="XYZ Company")
+    with r2_c2: selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=[])
+    with r2_c3: ext_attendees_raw = st.text_input("External Attendees", value="", placeholder="e.g. Mr. ABCD, Jane Doe")
+    with r2_c4: conf_name = st.text_input("Confirmed By (Name)", value="", placeholder="e.g. Client Rep")
+    with r2_c5: conf_desig = st.text_input("Designation", value="", placeholder="e.g. Managing Director")
 
     # Three Tabs
     tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text (Unlimited)"])
@@ -1084,6 +1117,7 @@ with st.container(border=True):
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                         st.session_state["other_discussions"] = ""
+                        st.session_state["chat_history"] = []
                         st.rerun()
 
     # TAB 2: RECORD AUDIO
@@ -1106,6 +1140,7 @@ with st.container(border=True):
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                         st.session_state["other_discussions"] = ""
+                        st.session_state["chat_history"] = []
                         st.rerun()
 
     # TAB 3: TEXT UPLOAD (UNLIMITED)
@@ -1134,11 +1169,12 @@ with st.container(border=True):
                     st.session_state["transcript"] = extracted_str.strip()
                     st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                     st.session_state["other_discussions"] = ""
+                    st.session_state["chat_history"] = []
                     st.rerun()
                 else:
                     st.warning("Please upload a file or paste text to proceed.")
 
-# ---- Step 2: Full Transcript UI & AI Chatbot ----
+# ---- Step 2: Full Transcript UI & Ask Echo ----
 if st.session_state["transcript"]:
     with st.container(border=True):
         f_col1, f_col2, f_col3 = st.columns([7.6, 1.2, 1.2])
@@ -1180,7 +1216,7 @@ if st.session_state["transcript"]:
                 <script>
                 document.getElementById("copy-btn").addEventListener("click", function() {{
                     navigator.clipboard.writeText({json.dumps(st.session_state["transcript"])}).then(function() {{
-                        document.getElementById("copy-btn").innerText = "Copied! ✅";
+                        document.getElementById("copy-btn").innerText = "Copied";
                         setTimeout(() => document.getElementById("copy-btn").innerText = "Copy Text", 2000);
                     }});
                 }});
@@ -1209,25 +1245,31 @@ if st.session_state["transcript"]:
                     st.session_state["other_discussions"] = other_disc
                     st.rerun()
         
-        # AI Chatbot Section
+        # Ask Echo Chatbot Section
         st.markdown("---")
-        st.markdown('<h4 style="margin-bottom:0.5rem;">Ask AI About the Transcript</h4>', unsafe_allow_html=True)
+        st.markdown('<h3>Ask Echo</h3>', unsafe_allow_html=True)
+        st.caption("Ask specific questions regarding action items, deliverables, remarks, or numbers discussed in this meeting.")
         
-        # Display chat history
+        # Conversation history with aligned bubbles
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
         for msg in st.session_state["chat_history"]:
             if msg["role"] == "user":
-                st.chat_message("user").markdown(msg["content"])
+                st.markdown(
+                    f'<div class="chat-bubble-user-wrap"><div class="chat-bubble-user">{msg["content"]}</div></div>',
+                    unsafe_allow_html=True
+                )
             else:
-                st.chat_message("assistant").markdown(msg["content"])
+                st.markdown(
+                    f'<div class="chat-bubble-ai-wrap"><div class="chat-bubble-ai">{msg["content"]}</div></div>',
+                    unsafe_allow_html=True
+                )
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Chat input
-        if prompt := st.chat_input("Ask a question about the meeting..."):
-            # Append user message
+        if prompt := st.chat_input("Ask Echo about the transcript..."):
             st.session_state["chat_history"].append({"role": "user", "content": prompt})
-            # Get answer
-            with st.spinner("Thinking..."):
+            with st.spinner("Analyzing meeting transcript..."):
                 answer = ask_deepseek_question(st.session_state["transcript"], prompt, st.session_state["chat_history"])
-            # Append assistant message
             st.session_state["chat_history"].append({"role": "assistant", "content": answer})
             st.rerun()
 
@@ -1237,90 +1279,86 @@ if not st.session_state["df"].empty:
         st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
         
         st.markdown(
-            "<p style='font-size:0.85rem; color:#666; margin-bottom: 0.5rem;'>"
-            "<i>*Note: Each discussion point is displayed as a separate card. You can edit each field directly.</i></p>", 
+            "<p style='font-size:0.85rem; color:#666; margin-bottom: 0.75rem;'>"
+            "<i>*Note: Each discussion point is rendered as a clean single-row card. Edit fields inline directly.</i></p>", 
             unsafe_allow_html=True
         )
         
-        # Get current DataFrame
-        df = st.session_state["df"].copy()
+        df = st.session_state["df"].copy().reset_index(drop=True)
         
-        # Handle deletion
         row_to_delete = None
         for idx in range(len(df)):
-            # Create a container for each row
             with st.container(border=True):
-                # Header with delete button
-                header_col, del_col = st.columns([9, 1])
-                with header_col:
-                    st.markdown(f"**Item {idx+1}**")
-                with del_col:
-                    if st.button("🗑️", key=f"del_{idx}", help="Delete this row"):
-                        row_to_delete = idx
-                        st.rerun()
+                # 1 Single Horizontal Row per discussion card
+                c_disc, c_act, c_date, c_pic, c_del = st.columns([3.2, 3.2, 1.8, 1.8, 0.6])
                 
-                # Four fields in two columns
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    discussion = st.text_area(
+                with c_disc:
+                    st.text_input(
                         "Discussion Points",
-                        value=df.at[idx, "Discussion Points"],
+                        value=str(df.at[idx, "Discussion Points"]),
                         key=f"dp_{idx}",
-                        height=100
+                        placeholder="Discussion topic..."
                     )
-                    date_val = st.text_input(
-                        "Indicative Delivery Date",
-                        value=df.at[idx, "Indicative Delivery Date"],
-                        key=f"date_{idx}"
-                    )
-                with col2:
-                    action = st.text_area(
+                with c_act:
+                    st.text_input(
                         "Action Plan",
-                        value=df.at[idx, "Action Plan"],
+                        value=str(df.at[idx, "Action Plan"]),
                         key=f"ap_{idx}",
-                        height=100
+                        placeholder="Action item..."
                     )
-                    pic = st.text_input(
+                with c_date:
+                    st.text_input(
+                        "Delivery Date",
+                        value=str(df.at[idx, "Indicative Delivery Date"]),
+                        key=f"date_{idx}",
+                        placeholder="TBD / Target Date"
+                    )
+                with c_pic:
+                    st.text_input(
                         "Person-in-charge",
-                        value=df.at[idx, "Person-in-charge"],
-                        key=f"pic_{idx}"
+                        value=str(df.at[idx, "Person-in-charge"]),
+                        key=f"pic_{idx}",
+                        placeholder="Assignee"
                     )
+                with c_del:
+                    st.write("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                    if st.button("X", key=f"del_{idx}", help=f"Remove item {idx+1}"):
+                        row_to_delete = idx
         
-        # If a row needs to be deleted, remove it from df and update session state
+        # Handle Deletion
         if row_to_delete is not None:
             df = df.drop(index=row_to_delete).reset_index(drop=True)
             st.session_state["df"] = df
             st.rerun()
         
-        # After rendering all rows, collect updated values from widgets and update df
-        updated_df = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+        # Collect updated values using a robust list aggregation (fixing pandas append deprecation)
+        rows_data = []
         for idx in range(len(df)):
-            # Retrieve values from widget keys
-            discussion = st.session_state.get(f"dp_{idx}", df.at[idx, "Discussion Points"])
-            action = st.session_state.get(f"ap_{idx}", df.at[idx, "Action Plan"])
+            discussion_val = st.session_state.get(f"dp_{idx}", df.at[idx, "Discussion Points"])
+            action_val = st.session_state.get(f"ap_{idx}", df.at[idx, "Action Plan"])
             date_val = st.session_state.get(f"date_{idx}", df.at[idx, "Indicative Delivery Date"])
-            pic = st.session_state.get(f"pic_{idx}", df.at[idx, "Person-in-charge"])
-            updated_df = updated_df.append({
-                "Discussion Points": discussion,
-                "Action Plan": action,
+            pic_val = st.session_state.get(f"pic_{idx}", df.at[idx, "Person-in-charge"])
+            
+            rows_data.append({
+                "Discussion Points": discussion_val,
+                "Action Plan": action_val,
                 "Indicative Delivery Date": date_val,
-                "Person-in-charge": pic
-            }, ignore_index=True)
+                "Person-in-charge": pic_val
+            })
         
-        st.session_state["df"] = updated_df
+        st.session_state["df"] = pd.DataFrame(rows_data, columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
         
-        # Add Row button
-        if st.button("➕ Add Row", key="add_row"):
-            new_row = pd.DataFrame([{
+        # Add Item Button
+        if st.button("+ Add Item", key="add_row"):
+            new_row_df = pd.DataFrame([{
                 "Discussion Points": "",
                 "Action Plan": "",
                 "Indicative Delivery Date": "",
                 "Person-in-charge": ""
             }])
-            st.session_state["df"] = pd.concat([st.session_state["df"], new_row], ignore_index=True)
+            st.session_state["df"] = pd.concat([st.session_state["df"], new_row_df], ignore_index=True)
             st.rerun()
         
-        # Other Discussions
         st.session_state["other_discussions"] = st.text_area(
             "Other Discussions",
             value=st.session_state["other_discussions"],
