@@ -13,7 +13,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml
 
 # ========== CONFIG ==========
-st.set_page_config(page_title="Project Echo | MOM Generator", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -119,14 +119,43 @@ def transcribe_audio(audio_bytes):
         st.error(f"Transcription failed: {resp.text}")
         return None
 
+def get_available_groq_model():
+    """Dynamically queries Groq to select the best available active chat model."""
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+    priority_order = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-70b-versatile",
+        "llama-3.1-8b-instant",
+        "llama3-8b-8192",
+        "gemma2-9b-it",
+        "qwen-2.5-32b",
+        "deepseek-r1-distill-llama-70b"
+    ]
+    try:
+        resp = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=10)
+        if resp.status_code == 200:
+            available_ids = [m["id"] for m in resp.json().get("data", [])]
+            for candidate in priority_order:
+                if candidate in available_ids:
+                    return candidate
+            chat_models = [m for m in available_ids if not m.startswith("whisper")]
+            if chat_models:
+                return chat_models[0]
+    except Exception:
+        pass
+    
+    return "llama-3.1-8b-instant"
+
 def extract_structured_insights(transcript):
     """
-    Robust Groq MOM extraction that automatically iterates active models on Groq.
+    Robust Groq MOM extraction using dynamic model discovery and regex cleanup.
     """
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
+    
+    selected_model = get_available_groq_model()
     
     prompt = f"""Extract Minutes of Meeting (MOM) from this transcript and output valid JSON ONLY with this schema:
 {{
@@ -144,50 +173,38 @@ def extract_structured_insights(transcript):
 Transcript:
 {transcript}"""
 
-    candidate_models = [
-        "llama-3.1-8b-instant",
-        "llama3-70b-8192",
-        "llama3-8b-8192",
-        "mixtral-8x7b-32768"
-    ]
+    payload = {
+        "model": selected_model,
+        "messages": [
+            {"role": "system", "content": "You are an executive assistant that outputs strictly valid JSON without markdown formatting."},
+            {"role": "user", "content": prompt}
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1
+    }
 
-    last_error = ""
+    try:
+        resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
+        if resp.status_code == 200:
+            raw_text = resp.json()["choices"][0]["message"]["content"].strip()
+            clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+            data = json.loads(clean_text)
 
-    for model in candidate_models:
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": "You are a professional executive assistant. You output valid JSON strictly following the requested schema without markdown backticks."},
-                {"role": "user", "content": prompt}
-            ],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.1
-        }
+            items = data.get("table_items", [])
+            df = pd.DataFrame(items)
+            for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+                if col not in df.columns:
+                    df[col] = ""
+            df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
+            return df, data.get("other_discussions", "")
+        else:
+            st.error(f"Groq API Error ({resp.status_code}) using model '{selected_model}': {resp.text}")
+            return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
 
-        try:
-            resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
-            if resp.status_code == 200:
-                raw_text = resp.json()["choices"][0]["message"]["content"].strip()
-                clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-                clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-                data = json.loads(clean_text)
-
-                items = data.get("table_items", [])
-                df = pd.DataFrame(items)
-                for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                    if col not in df.columns:
-                        df[col] = ""
-                df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
-                return df, data.get("other_discussions", "")
-            else:
-                last_error = f"{model} ({resp.status_code}): {resp.text}"
-                continue
-        except Exception as e:
-            last_error = f"{model} error: {str(e)}"
-            continue
-
-    st.error(f"All model requests failed. Last error: {last_error}")
-    return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+    except Exception as e:
+        st.error(f"Extraction Error: {str(e)}")
+        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
