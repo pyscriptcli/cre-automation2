@@ -1,7 +1,7 @@
 import os
 import time
-import math
-import io
+import subprocess
+import tempfile
 import streamlit as st
 import requests
 import json
@@ -10,7 +10,6 @@ import datetime
 import re
 from io import BytesIO
 import PyPDF2
-from pydub import AudioSegment
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
@@ -25,19 +24,22 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 # ========== CONFIG ==========
 st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
 
-# --- PROGRAMMATIC CONFIG & UPLOAD LIMIT LOCK (Up to 1GB uploads) ---
+# --- PROGRAMMATIC LIGHT MODE & 200MB LIMIT ---
 _config_dir = ".streamlit"
 _config_file = os.path.join(_config_dir, "config.toml")
 os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
-    f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 1000\n')
+    f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
-# API Keys & Endpoints loaded via st.secrets with fallback defaults
+# API Keys & Endpoints
 DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "sk-7b4c611f153f4fe0adc1a1cbd13a2930")
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "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")
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+
+OPENAI_API_KEY = "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"
+OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
 
 CRD_MEMBERS = [
     "Sondi Tuazon",
@@ -50,12 +52,15 @@ CRD_MEMBERS = [
     "Irish Rima"
 ]
 
-# 12-Hour AM/PM Time Options with blank default
-TIME_OPTIONS = [""]
-for h in range(24):
-    for m in (0, 30):
-        t = datetime.time(h, m)
-        TIME_OPTIONS.append(t.strftime("%I:%M %p"))
+LOCATION_PRESETS = [
+    "— Select a Preset (Optional) —",
+    "GreatWork Mega Tower 32F - Secret Room",
+    "GreatWork Mega Tower 32F - Small Meeting Room",
+    "GreatWork Mega Tower 24F - Meeting Room",
+    "GreatWork Mega Tower 32F - Board Room",
+    "GreatWork Mega Tower 32F - Co-working",
+    "Online Meeting"
+]
 
 # Initialize Session State Variables
 if "transcript" not in st.session_state: st.session_state["transcript"] = ""
@@ -64,7 +69,7 @@ if "other_discussions" not in st.session_state: st.session_state["other_discussi
 if "show_settings" not in st.session_state: st.session_state["show_settings"] = False
 if "tokens_used" not in st.session_state: st.session_state["tokens_used"] = 0
 if "last_api_call" not in st.session_state: st.session_state["last_api_call"] = None
-if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "DeepSeek (Primary)"
+if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "AI - DeepSeek"
 
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
@@ -87,19 +92,22 @@ html, body, [class*="css"] {
 .stApp > header { display: none !important; }
 .block-container { padding-top: 5.5rem !important; }
 
-.echo-topbar {
+/* Fixed Topbar */
+.echo-topbar-wrapper {
     position: fixed; top: 0; left: 0; right: 0; height: 60px;
     background-color: #161616;
     border-bottom: 1px solid #333333;
-    display: flex; align-items: center; padding: 0 2rem;
-    z-index: 999999; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 999990; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    display: flex; align-items: center; justify-content: flex-start;
+    padding: 0 2rem;
 }
-.echo-topbar h1 {
+
+.echo-title {
     font-family: 'Playfair Display', serif !important;
     font-style: italic !important; font-weight: 400 !important;
     font-size: 1.35rem !important; color: #FFFFFF !important; margin: 0 !important;
 }
-.echo-topbar h1 span { color: #D4AF37 !important; }
+.echo-title span { color: #D4AF37 !important; }
 
 h3 {
     font-family: 'Playfair Display', serif !important;
@@ -125,34 +133,60 @@ h3 {
     border-color: #D4AF37 !important; color: #D4AF37 !important;
     background-color: #1A1A1A !important;
 }
+
+/* Small SVG-only Settings Icon Button in the Card Header */
+div[data-testid="stButton"]:has(button[key="card_settings_btn"]) {
+    display: flex !important;
+    justify-content: flex-end !important;
+}
+
+button[key="card_settings_btn"] {
+    background-color: transparent !important;
+    border: 1px solid #C5A059 !important;
+    border-radius: 50% !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    box-shadow: none !important;
+}
+
+button[key="card_settings_btn"]::before {
+    content: "";
+    display: inline-block;
+    width: 17px;
+    height: 17px;
+    background-color: #C5A059;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    transition: background-color 0.2s ease;
+}
+
+button[key="card_settings_btn"]:hover {
+    background-color: #F8F5EE !important;
+    border-color: #A07828 !important;
+}
+
+button[key="card_settings_btn"]:hover::before {
+    background-color: #A07828 !important;
+}
+
 .stTextArea textarea {
     font-size: 0.95rem !important;
     line-height: 1.6 !important;
-}
-
-.loading-banner {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background-color: #FFFFFF;
-    border: 1px solid #D4AF37;
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin: 12px 0;
-    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.15);
-}
-.loading-banner span {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #161616;
 }
 </style>
 """
 
 # ========== SVG ICONS ==========
-SVG_SETTINGS = """<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>"""
 SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
-SVG_SPINNER = """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><style>@keyframes spin { 100% { transform: rotate(360deg); } }</style><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>"""
 
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
@@ -173,63 +207,120 @@ def extract_text_from_file(uploaded_file):
         st.error(f"Error reading file: {e}")
         return ""
 
-def _call_groq_whisper(audio_bytes):
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    files = {"file": ("chunk.mp3", audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
-    resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files)
-    if resp.status_code == 200:
-        return resp.json().get("text", "")
-    else:
-        error_msg = resp.json().get("error", {}).get("message", resp.text)
-        if "rate limit" in error_msg.lower():
-            time.sleep(10)
-            resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files)
-            if resp.status_code == 200:
-                return resp.json().get("text", "")
-        st.error(f"Transcription error: {error_msg}")
+def _call_openai_transcribe(audio_bytes, filename="audio.mp3"):
+    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+    files = {"file": (filename, audio_bytes), "model": (None, "gpt-4o-mini-transcribe"), "response_format": (None, "json")}
+    try:
+        resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, timeout=180)
+        if resp.status_code == 200:
+            return resp.json().get("text", "")
+        st.error(f"OpenAI fallback error: {resp.text}")
+        return None
+    except Exception as e:
+        st.error(f"OpenAI connection error: {e}")
         return None
 
-def transcribe_audio(audio_bytes, progress_container=None):
-    """
-    Handles unlimited audio size (100MB - 200MB+) by converting to mono 16kHz 32kbps MP3
-    and slicing into safe segments compliant with Groq's 25MB ceiling.
-    """
+def _call_groq_whisper(audio_bytes, filename="audio.mp3", status_placeholder=None):
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+    files = {"file": (filename, audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
+    
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=180)
+            if resp.status_code == 200:
+                return resp.json().get("text", "")
+            
+            error_data = resp.json().get("error", {})
+            error_msg = error_data.get("message", resp.text)
+            
+            # Fallback automatically to OpenAI on rate limit or 429
+            if "rate limit" in error_msg.lower() or resp.status_code == 429:
+                if status_placeholder:
+                    status_placeholder.warning("⚠️ Groq rate limit reached. Automatically switching to OpenAI gpt-4o-mini-transcribe...")
+                time.sleep(1.5)
+                return _call_openai_transcribe(audio_bytes, filename)
+
+            st.error(f"Transcription error: {error_msg}")
+            return None
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            st.warning("⚠️ Groq connection failure. Switching to OpenAI fallback...")
+            return _call_openai_transcribe(audio_bytes, filename)
+    return None
+
+def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, status_placeholder):
+    progress_bar.progress(10, text="Preprocessing audio container (10%)...")
+    
+    ext = os.path.splitext(original_filename)[1] or ".m4a"
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as src:
+        src.write(audio_bytes)
+        src_path = src.name
+
+    compressed_mp3 = src_path + "_compressed.mp3"
+    progress_bar.progress(25, text="Compressing audio to 16kHz Mono 24k MP3 (25%)...")
+
     try:
-        if progress_container:
-            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Compressing audio stream and preparing segments...</span></div>', unsafe_allow_html=True)
-            
-        sound = AudioSegment.from_file(io.BytesIO(audio_bytes))
-        sound = sound.set_channels(1)        # Downmix to mono
-        sound = sound.set_frame_rate(16000)  # Standard 16kHz for Whisper
-        
-        # 10 minutes per chunk (approx 2.4 MB per segment at 32k)
-        chunk_length_ms = 10 * 60 * 1000  
-        total_chunks = math.ceil(len(sound) / chunk_length_ms)
-        
+        cmd = [
+            "ffmpeg", "-y",
+            "-threads", "1",
+            "-i", src_path,
+            "-vn",
+            "-ac", "1",
+            "-ar", "16000",
+            "-c:a", "libmp3lame",
+            "-b:a", "24k",
+            compressed_mp3
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode != 0:
+            st.error(f"FFmpeg compression error: {res.stderr[:200]}")
+            return None
+
+        progress_bar.progress(55, text="Splitting recording into safe Whisper batches (55%)...")
+        segment_pattern = src_path + "_seg_%03d.mp3"
+        subprocess.run([
+            "ffmpeg", "-y", "-i", compressed_mp3,
+            "-f", "segment", "-segment_time", "120", "-c", "copy",
+            segment_pattern
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+        seg_dir = os.path.dirname(src_path)
+        base_name = os.path.basename(src_path) + "_seg_"
+        segments = sorted([os.path.join(seg_dir, f) for f in os.listdir(seg_dir) if f.startswith(base_name)])
+
         full_transcript = []
+        total_segs = len(segments)
         
-        for i in range(total_chunks):
-            start = i * chunk_length_ms
-            end = min((i + 1) * chunk_length_ms, len(sound))
+        for idx, seg in enumerate(segments):
+            pct = int(55 + ((idx + 1) / total_segs) * 40)
+            progress_bar.progress(pct, text=f"Transcribing audio segment {idx + 1} of {total_segs} ({pct}%)...")
             
-            chunk = sound[start:end]
-            chunk_buffer = io.BytesIO()
-            chunk.export(chunk_buffer, format="mp3", bitrate="32k")
-            chunk_bytes = chunk_buffer.getvalue()
-            
-            if progress_container:
-                progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Transcribing audio segment {i + 1} of {total_chunks} with Groq Whisper...</span></div>', unsafe_allow_html=True)
-            
-            text = _call_groq_whisper(chunk_bytes)
-            if text:
-                full_transcript.append(text)
-            time.sleep(1.0)
-            
+            with open(seg, "rb") as f:
+                seg_bytes = f.read()
+            t = _call_groq_whisper(seg_bytes, f"part_{idx}.mp3", status_placeholder)
+            if t:
+                full_transcript.append(t)
+            time.sleep(0.3)
+            try: os.remove(seg)
+            except: pass
+
+        progress_bar.progress(100, text="Transcription completed successfully (100%)!")
+        time.sleep(0.3)
         return " ".join(full_transcript)
+
     except Exception as e:
-        if progress_container:
-            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Processing direct single-pass audio transcription...</span></div>', unsafe_allow_html=True)
-        return _call_groq_whisper(audio_bytes)
+        st.error(f"Audio processing failure: {e}")
+        return None
+    finally:
+        if os.path.exists(src_path):
+            try: os.remove(src_path)
+            except: pass
+        if os.path.exists(compressed_mp3):
+            try: os.remove(compressed_mp3)
+            except: pass
 
 def normalize_llm_json_to_df(data):
     items = None
@@ -386,24 +477,29 @@ def heuristic_non_ai_extraction(transcript):
     other_text = "\n\n".join(other_discussions[:4])
     return df, other_text
 
-def extract_structured_insights(transcript, engine="DeepSeek (Primary)"):
-    progress_container = st.empty()
-    progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Translating Taglish conversation & structuring MOM with {engine}...</span></div>', unsafe_allow_html=True)
+def extract_structured_insights(transcript, engine="AI - DeepSeek"):
+    progress_bar = st.progress(0, text="Initializing MOM extraction (0%)...")
+    time.sleep(0.2)
+    progress_bar.progress(40, text=f"Translating Taglish conversation & extracting with {engine} (40%)...")
 
-    if engine == "Python Heuristic (Non-AI)":
+    if engine == "Non-AI - Python Heuristic":
         time.sleep(0.5)
         res_df, res_other = heuristic_non_ai_extraction(transcript)
-        progress_container.empty()
+        progress_bar.progress(100, text="Extraction completed (100%)!")
+        time.sleep(0.2)
+        progress_bar.empty()
         return res_df, res_other
 
     df, other = extract_with_deepseek(transcript)
     
     if df is not None and not df.empty:
-        progress_container.empty()
+        progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%)...")
+        time.sleep(0.3)
+        progress_bar.empty()
         return df, other
 
     df_fb, other_fb = heuristic_non_ai_extraction(transcript)
-    progress_container.empty()
+    progress_bar.empty()
     st.markdown(f"{SVG_ALERT} DeepSeek request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
     return df_fb, other_fb
 
@@ -776,24 +872,81 @@ def export_to_pdf(df, meeting_details, other_discussions):
 # ========== STREAMLIT UI SETUP ==========
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# Top Bar Fixed Header
 st.markdown("""
-<div class="echo-topbar">
- <h1>Project <span>Echo</span></h1>
+<div class="echo-topbar-wrapper">
+ <h1 class="echo-title">Project <span>Echo</span></h1>
 </div>
 """, unsafe_allow_html=True)
 
-# ---- Compact Details & Audio (Blank Defaults) ----
+# ---- Meeting Details Card ----
 with st.container(border=True):
-    st.markdown('<h3>Meeting Details & Audio</h3>', unsafe_allow_html=True)
+    head_col1, head_col2 = st.columns([9.3, 0.7])
+    with head_col1:
+        st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
+    with head_col2:
+        if st.button("", key="card_settings_btn", help="Open MoM Generation Engine & Token Diagnostics"):
+            st.session_state["show_settings"] = not st.session_state["show_settings"]
+            st.rerun()
+
+    # Settings Drawer
+    if st.session_state["show_settings"]:
+        with st.expander("Settings & Engine Diagnostics", expanded=True):
+            set_col1, set_col2 = st.columns([1.5, 1.5])
+            
+            with set_col1:
+                engine_options = [
+                    "AI - DeepSeek",
+                    "Non-AI - Python Heuristic"
+                ]
+                selected_eng = st.selectbox(
+                    "MoM Generation Engine",
+                    options=engine_options,
+                    index=engine_options.index(st.session_state["selected_engine"]) if st.session_state["selected_engine"] in engine_options else 0
+                )
+                st.session_state["selected_engine"] = selected_eng
+
+                if st.button("Regenerate MOM", key="btn_regen_mom"):
+                    if st.session_state["transcript"]:
+                        extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng)
+                        if not extracted_df.empty:
+                            st.session_state["df"] = extracted_df
+                            st.session_state["other_discussions"] = other_disc
+                            st.rerun()
+
+            with set_col2:
+                st.markdown("**Token Usage Diagnostics**")
+                st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
+                
+                if st.session_state["last_api_call"]:
+                    last_call = st.session_state["last_call"] if "last_call" in locals() else st.session_state["last_api_call"]
+                    st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
+                    st.write("• **DeepSeek Server Status:** `Active & Ready`")
+                else:
+                    st.write("• **DeepSeek Server Status:** `Ready`")
+        st.markdown("---")
     
-    # ROW 1
-    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.3, 2.0, 1.1, 1.1, 1.5, 1.5])
-    with r1_c1: meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
-    with r1_c2: meeting_location = st.text_input("Location", value="", placeholder="e.g. Boardroom")
-    with r1_c3: start_time = st.selectbox("Start", options=TIME_OPTIONS, index=0)
-    with r1_c4: end_time = st.selectbox("End", options=TIME_OPTIONS, index=0)
-    with r1_c5: prep_name = st.text_input("Prepared By (Name)", value="", placeholder="e.g. John Doe")
-    with r1_c6: prep_desig = st.text_input("Designation", value="", placeholder="e.g. Associate")
+    # ROW 1: Clean Date Picker, Blank Location with Presets, Simple Time Pickers, Prepared By
+    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.4, 2.2, 1.1, 1.1, 1.4, 1.4])
+    
+    with r1_c1:
+        meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
+    
+    with r1_c2:
+        loc_preset = st.selectbox("Location Preset", options=LOCATION_PRESETS, index=0)
+        custom_loc = st.text_input("Location", value="", placeholder="e.g. Boardroom", label_visibility="collapsed")
+        meeting_location = custom_loc.strip() if custom_loc.strip() else ("" if loc_preset == LOCATION_PRESETS[0] else loc_preset)
+
+    with r1_c3:
+        start_time_val = st.time_input("Start Time", value=None)
+
+    with r1_c4:
+        end_time_val = st.time_input("End Time", value=None)
+
+    with r1_c5:
+        prep_name = st.text_input("Prepared By (Name)", value="", placeholder="e.g. John Doe")
+    with r1_c6:
+        prep_desig = st.text_input("Designation", value="", placeholder="e.g. Associate")
 
     # ROW 2
     r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
@@ -810,18 +963,20 @@ with st.container(border=True):
         u_col1, u_col2 = st.columns([5, 1.5])
         with u_col1:
             uploaded_file = st.file_uploader(
-                "Upload audio file (100MB+ supported)",
+                "Upload audio file (200MB limit supported)",
                 type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
-                help="Large audio files (100MB+) will upload directly into browser memory. Once complete, click Transcribe Audio below."
+                help="Audio uploads up to 200MB are supported."
             )
         if uploaded_file:
             with u_col2:
                 st.write("")
                 st.write("")
                 if st.button("Transcribe Audio", key="btn_tx_upload"):
-                    loading_placeholder = st.empty()
-                    transcript = transcribe_audio(uploaded_file.read(), loading_placeholder)
-                    loading_placeholder.empty()
+                    p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
+                    p_status = st.empty()
+                    transcript = transcribe_audio_pipeline(uploaded_file.read(), uploaded_file.name, p_bar, p_status)
+                    p_bar.empty()
+                    p_status.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -838,9 +993,11 @@ with st.container(border=True):
                 st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
             with r_col3:
                 if st.button("Transcribe Audio", key="btn_tx_record"):
-                    loading_placeholder = st.empty()
-                    transcript = transcribe_audio(rec_bytes, loading_placeholder)
-                    loading_placeholder.empty()
+                    p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
+                    p_status = st.empty()
+                    transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
+                    p_bar.empty()
+                    p_status.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -856,12 +1013,18 @@ with st.container(border=True):
             st.write("") 
             st.write("") 
             if st.button("Process Text", key="btn_tx_text"):
+                p_bar = st.progress(0, text="Extracting document text (0%)...")
+                time.sleep(0.2)
+                p_bar.progress(50, text="Reading document stream (50%)...")
                 extracted_str = ""
                 if uploaded_text_file:
                     extracted_str = extract_text_from_file(uploaded_text_file)
                 if pasted_text and pasted_text.strip():
                     extracted_str += "\n" + pasted_text.strip()
                 
+                p_bar.progress(100, text="Document processed (100%)!")
+                time.sleep(0.2)
+                p_bar.empty()
                 if extracted_str.strip():
                     st.session_state["transcript"] = extracted_str.strip()
                     st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -884,57 +1047,10 @@ if st.session_state["transcript"]:
                     st.session_state["other_discussions"] = other_disc
                     st.rerun()
 
-# ---- Step 3: Minutes of Meeting Editor with SVG Settings ----
+# ---- Step 3: Minutes of Meeting Editor ----
 if not st.session_state["df"].empty:
     with st.container(border=True):
-        h_col1, h_col2 = st.columns([9.4, 0.6])
-        with h_col1:
-            st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
-        with h_col2:
-            st.markdown(
-                f'<div style="text-align: right; padding-top: 5px;">{SVG_SETTINGS}</div>', 
-                unsafe_allow_html=True
-            )
-            if st.button("Settings", key="btn_toggle_settings", help="Open Engine & Regeneration Settings"):
-                st.session_state["show_settings"] = not st.session_state["show_settings"]
-                st.rerun()
-
-        # Engine Settings & Usage Drawer
-        if st.session_state["show_settings"]:
-            with st.expander("Engine Configuration & Usage Diagnostics", expanded=True):
-                set_col1, set_col2 = st.columns([1.5, 1.5])
-                
-                with set_col1:
-                    engine_options = [
-                        "DeepSeek (Primary)",
-                        "Python Heuristic (Non-AI)"
-                    ]
-                    selected_eng = st.selectbox(
-                        "Extraction Engine",
-                        options=engine_options,
-                        index=engine_options.index(st.session_state["selected_engine"]) if st.session_state["selected_engine"] in engine_options else 0
-                    )
-                    st.session_state["selected_engine"] = selected_eng
-
-                    if st.button("Regenerate MOM", key="btn_regen_mom"):
-                        if st.session_state["transcript"]:
-                            extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng)
-                            if not extracted_df.empty:
-                                st.session_state["df"] = extracted_df
-                                st.session_state["other_discussions"] = other_disc
-                                st.rerun()
-
-                with set_col2:
-                    st.markdown("**Token Usage Diagnostics**")
-                    st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
-                    
-                    if st.session_state["last_api_call"]:
-                        last_call = st.session_state["last_api_call"]
-                        st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
-                        st.write("• **DeepSeek Server Status:** `Active & Ready`")
-                    else:
-                        st.write("• **DeepSeek Server Status:** `Ready`")
-                st.markdown("---")
+        st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
 
         edited_df = st.data_editor(
             st.session_state["df"],
@@ -952,8 +1068,13 @@ if not st.session_state["df"].empty:
 
         st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=100)
 
-        # Build formatted time range only if provided
-        time_range_str = f"{start_time} to {end_time}" if (start_time and end_time) else (start_time or end_time or "")
+        # Build clean formatted time string from native time picker
+        start_str = start_time_val.strftime("%I:%M %p") if start_time_val else ""
+        end_str = end_time_val.strftime("%I:%M %p") if end_time_val else ""
+        if start_str and end_str:
+            time_range_str = f"{start_str} to {end_str}"
+        else:
+            time_range_str = start_str or end_str or ""
 
         meeting_details = {
             "date": meeting_date.strftime("%B %d, %Y"),
