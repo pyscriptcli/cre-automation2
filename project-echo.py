@@ -13,7 +13,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml
 
 # ========== CONFIG ==========
-st.set_page_config(page_title="Project Echo | MOM Generator", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
 
 # --- PROGRAMMATIC LIGHT MODE LOCK ---
 _config_dir = ".streamlit"
@@ -119,16 +119,34 @@ def transcribe_audio(audio_bytes):
         st.error(f"Transcription failed: {resp.text}")
         return None
 
-def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]):
-    """Executes chat completion with JSON mode, regex cleanup, and multi-model fallback."""
+def chunk_text(text, max_chars=3500, overlap=250):
+    """Splits transcripts safely into conversational chunks."""
+    if len(text) <= max_chars:
+        return [text]
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + max_chars
+        chunks.append(text[start:end])
+        start += max_chars - overlap
+    return chunks
+
+def extract_json_from_groq(prompt):
+    """Executes robust extraction targeting Groq models."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
+    
     for model in models:
         payload = {
             "model": model,
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are an executive assistant extracting Minutes of the Meeting. Respond ONLY with a valid JSON object matching the requested schema."
+                    "content": (
+                        "You are an executive assistant extracting Minutes of the Meeting. "
+                        "Translate colloquial/Tagalog conversation and capture deliverables. "
+                        "Respond ONLY with a JSON object strictly matching the schema."
+                    )
                 },
                 {"role": "user", "content": prompt}
             ],
@@ -141,61 +159,83 @@ def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versat
                 raw_text = resp.json()["choices"][0]["message"]["content"].strip()
                 clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
                 clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-                
-                json_match = re.search(r"\{.*\}", clean_text, re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group(0))
+                match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+                if match:
+                    return json.loads(match.group(0))
                 return json.loads(clean_text)
         except Exception:
             continue
     return None
 
-def extract_structured_insights(transcript):
+def extract_structured_insights_robust(transcript):
     """
-    Robust MOM extraction with dynamic fallback and guaranteed tabular population.
+    Two-stage cache extraction: Process chunk 1, chunk 2... store in cache,
+    and only once all chunks are complete, compile the final MOM.
     """
-    if not transcript or not transcript.strip():
-        st.warning("Transcript is empty.")
-        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+    chunks = chunk_text(transcript, max_chars=3500, overlap=250)
+    chunk_cache = []
+    
+    progress_container = st.empty()
+    bar = progress_container.progress(0, text="Initializing multi-chunk analysis...")
+    
+    for idx, chunk in enumerate(chunks):
+        bar.progress(
+            int((idx) / len(chunks) * 100), 
+            text=f"Processing Part {idx + 1} of {len(chunks)}..."
+        )
+        
+        prompt = f"""You are extracting Minutes of the Meeting from Part {idx+1}/{len(chunks)} of a transcript.
+Extract all topics, progress points, follow-ups, and deliverables into JSON.
 
-    safe_transcript = transcript[:25000]
-
-    prompt = f"""Extract all Minutes of the Meeting (MOM) items from this transcript into valid JSON.
-Format MUST strictly follow:
+JSON Schema:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Key discussion item, milestone, or topic",
-      "Action Plan": "Concrete next steps or requirements",
-      "Indicative Delivery Date": "Specific date, quarter (e.g. Q1 2027), or 'TBD'",
-      "Person-in-charge": "Responsible person/entity (e.g. PRIME, Client Name, or unassigned)"
+      "Discussion Points": "Core discussion topic or milestone",
+      "Action Plan": "Detailed follow-up or actionable deliverable",
+      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
+      "Person-in-charge": "Responsible entity (e.g., PRIME, Client name, or unassigned)"
     }}
   ],
-  "other_discussions": "Summary of other discussions or secondary topics"
+  "other_discussions": "Summary of other conversational or informal points"
 }}
 
-Transcript:
-{safe_transcript}"""
+Transcript Content:
+{chunk}"""
 
-    res = call_groq_json(prompt)
+        res = extract_json_from_groq(prompt)
+        if res:
+            chunk_cache.append(res)
+
+    bar.progress(100, text="Finalizing and merging Minutes of the Meeting...")
     
-    if res and isinstance(res.get("table_items"), list) and len(res.get("table_items")) > 0:
-        items = res.get("table_items", [])
-        df = pd.DataFrame(items)
-        for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-            if col not in df.columns:
-                df[col] = ""
-        df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
-        return df, res.get("other_discussions", "")
+    # Store in memory cache
+    all_table_items = []
+    all_other_discussions = []
+    
+    for c in chunk_cache:
+        items = c.get("table_items", [])
+        if isinstance(items, list):
+            for itm in items:
+                if itm.get("Discussion Points") or itm.get("Action Plan"):
+                    all_table_items.append(itm)
+        disc = c.get("other_discussions", "")
+        if disc and disc.strip():
+            all_other_discussions.append(disc.strip())
 
-    # Baseline draft fallback if no explicit action items were found
-    fallback_df = pd.DataFrame([{
-        "Discussion Points": "Meeting Overview & Key Deliverables",
-        "Action Plan": safe_transcript[:250] + "...",
-        "Indicative Delivery Date": "TBD",
-        "Person-in-charge": "PRIME / Client"
-    }])
-    return fallback_df, "Discussion points generated in standard draft mode."
+    progress_container.empty()
+
+    if not all_table_items:
+        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+
+    df = pd.DataFrame(all_table_items)
+    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+        if col not in df.columns:
+            df[col] = ""
+            
+    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
+    merged_other = "\n\n".join(all_other_discussions)
+    return df, merged_other
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -220,7 +260,7 @@ def export_to_word(df, meeting_details, other_discussions):
             fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
             fp.add_run().add_picture("footer.png", width=Inches(7.0))
 
-    # MOM Title
+    # Title
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r_title = p_title.add_run("MINUTES OF THE MEETING")
@@ -316,9 +356,20 @@ def export_to_word(df, meeting_details, other_discussions):
         doc.add_heading("Other Discussions:", level=2)
         doc.add_paragraph(other_discussions)
 
+    # Dynamic Signatures
     doc.add_paragraph()
-    doc.add_paragraph("Prepared by:\n_______________________________\nAVP for Capital Markets\nPRIME Philippines")
-    doc.add_paragraph(f"Confirmed by:\n_______________________________\n{company}")
+    doc.add_paragraph("Prepared by:")
+    doc.add_paragraph("_______________________________")
+    prep_name = meeting_details.get("prep_name", "").strip()
+    prep_desig = meeting_details.get("prep_desig", "").strip()
+    doc.add_paragraph(f"{prep_name if prep_name else '____________________'}\n{prep_desig if prep_desig else 'PRIME Philippines'}")
+
+    doc.add_paragraph()
+    doc.add_paragraph("Confirmed by:")
+    doc.add_paragraph("_______________________________")
+    conf_name = meeting_details.get("conf_name", "").strip()
+    conf_desig = meeting_details.get("conf_desig", "").strip()
+    doc.add_paragraph(f"{conf_name if conf_name else '____________________'}\n{conf_desig if conf_desig else company}")
 
     bio = BytesIO()
     doc.save(bio)
@@ -330,7 +381,7 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 st.markdown("""
 <div class="echo-topbar">
- <h1>Project <span>Echo</span> | MOM Generator</h1>
+ <h1>Project <span>Echo</span></h1>
 </div>
 """, unsafe_allow_html=True)
 
@@ -342,77 +393,113 @@ if "other_discussions" not in st.session_state: st.session_state["other_discussi
 with st.container(border=True):
     st.markdown('<h3>Meeting Details & Audio</h3>', unsafe_allow_html=True)
     
-    # ROW 1: Date | Location | Start Time | End Time
-    r1_col1, r1_col2, r1_col3, r1_col4 = st.columns([1.5, 2.5, 1.2, 1.2])
-    with r1_col1:
-        meeting_date = st.date_input("Meeting Date", value=datetime.date.today())
-    with r1_col2:
+    # ROW 1: Date | Location | Start | End | Prepared By (Name & Desig)
+    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.3, 2.0, 1.1, 1.1, 1.5, 1.5])
+    with r1_c1:
+        meeting_date = st.date_input("Date", value=datetime.date.today())
+    with r1_c2:
         meeting_location = st.text_input("Location", value="Greatwork Mega Tower Boardroom")
-    with r1_col3:
+    with r1_c3:
         start_time_idx = TIME_OPTIONS.index("02:30 PM") if "02:30 PM" in TIME_OPTIONS else 29
-        start_time = st.selectbox("Start Time", options=TIME_OPTIONS, index=start_time_idx)
-    with r1_col4:
+        start_time = st.selectbox("Start", options=TIME_OPTIONS, index=start_time_idx)
+    with r1_c4:
         end_time_idx = TIME_OPTIONS.index("05:00 PM") if "05:00 PM" in TIME_OPTIONS else 34
-        end_time = st.selectbox("End Time", options=TIME_OPTIONS, index=end_time_idx)
+        end_time = st.selectbox("End", options=TIME_OPTIONS, index=end_time_idx)
+    with r1_c5:
+        prep_name = st.text_input("Prepared By (Name)", placeholder="e.g. John Doe")
+    with r1_c6:
+        prep_desig = st.text_input("Designation", placeholder="e.g. Associate")
 
-    # ROW 2: Client | CRD Team Dropdown | External Attendees
-    r2_col1, r2_col2, r2_col3 = st.columns([1.5, 2.5, 2.4])
-    with r2_col1:
-        client_name = st.text_input("Client / Company Name", placeholder="XYZ Company")
-    with r2_col2:
+    # ROW 2: Client | CRD Team | External Attendees | Confirmed By (Name & Desig)
+    r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
+    with r2_c1:
+        client_name = st.text_input("Client / Company", placeholder="XYZ Company")
+    with r2_c2:
         selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=CRD_MEMBERS)
-    with r2_col3:
+    with r2_c3:
         ext_attendees_raw = st.text_input("External Attendees", placeholder="e.g. Mr. ABCD, Jane Doe")
+    with r2_c4:
+        conf_name = st.text_input("Confirmed By (Name)", placeholder="e.g. Client Rep")
+    with r2_c5:
+        conf_desig = st.text_input("Designation", placeholder="e.g. Managing Director")
 
     # Audio Section: Upload or Live Record
     tab_upload, tab_record = st.tabs(["Upload Audio File", "Record Live Audio"])
     active_audio_bytes = None
 
     with tab_upload:
-        uploaded_file = st.file_uploader("Upload audio file", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"], label_visibility="collapsed")
+        u_col1, u_col2 = st.columns([5, 1.5])
+        with u_col1:
+            uploaded_file = st.file_uploader("Upload audio file", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"], label_visibility="collapsed")
         if uploaded_file:
             active_audio_bytes = uploaded_file.read()
+            with u_col2:
+                if st.button("Transcribe Audio", key="btn_tx_upload"):
+                    with st.spinner("Transcribing with Groq Whisper..."):
+                        transcript = transcribe_audio(active_audio_bytes)
+                    if transcript:
+                        st.session_state["transcript"] = transcript
+                        st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+                        st.session_state["other_discussions"] = ""
+                        st.rerun()
 
     with tab_record:
-        rec_col1, rec_col2 = st.columns([3, 1])
-        with rec_col1:
+        r_col1, r_col2, r_col3 = st.columns([4, 1.5, 1.5])
+        with r_col1:
             recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
         if recorded_audio:
             active_audio_bytes = recorded_audio.read()
-            with rec_col2:
+            with r_col2:
                 st.download_button(
                     label="Save Recording (.wav)",
                     data=active_audio_bytes,
                     file_name=f"Recording_{datetime.date.today().strftime('%Y%m%d')}.wav",
                     mime="audio/wav"
                 )
+            with r_col3:
+                if st.button("Transcribe Audio", key="btn_tx_record"):
+                    with st.spinner("Transcribing with Groq Whisper..."):
+                        transcript = transcribe_audio(active_audio_bytes)
+                    if transcript:
+                        st.session_state["transcript"] = transcript
+                        st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+                        st.session_state["other_discussions"] = ""
+                        st.rerun()
 
-    if active_audio_bytes:
-        if st.button("Transcribe Audio"):
-            with st.spinner("Transcribing with Groq Whisper..."):
-                transcript = transcribe_audio(active_audio_bytes)
-            if transcript:
-                st.session_state["transcript"] = transcript
-                st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-                st.session_state["other_discussions"] = ""
-                st.rerun()
-
-# ---- Step 2: Transcript & MOM Generation ----
+# ---- Step 2: Full Transcript with Copy Button ----
 if st.session_state["transcript"]:
     with st.container(border=True):
-        st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
-        st.text_area("Transcript Content", st.session_state["transcript"], height=120, label_visibility="collapsed")
+        col_t_head, col_t_copy = st.columns([9.5, 0.5])
+        with col_t_head:
+            st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
+        with col_t_copy:
+            # Native clipboard copy icon button
+            escaped_text = json.dumps(st.session_state["transcript"])
+            st.markdown(
+                f"""
+                <button onclick='navigator.clipboard.writeText({escaped_text})' 
+                        title="Copy Transcript"
+                        style="background:none; border:none; cursor:pointer; padding:6px; margin-top:2px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+                """,
+                unsafe_allow_html=True
+            )
+            
+        st.text_area("Transcript Content", st.session_state["transcript"], height=140, label_visibility="collapsed")
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                with st.spinner("Extracting action items..."):
-                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
+                extracted_df, other_disc = extract_structured_insights_robust(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
                     st.rerun()
 
-# ---- Step 3: MOM Table Editor & Word Export ----
+# ---- Step 3: Minutes of Meeting Editor ----
 if not st.session_state["df"].empty:
     with st.container(border=True):
         st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
@@ -439,7 +526,11 @@ if not st.session_state["df"].empty:
             "location": meeting_location,
             "company_name": client_name if client_name else "CLIENT",
             "prime_attendees": selected_crd,
-            "external_attendees": [x.strip() for x in ext_attendees_raw.split(",") if x.strip()]
+            "external_attendees": [x.strip() for x in ext_attendees_raw.split(",") if x.strip()],
+            "prep_name": prep_name,
+            "prep_desig": prep_desig,
+            "conf_name": conf_name,
+            "conf_desig": conf_desig
         }
 
         doc_bio = export_to_word(
