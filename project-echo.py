@@ -140,7 +140,7 @@ h3 {
     color: #1A2B4C !important; letter-spacing: 0.02em; margin-bottom: 0.25rem; font-size: 1.25rem !important;
 }
 
-/* Playfair Display Styling for Target Editor Labels & Tabs */
+/* Playfair Display Styling for Labels & Tab Headers */
 .playfair-label {
     font-family: 'Playfair Display', serif !important;
     font-style: italic !important;
@@ -159,24 +159,28 @@ button[data-baseweb="tab"] p {
     font-size: 1.05rem !important;
 }
 
-/* Symmetrical Grid Column Stretches */
-div[data-testid="column"] {
+/* Strict Symmetrical Card Heights for Top Row */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(div.top-card-anchor) {
+    min-height: 470px !important;
+    height: 470px !important;
     display: flex !important;
     flex-direction: column !important;
+    justify-content: flex-start !important;
+    background-color: #FFFFFF !important; 
+    border-radius: 12px !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid rgba(0, 0, 0, 0.04) !important; 
+    padding: 1.25rem !important; 
+    margin-bottom: 1rem !important;
 }
 
-div[data-testid="column"] > div[data-testid="stVerticalBlock"] {
+/* Strict Symmetrical Card Heights for Bottom Row */
+div[data-testid="stVerticalBlockBorderWrapper"]:has(div.bottom-card-anchor) {
+    min-height: 540px !important;
+    height: 540px !important;
     display: flex !important;
     flex-direction: column !important;
-    flex: 1 1 auto !important;
-    height: 100% !important;
-}
-
-div[data-testid="column"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 1 1 auto !important;
-    height: 100% !important;
+    justify-content: space-between !important;
     background-color: #FFFFFF !important; 
     border-radius: 12px !important;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
@@ -250,8 +254,8 @@ button[key="card_settings_btn"]::before {
     width: 17px;
     height: 17px;
     background-color: #C5A059;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -1099,12 +1103,13 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---- TOP ROW: Upload Section (Left) and Meeting Details (Right) Symmetrical Grid ----
+# ---- TOP ROW: Symmetrical Fixed Containers (Upload Left, Meeting Details Right) ----
 col_upload, col_details = st.columns(2)
 
 # LEFT CONTAINER: Audio & Text Upload Section
 with col_upload:
     with st.container(border=True):
+        st.markdown('<div class="top-card-anchor" style="display:none;"></div>', unsafe_allow_html=True)
         st.markdown('<h3>Input & Transcription</h3>', unsafe_allow_html=True)
         
         tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text"])
@@ -1182,6 +1187,7 @@ with col_upload:
 # RIGHT CONTAINER: Meeting Details Card
 with col_details:
     with st.container(border=True):
+        st.markdown('<div class="top-card-anchor" style="display:none;"></div>', unsafe_allow_html=True)
         head_col1, head_col2 = st.columns([9.0, 1.0])
         with head_col1:
             st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
@@ -1260,13 +1266,15 @@ with col_details:
                 conf_name = st.text_input("Confirmed By", value="", placeholder="Name")
                 conf_desig = st.text_input("Conf Designation", value="", placeholder="Designation")
 
-# ---- Step 2: Full Transcript & Ask Echo Side-by-Side Symmetrical Cards ----
+# ---- Step 2: Symmetrical Bottom Row (Full Transcript Left, Ask Echo Right) ----
 if st.session_state["transcript"]:
     row_left, row_right = st.columns(2)
     
     # LEFT CONTAINER: Full Transcript
     with row_left:
         with st.container(border=True):
+            st.markdown('<div class="bottom-card-anchor" style="display:none;"></div>', unsafe_allow_html=True)
+            
             ft_head, ft_btn1, ft_btn2 = st.columns([6, 2, 2])
             with ft_head:
                 st.markdown('<h3 style="margin-top:0.2rem;">Full Transcript</h3>', unsafe_allow_html=True)
@@ -1325,22 +1333,26 @@ if st.session_state["transcript"]:
             st.text_area(
                 "Transcript Content", 
                 st.session_state["transcript"], 
-                height=380, 
+                height=340, 
                 label_visibility="collapsed"
             )
             
             if st.session_state["df"].empty:
                 st.write("")
                 if st.button("Generate MOM", key="btn_gen_mom"):
-                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], st.session_state["selected_engine"])
+                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng=st.session_state["selected_engine"])
                     if not extracted_df.empty:
                         st.session_state["df"] = extracted_df
                         st.session_state["other_discussions"] = other_disc
                         st.rerun()
+            else:
+                st.write("")
 
-    # RIGHT CONTAINER: Ask Echo (AI on Left, User on Right, Sophisticated Theme)
+    # RIGHT CONTAINER: Ask Echo (AI on Left, User on Right, Symmetrical)
     with row_right:
         with st.container(border=True):
+            st.markdown('<div class="bottom-card-anchor" style="display:none;"></div>', unsafe_allow_html=True)
+            
             st.markdown('<h3 style="margin-top:0.2rem;">Ask Echo</h3>', unsafe_allow_html=True)
             st.caption("Ask specific questions regarding action items, timelines, deliverables, or remarks.")
             
@@ -1356,7 +1368,6 @@ if st.session_state["transcript"]:
             else:
                 for msg in st.session_state["chat_history"]:
                     if msg["role"] == "assistant":
-                        # AI Bubble (Left-Aligned, Elegant Off-White & Gold)
                         formatted_content = msg["content"].replace("\n", "<br>")
                         st.markdown(
                             f'<div class="chat-bubble-ai-wrap">'
@@ -1365,7 +1376,6 @@ if st.session_state["transcript"]:
                             unsafe_allow_html=True
                         )
                     else:
-                        # User Bubble (Right-Aligned, Warm Muted Pill)
                         st.markdown(
                             f'<div class="chat-bubble-user-wrap">'
                             f'<div class="chat-bubble-user">{msg["content"]}</div>'
