@@ -875,23 +875,23 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Settings Button rendered cleanly with text and CSS SVG Mask
-if st.button("Settings", key="topbar_settings_btn", help="Open Engine & Regeneration Settings"):
+if st.button("Settings", key="topbar_settings_btn", help="Settings"):
     st.session_state["show_settings"] = not st.session_state["show_settings"]
     st.rerun()
 
 # Top Settings Drawer
 if st.session_state["show_settings"]:
     with st.container(border=True):
-        st.markdown('<h3>Engine Configuration & Usage Diagnostics</h3>', unsafe_allow_html=True)
+        st.markdown('<h3>Settings/h3>', unsafe_allow_html=True)
         set_col1, set_col2 = st.columns([1.5, 1.5])
         
         with set_col1:
             engine_options = [
-                "DeepSeek (Primary)",
-                "Python Heuristic (Non-AI)"
+                "AI - Deepseek",
+                "AI - Python Heuristic"
             ]
             selected_eng = st.selectbox(
-                "Extraction Engine",
+                "MoM Generation Engine",
                 options=engine_options,
                 index=engine_options.index(st.session_state["selected_engine"]) if st.session_state["selected_engine"] in engine_options else 0
             )
@@ -918,7 +918,7 @@ if st.session_state["show_settings"]:
 
 # ---- Compact Details & Audio (Blank Defaults) ----
 with st.container(border=True):
-    st.markdown('<h3>Meeting Details & Audio</h3>', unsafe_allow_html=True)
+    st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
     
     # ROW 1
     r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.3, 2.0, 1.1, 1.1, 1.5, 1.5])
