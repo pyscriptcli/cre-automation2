@@ -31,7 +31,10 @@ os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
-# API Keys loaded strictly from Streamlit Cloud Secrets
+# API Keys loaded strictly from Streamlit Cloud Secrets (no hardcoded keys)
+DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
+
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
@@ -67,7 +70,7 @@ if "other_discussions" not in st.session_state: st.session_state["other_discussi
 if "show_settings" not in st.session_state: st.session_state["show_settings"] = False
 if "tokens_used" not in st.session_state: st.session_state["tokens_used"] = 0
 if "last_api_call" not in st.session_state: st.session_state["last_api_call"] = None
-if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "AI - OpenAI (GPT-4o-mini)"
+if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "AI - DeepSeek"
 
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
@@ -215,7 +218,7 @@ def _call_openai_transcribe(audio_bytes, filename="audio.mp3"):
         resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, timeout=180)
         if resp.status_code == 200:
             return resp.json().get("text", "")
-        st.error(f"OpenAI transcription error ({resp.status_code}): {resp.text}")
+        st.error(f"OpenAI fallback error: {resp.text}")
         return None
     except Exception as e:
         st.error(f"OpenAI connection error: {e}")
@@ -233,7 +236,6 @@ def _call_groq_whisper(audio_bytes, filename="audio.mp3"):
         return None
 
 def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, status_placeholder):
-    file_size_mb = len(audio_bytes) / (1024 * 1024)
     progress_bar.progress(10, text="Preprocessing audio container (10%)...")
     
     ext = os.path.splitext(original_filename)[1] or ".m4a"
@@ -264,9 +266,7 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
         progress_bar.progress(45, text="Evaluating audio duration & routing (45%)...")
 
-        # ROUTING LOGIC:
-        # If compressed file is <= 10MB (typically <= 45-60 mins of speech), try Groq Whisper first.
-        # If it's a long recording (> 10MB) or Groq encounters quota limits, use OpenAI directly.
+        # Routing Logic: Short files (<= 10MB) via Groq primary; long recordings (> 10MB) via OpenAI
         if comp_size_mb <= 10.0 and GROQ_API_KEY:
             status_placeholder.info("⚡ Processing via Groq Whisper Primary...")
             progress_bar.progress(70, text="Transcribing via Groq Whisper (70%)...")
@@ -277,9 +277,9 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
                 progress_bar.progress(100, text="Transcription completed (100%)!")
                 status_placeholder.empty()
                 return text
-            status_placeholder.warning("⚠️ Groq unavailable or quota exceeded. Switching to OpenAI...")
+            status_placeholder.warning("⚠️ Groq rate limit reached. Switching automatically to OpenAI...")
 
-        # Long audio pipeline via OpenAI with 600s chunks
+        # Long audio pipeline via OpenAI with 600s segments
         status_placeholder.info("🚀 Processing recording via OpenAI...")
         progress_bar.progress(55, text="Preparing audio segments for OpenAI (55%)...")
         
@@ -371,17 +371,17 @@ def normalize_llm_json_to_df(data):
     df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
     return df, other_disc
 
-def extract_with_openai_completion(transcript):
-    if not OPENAI_API_KEY:
-        st.error("OpenAI API Key is missing. Please add it to your Streamlit Cloud Secrets.")
+# High-Level Executive Prompt for DeepSeek Completion
+def extract_with_deepseek(transcript):
+    if not DEEPSEEK_API_KEY:
+        st.error("DeepSeek API Key is missing. Please add it to your Streamlit Cloud Secrets.")
         return None, ""
 
     headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json"
     }
 
-    # Highly optimized prompt to minimize token usage
     system_prompt = (
         "You are an expert executive assistant for PRIME Philippines tasked with producing comprehensive, "
         "high-level executive Minutes of the Meeting (MOM). "
@@ -393,17 +393,91 @@ def extract_with_openai_completion(transcript):
         "Output valid JSON only matching the exact schema provided."
     )
 
-    user_prompt = f"""Format the transcript into MOM JSON schema:
+    user_prompt = f"""Synthesize the following meeting transcript into formal, high-level Minutes of Meeting (MOM) formatted as valid JSON:
+
+Schema:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Core discussion or report topic",
-      "Action Plan": "Deliverable or action (or 'None')",
-      "Indicative Delivery Date": "Timeline or 'TBD'",
-      "Person-in-charge": "Responsible party or 'Unassigned'"
+      "Discussion Points": "Formal summary of key milestones, operational updates, or strategic topics discussed",
+      "Action Plan": "Concrete, actionable executive deliverables and next steps (state 'None' if purely informational)",
+      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
+      "Person-in-charge": "Designated individual, department (e.g., PRIME Philippines, Client name), or 'Unassigned'"
     }}
   ],
-  "other_discussions": "Concise administrative summary"
+  "other_discussions": "High-level summary of peripheral discussions, informal remarks, or general alignment"
+}}
+
+Transcript:
+{transcript[:28000]}"""
+
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1,
+        "max_tokens": 1800
+    }
+
+    try:
+        resp = requests.post(DEEPSEEK_CHAT_URL, headers=headers, json=payload, timeout=120)
+        if resp.status_code == 200:
+            res_json = resp.json()
+            usage = res_json.get("usage", {})
+            st.session_state["tokens_used"] += usage.get("total_tokens", len(transcript) // 4)
+            st.session_state["last_api_call"] = datetime.datetime.now()
+
+            raw_text = res_json["choices"][0]["message"]["content"].strip()
+            clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+            match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+            data = json.loads(match.group(0)) if match else json.loads(clean_text)
+            return normalize_llm_json_to_df(data)
+        else:
+            st.warning(f"DeepSeek Notice ({resp.status_code}): {resp.text}")
+    except Exception as e:
+        st.warning(f"DeepSeek connection error: {e}")
+
+    return None, ""
+
+# High-Level Executive Prompt for OpenAI Completion
+def extract_with_openai_completion(transcript):
+    if not OPENAI_API_KEY:
+        st.error("OpenAI API Key is missing. Please add it to your Streamlit Cloud Secrets.")
+        return None, ""
+
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    system_prompt = (
+        "You are an expert executive assistant for PRIME Philippines tasked with producing comprehensive, "
+        "high-level executive Minutes of the Meeting (MOM). "
+        "The transcript contains Tagalog, English, and Taglish dialogue. "
+        "Analyze the full conversation context and translate all colloquial, informal, and mixed-language statements "
+        "into polished, high-level corporate English. "
+        "Synthesize all key agreements, status reports, core discussion points, definitive action plans, "
+        "indicative delivery timelines, and assigned persons-in-charge without omitting critical business context. "
+        "Output valid JSON only matching the exact schema provided."
+    )
+
+    user_prompt = f"""Synthesize the following meeting transcript into formal, high-level Minutes of Meeting (MOM) formatted as valid JSON:
+
+Schema:
+{{
+  "table_items": [
+    {{
+      "Discussion Points": "Formal summary of key milestones, operational updates, or strategic topics discussed",
+      "Action Plan": "Concrete, actionable executive deliverables and next steps (state 'None' if purely informational)",
+      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
+      "Person-in-charge": "Designated individual, department (e.g., PRIME Philippines, Client name), or 'Unassigned'"
+    }}
+  ],
+  "other_discussions": "High-level summary of peripheral discussions, informal remarks, or general alignment"
 }}
 
 Transcript:
@@ -417,7 +491,7 @@ Transcript:
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.1,
-        "max_tokens": 1600
+        "max_tokens": 1800
     }
 
     try:
@@ -486,7 +560,7 @@ def heuristic_non_ai_extraction(transcript):
     other_text = "\n\n".join(other_discussions[:4])
     return df, other_text
 
-def extract_structured_insights(transcript, engine="AI - OpenAI (GPT-4o-mini)"):
+def extract_structured_insights(transcript, engine="AI - DeepSeek"):
     progress_bar = st.progress(0, text="Initializing MOM extraction (0%)...")
     time.sleep(0.2)
     progress_bar.progress(40, text=f"Translating Taglish conversation & extracting with {engine} (40%)...")
@@ -499,7 +573,10 @@ def extract_structured_insights(transcript, engine="AI - OpenAI (GPT-4o-mini)"):
         progress_bar.empty()
         return res_df, res_other
 
-    df, other = extract_with_openai_completion(transcript)
+    if "DeepSeek" in engine:
+        df, other = extract_with_deepseek(transcript)
+    else:
+        df, other = extract_with_openai_completion(transcript)
     
     if df is not None and not df.empty:
         progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%)...")
@@ -509,7 +586,7 @@ def extract_structured_insights(transcript, engine="AI - OpenAI (GPT-4o-mini)"):
 
     df_fb, other_fb = heuristic_non_ai_extraction(transcript)
     progress_bar.empty()
-    st.markdown(f"{SVG_ALERT} OpenAI request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
+    st.markdown(f"{SVG_ALERT} AI completion request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
     return df_fb, other_fb
 
 def set_cell_shading(cell, color_hex):
@@ -905,6 +982,7 @@ with st.container(border=True):
             
             with set_col1:
                 engine_options = [
+                    "AI - DeepSeek",
                     "AI - OpenAI (GPT-4o-mini)",
                     "Non-AI - Python Heuristic"
                 ]
@@ -930,9 +1008,9 @@ with st.container(border=True):
                 if st.session_state["last_api_call"]:
                     last_call = st.session_state["last_api_call"]
                     st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
-                    st.write("• **OpenAI Engine Status:** `Active & Ready`")
+                    st.write(f"• **Engine Status ({selected_eng}):** `Active & Ready`")
                 else:
-                    st.write("• **OpenAI Engine Status:** `Ready`")
+                    st.write("• **Engine Status:** `Ready`")
         st.markdown("---")
     
     # ROW 1: Clean Date Picker, Blank Location with Presets, Simple Time Pickers, Prepared By
