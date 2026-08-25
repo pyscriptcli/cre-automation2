@@ -38,6 +38,9 @@ DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "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")
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
+OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
+
 CRD_MEMBERS = [
     "Sondi Tuazon",
     "Kristina Balajadia",
@@ -159,8 +162,8 @@ button[key="card_settings_btn"]::before {
     width: 17px;
     height: 17px;
     background-color: #C5A059;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -173,28 +176,6 @@ button[key="card_settings_btn"]:hover {
 
 button[key="card_settings_btn"]:hover::before {
     background-color: #A07828 !important;
-}
-
-/* Digital Clock Style Segment Display */
-.clock-display-label {
-    font-size: 0.76rem;
-    font-weight: 600;
-    color: #555555;
-    margin-bottom: 2px;
-}
-.clock-box {
-    background: #1E1E1E;
-    color: #00FFCC;
-    font-family: 'Courier New', monospace;
-    font-size: 1.15rem;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    padding: 0.35rem 0.6rem;
-    border-radius: 6px;
-    border: 1px solid #333333;
-    text-align: center;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
-    margin-bottom: 4px;
 }
 
 .stTextArea textarea {
@@ -226,48 +207,62 @@ def extract_text_from_file(uploaded_file):
         st.error(f"Error reading file: {e}")
         return ""
 
-def _call_groq_whisper(audio_bytes, filename="audio.mp3"):
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    files = {"file": (filename, audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
+def _call_openai_transcribe(audio_bytes, filename="audio.mp3"):
+    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+    files = {"file": (filename, audio_bytes), "model": (None, "gpt-4o-mini-transcribe"), "response_format": (None, "json")}
     try:
-        resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=120)
+        resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, timeout=180)
         if resp.status_code == 200:
             return resp.json().get("text", "")
-        else:
-            error_msg = resp.json().get("error", {}).get("message", resp.text)
-            if "rate limit" in error_msg.lower():
-                time.sleep(10)
-                resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=120)
-                if resp.status_code == 200:
-                    return resp.json().get("text", "")
-            st.error(f"Transcription error: {error_msg}")
-            return None
+        st.error(f"OpenAI fallback error: {resp.text}")
+        return None
     except Exception as e:
-        st.error(f"Groq API connection error: {e}")
+        st.error(f"OpenAI connection error: {e}")
         return None
 
-def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, status_text):
-    """
-    Robust FFmpeg Pipeline:
-    - Never uses invalid preset on audio encoders
-    - Guaranteed chunk sizes under Groq's 25MB ceiling
-    """
-    status_text.write("Analyzing audio stream...")
-    progress_bar.progress(10)
+def _call_groq_whisper(audio_bytes, filename="audio.mp3", status_placeholder=None):
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+    files = {"file": (filename, audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
+    
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=180)
+            if resp.status_code == 200:
+                return resp.json().get("text", "")
+            
+            error_data = resp.json().get("error", {})
+            error_msg = error_data.get("message", resp.text)
+            
+            # If Groq hits rate limit (429 or ASPH quota limit), fallback automatically to OpenAI
+            if "rate limit" in error_msg.lower() or resp.status_code == 429:
+                if status_placeholder:
+                    status_placeholder.warning("⚠️ Groq rate limit reached. Automatically falling back to OpenAI gpt-4o-mini-transcribe...")
+                time.sleep(1.5)
+                return _call_openai_transcribe(audio_bytes, filename)
 
-    # Save to disk
+            st.error(f"Transcription error: {error_msg}")
+            return None
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            st.warning("⚠️ Groq connection failure. Falling back to OpenAI...")
+            return _call_openai_transcribe(audio_bytes, filename)
+    return None
+
+def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, status_placeholder):
+    progress_bar.progress(10, text="Preprocessing audio container (10%)...")
+    
     ext = os.path.splitext(original_filename)[1] or ".m4a"
     with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as src:
         src.write(audio_bytes)
         src_path = src.name
 
     compressed_mp3 = src_path + "_compressed.mp3"
-    
-    status_text.write("Compressing audio to 16kHz Mono 24k MP3...")
-    progress_bar.progress(30)
+    progress_bar.progress(25, text="Compressing audio to 16kHz Mono 24k MP3 (25%)...")
 
     try:
-        # Fixed FFmpeg command (No video preset on libmp3lame)
         cmd = [
             "ffmpeg", "-y",
             "-threads", "1",
@@ -281,30 +276,14 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         ]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if res.returncode != 0:
-            st.error(f"FFmpeg compression notice: {res.stderr[:200]}")
+            st.error(f"FFmpeg compression error: {res.stderr[:200]}")
             return None
 
-        comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
-        progress_bar.progress(55)
-
-        # Direct transcription if <= 22MB (safe buffer under 25MB)
-        if comp_size_mb <= 22.0:
-            status_text.write(f"Transcribing audio ({comp_size_mb:.1f} MB) via Groq Whisper...")
-            progress_bar.progress(75)
-            with open(compressed_mp3, "rb") as f:
-                c_bytes = f.read()
-            text = _call_groq_whisper(c_bytes, "compressed.mp3")
-            progress_bar.progress(100)
-            return text
-
-        # Slicing for multi-hour recordings
-        status_text.write("Slicing multi-hour recording into segments...")
-        progress_bar.progress(65)
-
+        progress_bar.progress(55, text="Splitting recording into safe Whisper batches (55%)...")
         segment_pattern = src_path + "_seg_%03d.mp3"
         subprocess.run([
             "ffmpeg", "-y", "-i", compressed_mp3,
-            "-f", "segment", "-segment_time", "600", "-c", "copy",
+            "-f", "segment", "-segment_time", "120", "-c", "copy",
             segment_pattern
         ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
@@ -313,19 +292,23 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         segments = sorted([os.path.join(seg_dir, f) for f in os.listdir(seg_dir) if f.startswith(base_name)])
 
         full_transcript = []
+        total_segs = len(segments)
+        
         for idx, seg in enumerate(segments):
-            status_text.write(f"Transcribing segment {idx + 1} of {len(segments)}...")
-            progress_bar.progress(int(65 + ((idx + 1) / len(segments)) * 30))
+            pct = int(55 + ((idx + 1) / total_segs) * 40)
+            progress_bar.progress(pct, text=f"Transcribing audio segment {idx + 1} of {total_segs} ({pct}%)...")
+            
             with open(seg, "rb") as f:
                 seg_bytes = f.read()
-            t = _call_groq_whisper(seg_bytes, f"part_{idx}.mp3")
+            t = _call_groq_whisper(seg_bytes, f"part_{idx}.mp3", status_placeholder)
             if t:
                 full_transcript.append(t)
-            time.sleep(1.0)
+            time.sleep(0.3)
             try: os.remove(seg)
             except: pass
 
-        progress_bar.progress(100)
+        progress_bar.progress(100, text="Transcription completed successfully (100%)!")
+        time.sleep(0.3)
         return " ".join(full_transcript)
 
     except Exception as e:
@@ -495,20 +478,22 @@ def heuristic_non_ai_extraction(transcript):
     return df, other_text
 
 def extract_structured_insights(transcript, engine="AI - DeepSeek"):
-    progress_bar = st.progress(0, text="Initializing MOM extraction...")
+    progress_bar = st.progress(0, text="Initializing MOM extraction (0%)...")
     time.sleep(0.2)
-    progress_bar.progress(40, text=f"Translating Taglish conversation & extracting with {engine}...")
+    progress_bar.progress(40, text=f"Translating Taglish conversation & extracting with {engine} (40%)...")
 
     if engine == "Non-AI - Python Heuristic":
         time.sleep(0.5)
         res_df, res_other = heuristic_non_ai_extraction(transcript)
+        progress_bar.progress(100, text="Extraction completed (100%)!")
+        time.sleep(0.2)
         progress_bar.empty()
         return res_df, res_other
 
     df, other = extract_with_deepseek(transcript)
     
     if df is not None and not df.empty:
-        progress_bar.progress(100, text="Finalizing Minutes of the Meeting...")
+        progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%)...")
         time.sleep(0.3)
         progress_bar.empty()
         return df, other
@@ -896,7 +881,6 @@ st.markdown("""
 
 # ---- Meeting Details Card ----
 with st.container(border=True):
-    # Header & Small SVG-only Settings icon button positioned at upper-right corner
     head_col1, head_col2 = st.columns([9.3, 0.7])
     with head_col1:
         st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
@@ -935,42 +919,29 @@ with st.container(border=True):
                 st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
                 
                 if st.session_state["last_api_call"]:
-                    last_call = st.session_state["last_api_call"]
+                    last_call = st.session_state["last_call"] if "last_call" in locals() else st.session_state["last_api_call"]
                     st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
                     st.write("• **DeepSeek Server Status:** `Active & Ready`")
                 else:
                     st.write("• **DeepSeek Server Status:** `Ready`")
         st.markdown("---")
     
-    # ROW 1: Date, Location, Clock Pickers, Prepared By
-    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.4, 2.1, 1.25, 1.25, 1.4, 1.4])
+    # ROW 1: Clean Date Picker, Blank Location with Presets, Simple Time Pickers, Prepared By
+    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.4, 2.2, 1.1, 1.1, 1.4, 1.4])
     
     with r1_c1:
-        meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25), format="MM/DD/YYYY")
+        meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
     
     with r1_c2:
         loc_preset = st.selectbox("Location Preset", options=LOCATION_PRESETS, index=0)
         custom_loc = st.text_input("Location", value="", placeholder="e.g. Boardroom", label_visibility="collapsed")
         meeting_location = custom_loc.strip() if custom_loc.strip() else ("" if loc_preset == LOCATION_PRESETS[0] else loc_preset)
-    
-    # Digital Clock App Style Pickers (HH : MM : AM/PM)
+
     with r1_c3:
-        st.markdown('<div class="clock-display-label">Start Time</div>', unsafe_allow_html=True)
-        t1_c1, t1_c2, t1_c3 = st.columns([1, 1, 1.1])
-        with t1_c1: s_h = st.selectbox("HH", options=["--"] + [f"{i:02d}" for i in range(1, 13)], index=0, key="start_h", label_visibility="collapsed")
-        with t1_c2: s_m = st.selectbox("MM", options=["--"] + [f"{i:02d}" for i in range(0, 60, 5)], index=0, key="start_m", label_visibility="collapsed")
-        with t1_c3: s_p = st.selectbox("AP", options=["AM", "PM"], index=1, key="start_p", label_visibility="collapsed")
-        start_time_str = f"{s_h}:{s_m} {s_p}" if (s_h != "--" and s_m != "--") else ""
-        st.markdown(f'<div class="clock-box">{start_time_str if start_time_str else "--:-- --"}</div>', unsafe_allow_html=True)
+        start_time_val = st.time_input("Start Time", value=None)
 
     with r1_c4:
-        st.markdown('<div class="clock-display-label">End Time</div>', unsafe_allow_html=True)
-        t2_c1, t2_c2, t2_c3 = st.columns([1, 1, 1.1])
-        with t2_c1: e_h = st.selectbox("HH", options=["--"] + [f"{i:02d}" for i in range(1, 13)], index=0, key="end_h", label_visibility="collapsed")
-        with t2_c2: e_m = st.selectbox("MM", options=["--"] + [f"{i:02d}" for i in range(0, 60, 5)], index=0, key="end_m", label_visibility="collapsed")
-        with t2_c3: e_p = st.selectbox("AP", options=["AM", "PM"], index=1, key="end_p", label_visibility="collapsed")
-        end_time_str = f"{e_h}:{e_m} {e_p}" if (e_h != "--" and e_m != "--") else ""
-        st.markdown(f'<div class="clock-box">{end_time_str if end_time_str else "--:-- --"}</div>', unsafe_allow_html=True)
+        end_time_val = st.time_input("End Time", value=None)
 
     with r1_c5:
         prep_name = st.text_input("Prepared By (Name)", value="", placeholder="e.g. John Doe")
@@ -1001,11 +972,11 @@ with st.container(border=True):
                 st.write("")
                 st.write("")
                 if st.button("Transcribe Audio", key="btn_tx_upload"):
-                    p_bar = st.progress(0)
-                    p_txt = st.empty()
-                    transcript = transcribe_audio_pipeline(uploaded_file.read(), uploaded_file.name, p_bar, p_txt)
+                    p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
+                    p_status = st.empty()
+                    transcript = transcribe_audio_pipeline(uploaded_file.read(), uploaded_file.name, p_bar, p_status)
                     p_bar.empty()
-                    p_txt.empty()
+                    p_status.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -1022,11 +993,11 @@ with st.container(border=True):
                 st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
             with r_col3:
                 if st.button("Transcribe Audio", key="btn_tx_record"):
-                    p_bar = st.progress(0)
-                    p_txt = st.empty()
-                    transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_txt)
+                    p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
+                    p_status = st.empty()
+                    transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
                     p_bar.empty()
-                    p_txt.empty()
+                    p_status.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -1042,16 +1013,16 @@ with st.container(border=True):
             st.write("") 
             st.write("") 
             if st.button("Process Text", key="btn_tx_text"):
-                p_bar = st.progress(0, text="Extracting document text...")
-                time.sleep(0.3)
-                p_bar.progress(50)
+                p_bar = st.progress(0, text="Extracting document text (0%)...")
+                time.sleep(0.2)
+                p_bar.progress(50, text="Reading document stream (50%)...")
                 extracted_str = ""
                 if uploaded_text_file:
                     extracted_str = extract_text_from_file(uploaded_text_file)
                 if pasted_text and pasted_text.strip():
                     extracted_str += "\n" + pasted_text.strip()
                 
-                p_bar.progress(100)
+                p_bar.progress(100, text="Document processed (100%)!")
                 time.sleep(0.2)
                 p_bar.empty()
                 if extracted_str.strip():
@@ -1097,11 +1068,13 @@ if not st.session_state["df"].empty:
 
         st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=100)
 
-        # Build clean formatted time string from clock inputs
-        if start_time_str and end_time_str:
-            time_range_str = f"{start_time_str} to {end_time_str}"
+        # Build clean formatted time string from native time picker
+        start_str = start_time_val.strftime("%I:%M %p") if start_time_val else ""
+        end_str = end_time_val.strftime("%I:%M %p") if end_time_val else ""
+        if start_str and end_str:
+            time_range_str = f"{start_str} to {end_str}"
         else:
-            time_range_str = start_time_str or end_time_str or ""
+            time_range_str = start_str or end_str or ""
 
         meeting_details = {
             "date": meeting_date.strftime("%B %d, %Y"),
@@ -1146,3 +1119,4 @@ if not st.session_state["df"].empty:
                 mime="application/pdf",
                 key="btn_download_pdf"
             )
+            
