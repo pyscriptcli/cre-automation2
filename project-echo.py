@@ -116,7 +116,12 @@ def transcribe_audio(audio_bytes):
     if resp.status_code == 200:
         return resp.json().get("text", "")
     else:
-        st.error(f"Transcription failed: {resp.text}")
+        # Better Rate Limit Handling
+        error_msg = resp.json().get("error", {}).get("message", resp.text)
+        if "rate limit" in error_msg.lower():
+            st.error("Groq Transcription Rate Limit Reached. Please wait a few minutes or paste your transcript in the 'Paste Transcript' tab.")
+        else:
+            st.error(f"Transcription failed: {error_msg}")
         return None
 
 def chunk_text(text, max_chars=3500, overlap=250):
@@ -134,6 +139,7 @@ def extract_json_from_groq(prompt):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
     
+    last_error = None
     for model in models:
         payload = {
             "model": model,
@@ -142,7 +148,7 @@ def extract_json_from_groq(prompt):
                     "role": "system",
                     "content": (
                         "You are an executive assistant extracting Minutes of the Meeting. "
-                        "Translate colloquial/Tagalog conversation and capture deliverables. "
+                        "Translate colloquial conversation and capture deliverables. "
                         "Respond ONLY with a JSON object strictly matching the schema."
                     )
                 },
@@ -161,7 +167,10 @@ def extract_json_from_groq(prompt):
                 if match:
                     return json.loads(match.group(0))
                 return json.loads(clean_text)
-        except Exception:
+            else:
+                last_error = resp.text
+        except Exception as e:
+            last_error = str(e)
             continue
     return None
 
@@ -218,8 +227,15 @@ Transcript Content:
 
     progress_container.empty()
 
+    # GUARANTEED FALLBACK: If Groq failed or hit limits, output a blank draft so the editor shows up
     if not all_table_items:
-        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+        st.warning("Auto-extraction yielded no items (possibly due to API rate limits). Generated a manual draft.")
+        all_table_items = [{
+            "Discussion Points": "Meeting Overview & Key Deliverables",
+            "Action Plan": "Pending (Manual Entry Required)",
+            "Indicative Delivery Date": "TBD",
+            "Person-in-charge": "Unassigned"
+        }]
 
     df = pd.DataFrame(all_table_items)
     for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
@@ -348,6 +364,7 @@ def export_to_word(df, meeting_details, other_discussions):
         doc.add_heading("Other Discussions:", level=2)
         doc.add_paragraph(other_discussions)
 
+    # Dynamic Signatures
     doc.add_paragraph()
     doc.add_paragraph("Prepared by:")
     doc.add_paragraph("_______________________________")
@@ -414,8 +431,8 @@ with st.container(border=True):
     with r2_c5:
         conf_desig = st.text_input("Designation", placeholder="e.g. Managing Director")
 
-    # Audio Section
-    tab_upload, tab_record = st.tabs(["Upload Audio File", "Record Live Audio"])
+    # Audio Section: Upload, Live Record, Paste Text
+    tab_upload, tab_record, tab_text = st.tabs(["Upload Audio File", "Record Live Audio", "Paste Transcript"])
     active_audio_bytes = None
 
     with tab_upload:
@@ -457,12 +474,26 @@ with st.container(border=True):
                         st.session_state["other_discussions"] = ""
                         st.rerun()
 
+    with tab_text:
+        text_col1, text_col2 = st.columns([5, 1.5])
+        with text_col1:
+            pasted_text = st.text_area("Paste or type transcript text here:", height=68, label_visibility="collapsed")
+        with text_col2:
+            if st.button("Process Text", key="btn_tx_text"):
+                if pasted_text and pasted_text.strip():
+                    st.session_state["transcript"] = pasted_text.strip()
+                    st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+                    st.session_state["other_discussions"] = ""
+                    st.rerun()
+                else:
+                    st.warning("Please paste some text first.")
+
 # ---- Step 2: Full Transcript Clean UI ----
 if st.session_state["transcript"]:
     with st.container(border=True):
         st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
         
-        # Streamlit's native full-width code view with integrated copy-to-clipboard button
+        # Native code block with copy button
         st.code(st.session_state["transcript"], language="text")
         
         if st.session_state["df"].empty:
