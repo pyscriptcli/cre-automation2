@@ -1,4 +1,5 @@
 import os
+import time
 import streamlit as st
 import requests
 import json
@@ -25,10 +26,12 @@ if not os.path.exists(_config_file):
         f.write('[theme]\nbase="light"\n')
 
 # API Keys & Endpoints
-GEMINI_API_KEY = "AIzaSyDlBkIdAth2AesZ9rr3xTe7t_IXl2_IEQM"
+PUTER_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InYyIn0.eyJ0IjoidCIsInYiOiIyIiwidG9rZW5fdWlkIjoiODUxNzZhZjYtZmM2Ni00M2ZjLTk2NmEtN2ZhMGQ3YWFlMjhhIiwidXUiOiJXQkx3bS9QM1ErQ3VBVDNTQjZDS1ZBPT0iLCJzdSI6ImkwL1N5ajZQUkZHbWhVTGdTS2lkYlE9PSIsImFpIjoiV0JMd20vUDNRK0N1QVQzU0I2Q0tWQT09IiwiZnVsbF9hY2Nlc3MiOnRydWUsImlhdCI6MTc4NzYyMjk4M30.C1hpyilomEizU-bP5ZXimpssrCUOMS1Pv6abBKjYFMQ"  # Free key from Puter.com (Optional, will fall back to Groq)
 GROQ_API_KEY = "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"
+
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
+PUTER_CHAT_URL = "https://api.puter.com/v1/chat/completions"
 
 CRD_MEMBERS = [
     "Sondi Tuazon",
@@ -164,6 +167,9 @@ def normalize_llm_json_to_df(data):
                 if isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
                     items = v
                     break
+            if items is None:
+                items = [data]
+                
         other_disc = str(data.get("other_discussions", "") or data.get("notes", "") or data.get("summary", ""))
 
     if not items or not isinstance(items, list):
@@ -190,88 +196,42 @@ def normalize_llm_json_to_df(data):
     df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
     return df, other_disc
 
-def extract_with_gemini(transcript):
-    """Primary Extraction Engine using Google Gemini Flash."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    headers = {"Content-Type": "application/json"}
-    
-    prompt = f"""You are an executive assistant for PRIME Philippines extracting Minutes of the Meeting (MOM).
-The transcript contains Tagalog and English (Taglish) discussion regarding property sourcing, sites (A1 sites), reports, tax maps, LGUs, trade areas, and client updates.
-Translate all colloquial dialogue into professional corporate English.
-
-Extract at least 3 to 10 clear, distinct table items covering all discussed tasks, updates, and deliverables.
-
-Output valid JSON ONLY with this schema:
-{{
-  "table_items": [
-    {{
-      "Discussion Points": "Core discussion topic, report update, or milestone",
-      "Action Plan": "Concrete next step, format to provide, report to send, or requirement",
-      "Indicative Delivery Date": "Specific date, timeline (e.g., Friday, Q1 2027), or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or name)"
-    }}
-  ],
-  "other_discussions": "Summary of informal remarks, administrative notes, or general context"
-}}
-
-Transcript:
-{transcript}"""
-
+def extract_with_puter(prompt):
+    """Engine 1: Puter AI. Proxies to GPT-4o-mini for robust large-context extraction."""
+    if not PUTER_API_KEY or PUTER_API_KEY == "YOUR_PUTER_API_KEY_HERE":
+        return None, ""
+        
+    headers = {"Authorization": f"Bearer {PUTER_API_KEY}", "Content-Type": "application/json"}
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "temperature": 0.1
-        }
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "You extract Minutes of the Meeting from transcripts. Output ONLY valid JSON matching the schema."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.1
     }
-    
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        resp = requests.post(PUTER_CHAT_URL, headers=headers, json=payload, timeout=90)
         if resp.status_code == 200:
-            raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            raw_text = resp.json()["choices"][0]["message"]["content"].strip()
             clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
             clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-            data = json.loads(clean_text)
+            match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+            data = json.loads(match.group(0)) if match else json.loads(clean_text)
             return normalize_llm_json_to_df(data)
-        else:
-            st.warning(f"Gemini Notice ({resp.status_code}): Switching to backup engine.")
-    except Exception as e:
-        st.warning(f"Gemini connection error: {e}. Switching to backup engine.")
-        
+    except Exception:
+        pass
     return None, ""
 
-def extract_with_groq_backup(transcript):
-    """Backup Engine using Groq LLaMA models."""
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
+def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]):
+    """Groq Direct API Call with Rate Limit Detection."""
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     
-    prompt = f"""You are an executive assistant for PRIME Philippines. Extract Minutes of the Meeting from this Taglish transcript.
-Translate dialogue to professional English. Extract all discussion points, site updates, reports, deliverables, and timelines.
-
-Output valid JSON ONLY matching:
-{{
-  "table_items": [
-    {{
-      "Discussion Points": "Core discussion topic or milestone",
-      "Action Plan": "Specific follow-up action or deliverable",
-      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or name)"
-    }}
-  ],
-  "other_discussions": "Summary of secondary points"
-}}
-
-Transcript:
-{transcript[:25000]}"""
-
-    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
     for model in models:
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": "You output strictly valid JSON."},
+                {"role": "system", "content": "You are an executive assistant extracting Minutes of the Meeting. Translate colloquial terms to English. Respond ONLY with valid JSON."},
                 {"role": "user", "content": prompt}
             ],
             "response_format": {"type": "json_object"},
@@ -285,28 +245,114 @@ Transcript:
                 clean_text = re.sub(r"\s*```$", "", clean_text).strip()
                 match = re.search(r"\{.*\}", clean_text, re.DOTALL)
                 data = json.loads(match.group(0)) if match else json.loads(clean_text)
-                df, other = normalize_llm_json_to_df(data)
-                if df is not None and not df.empty:
-                    return df, other
+                return normalize_llm_json_to_df(data)
+            elif resp.status_code == 429:
+                return "RATE_LIMIT"
         except Exception:
             continue
-            
-    return None, ""
+    return None
+
+def build_schema_prompt(text_section, part_info=""):
+    return f"""Extract Minutes of the Meeting {part_info}. Translate Taglish to professional English. Extract ALL discussion points, status updates, reports, and deadlines.
+Output valid JSON ONLY matching:
+{{
+  "table_items": [
+    {{
+      "Discussion Points": "Core discussion topic, report, or milestone",
+      "Action Plan": "Specific follow-up action, deliverable, or 'None'",
+      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
+      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or Unassigned)"
+    }}
+  ],
+  "other_discussions": "Summary of other points discussed"
+}}
+
+Transcript:
+{text_section}"""
+
+def chunk_text(text, max_chars=4000, overlap=300):
+    if len(text) <= max_chars:
+        return [text]
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + max_chars
+        chunks.append(text[start:end])
+        start += max_chars - overlap
+    return chunks
 
 def extract_structured_insights(transcript):
-    """Main extraction coordinator: Primary (Gemini) -> Backup (Groq)."""
-    # 1. Primary: Gemini
-    df, other_disc = extract_with_gemini(transcript)
+    """Dynamic Engine: Maximizes Puter and Groq APIs with intelligent rate-limit sleeps."""
+    progress_container = st.empty()
+    bar = progress_container.progress(0, text="Initializing Dynamic Extraction Engine...")
+
+    full_prompt = build_schema_prompt(transcript[:35000])
+
+    # 1. ENGINE 1: Try Puter API (Best for Large Texts)
+    bar.progress(10, text="Attempting extraction via Puter AI (Large Context)...")
+    df, other = extract_with_puter(full_prompt)
     if df is not None and not df.empty:
-        return df, other_disc
+        progress_container.empty()
+        return df, other
 
-    # 2. Backup: Groq
-    df_groq, other_disc_groq = extract_with_groq_backup(transcript)
-    if df_groq is not None and not df_groq.empty:
-        return df_groq, other_disc_groq
+    # 2. ENGINE 2: Groq Fast-Pass (If transcript is short enough, avoid chunking)
+    if len(transcript) < 10000:
+        bar.progress(30, text="Attempting Groq Fast-Pass Analysis...")
+        res = call_groq_json(full_prompt)
+        if res != "RATE_LIMIT" and res is not None:
+            df_g, other_g = res
+            if df_g is not None and not df_g.empty:
+                progress_container.empty()
+                return df_g, other_g
 
-    st.error("Extraction encountered an issue on both APIs. Please verify your transcript and retry.")
-    return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+    # 3. ENGINE 3: Groq Safe-Chunking with Sleep-Retries
+    bar.progress(50, text="Switching to Safe Chunking Engine (Protected against Rate Limits)...")
+    chunks = chunk_text(transcript, max_chars=4000, overlap=300)
+    
+    all_table_items = []
+    all_other_discussions = []
+    
+    for idx, chunk in enumerate(chunks):
+        chunk_prompt = build_schema_prompt(chunk, f"from Part {idx+1}/{len(chunks)} of the transcript")
+        
+        success = False
+        retries = 3
+        while not success and retries > 0:
+            bar.progress(int((idx) / len(chunks) * 100), text=f"Processing Part {idx + 1} of {len(chunks)}...")
+            
+            res = call_groq_json(chunk_prompt)
+            if res == "RATE_LIMIT":
+                bar.progress(int((idx) / len(chunks) * 100), text=f"Groq limits reached. Pausing for 20 seconds to refresh tokens... (Part {idx + 1}/{len(chunks)})")
+                time.sleep(20) # Crucial: Sleeps to reset Groq tokens
+                retries -= 1
+            elif res is not None:
+                df_c, other_c = res
+                if df_c is not None and not df_c.empty:
+                    all_table_items.extend(df_c.to_dict('records'))
+                if other_c:
+                    all_other_discussions.append(other_c)
+                success = True
+            else:
+                retries -= 1
+
+    progress_container.empty()
+
+    if all_table_items:
+        df = pd.DataFrame(all_table_items)
+        for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+            if col not in df.columns:
+                df[col] = ""
+        return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), "\n\n".join(all_other_discussions)
+
+    # 4. NUCLEAR FALLBACK (Guarantees editor loads)
+    st.warning("All AI Engines were exhausted or rate limited. Opening manual draft mode.")
+    fallback_df = pd.DataFrame([{
+        "Discussion Points": "Meeting Overview & Key Deliverables",
+        "Action Plan": "Pending (Manual Entry Required)",
+        "Indicative Delivery Date": "TBD",
+        "Person-in-charge": "Unassigned"
+    }])
+    return fallback_df, "API limits triggered. Please review the full transcript above."
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -550,8 +596,7 @@ if st.session_state["transcript"]:
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                with st.spinner("Generating Minutes of the Meeting with Gemini..."):
-                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
+                extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
