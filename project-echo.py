@@ -131,38 +131,48 @@ h3 {
     background-color: #1A1A1A !important;
 }
 
-/* Specific styling for the card settings button */
+/* Small SVG-only Settings Icon Button in the Card Header */
+div[data-testid="stButton"]:has(button[key="card_settings_btn"]) {
+    display: flex !important;
+    justify-content: flex-end !important;
+}
+
 button[key="card_settings_btn"] {
-    background-color: #FFFFFF !important;
-    color: #222222 !important;
-    border: 1px solid #CCCCCC !important;
-    border-radius: 6px !important;
-    padding: 0.25rem 0.75rem !important;
-    font-size: 0.8rem !important;
-    display: inline-flex !important;
+    background-color: transparent !important;
+    border: 1px solid #C5A059 !important;
+    border-radius: 50% !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 6px !important;
+    cursor: pointer !important;
+    box-shadow: none !important;
 }
+
 button[key="card_settings_btn"]::before {
     content: "";
     display: inline-block;
-    width: 14px;
-    height: 14px;
-    background-color: #222222;
+    width: 17px;
+    height: 17px;
+    background-color: #C5A059;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
-    transition: background-color 0.25s ease;
+    transition: background-color 0.2s ease;
 }
+
 button[key="card_settings_btn"]:hover {
-    border-color: #D4AF37 !important;
-    color: #D4AF37 !important;
-    background-color: #1A1A1A !important;
+    background-color: #F8F5EE !important;
+    border-color: #A07828 !important;
 }
+
 button[key="card_settings_btn"]:hover::before {
-    background-color: #D4AF37 !important;
+    background-color: #A07828 !important;
 }
 
 .stTextArea textarea {
@@ -864,12 +874,12 @@ st.markdown("""
 
 # ---- Meeting Details Card ----
 with st.container(border=True):
-    # Header & Settings button in upper right corner of the card
-    head_col1, head_col2 = st.columns([8.2, 1.8])
+    # Header & Small SVG-only Settings icon button positioned at upper-right corner
+    head_col1, head_col2 = st.columns([9.3, 0.7])
     with head_col1:
         st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
     with head_col2:
-        if st.button("Settings", key="card_settings_btn", help="Open MoM Generation Engine & Token Diagnostics"):
+        if st.button("", key="card_settings_btn", help="Open MoM Generation Engine & Token Diagnostics"):
             st.session_state["show_settings"] = not st.session_state["show_settings"]
             st.rerun()
 
@@ -913,7 +923,7 @@ with st.container(border=True):
     # ROW 1: Date (August 25, 2026), Presets Location, Native Time Pickers, Prepared By
     r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.5, 2.2, 1.1, 1.1, 1.5, 1.5])
     with r1_c1:
-        meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25), format="MMMM DD, YYYY")
+        meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
     with r1_c2:
         loc_choice = st.selectbox("Location Preset", options=LOCATION_PRESETS, index=0)
         if loc_choice == "Other (Custom Location)":
