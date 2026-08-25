@@ -25,6 +25,9 @@ if not os.path.exists(_config_file):
         f.write('[theme]\nbase="light"\n')
 
 # API Keys & Endpoints
+GEMINI_API_KEY = "AQ.Ab8RN6K_IOVmESIrWTR3fUqT-070gGvz5NwTYo5zOboMbpx6Zw"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+
 GROQ_API_KEY = "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"
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -141,13 +144,61 @@ def transcribe_audio(audio_bytes):
     else:
         error_msg = resp.json().get("error", {}).get("message", resp.text)
         if "rate limit" in error_msg.lower():
-            st.error("Groq Transcription Rate Limit Reached. Please wait a few minutes or use the 'Upload Text' tab.")
+            st.error("Transcription rate limit reached. Please wait or use the 'Upload Text' tab.")
         else:
             st.error(f"Transcription failed: {error_msg}")
         return None
 
+def extract_with_gemini(transcript):
+    """Primary Extraction Engine using Google Gemini 1M Context Window."""
+    headers = {"Content-Type": "application/json"}
+    
+    prompt = f"""You are an executive assistant extracting Minutes of the Meeting (MOM).
+The transcript contains Tagalog and English (Taglish). Translate colloquial points into structured, professional business English.
+
+Output valid JSON ONLY matching this exact schema:
+{{
+  "table_items": [
+    {{
+      "Discussion Points": "Core discussion topic, report, or milestone",
+      "Action Plan": "Specific follow-up action, next step, or deliverable (put 'None' if none)",
+      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
+      "Person-in-charge": "Responsible entity (e.g. PRIME, Client name, or Unassigned)"
+    }}
+  ],
+  "other_discussions": "Summary of informal or secondary points"
+}}
+
+Transcript:
+{transcript}"""
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.1
+        }
+    }
+    
+    try:
+        resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=60)
+        if resp.status_code == 200:
+            result = resp.json()
+            raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+            data = json.loads(raw_text)
+            items = data.get("table_items", [])
+            if items:
+                df = pd.DataFrame(items)
+                for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+                    if col not in df.columns:
+                        df[col] = ""
+                return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
+    except Exception:
+        pass
+    return None, None
+
 def groq_completion(prompt, system_instruction, json_mode=False):
-    """Unified call to Groq with model failovers."""
+    """Fallback Engine using Groq."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
     
@@ -171,43 +222,33 @@ def groq_completion(prompt, system_instruction, json_mode=False):
             continue
     return None
 
-def extract_two_step_pipeline(transcript):
+def extract_structured_insights(transcript):
     """
-    OPTION 2: TWO-STEP PIPELINE
-    Step 1: Translate and condense the Taglish/colloquial transcript into structured English bullet points.
-    Step 2: Parse the clean English notes into the target MOM JSON table schema.
+    Primary: Google Gemini (Native 1M Context + Taglish Comprehension)
+    Backup: Groq Two-Step Translation Pipeline
     """
-    progress_bar = st.progress(0, text="Step 1/2: Translating & condensing meeting discussion...")
-    
-    # Step 1 Prompt: Translate & Condense
-    step1_sys = (
-        "You are an expert executive assistant. Analyze this meeting transcript (which may contain Tagalog/Taglish). "
-        "Translate all informal dialogue into clear, professional English meeting minutes. "
-        "Extract every discussion topic, report update, action item, deadline, and assigned person. "
-        "Output structured bullet points grouped by topic."
-    )
-    step1_prompt = f"Transcript:\n{transcript[:25000]}"
-    
-    clean_notes = groq_completion(step1_prompt, step1_sys, json_mode=False)
-    
-    if not clean_notes:
-        progress_bar.empty()
-        st.error("Failed to summarize transcript. Please retry.")
-        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
-    
-    progress_bar.progress(50, text="Step 2/2: Formatting Minutes of the Meeting into table...")
-    
-    # Step 2 Prompt: Format to JSON Schema
-    step2_sys = (
-        "You are a data formatting specialist. Convert the provided meeting summary into a valid JSON object. "
-        "Ensure EVERY discussion topic and action plan from the summary is represented."
-    )
-    step2_prompt = f"""Convert these clean meeting notes into a JSON object matching this schema:
+    # 1. Primary Engine: Gemini
+    with st.spinner("Analyzing transcript with Gemini Engine..."):
+        df, other_disc = extract_with_gemini(transcript)
+        if df is not None and not df.empty:
+            return df, other_disc
+
+    # 2. Backup Engine: Groq 2-Step Pipeline
+    with st.spinner("Gemini busy. Falling back to Groq Backup Pipeline..."):
+        step1_sys = (
+            "You are an expert executive assistant. Analyze this transcript containing Tagalog/Taglish. "
+            "Translate dialogue into clean professional English. Extract all discussion topics and deliverables."
+        )
+        clean_notes = groq_completion(f"Transcript:\n{transcript[:25000]}", step1_sys, json_mode=False)
+        
+        if clean_notes:
+            step2_sys = "Convert the provided meeting summary into a valid JSON object matching the requested schema."
+            step2_prompt = f"""Convert these notes into a JSON object:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Core discussion topic, report, or milestone",
-      "Action Plan": "Specific follow-up action, next step, or deliverable (put 'None' if none)",
+      "Discussion Points": "Core discussion topic or milestone",
+      "Action Plan": "Specific follow-up action or deliverable (put 'None' if none)",
       "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
       "Person-in-charge": "Responsible entity (e.g. PRIME, Client name, or Unassigned)"
     }}
@@ -215,38 +256,33 @@ def extract_two_step_pipeline(transcript):
   "other_discussions": "Summary of informal or secondary points"
 }}
 
-Meeting Notes:
+Notes:
 {clean_notes}"""
+            json_raw = groq_completion(step2_prompt, step2_sys, json_mode=True)
+            if json_raw:
+                try:
+                    clean_text = re.sub(r"^```(?:json)?\s*", "", json_raw)
+                    clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+                    match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+                    data = json.loads(match.group(0)) if match else json.loads(clean_text)
+                    items = data.get("table_items", [])
+                    if items:
+                        df = pd.DataFrame(items)
+                        for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+                            if col not in df.columns:
+                                df[col] = ""
+                        return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
+                except Exception:
+                    pass
 
-    json_raw = groq_completion(step2_prompt, step2_sys, json_mode=True)
-    progress_bar.progress(100, text="Finalizing Minutes of the Meeting...")
-    progress_bar.empty()
-
-    if json_raw:
-        try:
-            clean_text = re.sub(r"^```(?:json)?\s*", "", json_raw)
-            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-            match = re.search(r"\{.*\}", clean_text, re.DOTALL)
-            data = json.loads(match.group(0)) if match else json.loads(clean_text)
-            
-            items = data.get("table_items", [])
-            if items:
-                df = pd.DataFrame(items)
-                for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                    if col not in df.columns:
-                        df[col] = ""
-                return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
-        except Exception:
-            pass
-
-    # Fallback to display notes directly if JSON parsing encounters issues
+    # 3. Fail-safe Draft Row
     fallback_df = pd.DataFrame([{
-        "Discussion Points": "Meeting Summary & Discussion Points",
-        "Action Plan": clean_notes[:350] + "...",
+        "Discussion Points": "Meeting Overview & Key Deliverables",
+        "Action Plan": "Pending (Manual Entry Required)",
         "Indicative Delivery Date": "TBD",
-        "Person-in-charge": "PRIME / Client"
+        "Person-in-charge": "Unassigned"
     }])
-    return fallback_df, clean_notes
+    return fallback_df, ""
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -490,7 +526,7 @@ if st.session_state["transcript"]:
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                extracted_df, other_disc = extract_two_step_pipeline(st.session_state["transcript"])
+                extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
