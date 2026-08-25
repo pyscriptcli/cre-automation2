@@ -96,7 +96,7 @@ h3 {
     background-color: #FFFFFF !important; border-radius: 12px !important;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
     border: 1px solid rgba(0, 0, 0, 0.04) !important; 
-    padding: 1.25rem !important margin-bottom: 1rem !important;
+    padding: 1.25rem !important; margin-bottom: 1rem !important;
 }
 
 .stButton > button, .stDownloadButton > button {
@@ -151,7 +151,7 @@ def transcribe_audio(audio_bytes):
         return None
 
 def normalize_llm_json_to_df(data):
-    """Universal parser: Converts any LLM JSON format into the standardized MOM DataFrame."""
+    """Universal parser: Converts any LLM JSON format into standardized MOM DataFrame."""
     items = None
     other_disc = ""
     
@@ -197,12 +197,20 @@ def normalize_llm_json_to_df(data):
     return df, other_disc
 
 def extract_with_puter(prompt):
-    """Engine 1: Puter AI. Proxies to GPT-4o-mini for robust large-context extraction."""
+    """Engine 1: Puter AI (Large context via GPT-4o-mini)."""
     headers = {"Authorization": f"Bearer {PUTER_API_KEY}", "Content-Type": "application/json"}
     payload = {
         "model": "gpt-4o-mini",
         "messages": [
-            {"role": "system", "content": "You extract Minutes of the Meeting from transcripts. Translate colloquial terms to business English. Output ONLY valid JSON matching the schema."},
+            {
+                "role": "system",
+                "content": (
+                    "You are an executive assistant extracting Minutes of the Meeting. "
+                    "Translate Taglish/Tagalog conversation into professional English. "
+                    "Extract discussion points, deliverables, deadlines, and responsible entities. "
+                    "Respond ONLY with valid JSON."
+                )
+            },
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.1
@@ -220,15 +228,18 @@ def extract_with_puter(prompt):
         pass
     return None, ""
 
-def call_groq_json(prompt, models=["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]):
-    """Engine 2: Groq Direct API Call."""
+def call_groq_single_chunk(prompt, models=["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]):
+    """Performs a rate-limit safe single chunk request to Groq."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     
     for model in models:
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": "You are an executive assistant extracting Minutes of the Meeting. Translate Taglish to English. Respond ONLY with valid JSON."},
+                {
+                    "role": "system",
+                    "content": "You are an executive assistant extracting Minutes of the Meeting. Translate Taglish to professional English. Respond ONLY with valid JSON."
+                },
                 {"role": "user", "content": prompt}
             ],
             "response_format": {"type": "json_object"},
@@ -243,47 +254,68 @@ def call_groq_json(prompt, models=["llama-3.3-70b-versatile", "llama-3.1-8b-inst
                 match = re.search(r"\{.*\}", clean_text, re.DOTALL)
                 data = json.loads(match.group(0)) if match else json.loads(clean_text)
                 return normalize_llm_json_to_df(data)
+            elif resp.status_code == 429:
+                return "RATE_LIMIT", ""
         except Exception:
             continue
     return None, ""
 
-def build_schema_prompt(text_section):
-    return f"""Extract Minutes of the Meeting from the transcript. Translate Taglish to professional English.
+def smart_chunk_transcript(text, max_chars=3500, overlap=300):
+    """Splits transcripts cleanly along sentence boundaries."""
+    if len(text) <= max_chars:
+        return [text]
+    
+    sentences = re.split(r'(?<=[.!?\n])\s+', text)
+    chunks = []
+    curr_chunk = []
+    curr_len = 0
+    
+    for sentence in sentences:
+        curr_chunk.append(sentence)
+        curr_len += len(sentence) + 1
+        if curr_len >= max_chars:
+            chunks.append(" ".join(curr_chunk))
+            # Overlap with previous sentence
+            curr_chunk = [sentence]
+            curr_len = len(sentence)
+            
+    if curr_chunk:
+        chunks.append(" ".join(curr_chunk))
+    return chunks
+
+def build_schema_prompt(text_section, part_info=""):
+    return f"""Extract Minutes of the Meeting {part_info}. Translate Taglish conversation to clear, professional corporate English.
+Extract every milestone, report deliverable, site sourcing task, LGU update, and deadline.
+
 Output valid JSON ONLY matching:
 {{
   "table_items": [
     {{
       "Discussion Points": "Core discussion topic, report, or milestone",
-      "Action Plan": "Specific follow-up action, deliverable, or 'None'",
+      "Action Plan": "Concrete next step or deliverable (put 'None' if none)",
       "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
       "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or Unassigned)"
     }}
   ],
-  "other_discussions": "Summary of other points discussed"
+  "other_discussions": "Summary of informal or secondary points"
 }}
 
-Transcript:
+Transcript Content:
 {text_section}"""
 
 def heuristic_non_ai_extraction(transcript):
-    """
-    ENGINE 3 (NON-AI FALLBACK): 
-    Uses Python heuristics, regex, and keywords to build the table if AI APIs fail completely.
-    """
+    """Fallback Engine: Regex extraction if all API limits are exhausted."""
     sentences = re.split(r'(?<=[.!?]) +', transcript)
     
-    # Taglish/English Action and Date Keywords
-    action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'ipapasa', 'provide', 'gawa', 'target', 'need', 'will do', 'ipresent', 'kukunin']
-    date_keywords = ['tomorrow', 'next week', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'q1', 'q2', 'q3', 'q4', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'bukas', 'sa susunod', 'deadline']
+    action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'ipapasa', 'provide', 'target', 'ipresent', 'kukunin']
+    date_keywords = ['tomorrow', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'q1', 'q2', 'q3', 'q4', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'bukas', 'deadline']
     
     table_items = []
     other_discussions = []
     
-    # Group sentences into chunks of 3 to form pseudo-topics
     for i in range(0, len(sentences), 3):
         chunk = sentences[i:i+3]
         if not chunk: continue
-        
         chunk_text = " ".join(chunk)
         
         has_action = any(kw in chunk_text.lower() for kw in action_keywords)
@@ -291,10 +323,8 @@ def heuristic_non_ai_extraction(transcript):
         
         if has_action or has_date:
             action_text = " ".join([s for s in chunk if any(kw in s.lower() for kw in action_keywords)])
-            date_text = " ".join([s for s in chunk if any(kw in s.lower() for kw in date_keywords)])
-            
             table_items.append({
-                "Discussion Points": chunk[0].strip() + "...",  # First sentence as topic
+                "Discussion Points": chunk[0].strip() + "...",
                 "Action Plan": action_text.strip() if action_text else "Review discussion for actions",
                 "Indicative Delivery Date": "Check transcript (Date mentioned)" if has_date else "TBD",
                 "Person-in-charge": "Unassigned"
@@ -302,58 +332,85 @@ def heuristic_non_ai_extraction(transcript):
         else:
             other_discussions.append(chunk_text)
             
-    # Limit to top 10 items to keep table clean
-    if len(table_items) > 10:
-        table_items = table_items[:10]
-        
     if not table_items:
         table_items = [{
             "Discussion Points": "Meeting Overview",
-            "Action Plan": "No specific action keywords detected. Please review transcript manually.",
+            "Action Plan": "Please review transcript manually.",
             "Indicative Delivery Date": "TBD",
             "Person-in-charge": "Unassigned"
         }]
         
-    df = pd.DataFrame(table_items)
+    df = pd.DataFrame(table_items[:10])
     for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
         if col not in df.columns:
             df[col] = ""
             
     df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
-    other_text = "\n\n".join(other_discussions[:5]) + ("\n...(truncated)" if len(other_discussions) > 5 else "")
-    
-    return df, "Auto-extracted via Keyword Rules (AI Limit Reached):\n" + other_text
+    other_text = "\n\n".join(other_discussions[:4])
+    return df, other_text
 
 def extract_structured_insights(transcript):
-    """Dynamic Engine: Puter AI -> Groq -> Non-AI Heuristic Regex Rule Engine"""
+    """
+    DYNAMIC CHUNK & PACING ENGINE:
+    1. First tries Puter AI (Large context single-pass).
+    2. If Puter unavailable, splits into sequential chunks and calls Groq with rate-limit pacing.
+    3. If rate-limits hit, waits for token bucket refresh.
+    4. Merges all chunks before rendering the editor.
+    """
     progress_container = st.empty()
-    bar = progress_container.progress(0, text="Initializing Extraction Engine...")
+    bar = progress_container.progress(0, text="Initializing extraction engine...")
 
-    # We use a safe substring limit for single-pass API calls (prevents 429 limits)
-    safe_transcript = transcript[:18000]
-    full_prompt = build_schema_prompt(safe_transcript)
-
-    # 1. Try Puter API (GPT-4o-mini)
-    bar.progress(20, text="Attempting extraction via Puter AI (Large Context)...")
-    res_puter = extract_with_puter(full_prompt)
-    if res_puter and res_puter[0] is not None and not res_puter[0].empty:
+    # 1. Try Puter Single-Pass
+    bar.progress(10, text="Attempting direct analysis via Puter AI...")
+    full_prompt = build_schema_prompt(transcript[:30000])
+    res_puter, other_p = extract_with_puter(full_prompt)
+    if res_puter is not None and not res_puter.empty:
         progress_container.empty()
-        return res_puter[0], res_puter[1]
+        return res_puter, other_p
 
-    # 2. Try Groq (Llama 3.3)
-    bar.progress(60, text="Puter busy. Attempting Groq Analysis...")
-    res_groq = call_groq_json(full_prompt)
-    if res_groq and res_groq[0] is not None and not res_groq[0].empty:
-        progress_container.empty()
-        return res_groq[0], res_groq[1]
-
-    # 3. Non-AI Fallback Engine
-    bar.progress(90, text="AI API Limits Reached. Running Non-AI Keyword Extraction...")
-    df, other = heuristic_non_ai_extraction(transcript)
+    # 2. Sequential Chunk Engine with Rate-Limit Pacing
+    bar.progress(30, text="Puter unavailable. Initializing sequential chunking engine...")
+    chunks = smart_chunk_transcript(transcript, max_chars=3500, overlap=300)
     
+    all_table_items = []
+    all_other_discussions = []
+    
+    for idx, chunk in enumerate(chunks):
+        chunk_prompt = build_schema_prompt(chunk, f"(Part {idx+1}/{len(chunks)})")
+        pct = int(30 + ((idx + 1) / len(chunks) * 60))
+        
+        success = False
+        retries = 2
+        while not success and retries >= 0:
+            bar.progress(pct, text=f"Processing Part {idx + 1} of {len(chunks)}...")
+            res_groq, other_g = call_groq_single_chunk(chunk_prompt)
+            
+            if res_groq == "RATE_LIMIT":
+                bar.progress(pct, text=f"Rate limit reached. Pausing 15s to refresh tokens (Part {idx + 1}/{len(chunks)})...")
+                time.sleep(15)
+                retries -= 1
+            elif res_groq is not None and not res_groq.empty:
+                all_table_items.extend(res_groq.to_dict('records'))
+                if other_g:
+                    all_other_discussions.append(other_g)
+                success = True
+                # Small polite delay between chunks to avoid bursting TPM
+                time.sleep(1.5)
+            else:
+                retries -= 1
+
     progress_container.empty()
-    st.warning("⚠️ AI servers are currently busy/rate-limited. The table below was populated using our offline Keyword Engine based on action words in the text.")
-    return df, other
+
+    if all_table_items:
+        df = pd.DataFrame(all_table_items)
+        for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+            if col not in df.columns:
+                df[col] = ""
+        return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), "\n\n".join(all_other_discussions)
+
+    # 3. Non-AI Fallback
+    df_fb, other_fb = heuristic_non_ai_extraction(transcript)
+    return df_fb, other_fb
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
