@@ -31,20 +31,19 @@ os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
-# API Keys & Endpoints
-DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "sk-7b4c611f153f4fe0adc1a1cbd13a2930")
+# API Keys & Endpoints loaded via st.secrets with fallback defaults
+DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
-GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "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")
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-# Directly embedded OpenAI Key to prevent Streamlit Cloud environment/secrets parsing mismatches
-# Safely pull OpenAI API Key from Streamlit Secrets with validation
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
 if not OPENAI_API_KEY and "OPENAI_API_KEY" in st.secrets:
     OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
+OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
 CRD_MEMBERS = [
     "Sondi Tuazon",
@@ -74,7 +73,7 @@ if "other_discussions" not in st.session_state: st.session_state["other_discussi
 if "show_settings" not in st.session_state: st.session_state["show_settings"] = False
 if "tokens_used" not in st.session_state: st.session_state["tokens_used"] = 0
 if "last_api_call" not in st.session_state: st.session_state["last_api_call"] = None
-if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "AI - DeepSeek"
+if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "AI - OpenAI (GPT-4o-mini)"
 
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
@@ -168,7 +167,7 @@ button[key="card_settings_btn"]::before {
     height: 17px;
     background-color: #C5A059;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -213,6 +212,9 @@ def extract_text_from_file(uploaded_file):
         return ""
 
 def _call_openai_transcribe(audio_bytes, filename="audio.mp3"):
+    if not OPENAI_API_KEY:
+        st.error("OpenAI API Key is missing. Please add it to your Streamlit Cloud Secrets.")
+        return None
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
     files = {"file": (filename, audio_bytes), "model": (None, "gpt-4o-mini-transcribe"), "response_format": (None, "json")}
     try:
@@ -372,9 +374,13 @@ def normalize_llm_json_to_df(data):
     df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
     return df, other_disc
 
-def extract_with_deepseek(transcript):
+def extract_with_openai_completion(transcript):
+    if not OPENAI_API_KEY:
+        st.error("OpenAI API Key is missing. Please add it to your Streamlit Cloud Secrets.")
+        return None, ""
+
     headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json"
     }
 
@@ -406,18 +412,17 @@ Transcript:
 {transcript[:35000]}"""
 
     payload = {
-        "model": "deepseek-chat",
+        "model": "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
         "response_format": {"type": "json_object"},
-        "temperature": 0.2,
-        "max_tokens": 2048
+        "temperature": 0.2
     }
 
     try:
-        resp = requests.post(DEEPSEEK_CHAT_URL, headers=headers, json=payload, timeout=120)
+        resp = requests.post(OPENAI_CHAT_URL, headers=headers, json=payload, timeout=120)
         if resp.status_code == 200:
             res_json = resp.json()
             usage = res_json.get("usage", {})
@@ -431,9 +436,9 @@ Transcript:
             data = json.loads(match.group(0)) if match else json.loads(clean_text)
             return normalize_llm_json_to_df(data)
         else:
-            st.warning(f"DeepSeek Notice ({resp.status_code}): {resp.text}")
+            st.warning(f"OpenAI Notice ({resp.status_code}): {resp.text}")
     except Exception as e:
-        st.warning(f"DeepSeek connection error: {e}")
+        st.warning(f"OpenAI connection error: {e}")
 
     return None, ""
 
@@ -482,7 +487,7 @@ def heuristic_non_ai_extraction(transcript):
     other_text = "\n\n".join(other_discussions[:4])
     return df, other_text
 
-def extract_structured_insights(transcript, engine="AI - DeepSeek"):
+def extract_structured_insights(transcript, engine="AI - OpenAI (GPT-4o-mini)"):
     progress_bar = st.progress(0, text="Initializing MOM extraction (0%)...")
     time.sleep(0.2)
     progress_bar.progress(40, text=f"Translating Taglish conversation & extracting with {engine} (40%)...")
@@ -495,7 +500,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
         progress_bar.empty()
         return res_df, res_other
 
-    df, other = extract_with_deepseek(transcript)
+    df, other = extract_with_openai_completion(transcript)
     
     if df is not None and not df.empty:
         progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%)...")
@@ -505,7 +510,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
 
     df_fb, other_fb = heuristic_non_ai_extraction(transcript)
     progress_bar.empty()
-    st.markdown(f"{SVG_ALERT} DeepSeek request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
+    st.markdown(f"{SVG_ALERT} OpenAI request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
     return df_fb, other_fb
 
 def set_cell_shading(cell, color_hex):
@@ -901,7 +906,7 @@ with st.container(border=True):
             
             with set_col1:
                 engine_options = [
-                    "AI - DeepSeek",
+                    "AI - OpenAI (GPT-4o-mini)",
                     "Non-AI - Python Heuristic"
                 ]
                 selected_eng = st.selectbox(
@@ -924,11 +929,11 @@ with st.container(border=True):
                 st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
                 
                 if st.session_state["last_api_call"]:
-                    last_call = st.session_state["last_call"] if "last_call" in locals() else st.session_state["last_api_call"]
+                    last_call = st.session_state["last_api_call"]
                     st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
-                    st.write("• **DeepSeek Server Status:** `Active & Ready`")
+                    st.write("• **OpenAI Engine Status:** `Active & Ready`")
                 else:
-                    st.write("• **DeepSeek Server Status:** `Ready`")
+                    st.write("• **OpenAI Engine Status:** `Ready`")
         st.markdown("---")
     
     # ROW 1: Clean Date Picker, Blank Location with Presets, Simple Time Pickers, Prepared By
