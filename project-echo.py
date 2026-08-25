@@ -21,7 +21,6 @@ from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 import streamlit.components.v1 as components
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ========== CONFIG ==========
 st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
@@ -42,31 +41,6 @@ GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
-
-# ========== DAILY AUDIO LIMIT CONFIGURATION ==========
-MAX_DAILY_AUDIO = 5  # Set maximum audio transcriptions per day
-USAGE_FILE = ".daily_audio_usage.json"
-
-def get_daily_audio_count():
-    today_str = datetime.date.today().isoformat()
-    if os.path.exists(USAGE_FILE):
-        try:
-            with open(USAGE_FILE, "r") as f:
-                data = json.load(f)
-                if data.get("date") == today_str:
-                    return data.get("count", 0)
-        except Exception:
-            pass
-    return 0
-
-def increment_daily_audio_count():
-    today_str = datetime.date.today().isoformat()
-    current = get_daily_audio_count()
-    try:
-        with open(USAGE_FILE, "w") as f:
-            json.dump({"date": today_str, "count": current + 1}, f)
-    except Exception:
-        pass
 
 CRD_MEMBERS = [
     "Sondi Tuazon",
@@ -306,12 +280,11 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
             if text:
                 progress_bar.progress(100, text="Transcription completed (100%)!")
                 status_placeholder.empty()
-                increment_daily_audio_count()
                 return text
             status_placeholder.warning("⚠️ Groq rate limit reached. Switching automatically to OpenAI...")
 
         status_placeholder.info("🚀 Processing recording via OpenAI...")
-        progress_bar.progress(55, text="Preparing audio segments for parallel OpenAI (55%)...")
+        progress_bar.progress(55, text="Preparing audio segments for OpenAI (55%)...")
         
         # Segment the audio into 10-minute chunks
         segment_pattern = src_path + "_seg_%03d.mp3"
@@ -328,38 +301,17 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         full_transcript = []
         total_segs = len(segments)
 
-        # Parallel processing with ThreadPoolExecutor
-        max_workers = min(5, total_segs)  # at most 5 workers
-        segment_results = {}
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_idx = {}
-            for idx, seg in enumerate(segments):
-                with open(seg, "rb") as f:
-                    seg_bytes = f.read()
-                future = executor.submit(_call_openai_transcribe, seg_bytes, f"part_{idx}.mp3")
-                future_to_idx[future] = idx
-
-            # Update progress as futures complete
-            completed = 0
-            for future in as_completed(future_to_idx):
-                idx = future_to_idx[future]
-                try:
-                    result = future.result()
-                    if result:
-                        segment_results[idx] = result
-                except Exception as e:
-                    st.error(f"Segment {idx} transcription error: {e}")
-                completed += 1
-                pct = int(55 + (completed / total_segs) * 40)
-                progress_bar.progress(pct, text=f"Transcribed {completed}/{total_segs} segments ({pct}%)...")
-
-        # Assemble transcript in original order
-        for idx in range(total_segs):
-            if idx in segment_results:
-                full_transcript.append(segment_results[idx])
-
-        # Clean up segment files
-        for seg in segments:
+        # Sequential processing of segments
+        for idx, seg in enumerate(segments):
+            pct = int(55 + ((idx + 1) / total_segs) * 40)
+            progress_bar.progress(pct, text=f"Transcribing segment {idx + 1} of {total_segs} ({pct}%)...")
+            
+            with open(seg, "rb") as f:
+                seg_bytes = f.read()
+            t = _call_openai_transcribe(seg_bytes, f"part_{idx}.mp3")
+            if t:
+                full_transcript.append(t)
+            time.sleep(0.2)
             try:
                 os.remove(seg)
             except:
@@ -368,7 +320,6 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         progress_bar.progress(100, text="Transcription completed successfully (100%)!")
         time.sleep(0.3)
         status_placeholder.empty()
-        increment_daily_audio_count()
         return " ".join(full_transcript)
 
     except Exception as e:
@@ -1015,10 +966,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Fetch current daily count
-daily_audio_used = get_daily_audio_count()
-audio_quota_reached = daily_audio_used >= MAX_DAILY_AUDIO
-
 # ---- Meeting Details Card ----
 with st.container(border=True):
     head_col1, head_col2 = st.columns([9.3, 0.7])
@@ -1055,8 +1002,7 @@ with st.container(border=True):
                             st.rerun()
 
             with set_col2:
-                st.markdown("**Daily Quota & Diagnostics**")
-                st.write(f"• **Daily Audio Usage:** `{daily_audio_used} / {MAX_DAILY_AUDIO}` transcriptions")
+                st.markdown("**Diagnostics**")
                 st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
                 
                 if st.session_state["last_api_call"]:
@@ -1115,60 +1061,52 @@ with st.container(border=True):
     # Three Tabs
     tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text (Unlimited)"])
 
-    # TAB 1: UPLOAD AUDIO (RATE LIMITED)
+    # TAB 1: UPLOAD AUDIO
     with tab_upload:
-        if audio_quota_reached:
-            st.warning(f"⚠️ Daily audio transcription quota ({MAX_DAILY_AUDIO}/{MAX_DAILY_AUDIO}) reached. You can still use the **Upload Text** tab without any limits!")
-        else:
-            st.caption(f"Audio transcription quota: **{daily_audio_used}/{MAX_DAILY_AUDIO}** used today.")
-            u_col1, u_col2 = st.columns([5, 1.5])
-            with u_col1:
-                uploaded_file = st.file_uploader(
-                    "Upload audio file (200MB limit supported)",
-                    type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
-                    help="Audio uploads up to 200MB are supported."
-                )
-            if uploaded_file:
-                with u_col2:
-                    st.write("")
-                    st.write("")
-                    if st.button("Transcribe Audio", key="btn_tx_upload"):
-                        p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
-                        p_status = st.empty()
-                        transcript = transcribe_audio_pipeline(uploaded_file.read(), uploaded_file.name, p_bar, p_status)
-                        p_bar.empty()
-                        p_status.empty()
-                        if transcript:
-                            st.session_state["transcript"] = transcript
-                            st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-                            st.session_state["other_discussions"] = ""
-                            st.rerun()
+        u_col1, u_col2 = st.columns([5, 1.5])
+        with u_col1:
+            uploaded_file = st.file_uploader(
+                "Upload audio file (200MB limit supported)",
+                type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
+                help="Audio uploads up to 200MB are supported."
+            )
+        if uploaded_file:
+            with u_col2:
+                st.write("")
+                st.write("")
+                if st.button("Transcribe Audio", key="btn_tx_upload"):
+                    p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
+                    p_status = st.empty()
+                    transcript = transcribe_audio_pipeline(uploaded_file.read(), uploaded_file.name, p_bar, p_status)
+                    p_bar.empty()
+                    p_status.empty()
+                    if transcript:
+                        st.session_state["transcript"] = transcript
+                        st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+                        st.session_state["other_discussions"] = ""
+                        st.rerun()
 
-    # TAB 2: RECORD AUDIO (RATE LIMITED)
+    # TAB 2: RECORD AUDIO
     with tab_record:
-        if audio_quota_reached:
-            st.warning(f"⚠️ Daily audio transcription quota ({MAX_DAILY_AUDIO}/{MAX_DAILY_AUDIO}) reached. You can still use the **Upload Text** tab without any limits!")
-        else:
-            st.caption(f"Audio transcription quota: **{daily_audio_used}/{MAX_DAILY_AUDIO}** used today.")
-            r_col1, r_col2, r_col3 = st.columns([4, 1.5, 1.5])
-            with r_col1:
-                recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
-            if recorded_audio:
-                rec_bytes = recorded_audio.read()
-                with r_col2:
-                    st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
-                with r_col3:
-                    if st.button("Transcribe Audio", key="btn_tx_record"):
-                        p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
-                        p_status = st.empty()
-                        transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
-                        p_bar.empty()
-                        p_status.empty()
-                        if transcript:
-                            st.session_state["transcript"] = transcript
-                            st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-                            st.session_state["other_discussions"] = ""
-                            st.rerun()
+        r_col1, r_col2, r_col3 = st.columns([4, 1.5, 1.5])
+        with r_col1:
+            recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
+        if recorded_audio:
+            rec_bytes = recorded_audio.read()
+            with r_col2:
+                st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
+            with r_col3:
+                if st.button("Transcribe Audio", key="btn_tx_record"):
+                    p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
+                    p_status = st.empty()
+                    transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
+                    p_bar.empty()
+                    p_status.empty()
+                    if transcript:
+                        st.session_state["transcript"] = transcript
+                        st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+                        st.session_state["other_discussions"] = ""
+                        st.rerun()
 
     # TAB 3: TEXT UPLOAD (UNLIMITED)
     with tab_text:
