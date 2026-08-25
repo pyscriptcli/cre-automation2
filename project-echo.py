@@ -50,8 +50,8 @@ CRD_MEMBERS = [
     "Irish Rima"
 ]
 
-# 12-Hour AM/PM Time Options
-TIME_OPTIONS = []
+# 12-Hour AM/PM Time Options with blank default
+TIME_OPTIONS = [""]
 for h in range(24):
     for m in (0, 30):
         t = datetime.time(h, m)
@@ -129,12 +129,30 @@ h3 {
     font-size: 0.95rem !important;
     line-height: 1.6 !important;
 }
+
+.loading-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background-color: #FFFFFF;
+    border: 1px solid #D4AF37;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 12px 0;
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.15);
+}
+.loading-banner span {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #161616;
+}
 </style>
 """
 
 # ========== SVG ICONS ==========
 SVG_SETTINGS = """<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>"""
 SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
+SVG_SPINNER = """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><style>@keyframes spin { 100% { transform: rotate(360deg); } }</style><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>"""
 
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
@@ -164,7 +182,6 @@ def _call_groq_whisper(audio_bytes):
     else:
         error_msg = resp.json().get("error", {}).get("message", resp.text)
         if "rate limit" in error_msg.lower():
-            st.warning("Whisper rate limit hit. Waiting 10s before continuing...")
             time.sleep(10)
             resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files)
             if resp.status_code == 200:
@@ -172,14 +189,17 @@ def _call_groq_whisper(audio_bytes):
         st.error(f"Transcription error: {error_msg}")
         return None
 
-def transcribe_audio(audio_bytes, progress_bar=None):
+def transcribe_audio(audio_bytes, progress_container=None):
     """
     Handles unlimited audio size (100MB - 200MB+) by converting to mono 16kHz 32kbps MP3
     and slicing into safe segments compliant with Groq's 25MB ceiling.
     """
     try:
+        if progress_container:
+            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Compressing audio stream and preparing segments...</span></div>', unsafe_allow_html=True)
+            
         sound = AudioSegment.from_file(io.BytesIO(audio_bytes))
-        sound = sound.set_channels(1)        # Downmix to mono (halves size)
+        sound = sound.set_channels(1)        # Downmix to mono
         sound = sound.set_frame_rate(16000)  # Standard 16kHz for Whisper
         
         # 10 minutes per chunk (approx 2.4 MB per segment at 32k)
@@ -197,8 +217,8 @@ def transcribe_audio(audio_bytes, progress_bar=None):
             chunk.export(chunk_buffer, format="mp3", bitrate="32k")
             chunk_bytes = chunk_buffer.getvalue()
             
-            if progress_bar:
-                progress_bar.progress(int(((i + 1) / total_chunks) * 100), text=f"Transcribing Audio Segment {i + 1} of {total_chunks}...")
+            if progress_container:
+                progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Transcribing audio segment {i + 1} of {total_chunks} with Groq Whisper...</span></div>', unsafe_allow_html=True)
             
             text = _call_groq_whisper(chunk_bytes)
             if text:
@@ -207,7 +227,8 @@ def transcribe_audio(audio_bytes, progress_bar=None):
             
         return " ".join(full_transcript)
     except Exception as e:
-        st.warning(f"Fast streaming fallthrough: {e}. Processing via single-pass...")
+        if progress_container:
+            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Processing direct single-pass audio transcription...</span></div>', unsafe_allow_html=True)
         return _call_groq_whisper(audio_bytes)
 
 def normalize_llm_json_to_df(data):
@@ -367,24 +388,20 @@ def heuristic_non_ai_extraction(transcript):
 
 def extract_structured_insights(transcript, engine="DeepSeek (Primary)"):
     progress_container = st.empty()
-    bar = progress_container.progress(0, text=f"Initializing {engine}...")
+    progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Translating Taglish conversation & structuring MOM with {engine}...</span></div>', unsafe_allow_html=True)
 
     if engine == "Python Heuristic (Non-AI)":
-        bar.progress(100, text="Extracting with Rule-Based Heuristic...")
         time.sleep(0.5)
+        res_df, res_other = heuristic_non_ai_extraction(transcript)
         progress_container.empty()
-        return heuristic_non_ai_extraction(transcript)
+        return res_df, res_other
 
-    bar.progress(35, text="Translating Taglish & Extracting MOM via DeepSeek V3...")
     df, other = extract_with_deepseek(transcript)
     
     if df is not None and not df.empty:
-        bar.progress(100, text="Finalizing Minutes of the Meeting...")
-        time.sleep(0.3)
         progress_container.empty()
         return df, other
 
-    bar.progress(90, text="DeepSeek unavailable. Running Non-AI Keyword Extraction...")
     df_fb, other_fb = heuristic_non_ai_extraction(transcript)
     progress_container.empty()
     st.markdown(f"{SVG_ALERT} DeepSeek request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
@@ -416,14 +433,12 @@ def export_to_word(df, meeting_details, other_discussions):
                     fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     fp.add_run().add_picture("footer.png", width=Inches(7.0))
 
-    # Configure Margins
     for section in doc.sections:
         section.top_margin = Inches(0.4)
         section.bottom_margin = Inches(0.4)
         section.left_margin = Inches(0.75)
         section.right_margin = Inches(0.75)
 
-    # 1. Title Header
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_title.paragraph_format.space_before = Pt(0)
@@ -435,7 +450,7 @@ def export_to_word(df, meeting_details, other_discussions):
     r_title.font.size = Pt(11)
 
     company_target = meeting_details.get("external_attendees", [])
-    primary_client_rep = company_target[0] if company_target else meeting_details.get("company_name", "CLIENT")
+    primary_client_rep = company_target[0] if company_target else meeting_details.get("company_name", "").strip() or "CLIENT"
     p_sub = doc.add_paragraph()
     p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_sub.paragraph_format.space_after = Pt(12)
@@ -444,10 +459,9 @@ def export_to_word(df, meeting_details, other_discussions):
     r_sub.font.name = "Arial"
     r_sub.font.size = Pt(11)
 
-    # 2. Metadata Block (Date, Location, Attended by)
     date_str = meeting_details.get("date", "____________")
     time_str = meeting_details.get("time_range", "")
-    full_date = f"Date: {date_str}" + (f", {time_str}" if time_str else "")
+    full_date = f"Date: {date_str}" + (f", {time_str}" if time_str.strip() else "")
     
     p_date = doc.add_paragraph(full_date)
     p_date.paragraph_format.space_after = Pt(2)
@@ -477,7 +491,8 @@ def export_to_word(df, meeting_details, other_discussions):
                 p.paragraph_format.left_indent = Inches(1.35)
             else:
                 p.add_run("\t")
-            r = p.add_run(f"{att}, {meeting_details.get('company_name', 'Client')}")
+            comp_label = f", {meeting_details.get('company_name')}" if meeting_details.get('company_name') else ""
+            r = p.add_run(f"{att}{comp_label}")
             r.font.name = "Arial"
             r.font.size = Pt(10)
             first_attendee = False
@@ -495,7 +510,6 @@ def export_to_word(df, meeting_details, other_discussions):
             r.font.size = Pt(10)
             first_attendee = False
 
-    # 3. Horizontal Separator Rule
     p_line = doc.add_paragraph()
     p_line.paragraph_format.space_before = Pt(4)
     p_line.paragraph_format.space_after = Pt(6)
@@ -503,15 +517,14 @@ def export_to_word(df, meeting_details, other_discussions):
     r_line.font.name = "Arial"
     r_line.font.color.rgb = RGBColor(160, 160, 160)
 
-    # 4. Context Intro Paragraph
+    client_display = meeting_details.get('company_name', '').strip() or "the Client"
     p_intro = doc.add_paragraph(
         f"During the meeting held last {date_str}, PRIME Philippines, represented by the attendee/s shown above, "
-        f"met with {meeting_details.get('company_name', 'the Client')} to discuss opportunities for collaboration."
+        f"met with {client_display} to discuss opportunities for collaboration."
     )
     p_intro.paragraph_format.space_after = Pt(10)
     for r in p_intro.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
 
-    # 5. Dynamic Data Table
     table = doc.add_table(rows=len(df)+1, cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.style = "Table Grid"
@@ -541,7 +554,6 @@ def export_to_word(df, meeting_details, other_discussions):
                 p.runs[0].font.size = Pt(8.5)
                 p.runs[0].font.name = "Arial"
 
-    # 6. Indicative Date Note
     doc.add_paragraph()
     p_note = doc.add_paragraph("*Note: The indicative delivery date serves as reference point and still subject to changes. Furthermore, it depends on the progress of both parties.")
     p_note.paragraph_format.space_after = Pt(8)
@@ -549,7 +561,6 @@ def export_to_word(df, meeting_details, other_discussions):
     p_note.runs[0].font.name = "Arial"
     p_note.runs[0].font.size = Pt(8)
 
-    # 7. Other Discussions Section
     if other_discussions.strip():
         p_od_head = doc.add_paragraph()
         p_od_head.paragraph_format.space_before = Pt(6)
@@ -563,7 +574,6 @@ def export_to_word(df, meeting_details, other_discussions):
         p_od.paragraph_format.space_after = Pt(12)
         for r in p_od.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
 
-    # 8. Sign-off / Prepared and Confirmed Section
     p_prep_label = doc.add_paragraph("Prepared by:")
     p_prep_label.paragraph_format.space_before = Pt(12)
     p_prep_label.paragraph_format.space_after = Pt(2)
@@ -573,8 +583,8 @@ def export_to_word(df, meeting_details, other_discussions):
     p_prep_line.paragraph_format.space_after = Pt(2)
     p_prep_line.runs[0].font.name = "Arial"
 
-    prep_name = meeting_details.get("prep_name", "").strip() or "Mr. Romel Dellosa"
-    prep_desig = meeting_details.get("prep_desig", "").strip() or "AVP for Capital Markets\nPRIME Philippines"
+    prep_name = meeting_details.get("prep_name", "").strip() or "____________________"
+    prep_desig = meeting_details.get("prep_desig", "").strip() or "PRIME Philippines"
     p_prep_info = doc.add_paragraph(f"{prep_name}\n{prep_desig}")
     p_prep_info.paragraph_format.space_after = Pt(12)
     for r in p_prep_info.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
@@ -587,8 +597,8 @@ def export_to_word(df, meeting_details, other_discussions):
     p_conf_line.paragraph_format.space_after = Pt(2)
     p_conf_line.runs[0].font.name = "Arial"
 
-    conf_name = meeting_details.get("conf_name", "").strip() or (ext_atts[0] if ext_atts else "Mr. ABCD")
-    conf_desig = meeting_details.get("conf_desig", "").strip() or meeting_details.get("company_name", "XYZ Company")
+    conf_name = meeting_details.get("conf_name", "").strip() or (ext_atts[0] if ext_atts else "____________________")
+    conf_desig = meeting_details.get("conf_desig", "").strip() or (meeting_details.get("company_name", "").strip() or "Client")
     p_conf_info = doc.add_paragraph(f"{conf_name}\n{conf_desig}")
     p_conf_info.paragraph_format.space_after = Pt(6)
     for r in p_conf_info.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
@@ -620,7 +630,7 @@ def export_to_pdf(df, meeting_details, other_discussions):
         spaceAfter=2
     )
     company_target = meeting_details.get("external_attendees", [])
-    primary_client_rep = company_target[0] if company_target else meeting_details.get("company_name", "CLIENT")
+    primary_client_rep = company_target[0] if company_target else meeting_details.get("company_name", "").strip() or "CLIENT"
     style_subtitle = ParagraphStyle(
         'DocSubTitle',
         parent=styles['Normal'],
@@ -670,7 +680,7 @@ def export_to_pdf(df, meeting_details, other_discussions):
 
     date_str = meeting_details.get("date", "____________")
     time_str = meeting_details.get("time_range", "")
-    full_date = f"<b>Date:</b> {date_str}" + (f", {time_str}" if time_str else "")
+    full_date = f"<b>Date:</b> {date_str}" + (f", {time_str}" if time_str.strip() else "")
     story.append(Paragraph(full_date, style_body))
     story.append(Paragraph(f"<b>Location:</b> {meeting_details.get('location', '____________')}", style_body))
 
@@ -680,7 +690,8 @@ def export_to_pdf(df, meeting_details, other_discussions):
     if ext_atts:
         for att in ext_atts:
             if att.strip():
-                att_list.append(f"{att}, {meeting_details.get('company_name', 'Client')}")
+                comp_label = f", {meeting_details.get('company_name')}" if meeting_details.get('company_name') else ""
+                att_list.append(f"{att}{comp_label}")
     if prime_atts:
         for att in prime_atts:
             att_list.append(f"{att} – PRIME Philippines")
@@ -691,9 +702,10 @@ def export_to_pdf(df, meeting_details, other_discussions):
             story.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{a}", style_body))
 
     story.append(Spacer(1, 4))
+    client_display = meeting_details.get('company_name', '').strip() or "the Client"
     story.append(Paragraph(
         f"During the meeting held last {date_str}, PRIME Philippines, represented by the attendee/s shown above, "
-        f"met with {meeting_details.get('company_name', 'the Client')} to discuss opportunities for collaboration.",
+        f"met with {client_display} to discuss opportunities for collaboration.",
         style_body
     ))
     story.append(Spacer(1, 6))
@@ -734,10 +746,10 @@ def export_to_pdf(df, meeting_details, other_discussions):
         story.append(Paragraph(other_discussions, style_body))
 
     story.append(Spacer(1, 8))
-    prep_name = meeting_details.get("prep_name", "").strip() or "Mr. Romel Dellosa"
-    prep_desig = meeting_details.get("prep_desig", "").strip() or "AVP for Capital Markets<br/>PRIME Philippines"
-    conf_name = meeting_details.get("conf_name", "").strip() or (ext_atts[0] if ext_atts else "Mr. ABCD")
-    conf_desig = meeting_details.get("conf_desig", "").strip() or meeting_details.get("company_name", "XYZ Company")
+    prep_name = meeting_details.get("prep_name", "").strip() or "____________________"
+    prep_desig = meeting_details.get("prep_desig", "").strip() or "PRIME Philippines"
+    conf_name = meeting_details.get("conf_name", "").strip() or (ext_atts[0] if ext_atts else "____________________")
+    conf_desig = meeting_details.get("conf_desig", "").strip() or (meeting_details.get("company_name", "").strip() or "Client")
 
     sign_data = [
         [Paragraph("<b>Prepared by:</b>", style_body), Paragraph("<b>Confirmed by:</b>", style_body)],
@@ -770,30 +782,26 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---- Compact 2-Row Details & Audio ----
+# ---- Compact Details & Audio (Blank Defaults) ----
 with st.container(border=True):
     st.markdown('<h3>Meeting Details & Audio</h3>', unsafe_allow_html=True)
     
     # ROW 1
     r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.3, 2.0, 1.1, 1.1, 1.5, 1.5])
-    with r1_c1: meeting_date = st.date_input("Date", value=datetime.date.today())
-    with r1_c2: meeting_location = st.text_input("Location", value="Greatwork Mega Tower Boardroom")
-    with r1_c3:
-        start_time_idx = TIME_OPTIONS.index("02:30 PM") if "02:30 PM" in TIME_OPTIONS else 29
-        start_time = st.selectbox("Start", options=TIME_OPTIONS, index=start_time_idx)
-    with r1_c4:
-        end_time_idx = TIME_OPTIONS.index("05:00 PM") if "05:00 PM" in TIME_OPTIONS else 34
-        end_time = st.selectbox("End", options=TIME_OPTIONS, index=end_time_idx)
-    with r1_c5: prep_name = st.text_input("Prepared By (Name)", placeholder="e.g. Mr. Romel Dellosa")
-    with r1_c6: prep_desig = st.text_input("Designation", placeholder="e.g. AVP for Capital Markets")
+    with r1_c1: meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
+    with r1_c2: meeting_location = st.text_input("Location", value="", placeholder="e.g. Boardroom")
+    with r1_c3: start_time = st.selectbox("Start", options=TIME_OPTIONS, index=0)
+    with r1_c4: end_time = st.selectbox("End", options=TIME_OPTIONS, index=0)
+    with r1_c5: prep_name = st.text_input("Prepared By (Name)", value="", placeholder="e.g. John Doe")
+    with r1_c6: prep_desig = st.text_input("Designation", value="", placeholder="e.g. Associate")
 
     # ROW 2
     r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
-    with r2_c1: client_name = st.text_input("Client / Company", placeholder="XYZ Company")
-    with r2_c2: selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=CRD_MEMBERS)
-    with r2_c3: ext_attendees_raw = st.text_input("External Attendees", placeholder="e.g. Mr. ABCD")
-    with r2_c4: conf_name = st.text_input("Confirmed By (Name)", placeholder="e.g. Mr. ABCD")
-    with r2_c5: conf_desig = st.text_input("Designation", placeholder="e.g. XYZ Company")
+    with r2_c1: client_name = st.text_input("Client / Company", value="", placeholder="XYZ Company")
+    with r2_c2: selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=[])
+    with r2_c3: ext_attendees_raw = st.text_input("External Attendees", value="", placeholder="e.g. Mr. ABCD, Jane Doe")
+    with r2_c4: conf_name = st.text_input("Confirmed By (Name)", value="", placeholder="e.g. Client Rep")
+    with r2_c5: conf_desig = st.text_input("Designation", value="", placeholder="e.g. Managing Director")
 
     # Three Tabs
     tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text"])
@@ -801,13 +809,19 @@ with st.container(border=True):
     with tab_upload:
         u_col1, u_col2 = st.columns([5, 1.5])
         with u_col1:
-            uploaded_file = st.file_uploader("Upload audio file (Up to 1GB supported)", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"], label_visibility="collapsed")
+            uploaded_file = st.file_uploader(
+                "Upload audio file (100MB+ supported)",
+                type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
+                help="Large audio files (100MB+) will upload directly into browser memory. Once complete, click Transcribe Audio below."
+            )
         if uploaded_file:
             with u_col2:
+                st.write("")
+                st.write("")
                 if st.button("Transcribe Audio", key="btn_tx_upload"):
-                    tx_progress = st.progress(0, text="Preprocessing & Compressing Audio Stream...")
-                    transcript = transcribe_audio(uploaded_file.read(), tx_progress)
-                    tx_progress.empty()
+                    loading_placeholder = st.empty()
+                    transcript = transcribe_audio(uploaded_file.read(), loading_placeholder)
+                    loading_placeholder.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -821,12 +835,12 @@ with st.container(border=True):
         if recorded_audio:
             rec_bytes = recorded_audio.read()
             with r_col2:
-                st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{datetime.date.today().strftime('%Y%m%d')}.wav", mime="audio/wav")
+                st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
             with r_col3:
                 if st.button("Transcribe Audio", key="btn_tx_record"):
-                    tx_progress = st.progress(0, text="Preprocessing Recording...")
-                    transcript = transcribe_audio(rec_bytes, tx_progress)
-                    tx_progress.empty()
+                    loading_placeholder = st.empty()
+                    transcript = transcribe_audio(rec_bytes, loading_placeholder)
+                    loading_placeholder.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -938,17 +952,20 @@ if not st.session_state["df"].empty:
 
         st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=100)
 
+        # Build formatted time range only if provided
+        time_range_str = f"{start_time} to {end_time}" if (start_time and end_time) else (start_time or end_time or "")
+
         meeting_details = {
             "date": meeting_date.strftime("%B %d, %Y"),
-            "time_range": f"{start_time} to {end_time}",
-            "location": meeting_location,
-            "company_name": client_name if client_name else "CLIENT",
+            "time_range": time_range_str,
+            "location": meeting_location if meeting_location.strip() else "____________",
+            "company_name": client_name.strip() if client_name.strip() else "",
             "prime_attendees": selected_crd,
             "external_attendees": [x.strip() for x in ext_attendees_raw.split(",") if x.strip()],
-            "prep_name": prep_name,
-            "prep_desig": prep_desig,
-            "conf_name": conf_name,
-            "conf_desig": conf_desig
+            "prep_name": prep_name.strip(),
+            "prep_desig": prep_desig.strip(),
+            "conf_name": conf_name.strip(),
+            "conf_desig": conf_desig.strip()
         }
 
         # Dual Export Section (Word DOCX and PDF)
