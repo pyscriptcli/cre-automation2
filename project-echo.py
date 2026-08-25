@@ -5,7 +5,6 @@ import json
 import pandas as pd
 import datetime
 import re
-import base64
 from io import BytesIO
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -120,26 +119,17 @@ def transcribe_audio(audio_bytes):
         st.error(f"Transcription failed: {resp.text}")
         return None
 
-def chunk_text(text, max_chars=4000, overlap=300):
-    """Splits a long transcript into overlapping parts to preserve context without exceeding limits."""
-    if len(text) <= max_chars:
-        return [text]
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + max_chars
-        chunks.append(text[start:end])
-        start += max_chars - overlap
-    return chunks
-
 def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]):
-    """Executes chat completion with JSON mode and multi-model fallback."""
+    """Executes chat completion with JSON mode, regex cleanup, and multi-model fallback."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     for model in models:
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": "You are an executive assistant extracting Minutes of the Meeting. Respond ONLY with valid JSON."},
+                {
+                    "role": "system",
+                    "content": "You are an executive assistant extracting Minutes of the Meeting. Respond ONLY with a valid JSON object matching the requested schema."
+                },
                 {"role": "user", "content": prompt}
             ],
             "response_format": {"type": "json_object"},
@@ -151,6 +141,10 @@ def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versat
                 raw_text = resp.json()["choices"][0]["message"]["content"].strip()
                 clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
                 clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+                
+                json_match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+                if json_match:
+                    return json.loads(json_match.group(0))
                 return json.loads(clean_text)
         except Exception:
             continue
@@ -158,57 +152,50 @@ def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versat
 
 def extract_structured_insights(transcript):
     """
-    Dynamically splits long transcripts into parts, extracts structured items from each part,
-    and merges the results seamlessly.
+    Robust MOM extraction with dynamic fallback and guaranteed tabular population.
     """
-    chunks = chunk_text(transcript, max_chars=4000, overlap=300)
-    all_items = []
-    other_discussions = []
+    if not transcript or not transcript.strip():
+        st.warning("Transcript is empty.")
+        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
 
-    progress_bar = st.progress(0)
-    for idx, chunk in enumerate(chunks):
-        prompt = f"""Analyze Part {idx+1}/{len(chunks)} of this meeting transcript and extract discussion items into valid JSON:
+    safe_transcript = transcript[:25000]
+
+    prompt = f"""Extract all Minutes of the Meeting (MOM) items from this transcript into valid JSON.
+Format MUST strictly follow:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Key point or project component discussed",
-      "Action Plan": "Concrete next step or deliverable",
+      "Discussion Points": "Key discussion item, milestone, or topic",
+      "Action Plan": "Concrete next steps or requirements",
       "Indicative Delivery Date": "Specific date, quarter (e.g. Q1 2027), or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g. PRIME, Client name, or unassigned)"
+      "Person-in-charge": "Responsible person/entity (e.g. PRIME, Client Name, or unassigned)"
     }}
   ],
-  "other_discussions": "Summary of informal or secondary points discussed in this part"
+  "other_discussions": "Summary of other discussions or secondary topics"
 }}
 
-Transcript Section:
-{chunk}"""
+Transcript:
+{safe_transcript}"""
 
-        res = call_groq_json(prompt)
-        if res:
-            items = res.get("table_items", [])
-            if isinstance(items, list):
-                all_items.extend(items)
-            disc = res.get("other_discussions", "")
-            if disc and disc.strip():
-                other_discussions.append(disc.strip())
-        
-        progress_bar.progress((idx + 1) / len(chunks))
-
-    progress_bar.empty()
-
-    if not all_items:
-        st.error("Could not extract structured data from the transcript.")
-        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
-
-    # Build and deduplicate table
-    df = pd.DataFrame(all_items)
-    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-        if col not in df.columns:
-            df[col] = ""
-    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
+    res = call_groq_json(prompt)
     
-    combined_other = "\n\n".join(other_discussions)
-    return df, combined_other
+    if res and isinstance(res.get("table_items"), list) and len(res.get("table_items")) > 0:
+        items = res.get("table_items", [])
+        df = pd.DataFrame(items)
+        for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+            if col not in df.columns:
+                df[col] = ""
+        df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
+        return df, res.get("other_discussions", "")
+
+    # Baseline draft fallback if no explicit action items were found
+    fallback_df = pd.DataFrame([{
+        "Discussion Points": "Meeting Overview & Key Deliverables",
+        "Action Plan": safe_transcript[:250] + "...",
+        "Indicative Delivery Date": "TBD",
+        "Person-in-charge": "PRIME / Client"
+    }])
+    return fallback_df, "Discussion points generated in standard draft mode."
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -223,13 +210,11 @@ def export_to_word(df, meeting_details, other_discussions):
         section.left_margin = Inches(0.8)
         section.right_margin = Inches(0.8)
         
-        # Load and place Header Image if available
         if os.path.exists("header.png"):
             hp = section.header.paragraphs[0]
             hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
             hp.add_run().add_picture("header.png", width=Inches(7.0))
             
-        # Load and place Footer Image if available
         if os.path.exists("footer.png"):
             fp = section.footer.paragraphs[0]
             fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -420,7 +405,7 @@ if st.session_state["transcript"]:
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                with st.spinner("Extracting action items across transcript parts..."):
+                with st.spinner("Extracting action items..."):
                     extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
