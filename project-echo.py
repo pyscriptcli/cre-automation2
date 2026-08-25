@@ -26,12 +26,11 @@ if not os.path.exists(_config_file):
         f.write('[theme]\nbase="light"\n')
 
 # API Keys & Endpoints
-PUTER_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InYyIn0.eyJ0IjoidCIsInYiOiIyIiwidG9rZW5fdWlkIjoiODUxNzZhZjYtZmM2Ni00M2ZjLTk2NmEtN2ZhMGQ3YWFlMjhhIiwidXUiOiJXQkx3bS9QM1ErQ3VBVDNTQjZDS1ZBPT0iLCJzdSI6ImkwL1N5ajZQUkZHbWhVTGdTS2lkYlE9PSIsImFpIjoiV0JMd20vUDNRK0N1QVQzU0I2Q0tWQT09IiwiZnVsbF9hY2Nlc3MiOnRydWUsImlhdCI6MTc4NzYyMjk4M30.C1hpyilomEizU-bP5ZXimpssrCUOMS1Pv6abBKjYFMQ"
-GROQ_API_KEY = "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"
+DEEPSEEK_API_KEY = "sk-7b4c611f153f4fe0adc1a1cbd13a2930"
+DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
+GROQ_API_KEY = "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"
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
-GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
-PUTER_CHAT_URL = "https://api.puter.com/v1/chat/completions"
 
 CRD_MEMBERS = [
     "Sondi Tuazon",
@@ -58,7 +57,7 @@ if "other_discussions" not in st.session_state: st.session_state["other_discussi
 if "show_settings" not in st.session_state: st.session_state["show_settings"] = False
 if "tokens_used" not in st.session_state: st.session_state["tokens_used"] = 0
 if "last_api_call" not in st.session_state: st.session_state["last_api_call"] = None
-if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "Auto (Puter -> Groq -> Python)"
+if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "DeepSeek (Primary)"
 
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
@@ -122,22 +121,6 @@ h3 {
 .stTextArea textarea {
     font-size: 0.95rem !important;
     line-height: 1.6 !important;
-}
-
-.gear-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    background-color: #ffffff;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-.gear-btn:hover {
-    border-color: #D4AF37;
-    background-color: #f9f9f9;
 }
 </style>
 """
@@ -220,120 +203,73 @@ def normalize_llm_json_to_df(data):
     df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
     return df, other_disc
 
-def extract_with_puter(prompt):
-    headers = {"Authorization": f"Bearer {PUTER_API_KEY}", "Content-Type": "application/json"}
-    payload = {
-        "model": "gpt-4o-mini",
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are an executive assistant extracting Minutes of the Meeting. "
-                    "Translate Taglish/Tagalog conversation into professional English. "
-                    "Extract discussion points, deliverables, deadlines, and responsible entities. "
-                    "Respond ONLY with valid JSON."
-                )
-            },
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.1
+def extract_with_deepseek(transcript):
+    """Primary Engine: DeepSeek-V3 Official API (High Context, Excellent Taglish Comprehension)."""
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json"
     }
+
+    system_prompt = (
+        "You are an expert executive assistant for PRIME Philippines extracting Minutes of the Meeting (MOM). "
+        "The transcript contains Tagalog and English (Taglish) dialogue. "
+        "Understand the core thought and context, translating all colloquial conversation into polished, professional corporate English. "
+        "Extract every discussion topic, report update, action plan, delivery date, and person-in-charge. "
+        "Respond ONLY with a valid JSON object matching the requested schema."
+    )
+
+    user_prompt = f"""Extract the Minutes of Meeting from this transcript into valid JSON.
+Extract 4 to 10 clear, distinct items covering all topics discussed.
+
+JSON Schema:
+{{
+  "table_items": [
+    {{
+      "Discussion Points": "Core discussion topic, report update, or milestone",
+      "Action Plan": "Concrete next step, deliverable, or requirement (put 'None' if none)",
+      "Indicative Delivery Date": "Specific date, timeline (e.g. Friday, Q1 2027), or 'TBD'",
+      "Person-in-charge": "Responsible entity (e.g. PRIME, Client name, or Unassigned)"
+    }}
+  ],
+  "other_discussions": "Summary of informal remarks, administrative notes, or general context"
+}}
+
+Transcript:
+{transcript}"""
+
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.2
+    }
+
     try:
-        resp = requests.post(PUTER_CHAT_URL, headers=headers, json=payload, timeout=90)
+        resp = requests.post(DEEPSEEK_CHAT_URL, headers=headers, json=payload, timeout=120)
         if resp.status_code == 200:
             res_json = resp.json()
             usage = res_json.get("usage", {})
-            st.session_state["tokens_used"] += usage.get("total_tokens", len(prompt) // 4)
+            st.session_state["tokens_used"] += usage.get("total_tokens", len(transcript) // 4)
             st.session_state["last_api_call"] = datetime.datetime.now()
-            
+
             raw_text = res_json["choices"][0]["message"]["content"].strip()
             clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
             clean_text = re.sub(r"\s*```$", "", clean_text).strip()
             match = re.search(r"\{.*\}", clean_text, re.DOTALL)
             data = json.loads(match.group(0)) if match else json.loads(clean_text)
             return normalize_llm_json_to_df(data)
-    except Exception:
-        pass
+        else:
+            st.warning(f"DeepSeek Notice ({resp.status_code}): {resp.text}")
+    except Exception as e:
+        st.warning(f"DeepSeek connection error: {e}")
+
     return None, ""
-
-def call_groq_single_chunk(prompt, models=["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]):
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    
-    for model in models:
-        payload = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are an executive assistant extracting Minutes of the Meeting. Translate Taglish to professional English. Respond ONLY with valid JSON."
-                },
-                {"role": "user", "content": prompt}
-            ],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.1
-        }
-        try:
-            resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
-            if resp.status_code == 200:
-                res_json = resp.json()
-                usage = res_json.get("usage", {})
-                st.session_state["tokens_used"] += usage.get("total_tokens", len(prompt) // 4)
-                st.session_state["last_api_call"] = datetime.datetime.now()
-                
-                raw_text = res_json["choices"][0]["message"]["content"].strip()
-                clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-                clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-                match = re.search(r"\{.*\}", clean_text, re.DOTALL)
-                data = json.loads(match.group(0)) if match else json.loads(clean_text)
-                return normalize_llm_json_to_df(data)
-            elif resp.status_code == 429:
-                return "RATE_LIMIT", ""
-        except Exception:
-            continue
-    return None, ""
-
-def smart_chunk_transcript(text, max_chars=3500, overlap=300):
-    if len(text) <= max_chars:
-        return [text]
-    
-    sentences = re.split(r'(?<=[.!?\n])\s+', text)
-    chunks = []
-    curr_chunk = []
-    curr_len = 0
-    
-    for sentence in sentences:
-        curr_chunk.append(sentence)
-        curr_len += len(sentence) + 1
-        if curr_len >= max_chars:
-            chunks.append(" ".join(curr_chunk))
-            curr_chunk = [sentence]
-            curr_len = len(sentence)
-            
-    if curr_chunk:
-        chunks.append(" ".join(curr_chunk))
-    return chunks
-
-def build_schema_prompt(text_section, part_info=""):
-    return f"""Extract Minutes of the Meeting {part_info}. Translate Taglish conversation to clear, professional corporate English.
-Extract every milestone, report deliverable, site sourcing task, LGU update, and deadline.
-
-Output valid JSON ONLY matching:
-{{
-  "table_items": [
-    {{
-      "Discussion Points": "Core discussion topic, report, or milestone",
-      "Action Plan": "Concrete next step or deliverable (put 'None' if none)",
-      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or Unassigned)"
-    }}
-  ],
-  "other_discussions": "Summary of informal or secondary points"
-}}
-
-Transcript Content:
-{text_section}"""
 
 def heuristic_non_ai_extraction(transcript):
+    """Backup Engine: Regex and Keyword Heuristics (100% Offline Python Logic)."""
     sentences = re.split(r'(?<=[.!?]) +', transcript)
     
     action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'ipapasa', 'provide', 'target', 'ipresent', 'kukunin']
@@ -378,96 +314,33 @@ def heuristic_non_ai_extraction(transcript):
     other_text = "\n\n".join(other_discussions[:4])
     return df, other_text
 
-def extract_structured_insights(transcript, engine="Auto (Puter -> Groq -> Python)"):
+def extract_structured_insights(transcript, engine="DeepSeek (Primary)"):
+    """Orchestration Pipeline: DeepSeek as Primary Engine with Python Heuristic Backup."""
     progress_container = st.empty()
     bar = progress_container.progress(0, text=f"Initializing {engine}...")
 
-    # Force Puter
-    if engine == "Puter AI":
-        bar.progress(30, text="Generating MOM with Puter AI...")
-        full_prompt = build_schema_prompt(transcript[:30000])
-        res, other = extract_with_puter(full_prompt)
-        progress_container.empty()
-        if res is not None and not res.empty:
-            return res, other
-        st.warning("Puter request failed. Defaulting to Python Heuristics.")
-        return heuristic_non_ai_extraction(transcript)
-
-    # Force Groq
-    if engine == "Groq LLaMA":
-        bar.progress(30, text="Generating MOM with Groq LLaMA...")
-        chunks = smart_chunk_transcript(transcript, max_chars=3500, overlap=300)
-        all_table_items = []
-        all_other_discussions = []
-        for idx, chunk in enumerate(chunks):
-            chunk_prompt = build_schema_prompt(chunk, f"(Part {idx+1}/{len(chunks)})")
-            res, other = call_groq_single_chunk(chunk_prompt)
-            if res is not None and not isinstance(res, str) and not res.empty:
-                all_table_items.extend(res.to_dict('records'))
-                if other: all_other_discussions.append(other)
-            time.sleep(1.5)
-        progress_container.empty()
-        if all_table_items:
-            df = pd.DataFrame(all_table_items)
-            for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                if col not in df.columns: df[col] = ""
-            return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), "\n\n".join(all_other_discussions)
-        st.warning("Groq request failed. Defaulting to Python Heuristics.")
-        return heuristic_non_ai_extraction(transcript)
-
-    # Force Python Non-AI
+    # Force Python Non-AI Engine
     if engine == "Python Heuristic (Non-AI)":
         bar.progress(100, text="Extracting with Rule-Based Heuristic...")
         time.sleep(0.5)
         progress_container.empty()
         return heuristic_non_ai_extraction(transcript)
 
-    # Auto Pipeline
-    bar.progress(10, text="Attempting direct analysis via Puter AI...")
-    full_prompt = build_schema_prompt(transcript[:30000])
-    res_puter, other_p = extract_with_puter(full_prompt)
-    if res_puter is not None and not res_puter.empty:
-        progress_container.empty()
-        return res_puter, other_p
-
-    bar.progress(30, text="Puter unavailable. Initializing sequential Groq chunking engine...")
-    chunks = smart_chunk_transcript(transcript, max_chars=3500, overlap=300)
-    all_table_items = []
-    all_other_discussions = []
+    # Primary Engine: DeepSeek API
+    bar.progress(35, text="Translating Taglish & Extracting MOM via DeepSeek V3...")
+    df, other = extract_with_deepseek(transcript)
     
-    for idx, chunk in enumerate(chunks):
-        chunk_prompt = build_schema_prompt(chunk, f"(Part {idx+1}/{len(chunks)})")
-        pct = int(30 + ((idx + 1) / len(chunks) * 60))
-        
-        success = False
-        retries = 2
-        while not success and retries >= 0:
-            bar.progress(pct, text=f"Processing Part {idx + 1} of {len(chunks)}...")
-            res_groq, other_g = call_groq_single_chunk(chunk_prompt)
-            
-            if res_groq == "RATE_LIMIT":
-                bar.progress(pct, text=f"Rate limit reached. Pausing 15s to refresh tokens (Part {idx + 1}/{len(chunks)})...")
-                time.sleep(15)
-                retries -= 1
-            elif res_groq is not None and not isinstance(res_groq, str) and not res_groq.empty:
-                all_table_items.extend(res_groq.to_dict('records'))
-                if other_g:
-                    all_other_discussions.append(other_g)
-                success = True
-                time.sleep(1.5)
-            else:
-                retries -= 1
+    if df is not None and not df.empty:
+        bar.progress(100, text="Finalizing Minutes of the Meeting...")
+        time.sleep(0.3)
+        progress_container.empty()
+        return df, other
 
-    progress_container.empty()
-
-    if all_table_items:
-        df = pd.DataFrame(all_table_items)
-        for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-            if col not in df.columns:
-                df[col] = ""
-        return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), "\n\n".join(all_other_discussions)
-
+    # Fallback to Python Non-AI
+    bar.progress(90, text="DeepSeek unavailable. Running Non-AI Keyword Extraction...")
     df_fb, other_fb = heuristic_non_ai_extraction(transcript)
+    progress_container.empty()
+    st.warning("⚠️ DeepSeek request could not be completed. The table below was populated using offline Keyword Heuristics.")
     return df_fb, other_fb
 
 def set_cell_shading(cell, color_hex):
@@ -721,13 +594,6 @@ if not st.session_state["df"].empty:
         with h_col1:
             st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
         with h_col2:
-            # SVG Gear Settings Button
-            gear_svg = """
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            """
             if st.button("⚙️", key="btn_toggle_settings", help="Open Engine & Regeneration Settings"):
                 st.session_state["show_settings"] = not st.session_state["show_settings"]
                 st.rerun()
@@ -739,15 +605,13 @@ if not st.session_state["df"].empty:
                 
                 with set_col1:
                     engine_options = [
-                        "Auto (Puter -> Groq -> Python)",
-                        "Puter AI",
-                        "Groq LLaMA",
+                        "DeepSeek (Primary)",
                         "Python Heuristic (Non-AI)"
                     ]
                     selected_eng = st.selectbox(
                         "Extraction Engine",
                         options=engine_options,
-                        index=engine_options.index(st.session_state["selected_engine"])
+                        index=engine_options.index(st.session_state["selected_engine"]) if st.session_state["selected_engine"] in engine_options else 0
                     )
                     st.session_state["selected_engine"] = selected_eng
 
@@ -761,19 +625,14 @@ if not st.session_state["df"].empty:
 
                 with set_col2:
                     st.markdown("**API & Token Usage Diagnostics**")
-                    st.write(f"• **Estimated Session Tokens Used:** `{st.session_state['tokens_used']:,}`")
+                    st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
                     
                     if st.session_state["last_api_call"]:
                         last_call = st.session_state["last_api_call"]
-                        st.write(f"• **Last Request:** `{last_call.strftime('%I:%M:%S %p')}`")
-                        # Groq token bucket replenish estimation (~1 min window)
-                        elapsed = (datetime.datetime.now() - last_call).total_seconds()
-                        if elapsed < 60:
-                            st.write(f"• **Rate Limit Window:** Replenishing in `{int(60 - elapsed)}s`")
-                        else:
-                            st.write("• **Rate Limit Window:** `Ready (100% Available)`")
+                        st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
+                        st.write("• **DeepSeek Server Status:** `Active & Ready`")
                     else:
-                        st.write("• **Rate Limit Window:** `Ready (No active rate-limit)`")
+                        st.write("• **DeepSeek Server Status:** `Ready`")
                 st.markdown("---")
 
         edited_df = st.data_editor(
