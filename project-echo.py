@@ -31,14 +31,14 @@ os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
-# API Keys & Endpoints loaded securely via st.secrets
+# API Keys & Endpoints
 DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "sk-7b4c611f153f4fe0adc1a1cbd13a2930")
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "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")
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
+OPENAI_API_KEY = "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"
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
 
 CRD_MEMBERS = [
