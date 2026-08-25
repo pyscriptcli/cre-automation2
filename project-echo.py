@@ -45,7 +45,7 @@ if not st.session_state["authenticated"]:
             st.rerun()
         else:
             st.error("Invalid access key. Contact the administrator.")
-    st.stop()  # Prevents unauthorized access to app functions
+    st.stop()
 
 # API Keys loaded strictly from Streamlit Cloud Secrets
 DEEPSEEK_API_KEY = str(st.secrets.get("DEEPSEEK_API_KEY", "")).strip()
@@ -140,7 +140,7 @@ h3 {
     color: #1A2B4C !important; letter-spacing: 0.02em; margin-bottom: 0.25rem; font-size: 1.25rem !important;
 }
 
-/* Playfair Display Styling for Labels & Tab Headers */
+/* Playfair Display Styling for Target Editor Labels & Tabs */
 .playfair-label {
     font-family: 'Playfair Display', serif !important;
     font-style: italic !important;
@@ -151,7 +151,6 @@ h3 {
     display: block;
 }
 
-/* Target Tab Text & Make it Playfair */
 button[data-baseweb="tab"] p {
     font-family: 'Playfair Display', serif !important;
     font-style: italic !important;
@@ -160,11 +159,30 @@ button[data-baseweb="tab"] p {
     font-size: 1.05rem !important;
 }
 
-[data-testid="stVerticalBlockBorderWrapper"] {
-    background-color: #FFFFFF !important; border-radius: 12px !important;
+/* Symmetrical Grid Column Stretches */
+div[data-testid="column"] {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+div[data-testid="column"] > div[data-testid="stVerticalBlock"] {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+}
+
+div[data-testid="column"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    background-color: #FFFFFF !important; 
+    border-radius: 12px !important;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
     border: 1px solid rgba(0, 0, 0, 0.04) !important; 
-    padding: 1.25rem !important; margin-bottom: 1rem !important;
+    padding: 1.25rem !important; 
+    margin-bottom: 1rem !important;
 }
 
 /* Uniform Small Pill Buttons */
@@ -233,7 +251,7 @@ button[key="card_settings_btn"]::before {
     height: 17px;
     background-color: #C5A059;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -257,6 +275,7 @@ button[key="card_settings_btn"]::before {
     flex-direction: column;
     gap: 0.85rem;
     margin-top: 0.5rem;
+    height: 380px;
     max-height: 380px;
     overflow-y: auto;
     padding-right: 0.35rem;
@@ -1080,7 +1099,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---- TOP ROW: Upload Section (Left) and Meeting Details (Right) in 2 Separate Containers ----
+# ---- TOP ROW: Upload Section (Left) and Meeting Details (Right) Symmetrical Grid ----
 col_upload, col_details = st.columns(2)
 
 # LEFT CONTAINER: Audio & Text Upload Section
@@ -1241,7 +1260,7 @@ with col_details:
                 conf_name = st.text_input("Confirmed By", value="", placeholder="Name")
                 conf_desig = st.text_input("Conf Designation", value="", placeholder="Designation")
 
-# ---- Step 2: Full Transcript & Ask Echo Side-by-Side ----
+# ---- Step 2: Full Transcript & Ask Echo Side-by-Side Symmetrical Cards ----
 if st.session_state["transcript"]:
     row_left, row_right = st.columns(2)
     
@@ -1379,7 +1398,7 @@ if not st.session_state["df"].empty:
         row_to_delete = None
         for idx in range(len(df)):
             with st.container(border=True):
-                # 1 Single Horizontal Row per discussion card with auto-wrapping text areas
+                # Single Horizontal Row per discussion card with auto-wrapping text areas
                 c_disc, c_act, c_date, c_pic, c_del = st.columns([3.2, 3.2, 1.8, 1.8, 0.6])
                 
                 with c_disc:
