@@ -1,7 +1,7 @@
 import os
 import time
-import math
-import io
+import subprocess
+import tempfile
 import streamlit as st
 import requests
 import json
@@ -10,7 +10,6 @@ import datetime
 import re
 from io import BytesIO
 import PyPDF2
-from pydub import AudioSegment
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
@@ -25,12 +24,12 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 # ========== CONFIG ==========
 st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
 
-# --- PROGRAMMATIC CONFIG & UPLOAD LIMIT LOCK (Up to 1GB uploads) ---
+# --- PROGRAMMATIC LIGHT MODE & 200MB LIMIT ---
 _config_dir = ".streamlit"
 _config_file = os.path.join(_config_dir, "config.toml")
 os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
-    f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 1000\n')
+    f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
 # API Keys & Endpoints loaded via st.secrets with fallback defaults
 DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "sk-7b4c611f153f4fe0adc1a1cbd13a2930")
@@ -173,9 +172,9 @@ def extract_text_from_file(uploaded_file):
         st.error(f"Error reading file: {e}")
         return ""
 
-def _call_groq_whisper(audio_bytes):
+def _call_groq_whisper(audio_bytes, filename="audio.mp3"):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    files = {"file": ("chunk.mp3", audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
+    files = {"file": (filename, audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
     resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files)
     if resp.status_code == 200:
         return resp.json().get("text", "")
@@ -189,47 +188,88 @@ def _call_groq_whisper(audio_bytes):
         st.error(f"Transcription error: {error_msg}")
         return None
 
-def transcribe_audio(audio_bytes, progress_container=None):
+def transcribe_audio_pipeline(audio_bytes, original_filename, progress_container=None):
     """
-    Handles unlimited audio size (100MB - 200MB+) by converting to mono 16kHz 32kbps MP3
-    and slicing into safe segments compliant with Groq's 25MB ceiling.
+    Zero-RAM-Spike Fast Audio Pipeline:
+    1. Direct upload to Groq if already <= 24MB.
+    2. Subprocess FFmpeg downsampling directly on disk if > 24MB.
+    3. Disk-based segment slicing if compressed file remains > 24MB.
     """
+    file_size_mb = len(audio_bytes) / (1024 * 1024)
+
+    # Fast Path 1: Direct dispatch for files under 24MB
+    if file_size_mb <= 24.0:
+        if progress_container:
+            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Sending audio directly to Groq Whisper ({file_size_mb:.1f} MB)...</span></div>', unsafe_allow_html=True)
+        return _call_groq_whisper(audio_bytes, original_filename)
+
+    # Path 2: Subprocess Disk Downsampling
+    ext = os.path.splitext(original_filename)[1] or ".m4a"
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as src:
+        src.write(audio_bytes)
+        src_path = src.name
+
+    compressed_mp3 = src_path + "_compressed.mp3"
+    
+    if progress_container:
+        progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Compressing {file_size_mb:.1f} MB audio to mono 16kHz via FFmpeg stream...</span></div>', unsafe_allow_html=True)
+
     try:
-        if progress_container:
-            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Compressing audio stream and preparing segments...</span></div>', unsafe_allow_html=True)
-            
-        sound = AudioSegment.from_file(io.BytesIO(audio_bytes))
-        sound = sound.set_channels(1)        # Downmix to mono
-        sound = sound.set_frame_rate(16000)  # Standard 16kHz for Whisper
-        
-        # 10 minutes per chunk (approx 2.4 MB per segment at 32k)
-        chunk_length_ms = 10 * 60 * 1000  
-        total_chunks = math.ceil(len(sound) / chunk_length_ms)
-        
-        full_transcript = []
-        
-        for i in range(total_chunks):
-            start = i * chunk_length_ms
-            end = min((i + 1) * chunk_length_ms, len(sound))
-            
-            chunk = sound[start:end]
-            chunk_buffer = io.BytesIO()
-            chunk.export(chunk_buffer, format="mp3", bitrate="32k")
-            chunk_bytes = chunk_buffer.getvalue()
-            
+        # Fast 1-pass conversion without loading PCM audio arrays into Python RAM
+        subprocess.run([
+            "ffmpeg", "-y", "-i", src_path,
+            "-vn", "-ac", "1", "-ar", "16000", "-b:a", "24k",
+            compressed_mp3
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+        comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
+
+        # Single dispatch if compressed file is now <= 24MB
+        if comp_size_mb <= 24.0:
             if progress_container:
-                progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Transcribing audio segment {i + 1} of {total_chunks} with Groq Whisper...</span></div>', unsafe_allow_html=True)
-            
-            text = _call_groq_whisper(chunk_bytes)
-            if text:
-                full_transcript.append(text)
-            time.sleep(1.0)
-            
-        return " ".join(full_transcript)
-    except Exception as e:
+                progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Transcribing compressed file ({comp_size_mb:.1f} MB) with Groq Whisper...</span></div>', unsafe_allow_html=True)
+            with open(compressed_mp3, "rb") as f:
+                c_bytes = f.read()
+            return _call_groq_whisper(c_bytes, "compressed.mp3")
+
+        # Path 3: Segment Slicing on disk if still > 24MB (3+ hour recordings)
         if progress_container:
-            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Processing direct single-pass audio transcription...</span></div>', unsafe_allow_html=True)
-        return _call_groq_whisper(audio_bytes)
+            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Slicing long recording into safe 15-minute segments...</span></div>', unsafe_allow_html=True)
+
+        segment_pattern = src_path + "_seg_%03d.mp3"
+        subprocess.run([
+            "ffmpeg", "-y", "-i", compressed_mp3,
+            "-f", "segment", "-segment_time", "900", "-c", "copy",
+            segment_pattern
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+        seg_dir = os.path.dirname(src_path)
+        base_name = os.path.basename(src_path) + "_seg_"
+        segments = sorted([os.path.join(seg_dir, f) for f in os.listdir(seg_dir) if f.startswith(base_name)])
+
+        full_transcript = []
+        for idx, seg in enumerate(segments):
+            if progress_container:
+                progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Transcribing segment {idx + 1} of {len(segments)}...</span></div>', unsafe_allow_html=True)
+            with open(seg, "rb") as f:
+                seg_bytes = f.read()
+            t = _call_groq_whisper(seg_bytes, f"part_{idx}.mp3")
+            if t:
+                full_transcript.append(t)
+            time.sleep(1.0)
+            try: os.remove(seg)
+            except: pass
+
+        return " ".join(full_transcript)
+
+    except Exception as e:
+        st.warning(f"Audio processing fallback: {e}")
+        return _call_groq_whisper(audio_bytes, original_filename)
+    finally:
+        try: os.remove(src_path)
+        except: pass
+        try: os.remove(compressed_mp3)
+        except: pass
 
 def normalize_llm_json_to_df(data):
     items = None
@@ -810,9 +850,9 @@ with st.container(border=True):
         u_col1, u_col2 = st.columns([5, 1.5])
         with u_col1:
             uploaded_file = st.file_uploader(
-                "Upload audio file (100MB+ supported)",
+                "Upload audio file (200MB limit supported)",
                 type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
-                help="Large audio files (100MB+) will upload directly into browser memory. Once complete, click Transcribe Audio below."
+                help="Audio uploads up to 200MB are supported."
             )
         if uploaded_file:
             with u_col2:
@@ -820,7 +860,7 @@ with st.container(border=True):
                 st.write("")
                 if st.button("Transcribe Audio", key="btn_tx_upload"):
                     loading_placeholder = st.empty()
-                    transcript = transcribe_audio(uploaded_file.read(), loading_placeholder)
+                    transcript = transcribe_audio_pipeline(uploaded_file.read(), uploaded_file.name, loading_placeholder)
                     loading_placeholder.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
@@ -839,7 +879,7 @@ with st.container(border=True):
             with r_col3:
                 if st.button("Transcribe Audio", key="btn_tx_record"):
                     loading_placeholder = st.empty()
-                    transcript = transcribe_audio(rec_bytes, loading_placeholder)
+                    transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", loading_placeholder)
                     loading_placeholder.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
@@ -856,12 +896,16 @@ with st.container(border=True):
             st.write("") 
             st.write("") 
             if st.button("Process Text", key="btn_tx_text"):
+                loading_placeholder = st.empty()
+                loading_placeholder.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Extracting document text...</span></div>', unsafe_allow_html=True)
+                
                 extracted_str = ""
                 if uploaded_text_file:
                     extracted_str = extract_text_from_file(uploaded_text_file)
                 if pasted_text and pasted_text.strip():
                     extracted_str += "\n" + pasted_text.strip()
                 
+                loading_placeholder.empty()
                 if extracted_str.strip():
                     st.session_state["transcript"] = extracted_str.strip()
                     st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
