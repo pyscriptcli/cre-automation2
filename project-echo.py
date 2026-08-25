@@ -33,13 +33,13 @@ with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
 # API Keys loaded strictly from Streamlit Cloud Secrets
-DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_API_KEY = str(st.secrets.get("DEEPSEEK_API_KEY", "")).strip()
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
-GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
+GROQ_API_KEY = str(st.secrets.get("GROQ_API_KEY", "")).strip()
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
+OPENAI_API_KEY = str(st.secrets.get("OPENAI_API_KEY", "")).strip()
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
 
 CRD_MEMBERS = [
@@ -125,6 +125,17 @@ h3 {
     color: #1A2B4C !important; letter-spacing: 0.02em; margin-bottom: 0.25rem; font-size: 1.25rem !important;
 }
 
+/* Playfair Display Styling for Target Editor Labels */
+.playfair-label {
+    font-family: 'Playfair Display', serif !important;
+    font-style: italic !important;
+    font-weight: 400 !important;
+    color: #1A2B4C !important;
+    font-size: 1.05rem !important;
+    margin-bottom: 0.25rem !important;
+    display: block;
+}
+
 [data-testid="stVerticalBlockBorderWrapper"] {
     background-color: #FFFFFF !important; border-radius: 12px !important;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
@@ -132,16 +143,43 @@ h3 {
     padding: 1.25rem !important; margin-bottom: 1rem !important;
 }
 
+/* Uniform Small Pill Buttons */
 .stButton > button, .stDownloadButton > button {
-    background-color: #222222 !important; color: #FFFFFF !important;
-    border: 1px solid #444444 !important; border-radius: 50px !important; 
-    font-family: 'Montserrat', sans-serif !important; font-weight: 500 !important;
-    letter-spacing: 0.5px; padding: 0.4rem 1.5rem !important;
-    transition: all 0.3s ease !important; width: 100% !important;
+    background-color: #222222 !important; 
+    color: #FFFFFF !important;
+    border: 1px solid #444444 !important; 
+    border-radius: 50px !important; 
+    font-family: 'Montserrat', sans-serif !important; 
+    font-weight: 500 !important;
+    font-size: 0.82rem !important;
+    letter-spacing: 0.5px; 
+    padding: 0.35rem 1.1rem !important;
+    min-height: 34px !important;
+    height: 34px !important;
+    transition: all 0.25s ease !important; 
+    width: 100% !important;
 }
+
 .stButton > button:hover, .stDownloadButton > button:hover {
-    border-color: #D4AF37 !important; color: #D4AF37 !important;
+    border-color: #D4AF37 !important; 
+    color: #D4AF37 !important;
     background-color: #1A1A1A !important;
+}
+
+/* Delete Row Mini Pill Button */
+button[key^="del_"] {
+    min-height: 32px !important;
+    height: 32px !important;
+    padding: 0.2rem 0.5rem !important;
+    background-color: #F7F5F0 !important;
+    color: #A03030 !important;
+    border: 1px solid rgba(160, 48, 48, 0.25) !important;
+}
+
+button[key^="del_"]:hover {
+    background-color: #A03030 !important;
+    color: #FFFFFF !important;
+    border-color: #A03030 !important;
 }
 
 /* Small SVG-only Settings Icon Button in the Card Header */
@@ -172,16 +210,18 @@ button[key="card_settings_btn"]::before {
     width: 17px;
     height: 17px;
     background-color: #C5A059;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
 }
 
+/* Auto-wrapping text inputs */
 .stTextArea textarea {
-    font-size: 0.95rem !important;
-    line-height: 1.6 !important;
+    font-size: 0.92rem !important;
+    line-height: 1.45 !important;
+    border-radius: 8px !important;
 }
 
 /* Time Picker Clean Layout */
@@ -189,30 +229,55 @@ button[key="card_settings_btn"]::before {
     margin-bottom: 0 !important;
 }
 
-/* Chat styling */
-[data-testid="stChatMessage"] {
-    border-radius: 12px;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+/* Ask Echo Chat Bubbles: AI Left, User Right */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    max-height: 380px;
+    overflow-y: auto;
+    padding-right: 0.4rem;
 }
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
-    background-color: #E8F0FE;
+
+.chat-bubble-ai-wrap {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.chat-bubble-ai {
+    background-color: #1A1A1A;
+    color: #FFFFFF;
+    padding: 0.65rem 1rem;
+    border-radius: 14px 14px 14px 2px;
+    max-width: 82%;
+    font-size: 0.88rem;
+    line-height: 1.45;
     border-left: 3px solid #D4AF37;
-    margin-left: auto;
-    max-width: 80%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {
-    background-color: #FFFFFF;
-    border-left: 3px solid #1A2B4C;
-    margin-right: auto;
-    max-width: 80%;
+
+.chat-bubble-user-wrap {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.chat-bubble-user {
+    background-color: #ECE9DF;
+    color: #1A1A1A;
+    padding: 0.65rem 1rem;
+    border-radius: 14px 14px 2px 14px;
+    max-width: 82%;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    border: 1px solid rgba(0,0,0,0.08);
 }
 </style>
 """
 
 # ========== SVG ICONS ==========
 SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
+SVG_TRASH = """<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>"""
 
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
@@ -292,7 +357,7 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         progress_bar.progress(45, text="Evaluating audio duration & routing (45%)...")
 
         if comp_size_mb <= 10.0 and GROQ_API_KEY:
-            status_placeholder.info("⚡ Processing via Groq Whisper Primary...")
+            status_placeholder.info("Processing via Groq Whisper Primary...")
             progress_bar.progress(70, text="Transcribing via Groq Whisper (70%)...")
             with open(compressed_mp3, "rb") as f:
                 c_bytes = f.read()
@@ -301,12 +366,11 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
                 progress_bar.progress(100, text="Transcription completed (100%)!")
                 status_placeholder.empty()
                 return text
-            status_placeholder.warning("⚠️ Groq rate limit reached. Switching automatically to OpenAI...")
+            status_placeholder.warning("Groq rate limit reached. Switching automatically to OpenAI...")
 
-        status_placeholder.info("🚀 Processing recording via OpenAI...")
+        status_placeholder.info("Processing recording via OpenAI...")
         progress_bar.progress(55, text="Preparing audio segments for OpenAI (55%)...")
         
-        # Segment the audio into 10-minute chunks
         segment_pattern = src_path + "_seg_%03d.mp3"
         subprocess.run([
             "ffmpeg", "-y", "-i", compressed_mp3,
@@ -321,7 +385,6 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         full_transcript = []
         total_segs = len(segments)
 
-        # Sequential processing of segments
         for idx, seg in enumerate(segments):
             pct = int(55 + ((idx + 1) / total_segs) * 40)
             progress_bar.progress(pct, text=f"Transcribing segment {idx + 1} of {total_segs} ({pct}%)...")
@@ -546,7 +609,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
 
 def ask_deepseek_question(transcript, question, chat_history):
     if not DEEPSEEK_API_KEY:
-        return "⚠️ DeepSeek API key is missing."
+        return "DeepSeek API key is missing. Please check your configuration."
 
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
@@ -554,14 +617,13 @@ def ask_deepseek_question(transcript, question, chat_history):
     }
 
     system_prompt = (
-        "You are an AI assistant helping the user understand a meeting transcript. "
-        "Answer questions based solely on the provided transcript. "
-        "If the answer is not in the transcript, say you don't know. "
-        "Be concise and helpful."
+        "You are Ask Echo, an authentic, concise AI assistant for PRIME Philippines helping users understand meeting transcripts. "
+        "Answer questions accurately and directly using solely the provided transcript. "
+        "If a specific detail is not in the transcript, concisely state that it was not mentioned. "
+        "Maintain a polished, corporate English tone."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
-    # Add conversation history (last few exchanges to keep context manageable)
     for msg in chat_history[-6:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": f"Transcript:\n{transcript[:20000]}\n\nQuestion: {question}"})
@@ -582,9 +644,9 @@ def ask_deepseek_question(transcript, question, chat_history):
             st.session_state["last_api_call"] = datetime.datetime.now()
             return res_json["choices"][0]["message"]["content"].strip()
         else:
-            return f"⚠️ Error {resp.status_code}: {resp.text}"
+            return f"Service notice ({resp.status_code}): {resp.text}"
     except Exception as e:
-        return f"⚠️ Connection error: {e}"
+        return f"Connection error: {e}"
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -1067,16 +1129,11 @@ with st.container(border=True):
 
     # ROW 2
     r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
-    with r2_c1:
-        client_name = st.text_input("Client / Company", value="", placeholder="XYZ Company")
-    with r2_c2:
-        selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=[])
-    with r2_c3:
-        ext_attendees_raw = st.text_input("External Attendees", value="", placeholder="e.g. Mr. ABCD, Jane Doe")
-    with r2_c4:
-        conf_name = st.text_input("Confirmed By (Name)", value="", placeholder="e.g. Client Rep")
-    with r2_c5:
-        conf_desig = st.text_input("Designation", value="", placeholder="e.g. Managing Director")
+    with r2_c1: client_name = st.text_input("Client / Company", value="", placeholder="XYZ Company")
+    with r2_c2: selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=[])
+    with r2_c3: ext_attendees_raw = st.text_input("External Attendees", value="", placeholder="e.g. Mr. ABCD, Jane Doe")
+    with r2_c4: conf_name = st.text_input("Confirmed By (Name)", value="", placeholder="e.g. Client Rep")
+    with r2_c5: conf_desig = st.text_input("Designation", value="", placeholder="e.g. Managing Director")
 
     # Three Tabs
     tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text (Unlimited)"])
@@ -1104,6 +1161,7 @@ with st.container(border=True):
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                         st.session_state["other_discussions"] = ""
+                        st.session_state["chat_history"] = []
                         st.rerun()
 
     # TAB 2: RECORD AUDIO
@@ -1126,6 +1184,7 @@ with st.container(border=True):
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                         st.session_state["other_discussions"] = ""
+                        st.session_state["chat_history"] = []
                         st.rerun()
 
     # TAB 3: TEXT UPLOAD (UNLIMITED)
@@ -1154,104 +1213,125 @@ with st.container(border=True):
                     st.session_state["transcript"] = extracted_str.strip()
                     st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                     st.session_state["other_discussions"] = ""
+                    st.session_state["chat_history"] = []
                     st.rerun()
                 else:
                     st.warning("Please upload a file or paste text to proceed.")
 
-# ---- Step 2: Full Transcript UI & Ask Echo ----
+# ---- Step 2: Full Transcript & Ask Echo in 1 Row (2 Separate Containers) ----
 if st.session_state["transcript"]:
-    with st.container(border=True):
-        f_col1, f_col2, f_col3 = st.columns([7.6, 1.2, 1.2])
-        with f_col1:
-            st.markdown('<h3 style="margin-top:0.3rem;">Full Transcript</h3>', unsafe_allow_html=True)
-            
-        with f_col2:
-            copy_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <style>
-            body {{ margin: 0; padding: 0; box-sizing: border-box; font-family: 'Montserrat', sans-serif; }}
-            button {{
-                width: 100%;
-                height: 41px;
-                background-color: #222222;
-                color: #FFFFFF;
-                border: 1px solid #444444;
-                border-radius: 50px;
-                font-size: 15px;
-                font-weight: 500;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 0;
-            }}
-            button:hover {{
-                border-color: #D4AF37;
-                color: #D4AF37;
-                background-color: #1A1A1A;
-            }}
-            </style>
-            </head>
-            <body>
-                <button id="copy-btn">Copy Text</button>
-                <script>
-                document.getElementById("copy-btn").addEventListener("click", function() {{
-                    navigator.clipboard.writeText({json.dumps(st.session_state["transcript"])}).then(function() {{
-                        document.getElementById("copy-btn").innerText = "Copied! ✅";
-                        setTimeout(() => document.getElementById("copy-btn").innerText = "Copy Text", 2000);
+    row_left, row_right = st.columns(2)
+    
+    # LEFT CONTAINER: Full Transcript
+    with row_left:
+        with st.container(border=True):
+            ft_head, ft_btn1, ft_btn2 = st.columns([6, 2, 2])
+            with ft_head:
+                st.markdown('<h3 style="margin-top:0.2rem;">Full Transcript</h3>', unsafe_allow_html=True)
+            with ft_btn1:
+                copy_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                <style>
+                body {{ margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; }}
+                button {{
+                    width: 100%;
+                    height: 34px;
+                    background-color: #222222;
+                    color: #FFFFFF;
+                    border: 1px solid #444444;
+                    border-radius: 50px;
+                    font-size: 0.82rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.25s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }}
+                button:hover {{
+                    border-color: #D4AF37;
+                    color: #D4AF37;
+                    background-color: #1A1A1A;
+                }}
+                </style>
+                </head>
+                <body>
+                    <button id="copy-btn">Copy Text</button>
+                    <script>
+                    document.getElementById("copy-btn").addEventListener("click", function() {{
+                        navigator.clipboard.writeText({json.dumps(st.session_state["transcript"])}).then(function() {{
+                            document.getElementById("copy-btn").innerText = "Copied";
+                            setTimeout(() => document.getElementById("copy-btn").innerText = "Copy Text", 2000);
+                        }});
                     }});
-                }});
-                </script>
-            </body>
-            </html>
-            """
-            components.html(copy_html, height=41)
+                    </script>
+                </body>
+                </html>
+                """
+                components.html(copy_html, height=34)
+            with ft_btn2:
+                st.download_button(
+                    label="Download",
+                    data=st.session_state["transcript"],
+                    file_name=f"Transcript_{meeting_date.strftime('%Y%m%d')}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
             
-        with f_col3:
-            st.download_button(
-                label="Download Text",
-                data=st.session_state["transcript"],
-                file_name=f"Transcript_{meeting_date.strftime('%Y%m%d')}.txt",
-                mime="text/plain",
-                use_container_width=True
+            st.text_area(
+                "Transcript Content", 
+                st.session_state["transcript"], 
+                height=380, 
+                label_visibility="collapsed"
             )
+            
+            if st.session_state["df"].empty:
+                st.write("")
+                if st.button("Generate MOM", key="btn_gen_mom"):
+                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], st.session_state["selected_engine"])
+                    if not extracted_df.empty:
+                        st.session_state["df"] = extracted_df
+                        st.session_state["other_discussions"] = other_disc
+                        st.rerun()
 
-        st.text_area("Transcript Content", st.session_state["transcript"], height=350, label_visibility="collapsed")
-        
-        if st.session_state["df"].empty:
-            if st.button("Generate MOM", key="btn_gen_mom"):
-                extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], st.session_state["selected_engine"])
-                if not extracted_df.empty:
-                    st.session_state["df"] = extracted_df
-                    st.session_state["other_discussions"] = other_disc
-                    st.rerun()
-        
-        # Ask Echo Chatbot Section
-        st.markdown("---")
-        st.markdown('<h4 style="margin-bottom:0.5rem;">Ask Echo</h4>', unsafe_allow_html=True)
-        
-        # Display chat history with proper alignment
-        for msg in st.session_state["chat_history"]:
-            if msg["role"] == "user":
-                with st.chat_message("user"):
-                    st.markdown(msg["content"])
+    # RIGHT CONTAINER: Ask Echo (AI on Left, User on Right)
+    with row_right:
+        with st.container(border=True):
+            st.markdown('<h3 style="margin-top:0.2rem;">Ask Echo</h3>', unsafe_allow_html=True)
+            st.caption("Ask specific questions regarding action items, timelines, deliverables, or remarks.")
+            
+            # Chat history container with AI Left & User Right bubbles
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            if not st.session_state["chat_history"]:
+                st.markdown(
+                    '<div class="chat-bubble-ai-wrap"><div class="chat-bubble-ai">Hello. I am Echo. Ask me anything regarding this meeting transcript.</div></div>',
+                    unsafe_allow_html=True
+                )
             else:
-                with st.chat_message("assistant"):
-                    st.markdown(msg["content"])
-        
-        # Chat input
-        if prompt := st.chat_input("Ask a question about the meeting..."):
-            # Append user message
-            st.session_state["chat_history"].append({"role": "user", "content": prompt})
-            # Get answer
-            with st.spinner("Thinking..."):
-                answer = ask_deepseek_question(st.session_state["transcript"], prompt, st.session_state["chat_history"])
-            # Append assistant message
-            st.session_state["chat_history"].append({"role": "assistant", "content": answer})
-            st.rerun()
+                for msg in st.session_state["chat_history"]:
+                    if msg["role"] == "assistant":
+                        # AI on LEFT
+                        st.markdown(
+                            f'<div class="chat-bubble-ai-wrap"><div class="chat-bubble-ai">{msg["content"]}</div></div>',
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        # User on RIGHT
+                        st.markdown(
+                            f'<div class="chat-bubble-user-wrap"><div class="chat-bubble-user">{msg["content"]}</div></div>',
+                            unsafe_allow_html=True
+                        )
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Chat input
+            if prompt := st.chat_input("Ask Echo a question..."):
+                st.session_state["chat_history"].append({"role": "user", "content": prompt})
+                with st.spinner("Analyzing transcript..."):
+                    answer = ask_deepseek_question(st.session_state["transcript"], prompt, st.session_state["chat_history"])
+                st.session_state["chat_history"].append({"role": "assistant", "content": answer})
+                st.rerun()
 
 # ---- Step 3: Minutes of Meeting Editor ----
 if not st.session_state["df"].empty:
@@ -1259,86 +1339,96 @@ if not st.session_state["df"].empty:
         st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
         
         st.markdown(
-            "<p style='font-size:0.85rem; color:#666; margin-bottom: 0.5rem;'>"
-            "<i>*Note: Each discussion point is displayed as a separate card. You can edit each field directly.</i></p>", 
+            "<p style='font-size:0.85rem; color:#666; margin-bottom: 0.75rem;'>"
+            "<i>*Note: Each discussion item is rendered as a clean card with auto-wrapping text boxes. Edit fields inline directly.</i></p>", 
             unsafe_allow_html=True
         )
         
-        # Get current DataFrame
-        df = st.session_state["df"].copy()
+        df = st.session_state["df"].copy().reset_index(drop=True)
         
-        # Handle deletion
         row_to_delete = None
         for idx in range(len(df)):
-            # Create a container for each row (single column layout)
             with st.container(border=True):
-                # Header with delete button
-                header_col, del_col = st.columns([9, 1])
-                with header_col:
-                    st.markdown(f"**Item {idx+1}**")
-                with del_col:
-                    if st.button("🗑️", key=f"del_{idx}", help="Delete this row"):
-                        row_to_delete = idx
-                        st.rerun()
+                # 1 Single Horizontal Row per discussion card with auto-wrapping text areas
+                c_disc, c_act, c_date, c_pic, c_del = st.columns([3.2, 3.2, 1.8, 1.8, 0.6])
                 
-                # Stacked fields for easy editing
-                discussion = st.text_area(
-                    "Discussion Points",
-                    value=df.at[idx, "Discussion Points"],
-                    key=f"dp_{idx}",
-                    height=100
-                )
-                action = st.text_area(
-                    "Action Plan",
-                    value=df.at[idx, "Action Plan"],
-                    key=f"ap_{idx}",
-                    height=100
-                )
-                date_val = st.text_input(
-                    "Indicative Delivery Date",
-                    value=df.at[idx, "Indicative Delivery Date"],
-                    key=f"date_{idx}"
-                )
-                pic = st.text_input(
-                    "Person-in-charge",
-                    value=df.at[idx, "Person-in-charge"],
-                    key=f"pic_{idx}"
-                )
+                with c_disc:
+                    st.markdown('<span class="playfair-label">Discussion Points</span>', unsafe_allow_html=True)
+                    st.text_area(
+                        "DP",
+                        value=str(df.at[idx, "Discussion Points"]),
+                        key=f"dp_{idx}",
+                        height=75,
+                        label_visibility="collapsed"
+                    )
+                with c_act:
+                    st.markdown('<span class="playfair-label">Action Plan</span>', unsafe_allow_html=True)
+                    st.text_area(
+                        "AP",
+                        value=str(df.at[idx, "Action Plan"]),
+                        key=f"ap_{idx}",
+                        height=75,
+                        label_visibility="collapsed"
+                    )
+                with c_date:
+                    st.markdown('<span class="playfair-label">Delivery Date</span>', unsafe_allow_html=True)
+                    st.text_area(
+                        "DD",
+                        value=str(df.at[idx, "Indicative Delivery Date"]),
+                        key=f"date_{idx}",
+                        height=75,
+                        label_visibility="collapsed"
+                    )
+                with c_pic:
+                    st.markdown('<span class="playfair-label">Person-in-charge</span>', unsafe_allow_html=True)
+                    st.text_area(
+                        "PIC",
+                        value=str(df.at[idx, "Person-in-charge"]),
+                        key=f"pic_{idx}",
+                        height=75,
+                        label_visibility="collapsed"
+                    )
+                with c_del:
+                    st.write("<div style='height: 38px;'></div>", unsafe_allow_html=True)
+                    if st.button("Delete", key=f"del_{idx}", help=f"Remove item {idx+1}"):
+                        row_to_delete = idx
         
-        # If a row needs to be deleted, remove it from df and update session state
+        # Handle Deletion
         if row_to_delete is not None:
             df = df.drop(index=row_to_delete).reset_index(drop=True)
             st.session_state["df"] = df
             st.rerun()
         
-        # After rendering all rows, collect updated values from widgets and update df
-        updated_data = []
+        # Safe dataframe collection
+        rows_data = []
         for idx in range(len(df)):
-            discussion = st.session_state.get(f"dp_{idx}", df.at[idx, "Discussion Points"])
-            action = st.session_state.get(f"ap_{idx}", df.at[idx, "Action Plan"])
+            discussion_val = st.session_state.get(f"dp_{idx}", df.at[idx, "Discussion Points"])
+            action_val = st.session_state.get(f"ap_{idx}", df.at[idx, "Action Plan"])
             date_val = st.session_state.get(f"date_{idx}", df.at[idx, "Indicative Delivery Date"])
-            pic = st.session_state.get(f"pic_{idx}", df.at[idx, "Person-in-charge"])
-            updated_data.append({
-                "Discussion Points": discussion,
-                "Action Plan": action,
+            pic_val = st.session_state.get(f"pic_{idx}", df.at[idx, "Person-in-charge"])
+            
+            rows_data.append({
+                "Discussion Points": discussion_val,
+                "Action Plan": action_val,
                 "Indicative Delivery Date": date_val,
-                "Person-in-charge": pic
+                "Person-in-charge": pic_val
             })
         
-        st.session_state["df"] = pd.DataFrame(updated_data)
+        st.session_state["df"] = pd.DataFrame(rows_data, columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
         
-        # Add Row button
-        if st.button("➕ Add Row", key="add_row"):
-            new_row = pd.DataFrame([{
-                "Discussion Points": "",
-                "Action Plan": "",
-                "Indicative Delivery Date": "",
-                "Person-in-charge": ""
-            }])
-            st.session_state["df"] = pd.concat([st.session_state["df"], new_row], ignore_index=True)
-            st.rerun()
+        # Add Item Button
+        add_col, _ = st.columns([2, 8])
+        with add_col:
+            if st.button("+ Add Item", key="add_row"):
+                new_row_df = pd.DataFrame([{
+                    "Discussion Points": "",
+                    "Action Plan": "",
+                    "Indicative Delivery Date": "",
+                    "Person-in-charge": ""
+                }])
+                st.session_state["df"] = pd.concat([st.session_state["df"], new_row_df], ignore_index=True)
+                st.rerun()
         
-        # Other Discussions
         st.session_state["other_discussions"] = st.text_area(
             "Other Discussions",
             value=st.session_state["other_discussions"],
