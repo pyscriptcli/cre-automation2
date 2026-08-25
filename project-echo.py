@@ -96,6 +96,28 @@ if "selected_engine" not in st.session_state:
 if "chat_history" not in st.session_state:
     st.session_state["chat_history"] = []
 
+# State for Auto-Populated Meeting Details
+if "meeting_date" not in st.session_state:
+    st.session_state["meeting_date"] = datetime.date(2026, 8, 25)
+if "meeting_location_custom" not in st.session_state:
+    st.session_state["meeting_location_custom"] = ""
+if "meeting_location_preset" not in st.session_state:
+    st.session_state["meeting_location_preset"] = LOCATION_PRESETS[0]
+if "meeting_client_name" not in st.session_state:
+    st.session_state["meeting_client_name"] = ""
+if "meeting_selected_crd" not in st.session_state:
+    st.session_state["meeting_selected_crd"] = []
+if "meeting_ext_attendees" not in st.session_state:
+    st.session_state["meeting_ext_attendees"] = ""
+if "meeting_prep_name" not in st.session_state:
+    st.session_state["meeting_prep_name"] = ""
+if "meeting_prep_desig" not in st.session_state:
+    st.session_state["meeting_prep_desig"] = ""
+if "meeting_conf_name" not in st.session_state:
+    st.session_state["meeting_conf_name"] = ""
+if "meeting_conf_desig" not in st.session_state:
+    st.session_state["meeting_conf_desig"] = ""
+
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
 <style>
@@ -105,13 +127,14 @@ html, body, [class*="css"] {
     font-family: 'Montserrat', sans-serif !important;
 }
 
+/* Crisp Technical Large Gridlines Background */
 .stApp {
-    background-color: #F4F2EC; 
+    background-color: #F3EFE6; 
     background-image: 
-        linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
-    background-size: 80px 80px;
-    color: #333333;
+        linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+    background-size: 72px 72px;
+    color: #2D2D2D;
 }
 
 .stApp > header { display: none !important; }
@@ -122,7 +145,7 @@ html, body, [class*="css"] {
     position: fixed; top: 0; left: 0; right: 0; height: 60px;
     background-color: #161616;
     border-bottom: 1px solid #333333;
-    z-index: 999990; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 999990; box-shadow: 0 4px 15px rgba(0,0,0,0.25);
     display: flex; align-items: center; justify-content: flex-start;
     padding: 0 2rem;
 }
@@ -140,7 +163,6 @@ h3 {
     color: #1A2B4C !important; letter-spacing: 0.02em; margin-bottom: 0.25rem; font-size: 1.25rem !important;
 }
 
-/* Playfair Display Styling for Labels & Tab Headers */
 .playfair-label {
     font-family: 'Playfair Display', serif !important;
     font-style: italic !important;
@@ -159,34 +181,32 @@ button[data-baseweb="tab"] p {
     font-size: 1.05rem !important;
 }
 
-/* Strict Symmetrical Card Heights for Top Row */
+/* Card Depth with Prominent Right-Side & Bottom Drop Shadows */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #FFFFFF !important; 
+    border-radius: 12px !important;
+    box-shadow: 10px 10px 24px rgba(0, 0, 0, 0.08), 2px 2px 6px rgba(0, 0, 0, 0.04) !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important; 
+    padding: 1.25rem !important; 
+    margin-bottom: 1.25rem !important;
+}
+
+/* Top Row Cards Symmetrical Fixed Height & Layout */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(div.top-card-anchor) {
-    min-height: 470px !important;
-    height: 470px !important;
+    min-height: 480px !important;
+    height: 480px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
-    background-color: #FFFFFF !important; 
-    border-radius: 12px !important;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
-    border: 1px solid rgba(0, 0, 0, 0.04) !important; 
-    padding: 1.25rem !important; 
-    margin-bottom: 1rem !important;
 }
 
-/* Strict Symmetrical Card Heights for Bottom Row */
+/* Bottom Row Cards Symmetrical Fixed Height & Layout */
 div[data-testid="stVerticalBlockBorderWrapper"]:has(div.bottom-card-anchor) {
-    min-height: 540px !important;
-    height: 540px !important;
+    min-height: 550px !important;
+    height: 550px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    background-color: #FFFFFF !important; 
-    border-radius: 12px !important;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
-    border: 1px solid rgba(0, 0, 0, 0.04) !important; 
-    padding: 1.25rem !important; 
-    margin-bottom: 1rem !important;
 }
 
 /* Uniform Small Pill Buttons */
@@ -254,8 +274,8 @@ button[key="card_settings_btn"]::before {
     width: 17px;
     height: 17px;
     background-color: #C5A059;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -268,12 +288,11 @@ button[key="card_settings_btn"]::before {
     border-radius: 8px !important;
 }
 
-/* Time Picker Clean Layout */
 [data-testid="column"] .stSelectbox {
     margin-bottom: 0 !important;
 }
 
-/* Sophisticated, Mature & Minimalist Ask Echo Chat UI */
+/* Sophisticated Ask Echo Chat UI */
 .chat-container {
     display: flex;
     flex-direction: column;
@@ -590,6 +609,60 @@ Transcript:
         st.warning(f"DeepSeek connection error: {e}")
 
     return None, ""
+
+def extract_metadata_with_deepseek(transcript):
+    if not DEEPSEEK_API_KEY:
+        st.error("DeepSeek API Key is missing.")
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    system_prompt = (
+        "You are an AI assistant for PRIME Philippines. Analyze the meeting transcript (which may contain Taglish/Filipino) "
+        "and extract the meeting metadata. Match CRD team attendees strictly to this list: "
+        f"{', '.join(CRD_MEMBERS)}. "
+        "Output ONLY a valid JSON object matching the schema."
+    )
+
+    user_prompt = f"""Extract metadata from this transcript into valid JSON:
+Schema:
+{{
+  "client_name": "Company/Client name or empty string",
+  "location": "Meeting location or preset if mentioned or empty string",
+  "crd_attendees": ["Exact matching names from CRD member list"],
+  "external_attendees": "Comma-separated list of external attendee names",
+  "prepared_by": "Name of attendee from PRIME taking notes or empty string",
+  "confirmed_by": "Primary external attendee/client rep or empty string"
+}}
+
+Transcript:
+{transcript[:15000]}"""
+
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1,
+        "max_tokens": 500
+    }
+
+    try:
+        resp = requests.post(DEEPSEEK_CHAT_URL, headers=headers, json=payload, timeout=45)
+        if resp.status_code == 200:
+            res_json = resp.json()
+            raw_text = res_json["choices"][0]["message"]["content"].strip()
+            clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+            return json.loads(clean_text)
+    except Exception as e:
+        st.error(f"Error auto-populating metadata: {e}")
+    return None
 
 def heuristic_non_ai_extraction(transcript):
     sentences = re.split(r'(?<=[.!?]) +', transcript)
@@ -1184,11 +1257,40 @@ with col_upload:
                 else:
                     st.warning("Please upload a file or paste text to proceed.")
 
-# RIGHT CONTAINER: Meeting Details Card
+# RIGHT CONTAINER: Meeting Details Card (with Auto-Populate Button)
 with col_details:
     with st.container(border=True):
         st.markdown('<div class="top-card-anchor" style="display:none;"></div>', unsafe_allow_html=True)
-        head_col1, head_col2 = st.columns([9.0, 1.0])
+        
+        # Header + Auto-populate button (when transcript exists) + Settings Button
+        if st.session_state["transcript"]:
+            head_col1, head_col_auto, head_col2 = st.columns([5.5, 3.5, 1.0])
+            with head_col_auto:
+                if st.button("Auto-Fill from Transcript", key="btn_auto_populate", help="Analyze transcript to automatically populate client, location, and attendees"):
+                    with st.spinner("Extracting metadata..."):
+                        meta = extract_metadata_with_deepseek(st.session_state["transcript"])
+                        if meta:
+                            if meta.get("client_name"):
+                                st.session_state["meeting_client_name"] = meta["client_name"]
+                            if meta.get("location"):
+                                if meta["location"] in LOCATION_PRESETS:
+                                    st.session_state["meeting_location_preset"] = meta["location"]
+                                else:
+                                    st.session_state["meeting_location_custom"] = meta["location"]
+                            if meta.get("crd_attendees"):
+                                matched_crd = [c for c in meta["crd_attendees"] if c in CRD_MEMBERS]
+                                if matched_crd:
+                                    st.session_state["meeting_selected_crd"] = matched_crd
+                            if meta.get("external_attendees"):
+                                st.session_state["meeting_ext_attendees"] = meta["external_attendees"]
+                            if meta.get("prepared_by"):
+                                st.session_state["meeting_prep_name"] = meta["prepared_by"]
+                            if meta.get("confirmed_by"):
+                                st.session_state["meeting_conf_name"] = meta["confirmed_by"]
+                            st.rerun()
+        else:
+            head_col1, head_col2 = st.columns([9.0, 1.0])
+            
         with head_col1:
             st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
         with head_col2:
@@ -1228,10 +1330,14 @@ with col_details:
         # Row 1: Date, Location Preset & Input
         r1_c1, r1_c2 = st.columns([1.2, 2.0])
         with r1_c1:
-            meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
+            meeting_date = st.date_input("Date", value=st.session_state["meeting_date"])
+            st.session_state["meeting_date"] = meeting_date
         with r1_c2:
-            loc_preset = st.selectbox("Location Preset", options=LOCATION_PRESETS, index=0)
-            custom_loc = st.text_input("Location", value="", placeholder="e.g. Boardroom", label_visibility="collapsed")
+            current_preset_idx = LOCATION_PRESETS.index(st.session_state["meeting_location_preset"]) if st.session_state["meeting_location_preset"] in LOCATION_PRESETS else 0
+            loc_preset = st.selectbox("Location Preset", options=LOCATION_PRESETS, index=current_preset_idx)
+            st.session_state["meeting_location_preset"] = loc_preset
+            custom_loc = st.text_input("Location", value=st.session_state["meeting_location_custom"], placeholder="e.g. Boardroom", label_visibility="collapsed")
+            st.session_state["meeting_location_custom"] = custom_loc
             meeting_location = custom_loc.strip() if custom_loc.strip() else ("" if loc_preset == LOCATION_PRESETS[0] else loc_preset)
 
         # Row 2: Time Pickers
@@ -1254,17 +1360,24 @@ with col_details:
         # Row 3: Attendees & Parties
         r3_c1, r3_c2 = st.columns(2)
         with r3_c1:
-            client_name = st.text_input("Client / Company", value="", placeholder="XYZ Company")
-            selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=[])
+            client_name = st.text_input("Client / Company", value=st.session_state["meeting_client_name"], placeholder="XYZ Company")
+            st.session_state["meeting_client_name"] = client_name
+            selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=st.session_state["meeting_selected_crd"])
+            st.session_state["meeting_selected_crd"] = selected_crd
         with r3_c2:
-            ext_attendees_raw = st.text_input("External Attendees", value="", placeholder="e.g. Mr. ABCD, Jane Doe")
+            ext_attendees_raw = st.text_input("External Attendees", value=st.session_state["meeting_ext_attendees"], placeholder="e.g. Mr. ABCD, Jane Doe")
+            st.session_state["meeting_ext_attendees"] = ext_attendees_raw
             prep_col, conf_col = st.columns(2)
             with prep_col:
-                prep_name = st.text_input("Prepared By", value="", placeholder="Name")
-                prep_desig = st.text_input("Prep Designation", value="", placeholder="Designation")
+                prep_name = st.text_input("Prepared By", value=st.session_state["meeting_prep_name"], placeholder="Name")
+                st.session_state["meeting_prep_name"] = prep_name
+                prep_desig = st.text_input("Prep Designation", value=st.session_state["meeting_prep_desig"], placeholder="Designation")
+                st.session_state["meeting_prep_desig"] = prep_desig
             with conf_col:
-                conf_name = st.text_input("Confirmed By", value="", placeholder="Name")
-                conf_desig = st.text_input("Conf Designation", value="", placeholder="Designation")
+                conf_name = st.text_input("Confirmed By", value=st.session_state["meeting_conf_name"], placeholder="Name")
+                st.session_state["meeting_conf_name"] = conf_name
+                conf_desig = st.text_input("Conf Designation", value=st.session_state["meeting_conf_desig"], placeholder="Designation")
+                st.session_state["meeting_conf_desig"] = conf_desig
 
 # ---- Step 2: Symmetrical Bottom Row (Full Transcript Left, Ask Echo Right) ----
 if st.session_state["transcript"]:
