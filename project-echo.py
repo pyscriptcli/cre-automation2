@@ -385,7 +385,7 @@ def extract_with_deepseek(transcript):
     system_prompt = (
         "You are an expert executive assistant for PRIME Philippines tasked with producing comprehensive, "
         "high-level executive Minutes of the Meeting (MOM). "
-        "The transcript contains Tagalog, English, and Taglish dialogue. "
+        "The transcript contains Tagalog, English, and Taglish dialogue which you will translate and synthesize to all english"
         "Analyze the full conversation context and translate all colloquial, informal, and mixed-language statements "
         "into polished, high-level corporate English. "
         "Synthesize all key agreements, status reports, core discussion points, definitive action plans, "
@@ -393,7 +393,7 @@ def extract_with_deepseek(transcript):
         "Output valid JSON only matching the exact schema provided."
     )
 
-    user_prompt = f"""Synthesize the following meeting transcript into formal, high-level Minutes of Meeting (MOM) formatted as valid JSON:
+    user_prompt = f"""Synthesize the following meeting transcript into formal, short and direct high-level Minutes of Meeting (MOM) formatted as valid JSON:
 
 Schema:
 {{
