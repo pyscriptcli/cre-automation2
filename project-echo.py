@@ -25,6 +25,9 @@ if not os.path.exists(_config_file):
         f.write('[theme]\nbase="light"\n')
 
 # API Keys & Endpoints
+GEMINI_API_KEY = "AIzaSyDlBkIdAth2AesZ9rr3xTe7t_IXl2_IEQM"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+
 GROQ_API_KEY = "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"
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -146,35 +149,27 @@ def transcribe_audio(audio_bytes):
             st.error(f"Transcription failed: {error_msg}")
         return None
 
-def extract_structured_insights_single_pass(transcript):
-    """
-    Direct Single-Pass Extraction Engine.
-    Processes the whole transcript without chunking, specially tuned for Taglish dialogue.
-    """
+def extract_with_gemini(transcript):
+    """Primary Engine: Google Gemini 1.5 Flash (1M token context, handles full Taglish meetings seamlessly)."""
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY
     }
+    
+    prompt = f"""You are an executive assistant for PRIME Philippines extracting Minutes of the Meeting (MOM).
+The transcript contains Tagalog and English (Taglish) discussion regarding property sourcing, sites (A1 sites), reports, tax maps, LGUs, trade areas, and client updates.
+Translate all discussion points and action plans into clear, professional corporate English.
 
-    system_prompt = (
-        "You are an expert executive assistant for PRIME Philippines generating Minutes of the Meeting (MOM). "
-        "The transcript is a business conversation in English and Tagalog (Taglish). "
-        "Your task: Translate colloquial dialogue into professional corporate English and extract ALL discussion points, "
-        "site sourcing tasks, report submissions, trade area reviews, deliverables, deadlines, and responsible entities. "
-        "You MUST return a JSON object with 'table_items' (array of objects) and 'other_discussions' (string)."
-    )
+You MUST extract at least 3 to 8 clear, distinct table items covering all topics discussed.
 
-    user_prompt = f"""Extract the Minutes of Meeting from this complete transcript into valid JSON.
-Extract AT LEAST 3 to 8 clear, detailed table items covering all discussed topics (e.g., site mapping, sourcing report templates, trade areas, LGU tax maps, site visits, follow-up meetings).
-
-JSON Structure:
+Output valid JSON ONLY with this schema:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Clear description of the topic, report, site status, or milestone discussed",
-      "Action Plan": "Concrete next steps, deliverables, formats to send, or requirements",
-      "Indicative Delivery Date": "Specific date, timeline (e.g. Q1 2027, Friday), or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g. PRIME, Client, or specific person)"
+      "Discussion Points": "Core discussion topic, report update, or milestone",
+      "Action Plan": "Concrete next step, deliverable, format to provide, or requirement",
+      "Indicative Delivery Date": "Specific date, timeline (e.g., Friday, Q1 2027), or 'TBD'",
+      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or name)"
     }}
   ],
   "other_discussions": "Summary of informal remarks, administrative notes, or general context"
@@ -183,8 +178,61 @@ JSON Structure:
 Transcript:
 {transcript}"""
 
-    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.1
+        }
+    }
+    
+    try:
+        resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=60)
+        if resp.status_code == 200:
+            result = resp.json()
+            raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+            data = json.loads(raw_text)
+            items = data.get("table_items", [])
+            if items:
+                df = pd.DataFrame(items)
+                for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+                    if col not in df.columns:
+                        df[col] = ""
+                return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
+    except Exception:
+        pass
+    return None, None
 
+def extract_with_groq_backup(transcript):
+    """Backup Engine: Groq 70B & 8B with single-pass corporate extraction."""
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    system_prompt = (
+        "You are an executive assistant extracting Minutes of the Meeting (MOM). "
+        "The transcript contains Tagalog and English (Taglish). Translate dialogue into professional English. "
+        "Extract all key discussion points and action items. Respond ONLY with valid JSON."
+    )
+    
+    user_prompt = f"""Extract all Minutes of the Meeting items into valid JSON:
+{{
+  "table_items": [
+    {{
+      "Discussion Points": "Core discussion topic, report, or milestone",
+      "Action Plan": "Specific follow-up action or deliverable",
+      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
+      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or Unassigned)"
+    }}
+  ],
+  "other_discussions": "Summary of other points discussed"
+}}
+
+Transcript:
+{transcript[:25000]}"""
+
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
     for model in models:
         payload = {
             "model": model,
@@ -203,21 +251,30 @@ Transcript:
                 clean_text = re.sub(r"\s*```$", "", clean_text).strip()
                 match = re.search(r"\{.*\}", clean_text, re.DOTALL)
                 data = json.loads(match.group(0)) if match else json.loads(clean_text)
-
                 items = data.get("table_items", [])
-                if items and len(items) > 0:
+                if items:
                     df = pd.DataFrame(items)
                     for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
                         if col not in df.columns:
                             df[col] = ""
-                    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
-                    return df, data.get("other_discussions", "")
-            else:
-                continue
+                    return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
         except Exception:
             continue
+    return None, None
 
-    st.error("Failed to generate MOM items. Please verify your transcript and retry.")
+def extract_structured_insights(transcript):
+    """Main extraction coordinator: Runs Gemini as Primary, Groq as Backup."""
+    # 1. Primary: Gemini
+    df, other_disc = extract_with_gemini(transcript)
+    if df is not None and not df.empty:
+        return df, other_disc
+
+    # 2. Backup: Groq
+    df_groq, other_disc_groq = extract_with_groq_backup(transcript)
+    if df_groq is not None and not df_groq.empty:
+        return df_groq, other_disc_groq
+
+    st.error("Extraction failed on both Gemini and Groq. Please check transcript and retry.")
     return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
 
 def set_cell_shading(cell, color_hex):
@@ -462,8 +519,8 @@ if st.session_state["transcript"]:
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                with st.spinner("Extracting Minutes of Meeting discussion points..."):
-                    extracted_df, other_disc = extract_structured_insights_single_pass(st.session_state["transcript"])
+                with st.spinner("Generating Minutes of the Meeting..."):
+                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
