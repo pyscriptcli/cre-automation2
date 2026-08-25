@@ -10,7 +10,7 @@ from io import BytesIO
 import PyPDF2
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml
 from reportlab.lib.pagesizes import letter
@@ -351,234 +351,206 @@ def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
     cell._tc.get_or_add_tcPr().append(shd)
 
-def replace_text_in_paragraphs(paragraphs, target, replacement):
-    for p in paragraphs:
-        if target in p.text:
-            inline = p.runs
-            for i in range(len(inline)):
-                if target in inline[i].text:
-                    inline[i].text = inline[i].text.replace(target, replacement)
-            if target in p.text:
-                p.text = p.text.replace(target, replacement)
-
 def export_to_word(df, meeting_details, other_discussions):
+    # Template preservation strategy: check if template exists
     template_files = ["MOM_Template.docx", "MOM Template.docx"]
     template_path = next((f for f in template_files if os.path.exists(f)), None)
 
     if template_path:
         doc = Document(template_path)
-        company = meeting_details.get("company_name", "CLIENT").strip().upper()
-        date_str = meeting_details.get("date", "____________")
-        time_str = meeting_details.get("time_range", "")
-        full_date = f"Date: {date_str}" + (f", {time_str}" if time_str else "")
-        location_str = f"Location: {meeting_details.get('location', '____________')}"
-
-        replace_text_in_paragraphs(doc.paragraphs, "{{COMPANY}}", company)
-        replace_text_in_paragraphs(doc.paragraphs, "{{DATE}}", full_date)
-        replace_text_in_paragraphs(doc.paragraphs, "{{LOCATION}}", location_str)
-
-        if doc.tables:
-            table = doc.tables[0]
-            headers = ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]
-            for col_idx, h in enumerate(headers):
-                if col_idx < len(table.rows[0].cells):
-                    table.rows[0].cells[col_idx].text = h
-                    set_cell_shading(table.rows[0].cells[col_idx], "FFFF00")
-
-            for i, row in df.iterrows():
-                row_cells = table.add_row().cells
-                row_cells[0].text = f"{i+1}.  {str(row.get('Discussion Points', ''))}"
-                row_cells[1].text = str(row.get("Action Plan", ""))
-                row_cells[2].text = str(row.get("Indicative Delivery Date", ""))
-                row_cells[3].text = str(row.get("Person-in-charge", ""))
-                for c_idx, cell in enumerate(row_cells):
-                    p = cell.paragraphs[0]
-                    if c_idx in [2, 3]: p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    if p.runs:
-                        p.runs[0].font.size = Pt(9)
-                        p.runs[0].font.name = "Arial"
-        else:
-            table = doc.add_table(rows=len(df)+1, cols=4)
-            table.alignment = WD_TABLE_ALIGNMENT.CENTER
-            table.style = "Table Grid"
-            headers = ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]
-            for i, header in enumerate(headers):
-                cell = table.rows[0].cells[i]
-                cell.text = header
-                set_cell_shading(cell, "FFFF00")
-                p = cell.paragraphs[0]
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                if p.runs:
-                    p.runs[0].font.bold = True
-                    p.runs[0].font.size = Pt(9.5)
-                    p.runs[0].font.name = "Arial"
-
-            for i, row in df.iterrows():
-                cells = table.rows[i+1].cells
-                cells[0].text = f"{i+1}.  {str(row.get('Discussion Points', ''))}"
-                cells[1].text = str(row.get("Action Plan", ""))
-                cells[2].text = str(row.get("Indicative Delivery Date", ""))
-                cells[3].text = str(row.get("Person-in-charge", ""))
-                for c_idx, cell in enumerate(cells):
-                    p = cell.paragraphs[0]
-                    if c_idx in [2, 3]: p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    if p.runs:
-                        p.runs[0].font.size = Pt(9)
-                        p.runs[0].font.name = "Arial"
-
-        if other_discussions.strip():
-            p_od_head = doc.add_paragraph()
-            p_od_head.paragraph_format.space_before = Pt(8)
-            r_od_head = p_od_head.add_run("Other Discussions:")
-            r_od_head.bold = True
-            r_od_head.font.size = Pt(10)
-            r_od_head.font.name = "Arial"
-            doc.add_paragraph(other_discussions)
-
     else:
         doc = Document()
-        for section in doc.sections:
-            section.top_margin = Inches(0.5)
-            section.bottom_margin = Inches(0.5)
-            section.left_margin = Inches(0.75)
-            section.right_margin = Inches(0.75)
+        if os.path.exists("header.png"):
+            for section in doc.sections:
+                section.top_margin = Inches(0.4)
+                section.bottom_margin = Inches(0.4)
+                section.left_margin = Inches(0.75)
+                section.right_margin = Inches(0.75)
+                hp = section.header.paragraphs[0]
+                hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                hp.add_run().add_picture("header.png", width=Inches(7.0))
+                if os.path.exists("footer.png"):
+                    fp = section.footer.paragraphs[0]
+                    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    fp.add_run().add_picture("footer.png", width=Inches(7.0))
 
-            header = section.header
-            hp = header.paragraphs[0]
-            hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            if os.path.exists("header.png"):
-                hp.add_run().add_picture("header.png", width=Inches(6.8))
+    # Configure Margins
+    for section in doc.sections:
+        section.top_margin = Inches(0.4)
+        section.bottom_margin = Inches(0.4)
+        section.left_margin = Inches(0.75)
+        section.right_margin = Inches(0.75)
+
+    # 1. Title Header
+    p_title = doc.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_before = Pt(0)
+    p_title.paragraph_format.space_after = Pt(2)
+    r_title = p_title.add_run("MINUTES OF THE MEETING")
+    r_title.bold = True
+    r_title.underline = True
+    r_title.font.name = "Arial"
+    r_title.font.size = Pt(11)
+
+    company_target = meeting_details.get("external_attendees", [])
+    primary_client_rep = company_target[0] if company_target else meeting_details.get("company_name", "CLIENT")
+    p_sub = doc.add_paragraph()
+    p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_sub.paragraph_format.space_after = Pt(12)
+    r_sub = p_sub.add_run(f"PRIME PHILIPPINES & {primary_client_rep.upper()}")
+    r_sub.bold = True
+    r_sub.font.name = "Arial"
+    r_sub.font.size = Pt(11)
+
+    # 2. Metadata Block (Date, Location, Attended by)
+    date_str = meeting_details.get("date", "____________")
+    time_str = meeting_details.get("time_range", "")
+    full_date = f"Date: {date_str}" + (f", {time_str}" if time_str else "")
+    
+    p_date = doc.add_paragraph(full_date)
+    p_date.paragraph_format.space_after = Pt(2)
+    for r in p_date.runs: r.font.name = "Arial"; r.font.size = Pt(10)
+
+    p_loc = doc.add_paragraph(f"Location: {meeting_details.get('location', '____________')}")
+    p_loc.paragraph_format.space_after = Pt(2)
+    for r in p_loc.runs: r.font.name = "Arial"; r.font.size = Pt(10)
+
+    prime_atts = meeting_details.get("prime_attendees", [])
+    ext_atts = meeting_details.get("external_attendees", [])
+    
+    # Format attendees with alignment tabs
+    p_att = doc.add_paragraph()
+    p_att.paragraph_format.space_after = Pt(2)
+    p_att.paragraph_format.tab_stops.add_tab_stop(Inches(1.35), WD_TAB_ALIGNMENT.LEFT)
+    r_att_label = p_att.add_run("Attended by:")
+    r_att_label.font.name = "Arial"
+    r_att_label.font.size = Pt(10)
+    
+    first_attendee = True
+    if ext_atts:
+        for att in ext_atts:
+            if not att.strip(): continue
+            p = p_att if first_attendee else doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(2)
+            if not first_attendee:
+                p.paragraph_format.left_indent = Inches(1.35)
             else:
-                hrun = hp.add_run("PRIME PHILIPPINES | COMMERCIAL REAL ESTATE ADVISORY")
-                hrun.font.name = "Arial"
-                hrun.font.size = Pt(8.5)
-                hrun.font.color.rgb = RGBColor(128, 128, 128)
+                p.add_run("\t")
+            r = p.add_run(f"{att}, {meeting_details.get('company_name', 'Client')}")
+            r.font.name = "Arial"
+            r.font.size = Pt(10)
+            first_attendee = False
 
-            footer = section.footer
-            fp = footer.paragraphs[0]
-            fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            if os.path.exists("footer.png"):
-                fp.add_run().add_picture("footer.png", width=Inches(6.8))
+    if prime_atts:
+        for att in prime_atts:
+            p = p_att if first_attendee else doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(2)
+            if not first_attendee:
+                p.paragraph_format.left_indent = Inches(1.35)
             else:
-                frun = fp.add_run("Confidential - For Internal and Client Collaboration Only")
-                frun.font.name = "Arial"
-                frun.font.size = Pt(8)
-                frun.font.italic = True
-                frun.font.color.rgb = RGBColor(150, 150, 150)
+                p.add_run("\t")
+            r = p.add_run(f"{att} – PRIME Philippines")
+            r.font.name = "Arial"
+            r.font.size = Pt(10)
+            first_attendee = False
 
-        p_title = doc.add_paragraph()
-        p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r_title = p_title.add_run("MINUTES OF THE MEETING")
-        r_title.bold = True
-        r_title.underline = True
-        r_title.font.name = "Arial"
-        r_title.font.size = Pt(11)
+    # 3. Horizontal Separator Rule
+    p_line = doc.add_paragraph()
+    p_line.paragraph_format.space_before = Pt(4)
+    p_line.paragraph_format.space_after = Pt(6)
+    r_line = p_line.add_run("_________________________________________________________________________________")
+    r_line.font.name = "Arial"
+    r_line.font.color.rgb = RGBColor(160, 160, 160)
 
-        company = meeting_details.get("company_name", "CLIENT").strip().upper()
-        p_sub = doc.add_paragraph()
-        p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r_sub = p_sub.add_run(f"PRIME PHILIPPINES & {company}")
-        r_sub.bold = True
-        r_sub.font.name = "Arial"
-        r_sub.font.size = Pt(11)
+    # 4. Context Intro Paragraph
+    p_intro = doc.add_paragraph(
+        f"During the meeting held last {date_str}, PRIME Philippines, represented by the attendee/s shown above, "
+        f"met with {meeting_details.get('company_name', 'the Client')} to discuss opportunities for collaboration."
+    )
+    p_intro.paragraph_format.space_after = Pt(10)
+    for r in p_intro.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
 
-        doc.add_paragraph()
+    # 5. Dynamic Data Table
+    table = doc.add_table(rows=len(df)+1, cols=4)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.style = "Table Grid"
 
-        date_str = meeting_details.get("date", "____________")
-        time_str = meeting_details.get("time_range", "")
-        full_date = f"Date: {date_str}" + (f", {time_str}" if time_str else "")
+    headers = ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]
+    for i, header in enumerate(headers):
+        cell = table.rows[0].cells[i]
+        cell.text = header
+        set_cell_shading(cell, "FFFF00")
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if p.runs:
+            p.runs[0].font.bold = True
+            p.runs[0].font.size = Pt(9)
+            p.runs[0].font.name = "Arial"
 
-        doc.add_paragraph(full_date).paragraph_format.space_after = Pt(2)
-        doc.add_paragraph(f"Location: {meeting_details.get('location', '____________')}").paragraph_format.space_after = Pt(2)
-
-        prime_atts = meeting_details.get("prime_attendees", [])
-        ext_atts = meeting_details.get("external_attendees", [])
-
-        p_att = doc.add_paragraph("Attended by:\t")
-        p_att.paragraph_format.space_after = Pt(2)
-
-        first = True
-        if ext_atts:
-            for att in ext_atts:
-                if not att.strip(): continue
-                p = p_att if first else doc.add_paragraph()
-                if not first: p.paragraph_format.left_indent = Inches(1.2)
-                p.add_run(f"{att} – {meeting_details.get('company_name', 'Client')}")
-                first = False
-
-        if prime_atts:
-            for att in prime_atts:
-                p = p_att if first else doc.add_paragraph()
-                if not first: p.paragraph_format.left_indent = Inches(1.2)
-                p.add_run(f"{att} – PRIME Philippines")
-                first = False
-
-        p_line = doc.add_paragraph()
-        p_line.paragraph_format.space_before = Pt(4)
-        p_line.paragraph_format.space_after = Pt(4)
-        p_line.add_run("_________________________________________________________________________________").font.color.rgb = RGBColor(180, 180, 180)
-
-        doc.add_paragraph(
-            f"During the meeting held last {date_str}, PRIME Philippines, represented by the attendee/s shown above, "
-            f"met with {meeting_details.get('company_name', 'the Client')} to discuss opportunities for collaboration."
-        )
-
-        table = doc.add_table(rows=len(df)+1, cols=4)
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        table.style = "Table Grid"
-
-        headers = ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]
-        for i, header in enumerate(headers):
-            cell = table.rows[0].cells[i]
-            cell.text = header
-            set_cell_shading(cell, "FFFF00")
+    for i, row in df.iterrows():
+        cells = table.rows[i+1].cells
+        cells[0].text = f"{i+1}. {str(row.get('Discussion Points', ''))}"
+        cells[1].text = str(row.get("Action Plan", ""))
+        cells[2].text = str(row.get("Indicative Delivery Date", ""))
+        cells[3].text = str(row.get("Person-in-charge", ""))
+        for c_idx, cell in enumerate(cells):
             p = cell.paragraphs[0]
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            if c_idx in [2, 3]: p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             if p.runs:
-                p.runs[0].font.bold = True
-                p.runs[0].font.size = Pt(9.5)
+                p.runs[0].font.size = Pt(8.5)
                 p.runs[0].font.name = "Arial"
 
-        for i, row in df.iterrows():
-            cells = table.rows[i+1].cells
-            cells[0].text = f"{i+1}.  {str(row.get('Discussion Points', ''))}"
-            cells[1].text = str(row.get("Action Plan", ""))
-            cells[2].text = str(row.get("Indicative Delivery Date", ""))
-            cells[3].text = str(row.get("Person-in-charge", ""))
-            for c_idx, cell in enumerate(cells):
-                p = cell.paragraphs[0]
-                if c_idx in [2, 3]: p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                if p.runs:
-                    p.runs[0].font.size = Pt(9)
-                    p.runs[0].font.name = "Arial"
+    # 6. Indicative Date Note
+    doc.add_paragraph()
+    p_note = doc.add_paragraph("*Note: The indicative delivery date serves as reference point and still subject to changes. Furthermore, it depends on the progress of both parties.")
+    p_note.paragraph_format.space_after = Pt(8)
+    p_note.runs[0].font.italic = True
+    p_note.runs[0].font.name = "Arial"
+    p_note.runs[0].font.size = Pt(8)
 
-        doc.add_paragraph()
-        p_note = doc.add_paragraph("*Note: The indicative delivery date serves as reference point and still subject to changes. Furthermore, it depends on the progress of both parties.")
-        p_note.runs[0].font.italic = True
-        p_note.runs[0].font.size = Pt(8.5)
+    # 7. Other Discussions Section
+    if other_discussions.strip():
+        p_od_head = doc.add_paragraph()
+        p_od_head.paragraph_format.space_before = Pt(6)
+        p_od_head.paragraph_format.space_after = Pt(4)
+        r_od_head = p_od_head.add_run("Other Discussions:")
+        r_od_head.bold = True
+        r_od_head.font.size = Pt(10)
+        r_od_head.font.name = "Arial"
+        
+        p_od = doc.add_paragraph(other_discussions)
+        p_od.paragraph_format.space_after = Pt(12)
+        for r in p_od.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
 
-        if other_discussions.strip():
-            p_od_head = doc.add_paragraph()
-            p_od_head.paragraph_format.space_before = Pt(8)
-            r_od_head = p_od_head.add_run("Other Discussions:")
-            r_od_head.bold = True
-            r_od_head.font.size = Pt(10)
-            r_od_head.font.name = "Arial"
-            doc.add_paragraph(other_discussions)
+    # 8. Sign-off / Prepared and Confirmed Section
+    p_prep_label = doc.add_paragraph("Prepared by:")
+    p_prep_label.paragraph_format.space_before = Pt(12)
+    p_prep_label.paragraph_format.space_after = Pt(2)
+    p_prep_label.runs[0].font.name = "Arial"; p_prep_label.runs[0].font.bold = True; p_prep_label.runs[0].font.size = Pt(9.5)
 
-        doc.add_paragraph()
-        doc.add_paragraph("Prepared by:")
-        doc.add_paragraph("_______________________________")
-        prep_name = meeting_details.get("prep_name", "").strip()
-        prep_desig = meeting_details.get("prep_desig", "").strip()
-        doc.add_paragraph(f"{prep_name if prep_name else '____________________'}\n{prep_desig if prep_desig else 'PRIME Philippines'}")
+    p_prep_line = doc.add_paragraph("_______________________________")
+    p_prep_line.paragraph_format.space_after = Pt(2)
+    p_prep_line.runs[0].font.name = "Arial"
 
-        doc.add_paragraph()
-        doc.add_paragraph("Confirmed by:")
-        doc.add_paragraph("_______________________________")
-        conf_name = meeting_details.get("conf_name", "").strip()
-        conf_desig = meeting_details.get("conf_desig", "").strip()
-        doc.add_paragraph(f"{conf_name if conf_name else '____________________'}\n{conf_desig if conf_desig else company}")
+    prep_name = meeting_details.get("prep_name", "").strip() or "Mr. Romel Dellosa"
+    prep_desig = meeting_details.get("prep_desig", "").strip() or "AVP for Capital Markets\nPRIME Philippines"
+    p_prep_info = doc.add_paragraph(f"{prep_name}\n{prep_desig}")
+    p_prep_info.paragraph_format.space_after = Pt(12)
+    for r in p_prep_info.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
+
+    p_conf_label = doc.add_paragraph("Confirmed by:")
+    p_conf_label.paragraph_format.space_after = Pt(2)
+    p_conf_label.runs[0].font.name = "Arial"; p_conf_label.runs[0].font.bold = True; p_conf_label.runs[0].font.size = Pt(9.5)
+
+    p_conf_line = doc.add_paragraph("_______________________________")
+    p_conf_line.paragraph_format.space_after = Pt(2)
+    p_conf_line.runs[0].font.name = "Arial"
+
+    conf_name = meeting_details.get("conf_name", "").strip() or (ext_atts[0] if ext_atts else "Mr. ABCD")
+    conf_desig = meeting_details.get("conf_desig", "").strip() or meeting_details.get("company_name", "XYZ Company")
+    p_conf_info = doc.add_paragraph(f"{conf_name}\n{conf_desig}")
+    p_conf_info.paragraph_format.space_after = Pt(6)
+    for r in p_conf_info.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
 
     bio = BytesIO()
     doc.save(bio)
@@ -602,17 +574,19 @@ def export_to_pdf(df, meeting_details, other_discussions):
         'DocTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=12,
+        fontSize=11.5,
         alignment=1,
         spaceAfter=2
     )
+    company_target = meeting_details.get("external_attendees", [])
+    primary_client_rep = company_target[0] if company_target else meeting_details.get("company_name", "CLIENT")
     style_subtitle = ParagraphStyle(
         'DocSubTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=11,
+        fontSize=10.5,
         alignment=1,
-        spaceAfter=12
+        spaceAfter=10
     )
     style_body = ParagraphStyle(
         'DocBody',
@@ -648,11 +622,10 @@ def export_to_pdf(df, meeting_details, other_discussions):
 
     if os.path.exists("header.png"):
         story.append(Image("header.png", width=6.8 * inch, height=0.75 * inch))
-        story.append(Spacer(1, 8))
+        story.append(Spacer(1, 6))
 
     story.append(Paragraph("<u>MINUTES OF THE MEETING</u>", style_title))
-    company = meeting_details.get("company_name", "CLIENT").strip().upper()
-    story.append(Paragraph(f"PRIME PHILIPPINES & {company}", style_subtitle))
+    story.append(Paragraph(f"PRIME PHILIPPINES & {primary_client_rep.upper()}", style_subtitle))
 
     date_str = meeting_details.get("date", "____________")
     time_str = meeting_details.get("time_range", "")
@@ -666,15 +639,15 @@ def export_to_pdf(df, meeting_details, other_discussions):
     if ext_atts:
         for att in ext_atts:
             if att.strip():
-                att_list.append(f"{att} – {meeting_details.get('company_name', 'Client')}")
+                att_list.append(f"{att}, {meeting_details.get('company_name', 'Client')}")
     if prime_atts:
         for att in prime_atts:
             att_list.append(f"{att} – PRIME Philippines")
 
     if att_list:
-        story.append(Paragraph(f"<b>Attended by:</b> {att_list[0]}", style_body))
+        story.append(Paragraph(f"<b>Attended by:</b>&nbsp;&nbsp;&nbsp;&nbsp;{att_list[0]}", style_body))
         for a in att_list[1:]:
-            story.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{a}", style_body))
+            story.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{a}", style_body))
 
     story.append(Spacer(1, 4))
     story.append(Paragraph(
@@ -719,11 +692,11 @@ def export_to_pdf(df, meeting_details, other_discussions):
         story.append(Paragraph("<b>Other Discussions:</b>", style_body))
         story.append(Paragraph(other_discussions, style_body))
 
-    story.append(Spacer(1, 10))
-    prep_name = meeting_details.get("prep_name", "").strip() or "____________________"
-    prep_desig = meeting_details.get("prep_desig", "").strip() or "PRIME Philippines"
-    conf_name = meeting_details.get("conf_name", "").strip() or "____________________"
-    conf_desig = meeting_details.get("conf_desig", "").strip() or company
+    story.append(Spacer(1, 8))
+    prep_name = meeting_details.get("prep_name", "").strip() or "Mr. Romel Dellosa"
+    prep_desig = meeting_details.get("prep_desig", "").strip() or "AVP for Capital Markets<br/>PRIME Philippines"
+    conf_name = meeting_details.get("conf_name", "").strip() or (ext_atts[0] if ext_atts else "Mr. ABCD")
+    conf_desig = meeting_details.get("conf_desig", "").strip() or meeting_details.get("company_name", "XYZ Company")
 
     sign_data = [
         [Paragraph("<b>Prepared by:</b>", style_body), Paragraph("<b>Confirmed by:</b>", style_body)],
@@ -770,16 +743,16 @@ with st.container(border=True):
     with r1_c4:
         end_time_idx = TIME_OPTIONS.index("05:00 PM") if "05:00 PM" in TIME_OPTIONS else 34
         end_time = st.selectbox("End", options=TIME_OPTIONS, index=end_time_idx)
-    with r1_c5: prep_name = st.text_input("Prepared By (Name)", placeholder="e.g. John Doe")
-    with r1_c6: prep_desig = st.text_input("Designation", placeholder="e.g. Associate")
+    with r1_c5: prep_name = st.text_input("Prepared By (Name)", placeholder="e.g. Mr. Romel Dellosa")
+    with r1_c6: prep_desig = st.text_input("Designation", placeholder="e.g. AVP for Capital Markets")
 
     # ROW 2
     r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
     with r2_c1: client_name = st.text_input("Client / Company", placeholder="XYZ Company")
     with r2_c2: selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=CRD_MEMBERS)
-    with r2_c3: ext_attendees_raw = st.text_input("External Attendees", placeholder="e.g. Mr. ABCD, Jane Doe")
-    with r2_c4: conf_name = st.text_input("Confirmed By (Name)", placeholder="e.g. Client Rep")
-    with r2_c5: conf_desig = st.text_input("Designation", placeholder="e.g. Managing Director")
+    with r2_c3: ext_attendees_raw = st.text_input("External Attendees", placeholder="e.g. Mr. ABCD")
+    with r2_c4: conf_name = st.text_input("Confirmed By (Name)", placeholder="e.g. Mr. ABCD")
+    with r2_c5: conf_desig = st.text_input("Designation", placeholder="e.g. XYZ Company")
 
     # Three Tabs
     tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text"])
