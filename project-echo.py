@@ -1,4 +1,5 @@
 import os
+import time
 import streamlit as st
 import requests
 import json
@@ -25,14 +26,22 @@ if not os.path.exists(_config_file):
         f.write('[theme]\nbase="light"\n')
 
 # API Keys & Endpoints
-GEMINI_API_KEY = "AIzaSyDlBkIdAth2AesZ9rr3xTe7t_IXl2_IEQM"
+PUTER_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InYyIn0.eyJ0IjoidCIsInYiOiIyIiwidG9rZW5fdWlkIjoiODUxNzZhZjYtZmM2Ni00M2ZjLTk2NmEtN2ZhMGQ3YWFlMjhhIiwidXUiOiJXQkx3bS9QM1ErQ3VBVDNTQjZDS1ZBPT0iLCJzdSI6ImkwL1N5ajZQUkZHbWhVTGdTS2lkYlE9PSIsImFpIjoiV0JMd20vUDNRK0N1QVQzU0I2Q0tWQT09IiwiZnVsbF9hY2Nlc3MiOnRydWUsImlhdCI6MTc4NzYyMjk4M30.C1hpyilomEizU-bP5ZXimpssrCUOMS1Pv6abBKjYFMQ"
 GROQ_API_KEY = "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"
+
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
+PUTER_CHAT_URL = "https://api.puter.com/v1/chat/completions"
 
 CRD_MEMBERS = [
-    "Sondi Tuazon", "Kristina Balajadia", "Meliza Zapata", "Dykstra Pineda",
-    "Cedtrix Rena", "Carlo Medina", "Dave Policarpio", "Irish Rima"
+    "Sondi Tuazon",
+    "Kristina Balajadia",
+    "Meliza Zapata",
+    "Dykstra Pineda",
+    "Cedtrix Rena",
+    "Carlo Medina",
+    "Dave Policarpio",
+    "Irish Rima"
 ]
 
 # 12-Hour AM/PM Time Options
@@ -47,39 +56,47 @@ CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Playfair+Display:ital,wght@1,400;1,500&display=swap');
 
-html, body, [class*="css"] { font-family: 'Montserrat', sans-serif !important; }
+html, body, [class*="css"] {
+    font-family: 'Montserrat', sans-serif !important;
+}
+
 .stApp {
     background-color: #F4F2EC; 
-    background-image: linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
-    background-size: 80px 80px; color: #333333;
+    background-image: 
+        linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+    background-size: 80px 80px;
+    color: #333333;
 }
+
 .stApp > header { display: none !important; }
 .block-container { padding-top: 5.5rem !important; }
 
 .echo-topbar {
     position: fixed; top: 0; left: 0; right: 0; height: 60px;
-    background-color: #161616; border-bottom: 1px solid #333333;
+    background-color: #161616;
+    border-bottom: 1px solid #333333;
     display: flex; align-items: center; padding: 0 2rem;
     z-index: 999999; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 .echo-topbar h1 {
-    font-family: 'Playfair Display', serif !important; font-style: italic !important; 
-    font-weight: 400 !important; font-size: 1.35rem !important; 
-    color: #FFFFFF !important; margin: 0 !important;
+    font-family: 'Playfair Display', serif !important;
+    font-style: italic !important; font-weight: 400 !important;
+    font-size: 1.35rem !important; color: #FFFFFF !important; margin: 0 !important;
 }
 .echo-topbar h1 span { color: #D4AF37 !important; }
 
 h3 {
-    font-family: 'Playfair Display', serif !important; font-style: italic !important; 
-    font-weight: 400 !important; color: #1A2B4C !important; 
-    letter-spacing: 0.02em; margin-bottom: 0.25rem; font-size: 1.25rem !important;
+    font-family: 'Playfair Display', serif !important;
+    font-style: italic !important; font-weight: 400 !important; 
+    color: #1A2B4C !important; letter-spacing: 0.02em; margin-bottom: 0.25rem; font-size: 1.25rem !important;
 }
 
 [data-testid="stVerticalBlockBorderWrapper"] {
     background-color: #FFFFFF !important; border-radius: 12px !important;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04) !important;
     border: 1px solid rgba(0, 0, 0, 0.04) !important; 
-    padding: 1.25rem !important; margin-bottom: 1rem !important;
+    padding: 1.25rem !important margin-bottom: 1rem !important;
 }
 
 .stButton > button, .stDownloadButton > button {
@@ -93,38 +110,24 @@ h3 {
     border-color: #D4AF37 !important; color: #D4AF37 !important;
     background-color: #1A1A1A !important;
 }
-.stTextArea textarea { font-size: 0.95rem !important; line-height: 1.6 !important; }
+.stTextArea textarea {
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+}
 </style>
 """
 
 # ========== CORE LOGIC ==========
-def extract_json_from_text(text):
-    """Robustly extracts JSON from LLM responses, handling markdown and formatting quirks."""
-    text = text.strip()
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text).strip()
-    
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(0))
-        except json.JSONDecodeError:
-            pass
-            
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-        
-    return None
-
 def extract_text_from_file(uploaded_file):
     try:
         if uploaded_file.name.endswith('.txt'):
             return uploaded_file.getvalue().decode("utf-8")
         elif uploaded_file.name.endswith('.pdf'):
             reader = PyPDF2.PdfReader(uploaded_file)
-            return "\n".join([page.extract_text() or "" for page in reader.pages])
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            return text
         elif uploaded_file.name.endswith('.docx'):
             doc = Document(uploaded_file)
             return "\n".join([para.text for para in doc.paragraphs])
@@ -135,11 +138,7 @@ def extract_text_from_file(uploaded_file):
 
 def transcribe_audio(audio_bytes):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    files = {
-        "file": ("audio.wav", audio_bytes), 
-        "model": (None, "whisper-large-v3-turbo"), 
-        "response_format": (None, "json")
-    }
+    files = {"file": ("audio.wav", audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
     resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files)
     if resp.status_code == 200:
         return resp.json().get("text", "")
@@ -151,83 +150,111 @@ def transcribe_audio(audio_bytes):
             st.error(f"Transcription failed: {error_msg}")
         return None
 
-def extract_with_gemini(transcript):
-    gemini_models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
+def normalize_llm_json_to_df(data):
+    """Universal parser: Converts any LLM JSON format into the standardized MOM DataFrame."""
+    items = None
+    other_disc = ""
     
-    prompt = f"""You are an executive assistant for PRIME Philippines extracting Minutes of the Meeting (MOM).
-The transcript contains Tagalog and English (Taglish) discussion regarding property sourcing, sites (A1 sites), reports, tax maps, LGUs, trade areas, and client updates.
-Translate all colloquial and Taglish dialogue into clear, professional corporate English.
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict):
+        for key in ["table_items", "items", "minutes", "table", "data", "discussion_items", "discussions", "action_items"]:
+            if key in data and isinstance(data[key], list) and len(data[key]) > 0:
+                items = data[key]
+                break
+        if items is None:
+            for v in data.values():
+                if isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+                    items = v
+                    break
+            if items is None:
+                items = [data]
+                
+        other_disc = str(data.get("other_discussions", "") or data.get("notes", "") or data.get("summary", ""))
 
-Extract at least 3 to 10 clear, distinct table items covering all discussed tasks, updates, and deliverables.
+    if not items or not isinstance(items, list):
+        return None, ""
 
-Output valid JSON ONLY matching this schema:
-{{
-  "table_items": [
-    {{
-      "Discussion Points": "Core discussion topic, site status, or milestone",
-      "Action Plan": "Concrete next step, format to provide, report to send, or requirement",
-      "Indicative Delivery Date": "Specific date, timeline (e.g., Friday, Q1 2027), or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or name)"
-    }}
-  ],
-  "other_discussions": "Summary of informal remarks, administrative notes, or general context"
-}}
+    df = pd.DataFrame(items)
+    col_mapping = {}
+    for c in df.columns:
+        c_clean = str(c).lower().replace("_", " ").replace("-", " ")
+        if any(k in c_clean for k in ["discuss", "point", "topic", "milestone"]):
+            col_mapping[c] = "Discussion Points"
+        elif any(k in c_clean for k in ["action", "plan", "step", "deliverable"]):
+            col_mapping[c] = "Action Plan"
+        elif any(k in c_clean for k in ["date", "time", "delivery", "deadline"]):
+            col_mapping[c] = "Indicative Delivery Date"
+        elif any(k in c_clean for k in ["person", "charge", "pic", "assign", "who", "responsible"]):
+            col_mapping[c] = "Person-in-charge"
 
-Transcript:
-{transcript[:30000]}"""
+    df = df.rename(columns=col_mapping)
+    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+        if col not in df.columns:
+            df[col] = ""
+            
+    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
+    return df, other_disc
 
+def extract_with_puter(prompt):
+    """Engine 1: Puter AI. Proxies to GPT-4o-mini for robust large-context extraction."""
+    headers = {"Authorization": f"Bearer {PUTER_API_KEY}", "Content-Type": "application/json"}
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "response_mime_type": "application/json",
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "You extract Minutes of the Meeting from transcripts. Translate colloquial terms to business English. Output ONLY valid JSON matching the schema."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.1
+    }
+    try:
+        resp = requests.post(PUTER_CHAT_URL, headers=headers, json=payload, timeout=90)
+        if resp.status_code == 200:
+            raw_text = resp.json()["choices"][0]["message"]["content"].strip()
+            clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+            match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+            data = json.loads(match.group(0)) if match else json.loads(clean_text)
+            return normalize_llm_json_to_df(data)
+    except Exception:
+        pass
+    return None, ""
+
+def call_groq_json(prompt, models=["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]):
+    """Engine 2: Groq Direct API Call."""
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are an executive assistant extracting Minutes of the Meeting. Translate Taglish to English. Respond ONLY with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"},
             "temperature": 0.1
         }
-    }
-    
-    for model_name in gemini_models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
-        headers = {"Content-Type": "application/json"}
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=60)
+            resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
             if resp.status_code == 200:
-                result = resp.json()
-                if "candidates" in result and len(result["candidates"]) > 0:
-                    raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    data = extract_json_from_text(raw_text)
-                    if data:
-                        items = data.get("table_items", [])
-                        if items and len(items) > 0:
-                            df = pd.DataFrame(items)
-                            for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                                if col not in df.columns:
-                                    df[col] = ""
-                            return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
-            else:
-                st.warning(f"Gemini API Error ({model_name}): {resp.status_code} - {resp.text[:200]}")
-        except Exception as e:
-            st.warning(f"Gemini Exception ({model_name}): {e}")
+                raw_text = resp.json()["choices"][0]["message"]["content"].strip()
+                clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+                clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+                match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+                data = json.loads(match.group(0)) if match else json.loads(clean_text)
+                return normalize_llm_json_to_df(data)
+        except Exception:
             continue
-            
-    return None, None
+    return None, ""
 
-def extract_with_groq_backup(transcript):
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    system_prompt = (
-        "You are an executive assistant extracting Minutes of the Meeting (MOM). "
-        "The transcript contains Tagalog and English (Taglish). Translate dialogue into professional English. "
-        "Extract all key discussion points and action items. Respond ONLY with valid JSON."
-    )
-    
-    user_prompt = f"""Extract all Minutes of the Meeting items into valid JSON:
+def build_schema_prompt(text_section):
+    return f"""Extract Minutes of the Meeting from the transcript. Translate Taglish to professional English.
+Output valid JSON ONLY matching:
 {{
   "table_items": [
     {{
       "Discussion Points": "Core discussion topic, report, or milestone",
-      "Action Plan": "Specific follow-up action or deliverable",
+      "Action Plan": "Specific follow-up action, deliverable, or 'None'",
       "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
       "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or Unassigned)"
     }}
@@ -236,57 +263,97 @@ def extract_with_groq_backup(transcript):
 }}
 
 Transcript:
-{transcript[:25000]}"""
+{text_section}"""
 
-    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
-    for model in models:
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.1
-        }
-        try:
-            resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
-            if resp.status_code == 200:
-                resp_json = resp.json()
-                raw_text = resp_json["choices"][0]["message"]["content"].strip()
-                data = extract_json_from_text(raw_text)
-                if data:
-                    items = data.get("table_items", [])
-                    if items and len(items) > 0:
-                        df = pd.DataFrame(items)
-                        for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                            if col not in df.columns:
-                                df[col] = ""
-                        return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
-            else:
-                st.warning(f"Groq API Error ({model}): {resp.status_code} - {resp.text[:200]}")
-        except Exception as e:
-            st.warning(f"Groq Exception ({model}): {e}")
-            continue
-    return None, None
+def heuristic_non_ai_extraction(transcript):
+    """
+    ENGINE 3 (NON-AI FALLBACK): 
+    Uses Python heuristics, regex, and keywords to build the table if AI APIs fail completely.
+    """
+    sentences = re.split(r'(?<=[.!?]) +', transcript)
+    
+    # Taglish/English Action and Date Keywords
+    action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'ipapasa', 'provide', 'gawa', 'target', 'need', 'will do', 'ipresent', 'kukunin']
+    date_keywords = ['tomorrow', 'next week', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'q1', 'q2', 'q3', 'q4', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'bukas', 'sa susunod', 'deadline']
+    
+    table_items = []
+    other_discussions = []
+    
+    # Group sentences into chunks of 3 to form pseudo-topics
+    for i in range(0, len(sentences), 3):
+        chunk = sentences[i:i+3]
+        if not chunk: continue
+        
+        chunk_text = " ".join(chunk)
+        
+        has_action = any(kw in chunk_text.lower() for kw in action_keywords)
+        has_date = any(kw in chunk_text.lower() for kw in date_keywords)
+        
+        if has_action or has_date:
+            action_text = " ".join([s for s in chunk if any(kw in s.lower() for kw in action_keywords)])
+            date_text = " ".join([s for s in chunk if any(kw in s.lower() for kw in date_keywords)])
+            
+            table_items.append({
+                "Discussion Points": chunk[0].strip() + "...",  # First sentence as topic
+                "Action Plan": action_text.strip() if action_text else "Review discussion for actions",
+                "Indicative Delivery Date": "Check transcript (Date mentioned)" if has_date else "TBD",
+                "Person-in-charge": "Unassigned"
+            })
+        else:
+            other_discussions.append(chunk_text)
+            
+    # Limit to top 10 items to keep table clean
+    if len(table_items) > 10:
+        table_items = table_items[:10]
+        
+    if not table_items:
+        table_items = [{
+            "Discussion Points": "Meeting Overview",
+            "Action Plan": "No specific action keywords detected. Please review transcript manually.",
+            "Indicative Delivery Date": "TBD",
+            "Person-in-charge": "Unassigned"
+        }]
+        
+    df = pd.DataFrame(table_items)
+    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+        if col not in df.columns:
+            df[col] = ""
+            
+    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
+    other_text = "\n\n".join(other_discussions[:5]) + ("\n...(truncated)" if len(other_discussions) > 5 else "")
+    
+    return df, "Auto-extracted via Keyword Rules (AI Limit Reached):\n" + other_text
 
 def extract_structured_insights(transcript):
-    if not transcript or not transcript.strip():
-        st.error("Transcript is empty. Please provide valid text or audio to transcribe.")
-        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+    """Dynamic Engine: Puter AI -> Groq -> Non-AI Heuristic Regex Rule Engine"""
+    progress_container = st.empty()
+    bar = progress_container.progress(0, text="Initializing Extraction Engine...")
 
-    # 1. Primary: Gemini
-    df, other_disc = extract_with_gemini(transcript)
-    if df is not None and not df.empty:
-        return df, other_disc
+    # We use a safe substring limit for single-pass API calls (prevents 429 limits)
+    safe_transcript = transcript[:18000]
+    full_prompt = build_schema_prompt(safe_transcript)
 
-    # 2. Backup: Groq
-    df_groq, other_disc_groq = extract_with_groq_backup(transcript)
-    if df_groq is not None and not df_groq.empty:
-        return df_groq, other_disc_groq
+    # 1. Try Puter API (GPT-4o-mini)
+    bar.progress(20, text="Attempting extraction via Puter AI (Large Context)...")
+    res_puter = extract_with_puter(full_prompt)
+    if res_puter and res_puter[0] is not None and not res_puter[0].empty:
+        progress_container.empty()
+        return res_puter[0], res_puter[1]
 
-    st.error("Extraction encountered an issue on both APIs. Please verify your transcript and retry. Check the warning messages above for specific API error details.")
-    return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+    # 2. Try Groq (Llama 3.3)
+    bar.progress(60, text="Puter busy. Attempting Groq Analysis...")
+    res_groq = call_groq_json(full_prompt)
+    if res_groq and res_groq[0] is not None and not res_groq[0].empty:
+        progress_container.empty()
+        return res_groq[0], res_groq[1]
+
+    # 3. Non-AI Fallback Engine
+    bar.progress(90, text="AI API Limits Reached. Running Non-AI Keyword Extraction...")
+    df, other = heuristic_non_ai_extraction(transcript)
+    
+    progress_container.empty()
+    st.warning("⚠️ AI servers are currently busy/rate-limited. The table below was populated using our offline Keyword Engine based on action words in the text.")
+    return df, other
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -530,9 +597,8 @@ if st.session_state["transcript"]:
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                with st.spinner("Generating Minutes of the Meeting..."):
-                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
-                if extracted_df is not None and not extracted_df.empty:
+                extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
+                if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
                     st.rerun()
