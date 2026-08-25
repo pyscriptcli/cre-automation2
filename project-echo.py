@@ -51,6 +51,15 @@ for h in range(24):
         t = datetime.time(h, m)
         TIME_OPTIONS.append(t.strftime("%I:%M %p"))
 
+# Initialize Session State Variables
+if "transcript" not in st.session_state: st.session_state["transcript"] = ""
+if "df" not in st.session_state: st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+if "other_discussions" not in st.session_state: st.session_state["other_discussions"] = ""
+if "show_settings" not in st.session_state: st.session_state["show_settings"] = False
+if "tokens_used" not in st.session_state: st.session_state["tokens_used"] = 0
+if "last_api_call" not in st.session_state: st.session_state["last_api_call"] = None
+if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "Auto (Puter -> Groq -> Python)"
+
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
 <style>
@@ -114,6 +123,22 @@ h3 {
     font-size: 0.95rem !important;
     line-height: 1.6 !important;
 }
+
+.gear-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background-color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.gear-btn:hover {
+    border-color: #D4AF37;
+    background-color: #f9f9f9;
+}
 </style>
 """
 
@@ -151,7 +176,6 @@ def transcribe_audio(audio_bytes):
         return None
 
 def normalize_llm_json_to_df(data):
-    """Universal parser: Converts any LLM JSON format into standardized MOM DataFrame."""
     items = None
     other_disc = ""
     
@@ -197,7 +221,6 @@ def normalize_llm_json_to_df(data):
     return df, other_disc
 
 def extract_with_puter(prompt):
-    """Engine 1: Puter AI (Large context via GPT-4o-mini)."""
     headers = {"Authorization": f"Bearer {PUTER_API_KEY}", "Content-Type": "application/json"}
     payload = {
         "model": "gpt-4o-mini",
@@ -218,7 +241,12 @@ def extract_with_puter(prompt):
     try:
         resp = requests.post(PUTER_CHAT_URL, headers=headers, json=payload, timeout=90)
         if resp.status_code == 200:
-            raw_text = resp.json()["choices"][0]["message"]["content"].strip()
+            res_json = resp.json()
+            usage = res_json.get("usage", {})
+            st.session_state["tokens_used"] += usage.get("total_tokens", len(prompt) // 4)
+            st.session_state["last_api_call"] = datetime.datetime.now()
+            
+            raw_text = res_json["choices"][0]["message"]["content"].strip()
             clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
             clean_text = re.sub(r"\s*```$", "", clean_text).strip()
             match = re.search(r"\{.*\}", clean_text, re.DOTALL)
@@ -229,7 +257,6 @@ def extract_with_puter(prompt):
     return None, ""
 
 def call_groq_single_chunk(prompt, models=["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]):
-    """Performs a rate-limit safe single chunk request to Groq."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     
     for model in models:
@@ -248,7 +275,12 @@ def call_groq_single_chunk(prompt, models=["llama-3.3-70b-versatile", "llama-3.1
         try:
             resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
             if resp.status_code == 200:
-                raw_text = resp.json()["choices"][0]["message"]["content"].strip()
+                res_json = resp.json()
+                usage = res_json.get("usage", {})
+                st.session_state["tokens_used"] += usage.get("total_tokens", len(prompt) // 4)
+                st.session_state["last_api_call"] = datetime.datetime.now()
+                
+                raw_text = res_json["choices"][0]["message"]["content"].strip()
                 clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
                 clean_text = re.sub(r"\s*```$", "", clean_text).strip()
                 match = re.search(r"\{.*\}", clean_text, re.DOTALL)
@@ -261,7 +293,6 @@ def call_groq_single_chunk(prompt, models=["llama-3.3-70b-versatile", "llama-3.1
     return None, ""
 
 def smart_chunk_transcript(text, max_chars=3500, overlap=300):
-    """Splits transcripts cleanly along sentence boundaries."""
     if len(text) <= max_chars:
         return [text]
     
@@ -275,7 +306,6 @@ def smart_chunk_transcript(text, max_chars=3500, overlap=300):
         curr_len += len(sentence) + 1
         if curr_len >= max_chars:
             chunks.append(" ".join(curr_chunk))
-            # Overlap with previous sentence
             curr_chunk = [sentence]
             curr_len = len(sentence)
             
@@ -304,7 +334,6 @@ Transcript Content:
 {text_section}"""
 
 def heuristic_non_ai_extraction(transcript):
-    """Fallback Engine: Regex extraction if all API limits are exhausted."""
     sentences = re.split(r'(?<=[.!?]) +', transcript)
     
     action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'ipapasa', 'provide', 'target', 'ipresent', 'kukunin']
@@ -349,18 +378,51 @@ def heuristic_non_ai_extraction(transcript):
     other_text = "\n\n".join(other_discussions[:4])
     return df, other_text
 
-def extract_structured_insights(transcript):
-    """
-    DYNAMIC CHUNK & PACING ENGINE:
-    1. First tries Puter AI (Large context single-pass).
-    2. If Puter unavailable, splits into sequential chunks and calls Groq with rate-limit pacing.
-    3. If rate-limits hit, waits for token bucket refresh.
-    4. Merges all chunks before rendering the editor.
-    """
+def extract_structured_insights(transcript, engine="Auto (Puter -> Groq -> Python)"):
     progress_container = st.empty()
-    bar = progress_container.progress(0, text="Initializing extraction engine...")
+    bar = progress_container.progress(0, text=f"Initializing {engine}...")
 
-    # 1. Try Puter Single-Pass
+    # Force Puter
+    if engine == "Puter AI":
+        bar.progress(30, text="Generating MOM with Puter AI...")
+        full_prompt = build_schema_prompt(transcript[:30000])
+        res, other = extract_with_puter(full_prompt)
+        progress_container.empty()
+        if res is not None and not res.empty:
+            return res, other
+        st.warning("Puter request failed. Defaulting to Python Heuristics.")
+        return heuristic_non_ai_extraction(transcript)
+
+    # Force Groq
+    if engine == "Groq LLaMA":
+        bar.progress(30, text="Generating MOM with Groq LLaMA...")
+        chunks = smart_chunk_transcript(transcript, max_chars=3500, overlap=300)
+        all_table_items = []
+        all_other_discussions = []
+        for idx, chunk in enumerate(chunks):
+            chunk_prompt = build_schema_prompt(chunk, f"(Part {idx+1}/{len(chunks)})")
+            res, other = call_groq_single_chunk(chunk_prompt)
+            if res is not None and not isinstance(res, str) and not res.empty:
+                all_table_items.extend(res.to_dict('records'))
+                if other: all_other_discussions.append(other)
+            time.sleep(1.5)
+        progress_container.empty()
+        if all_table_items:
+            df = pd.DataFrame(all_table_items)
+            for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+                if col not in df.columns: df[col] = ""
+            return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), "\n\n".join(all_other_discussions)
+        st.warning("Groq request failed. Defaulting to Python Heuristics.")
+        return heuristic_non_ai_extraction(transcript)
+
+    # Force Python Non-AI
+    if engine == "Python Heuristic (Non-AI)":
+        bar.progress(100, text="Extracting with Rule-Based Heuristic...")
+        time.sleep(0.5)
+        progress_container.empty()
+        return heuristic_non_ai_extraction(transcript)
+
+    # Auto Pipeline
     bar.progress(10, text="Attempting direct analysis via Puter AI...")
     full_prompt = build_schema_prompt(transcript[:30000])
     res_puter, other_p = extract_with_puter(full_prompt)
@@ -368,10 +430,8 @@ def extract_structured_insights(transcript):
         progress_container.empty()
         return res_puter, other_p
 
-    # 2. Sequential Chunk Engine with Rate-Limit Pacing
-    bar.progress(30, text="Puter unavailable. Initializing sequential chunking engine...")
+    bar.progress(30, text="Puter unavailable. Initializing sequential Groq chunking engine...")
     chunks = smart_chunk_transcript(transcript, max_chars=3500, overlap=300)
-    
     all_table_items = []
     all_other_discussions = []
     
@@ -389,12 +449,11 @@ def extract_structured_insights(transcript):
                 bar.progress(pct, text=f"Rate limit reached. Pausing 15s to refresh tokens (Part {idx + 1}/{len(chunks)})...")
                 time.sleep(15)
                 retries -= 1
-            elif res_groq is not None and not res_groq.empty:
+            elif res_groq is not None and not isinstance(res_groq, str) and not res_groq.empty:
                 all_table_items.extend(res_groq.to_dict('records'))
                 if other_g:
                     all_other_discussions.append(other_g)
                 success = True
-                # Small polite delay between chunks to avoid bursting TPM
                 time.sleep(1.5)
             else:
                 retries -= 1
@@ -408,7 +467,6 @@ def extract_structured_insights(transcript):
                 df[col] = ""
         return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), "\n\n".join(all_other_discussions)
 
-    # 3. Non-AI Fallback
     df_fb, other_fb = heuristic_non_ai_extraction(transcript)
     return df_fb, other_fb
 
@@ -558,10 +616,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-if "transcript" not in st.session_state: st.session_state["transcript"] = ""
-if "df" not in st.session_state: st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-if "other_discussions" not in st.session_state: st.session_state["other_discussions"] = ""
-
 # ---- Compact 2-Row Details & Audio ----
 with st.container(border=True):
     st.markdown('<h3>Meeting Details & Audio</h3>', unsafe_allow_html=True)
@@ -654,17 +708,74 @@ if st.session_state["transcript"]:
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
+                extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], st.session_state["selected_engine"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
                     st.rerun()
 
-# ---- Step 3: Minutes of Meeting Editor ----
+# ---- Step 3: Minutes of Meeting Editor with Gear Settings ----
 if not st.session_state["df"].empty:
     with st.container(border=True):
-        st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
-        
+        h_col1, h_col2 = st.columns([9.5, 0.5])
+        with h_col1:
+            st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
+        with h_col2:
+            # SVG Gear Settings Button
+            gear_svg = """
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            """
+            if st.button("⚙️", key="btn_toggle_settings", help="Open Engine & Regeneration Settings"):
+                st.session_state["show_settings"] = not st.session_state["show_settings"]
+                st.rerun()
+
+        # Engine Settings & Usage Drawer
+        if st.session_state["show_settings"]:
+            with st.expander("⚙️ Engine Configuration & Usage Statistics", expanded=True):
+                set_col1, set_col2 = st.columns([1.5, 1.5])
+                
+                with set_col1:
+                    engine_options = [
+                        "Auto (Puter -> Groq -> Python)",
+                        "Puter AI",
+                        "Groq LLaMA",
+                        "Python Heuristic (Non-AI)"
+                    ]
+                    selected_eng = st.selectbox(
+                        "Extraction Engine",
+                        options=engine_options,
+                        index=engine_options.index(st.session_state["selected_engine"])
+                    )
+                    st.session_state["selected_engine"] = selected_eng
+
+                    if st.button("🔄 Regenerate MOM"):
+                        if st.session_state["transcript"]:
+                            extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng)
+                            if not extracted_df.empty:
+                                st.session_state["df"] = extracted_df
+                                st.session_state["other_discussions"] = other_disc
+                                st.rerun()
+
+                with set_col2:
+                    st.markdown("**API & Token Usage Diagnostics**")
+                    st.write(f"• **Estimated Session Tokens Used:** `{st.session_state['tokens_used']:,}`")
+                    
+                    if st.session_state["last_api_call"]:
+                        last_call = st.session_state["last_api_call"]
+                        st.write(f"• **Last Request:** `{last_call.strftime('%I:%M:%S %p')}`")
+                        # Groq token bucket replenish estimation (~1 min window)
+                        elapsed = (datetime.datetime.now() - last_call).total_seconds()
+                        if elapsed < 60:
+                            st.write(f"• **Rate Limit Window:** Replenishing in `{int(60 - elapsed)}s`")
+                        else:
+                            st.write("• **Rate Limit Window:** `Ready (100% Available)`")
+                    else:
+                        st.write("• **Rate Limit Window:** `Ready (No active rate-limit)`")
+                st.markdown("---")
+
         edited_df = st.data_editor(
             st.session_state["df"],
             num_rows="dynamic",
