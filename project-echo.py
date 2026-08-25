@@ -32,7 +32,7 @@ os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
-# Simple Password Gate at the start of app execution
+# Simple Password Gate
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
@@ -47,7 +47,7 @@ if not st.session_state["authenticated"]:
             st.error("Invalid access key. Contact the administrator.")
     st.stop()
 
-# API Keys loaded strictly from Streamlit Cloud Secrets
+# API Keys
 DEEPSEEK_API_KEY = str(st.secrets.get("DEEPSEEK_API_KEY", "")).strip()
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
@@ -66,16 +66,6 @@ CRD_MEMBERS = [
     "Carlo Medina",
     "Dave Policarpio",
     "Irish Rima"
-]
-
-LOCATION_PRESETS = [
-    "— Select a Preset (Optional) —",
-    "GreatWork Mega Tower 32F - Secret Room",
-    "GreatWork Mega Tower 32F - Small Meeting Room",
-    "GreatWork Mega Tower 24F - Meeting Room",
-    "GreatWork Mega Tower 32F - Board Room",
-    "GreatWork Mega Tower 32F - Co-working",
-    "Online Meeting"
 ]
 
 # Initialize Session State Variables
@@ -99,10 +89,8 @@ if "chat_history" not in st.session_state:
 # State for Auto-Populated Meeting Details
 if "meeting_date" not in st.session_state:
     st.session_state["meeting_date"] = datetime.date.today()
-if "meeting_location_custom" not in st.session_state:
-    st.session_state["meeting_location_custom"] = ""
-if "meeting_location_preset" not in st.session_state:
-    st.session_state["meeting_location_preset"] = LOCATION_PRESETS[0]
+if "meeting_location" not in st.session_state:
+    st.session_state["meeting_location"] = ""
 if "meeting_client_name" not in st.session_state:
     st.session_state["meeting_client_name"] = ""
 if "meeting_selected_crd" not in st.session_state:
@@ -127,7 +115,6 @@ html, body, [class*="css"] {
     font-family: 'Montserrat', sans-serif !important;
 }
 
-/* Crisp Technical Large Gridlines Background */
 .stApp {
     background-color: #F3EFE6; 
     background-image: 
@@ -189,6 +176,23 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     border: 1px solid rgba(0, 0, 0, 0.05) !important; 
     padding: 1.5rem !important; 
     margin-bottom: 1.25rem !important;
+}
+
+/* Sticky Headers for scrollable containers */
+div[data-testid="stVerticalBlock"] > div.element-container:has(.sticky-header-wrapper) {
+    position: sticky !important;
+    top: 0px !important;
+    background-color: #FFFFFF !important;
+    z-index: 999 !important;
+    margin-top: -1.5rem !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 0.75rem !important;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.sticky-header-wrapper h3 {
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 /* Uniform Small Pill Buttons */
@@ -268,7 +272,7 @@ button[key="card_settings_btn"]::before {
     height: 17px;
     background-color: #C5A059;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -285,16 +289,11 @@ button[key="card_settings_btn"]::before {
     margin-bottom: 0 !important;
 }
 
-/* Sophisticated Ask Echo Chat UI */
+/* Ultra-Compact & Minimalist Ask Echo Chat UI */
 .chat-container {
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
-    margin-top: 0.5rem;
-    height: 380px;
-    max-height: 380px;
-    overflow-y: auto;
-    padding-right: 0.35rem;
+    gap: 0.4rem;
 }
 
 .chat-bubble-ai-wrap {
@@ -307,22 +306,22 @@ button[key="card_settings_btn"]::before {
 .chat-bubble-ai {
     background-color: #FAF9F5;
     color: #222222;
-    padding: 0.85rem 1.1rem;
-    border-radius: 4px 14px 14px 14px;
-    max-width: 88%;
-    font-size: 0.88rem;
-    line-height: 1.55;
+    padding: 0.4rem 0.75rem;
+    border-radius: 4px 10px 10px 10px;
+    max-width: 90%;
+    font-size: 0.82rem;
+    line-height: 1.4;
     border: 1px solid rgba(212, 175, 55, 0.35);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.02);
 }
 
 .chat-bubble-ai .ai-header {
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.8px;
     font-weight: 600;
     color: #A07828;
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.2rem;
 }
 
 .chat-bubble-user-wrap {
@@ -333,15 +332,18 @@ button[key="card_settings_btn"]::before {
 .chat-bubble-user {
     background-color: #ECE8DD;
     color: #1A1A1A;
-    padding: 0.65rem 1rem;
-    border-radius: 14px 14px 4px 14px;
+    padding: 0.4rem 0.75rem;
+    border-radius: 10px 10px 4px 10px;
     max-width: 85%;
-    font-size: 0.88rem;
-    line-height: 1.45;
+    font-size: 0.82rem;
+    line-height: 1.4;
     border: 1px solid rgba(0,0,0,0.06);
 }
 </style>
 """
+
+# ========== SVG ICONS ==========
+SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
 
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
@@ -550,7 +552,7 @@ def extract_metadata_with_deepseek(transcript):
 Schema:
 {{
   "client_name": "Company/Client name or empty string",
-  "location": "Meeting location or preset if mentioned or empty string",
+  "location": "Meeting location preset or custom name or empty string",
   "crd_attendees": ["Exact matching names from CRD member list"],
   "external_attendees": "Comma-separated list of external attendee names",
   "prepared_by": "Name of attendee from PRIME taking notes or empty string",
@@ -1261,10 +1263,7 @@ with col_details:
                             if meta.get("client_name"):
                                 st.session_state["meeting_client_name"] = meta["client_name"]
                             if meta.get("location"):
-                                if meta["location"] in LOCATION_PRESETS:
-                                    st.session_state["meeting_location_preset"] = meta["location"]
-                                else:
-                                    st.session_state["meeting_location_custom"] = meta["location"]
+                                st.session_state["meeting_location"] = meta["location"]
                             if meta.get("crd_attendees"):
                                 matched_crd = [c for c in meta["crd_attendees"] if c in CRD_MEMBERS]
                                 if matched_crd:
@@ -1315,18 +1314,14 @@ with col_details:
                     st.write(f"• **Status:** `Active & Ready`")
             st.markdown("---")
 
-        # Row 1: Date, Location Preset & Input
+        # Row 1: Date, Location Input
         r1_c1, r1_c2 = st.columns([1.2, 2.0])
         with r1_c1:
             meeting_date = st.date_input("Date", value=st.session_state["meeting_date"])
             st.session_state["meeting_date"] = meeting_date
         with r1_c2:
-            current_preset_idx = LOCATION_PRESETS.index(st.session_state["meeting_location_preset"]) if st.session_state["meeting_location_preset"] in LOCATION_PRESETS else 0
-            loc_preset = st.selectbox("Location Preset", options=LOCATION_PRESETS, index=current_preset_idx)
-            st.session_state["meeting_location_preset"] = loc_preset
-            custom_loc = st.text_input("Location", value=st.session_state["meeting_location_custom"], placeholder="e.g. Boardroom", label_visibility="collapsed")
-            st.session_state["meeting_location_custom"] = custom_loc
-            meeting_location = custom_loc.strip() if custom_loc.strip() else ("" if loc_preset == LOCATION_PRESETS[0] else loc_preset)
+            meeting_location = st.text_input("Location", value=st.session_state.get("meeting_location", ""), placeholder="e.g. Boardroom or GreatWork Tower")
+            st.session_state["meeting_location"] = meeting_location
 
         # Row 2: Time Pickers
         r2_c1, r2_c2 = st.columns(2)
@@ -1373,12 +1368,33 @@ if st.session_state["transcript"]:
     
     # LEFT CONTAINER: Full Transcript
     with row_left:
-        with st.container(height=560, border=True):
+        with st.container(height=580, border=True):
             
-            ft_head, ft_btn1, ft_btn2 = st.columns([6, 2, 2])
-            with ft_head:
-                st.markdown('<h3 style="margin-top:0.2rem;">Full Transcript</h3>', unsafe_allow_html=True)
-            with ft_btn1:
+            st.markdown('''
+            <div class="sticky-header-wrapper">
+                <h3 style="margin-top:0; padding-top:0;">Full Transcript</h3>
+            </div>
+            ''', unsafe_allow_html=True)
+            
+            st.text_area(
+                "Transcript Content", 
+                st.session_state["transcript"], 
+                height=380, 
+                label_visibility="collapsed"
+            )
+            
+            st.markdown("<hr style='margin: 0.8rem 0;'>", unsafe_allow_html=True)
+            
+            # Transcript bottom action bar
+            t_col1, t_col2, t_col3 = st.columns(3)
+            with t_col1:
+                if st.button("Generate MOM", key="btn_gen_mom"):
+                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng=st.session_state["selected_engine"])
+                    if not extracted_df.empty:
+                        st.session_state["df"] = extracted_df
+                        st.session_state["other_discussions"] = other_disc
+                        st.rerun()
+            with t_col2:
                 copy_html = f"""
                 <!DOCTYPE html>
                 <html>
@@ -1400,11 +1416,7 @@ if st.session_state["transcript"]:
                     align-items: center;
                     justify-content: center;
                 }}
-                button:hover {{
-                    border-color: #D4AF37;
-                    color: #D4AF37;
-                    background-color: #1A1A1A;
-                }}
+                button:hover {{ border-color: #D4AF37; color: #D4AF37; background-color: #1A1A1A; }}
                 </style>
                 </head>
                 <body>
@@ -1421,7 +1433,7 @@ if st.session_state["transcript"]:
                 </html>
                 """
                 components.html(copy_html, height=34)
-            with ft_btn2:
+            with t_col3:
                 st.download_button(
                     label="Download",
                     data=st.session_state["transcript"],
@@ -1429,31 +1441,17 @@ if st.session_state["transcript"]:
                     mime="text/plain",
                     use_container_width=True
                 )
-            
-            st.text_area(
-                "Transcript Content", 
-                st.session_state["transcript"], 
-                height=350, 
-                label_visibility="collapsed"
-            )
-            
-            if st.session_state["df"].empty:
-                st.write("")
-                if st.button("Generate MOM", key="btn_gen_mom"):
-                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng=st.session_state["selected_engine"])
-                    if not extracted_df.empty:
-                        st.session_state["df"] = extracted_df
-                        st.session_state["other_discussions"] = other_disc
-                        st.rerun()
-            else:
-                st.write("")
 
-    # RIGHT CONTAINER: Ask Echo (AI on Left, User on Right, Symmetrical)
+    # RIGHT CONTAINER: Ask Echo (AI on Left, User on Right)
     with row_right:
-        with st.container(height=560, border=True):
+        with st.container(height=580, border=True):
             
-            st.markdown('<h3 style="margin-top:0.2rem;">Ask Echo</h3>', unsafe_allow_html=True)
-            st.caption("Ask specific questions regarding action items, timelines, deliverables, or remarks.")
+            st.markdown('''
+            <div class="sticky-header-wrapper">
+                <h3 style="margin-top:0; padding-top:0;">Ask Echo</h3>
+                <span style="font-size: 0.85rem; color: #666;">Ask specific questions regarding action items, timelines, deliverables, or remarks.</span>
+            </div>
+            ''', unsafe_allow_html=True)
             
             # Chat history container with Minimalist/Mature Styling
             st.markdown('<div class="chat-container">', unsafe_allow_html=True)
@@ -1483,7 +1481,7 @@ if st.session_state["transcript"]:
                         )
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Chat input
+            # Chat input automatically anchors inside fixed container
             if prompt := st.chat_input("Ask Echo a question..."):
                 st.session_state["chat_history"].append({"role": "user", "content": prompt})
                 with st.spinner("Analyzing transcript..."):
@@ -1548,7 +1546,7 @@ if not st.session_state["df"].empty:
                     )
                 with c_del:
                     st.write("<div style='height: 38px;'></div>", unsafe_allow_html=True)
-                    if st.button("Delete", key=f"del_{idx}", help=f"Remove item {idx+1}"):
+                    if st.button("Remove", key=f"del_{idx}", help=f"Remove item {idx+1}"):
                         row_to_delete = idx
         
         # Handle Deletion
