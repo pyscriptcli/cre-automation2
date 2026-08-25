@@ -68,6 +68,15 @@ CRD_MEMBERS = [
     "Irish Rima"
 ]
 
+LOCATION_OPTIONS = [
+    "GreatWork Mega Tower 32F - Secret Room",
+    "GreatWork Mega Tower 32F - Small Meeting Room",
+    "GreatWork Mega Tower 24F - Meeting Room",
+    "GreatWork Mega Tower 32F - Board Room",
+    "GreatWork Mega Tower 32F - Co-working",
+    "Online Meeting"
+]
+
 # Initialize Session State Variables
 if "transcript" not in st.session_state:
     st.session_state["transcript"] = ""
@@ -88,7 +97,7 @@ if "chat_history" not in st.session_state:
 
 # State for Auto-Populated Meeting Details
 if "meeting_date" not in st.session_state:
-    st.session_state["meeting_date"] = datetime.date.today()
+    st.session_state["meeting_date"] = datetime.date(2026, 8, 25)
 if "meeting_location" not in st.session_state:
     st.session_state["meeting_location"] = ""
 if "meeting_client_name" not in st.session_state:
@@ -197,22 +206,6 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 
 [data-testid="column"] .stSelectbox { margin-bottom: 0 !important; }
 
-/* Sticky Headers without white gaps */
-div.element-container:has(.sticky-header) {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 999 !important;
-    background-color: rgba(255, 255, 255, 0.95) !important;
-    backdrop-filter: blur(8px);
-    margin: -1.5rem -1.5rem 1rem -1.5rem !important;
-    padding: 1.5rem 1.5rem 0.75rem 1.5rem !important;
-    width: calc(100% + 3rem) !important;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
-    box-shadow: 0 4px 6px -4px rgba(0,0,0,0.05);
-}
-.sticky-header h3 { margin: 0 !important; padding: 0 !important; }
-.sticky-header span { font-size: 0.82rem; color: #666; display: block; margin-top: 0.2rem; }
-
 /* Uniform Deep-Shadow Pill Buttons */
 .stButton > button, .stDownloadButton > button {
     background-color: #222222 !important; 
@@ -266,8 +259,8 @@ button[key="card_settings_btn"] {
 }
 button[key="card_settings_btn"]::before {
     content: ""; display: inline-block; width: 17px; height: 17px; background-color: #C5A059;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain; mask-size: contain;
 }
 
@@ -601,6 +594,51 @@ Transcript:
     progress_bar.empty()
     st.markdown(f"{SVG_ALERT} AI completion request could not be completed. The table below was populated using offline Keyword Heuristics.", unsafe_allow_html=True)
     return df_fb, other_fb
+
+def heuristic_non_ai_extraction(transcript):
+    sentences = re.split(r'(?<=[.!?]) +', transcript)
+    action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'ipapasa', 'provide', 'target', 'ipresent', 'kukunin']
+    date_keywords = ['tomorrow', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'q1', 'q2', 'q3', 'q4', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'bukas', 'deadline']
+    
+    table_items = []
+    other_discussions = []
+    
+    for i in range(0, len(sentences), 3):
+        chunk = sentences[i:i+3]
+        if not chunk:
+            continue
+        chunk_text = " ".join(chunk)
+        
+        has_action = any(kw in chunk_text.lower() for kw in action_keywords)
+        has_date = any(kw in chunk_text.lower() for kw in date_keywords)
+        
+        if has_action or has_date:
+            action_text = " ".join([s for s in chunk if any(kw in s.lower() for kw in action_keywords)])
+            table_items.append({
+                "Discussion Points": chunk[0].strip() + "...",
+                "Action Plan": action_text.strip() if action_text else "Review discussion for actions",
+                "Indicative Delivery Date": "Check transcript (Date mentioned)" if has_date else "TBD",
+                "Person-in-charge": "Unassigned"
+            })
+        else:
+            other_discussions.append(chunk_text)
+            
+    if not table_items:
+        table_items = [{
+            "Discussion Points": "Meeting Overview",
+            "Action Plan": "Please review transcript manually.",
+            "Indicative Delivery Date": "TBD",
+            "Person-in-charge": "Unassigned"
+        }]
+        
+    df = pd.DataFrame(table_items[:10])
+    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+        if col not in df.columns:
+            df[col] = ""
+            
+    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
+    other_text = "\n\n".join(other_discussions[:4])
+    return df, other_text
 
 def ask_deepseek_question(transcript, question, chat_history):
     if not DEEPSEEK_API_KEY:
@@ -1158,14 +1196,27 @@ with col_details:
                         st.write(f"• **Last Call:** `{last_call.strftime('%I:%M:%S %p')}`")
             st.markdown("---")
 
-        # Row 1: Date & Location Input
+        # Row 1: Date & Single Hybrid Location Input
         r1_c1, r1_c2 = st.columns([1.2, 2.0])
         with r1_c1:
             meeting_date = st.date_input("Date", value=st.session_state["meeting_date"])
             st.session_state["meeting_date"] = meeting_date
         with r1_c2:
-            meeting_location = st.text_input("Location", value=st.session_state.get("meeting_location", ""), placeholder="e.g. Boardroom or GreatWork Tower")
-            st.session_state["meeting_location"] = meeting_location
+            # Single Hybrid Location Box supporting both direct encoding and preset choices
+            try:
+                meeting_location = st.selectbox(
+                    "Location",
+                    options=LOCATION_OPTIONS,
+                    index=LOCATION_OPTIONS.index(st.session_state.get("meeting_location")) if st.session_state.get("meeting_location") in LOCATION_OPTIONS else None,
+                    placeholder="e.g. Boardroom or GreatWork Tower",
+                    accept_user_input=True
+                )
+            except TypeError:
+                # Safe fallback if Streamlit version doesn't support accept_user_input
+                loc_val = st.session_state.get("meeting_location", "")
+                meeting_location = st.text_input("Location", value=loc_val, placeholder="e.g. Boardroom or GreatWork Tower")
+            
+            st.session_state["meeting_location"] = meeting_location if meeting_location else ""
 
         # Row 2: Time Pickers
         r2_c1, r2_c2 = st.columns(2)
@@ -1213,17 +1264,12 @@ if st.session_state["transcript"]:
     # LEFT CONTAINER: Full Transcript
     with row_left:
         with st.container(height=580, border=True):
-            
-            st.markdown('''
-            <div class="sticky-header">
-                <h3>Full Transcript</h3>
-            </div>
-            ''', unsafe_allow_html=True)
+            st.markdown('<h3 style="margin-top:0.2rem;">Full Transcript</h3>', unsafe_allow_html=True)
             
             st.text_area(
                 "Transcript Content", 
                 st.session_state["transcript"], 
-                height=350, 
+                height=380, 
                 label_visibility="collapsed"
             )
             
@@ -1233,7 +1279,7 @@ if st.session_state["transcript"]:
             t_col1, t_col2, t_col3 = st.columns(3)
             with t_col1:
                 if st.button("Generate MOM", key="btn_gen_mom"):
-                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng=st.session_state["selected_engine"])
+                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], engine=st.session_state["selected_engine"])
                     if not extracted_df.empty:
                         st.session_state["df"] = extracted_df
                         st.session_state["other_discussions"] = other_disc
@@ -1287,32 +1333,22 @@ if st.session_state["transcript"]:
     # RIGHT CONTAINER: Ask Echo (AI on Left, User on Right, Symmetrical)
     with row_right:
         with st.container(height=580, border=True):
-            
-            st.markdown('''
-            <div class="sticky-header">
-                <h3>Ask Echo</h3>
-                <span>Ask specific questions regarding action items, timelines, deliverables, or remarks.</span>
-            </div>
-            ''', unsafe_allow_html=True)
+            st.markdown('<h3 style="margin-top:0.2rem;">Ask Echo</h3>', unsafe_allow_html=True)
+            st.caption("Ask specific questions regarding action items, timelines, deliverables, or remarks.")
             
             # Chat history container with Claude Minimalist Styling
             st.markdown('<div class="chat-container">', unsafe_allow_html=True)
             if not st.session_state["chat_history"]:
                 st.markdown(
-                    '<div class="chat-bubble-ai-wrap">'
-                    '<div class="chat-bubble-ai">Hello. I am Echo. How may I assist you regarding this meeting transcript?</div>'
-                    '</div>',
+                    '<div class="chat-ai">Hello. I am Echo. How may I assist you regarding this meeting transcript?</div>',
                     unsafe_allow_html=True
                 )
             else:
                 for msg in st.session_state["chat_history"]:
                     if msg["role"] == "assistant":
-                        # Convert markdown bold to standard bold tags for raw HTML rendering
                         formatted_content = msg["content"].replace("\n", "<br>")
                         st.markdown(
-                            f'<div class="chat-bubble-ai-wrap">'
-                            f'<div class="chat-bubble-ai">{formatted_content}</div>'
-                            f'</div>',
+                            f'<div class="chat-ai">{formatted_content}</div>',
                             unsafe_allow_html=True
                         )
                     else:
@@ -1324,7 +1360,7 @@ if st.session_state["transcript"]:
                         )
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Chat input automatically anchors
+            # Chat input
             if prompt := st.chat_input("Ask Echo a question..."):
                 st.session_state["chat_history"].append({"role": "user", "content": prompt})
                 with st.spinner("Analyzing transcript..."):
