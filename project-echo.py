@@ -84,15 +84,15 @@ html, body, [class*="css"] {
 }
 
 .stApp > header { display: none !important; }
-.block-container { padding-top: 5.2rem !important; }
+.block-container { padding-top: 5.5rem !important; }
 
 /* Fixed Topbar */
 .echo-topbar-wrapper {
     position: fixed; top: 0; left: 0; right: 0; height: 60px;
     background-color: #161616;
     border-bottom: 1px solid #333333;
-    z-index: 999999; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    display: flex; align-items: center; justify-content: space-between;
+    z-index: 999990; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    display: flex; align-items: center; justify-content: flex-start;
     padding: 0 2rem;
 }
 
@@ -103,30 +103,45 @@ html, body, [class*="css"] {
 }
 .echo-title span { color: #D4AF37 !important; }
 
-/* Topbar Settings Button Styling */
-div[data-testid="stHorizontalBlock"]:has(button[key="topbar_settings_btn"]) {
+/* Anchor Topbar Settings Button directly inside the Echo bar */
+div[data-testid="stButton"]:has(button[key="topbar_settings_btn"]) {
     position: fixed !important;
-    top: 10px !important;
+    top: 11px !important;
     right: 2rem !important;
-    z-index: 1000000 !important;
+    z-index: 999999 !important;
     width: auto !important;
 }
 
 button[key="topbar_settings_btn"] {
-    background: transparent !important;
+    background-color: transparent !important;
     border: 1px solid #444444 !important;
-    border-radius: 50% !important;
-    width: 40px !important;
-    height: 40px !important;
-    padding: 0 !important;
-    display: flex !important;
+    border-radius: 6px !important;
+    color: #F4F2EC !important;
+    padding: 0.35rem 0.85rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.5px !important;
+    display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    transition: all 0.3s ease !important;
+    gap: 8px !important;
+    cursor: pointer !important;
+    transition: all 0.25s ease !important;
 }
+
 button[key="topbar_settings_btn"]:hover {
     border-color: #D4AF37 !important;
+    color: #D4AF37 !important;
     background-color: #222222 !important;
+}
+
+button[key="topbar_settings_btn"] svg {
+    stroke: #F4F2EC !important;
+    transition: stroke 0.25s ease !important;
+}
+
+button[key="topbar_settings_btn"]:hover svg {
+    stroke: #D4AF37 !important;
 }
 
 h3 {
@@ -180,6 +195,7 @@ h3 {
 # ========== SVG ICONS ==========
 SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
 SVG_SPINNER = """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><style>@keyframes spin { 100% { transform: rotate(360deg); } }</style><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>"""
+SVG_SETTINGS_INLINE = """<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; display: inline-block;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>"""
 
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
@@ -843,19 +859,17 @@ def export_to_pdf(df, meeting_details, other_discussions):
 # ========== STREAMLIT UI SETUP ==========
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# Top Bar (Title + Right In-line Settings Button)
+# Top Bar Fixed Header
 st.markdown("""
 <div class="echo-topbar-wrapper">
  <h1 class="echo-title">Project <span>Echo</span></h1>
 </div>
 """, unsafe_allow_html=True)
 
-# Right In-Line Settings Action Button (Positioned over Topbar)
-topbar_cols = st.columns([0.94, 0.06])
-with topbar_cols[1]:
-    if st.button("⚙️", key="topbar_settings_btn", help="Open Engine & Regeneration Settings"):
-        st.session_state["show_settings"] = not st.session_state["show_settings"]
-        st.rerun()
+# Right In-Line Settings Action Button inside top bar (Using SVG icon & named Settings)
+if st.button(f"{SVG_SETTINGS_INLINE} Settings", key="topbar_settings_btn", help="Open Engine & Regeneration Settings"):
+    st.session_state["show_settings"] = not st.session_state["show_settings"]
+    st.rerun()
 
 # Top Settings Drawer
 if st.session_state["show_settings"]:
