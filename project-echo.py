@@ -32,7 +32,7 @@ os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
-# Simple Password Gate at the start of app execution (Read strictly from Streamlit Cloud Secrets)
+# Simple Password Gate at the start of app execution
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
@@ -181,27 +181,6 @@ button[data-baseweb="tab"] p {
     font-size: 1.05rem !important;
 }
 
-/* Symmetrical Grid Column Stretches - Force containers to equal heights */
-[data-testid="stHorizontalBlock"] {
-    align-items: stretch !important;
-}
-
-[data-testid="stHorizontalBlock"] > [data-testid="column"] {
-    display: flex !important;
-    flex-direction: column !important;
-}
-
-[data-testid="stHorizontalBlock"] > [data-testid="column"] > div[data-testid="stVerticalBlock"] {
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-}
-
-[data-testid="stHorizontalBlock"] > [data-testid="column"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
-    flex: 1 !important;
-    height: 100% !important;
-}
-
 /* Card Depth with Prominent Right-Side & Bottom Drop Shadows */
 div[data-testid="stVerticalBlockBorderWrapper"] {
     background-color: #FFFFFF !important; 
@@ -289,7 +268,7 @@ button[key="card_settings_btn"]::before {
     height: 17px;
     background-color: #C5A059;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -1187,13 +1166,13 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---- TOP ROW: Symmetrical Fixed Containers (Upload Left, Meeting Details Right) ----
+# ---- TOP ROW: Symmetrical Fixed Containers ----
 col_upload, col_details = st.columns(2)
 
 # LEFT CONTAINER: Audio & Text Upload Section
 with col_upload:
-    with st.container(border=True):
-        st.markdown('<h3 style="margin-top:0.2rem;">Input & Transcription</h3>', unsafe_allow_html=True)
+    with st.container(height=520, border=True):
+        st.markdown('<h3>Input & Transcription</h3>', unsafe_allow_html=True)
         
         tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text"])
 
@@ -1269,9 +1248,9 @@ with col_upload:
 
 # RIGHT CONTAINER: Meeting Details Card (with Auto-Populate Button)
 with col_details:
-    with st.container(border=True):
+    with st.container(height=520, border=True):
         
-        # Header + Auto-populate button (when transcript exists) + Settings Button
+        # Header + Auto-populate button + Settings Button
         if st.session_state["transcript"]:
             head_col1, head_col_auto, head_col2 = st.columns([5.5, 3.5, 1.0])
             with head_col_auto:
@@ -1394,7 +1373,7 @@ if st.session_state["transcript"]:
     
     # LEFT CONTAINER: Full Transcript
     with row_left:
-        with st.container(border=True):
+        with st.container(height=560, border=True):
             
             ft_head, ft_btn1, ft_btn2 = st.columns([6, 2, 2])
             with ft_head:
@@ -1454,7 +1433,7 @@ if st.session_state["transcript"]:
             st.text_area(
                 "Transcript Content", 
                 st.session_state["transcript"], 
-                height=340, 
+                height=350, 
                 label_visibility="collapsed"
             )
             
@@ -1471,7 +1450,7 @@ if st.session_state["transcript"]:
 
     # RIGHT CONTAINER: Ask Echo (AI on Left, User on Right, Symmetrical)
     with row_right:
-        with st.container(border=True):
+        with st.container(height=560, border=True):
             
             st.markdown('<h3 style="margin-top:0.2rem;">Ask Echo</h3>', unsafe_allow_html=True)
             st.caption("Ask specific questions regarding action items, timelines, deliverables, or remarks.")
@@ -1569,7 +1548,7 @@ if not st.session_state["df"].empty:
                     )
                 with c_del:
                     st.write("<div style='height: 38px;'></div>", unsafe_allow_html=True)
-                    if st.button("Remove", key=f"del_{idx}", help=f"Remove item {idx+1}"):
+                    if st.button("Delete", key=f"del_{idx}", help=f"Remove item {idx+1}"):
                         row_to_delete = idx
         
         # Handle Deletion
