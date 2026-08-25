@@ -43,31 +43,6 @@ GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
 
-# ========== DAILY AUDIO LIMIT CONFIGURATION ==========
-MAX_DAILY_AUDIO = 5  # Set maximum audio transcriptions per day
-USAGE_FILE = ".daily_audio_usage.json"
-
-def get_daily_audio_count():
-    today_str = datetime.date.today().isoformat()
-    if os.path.exists(USAGE_FILE):
-        try:
-            with open(USAGE_FILE, "r") as f:
-                data = json.load(f)
-                if data.get("date") == today_str:
-                    return data.get("count", 0)
-        except Exception:
-            pass
-    return 0
-
-def increment_daily_audio_count():
-    today_str = datetime.date.today().isoformat()
-    current = get_daily_audio_count()
-    try:
-        with open(USAGE_FILE, "w") as f:
-            json.dump({"date": today_str, "count": current + 1}, f)
-    except Exception:
-        pass
-
 CRD_MEMBERS = [
     "Sondi Tuazon",
     "Kristina Balajadia",
@@ -98,6 +73,11 @@ if "tokens_used" not in st.session_state: st.session_state["tokens_used"] = 0
 if "last_api_call" not in st.session_state: st.session_state["last_api_call"] = None
 if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "AI - DeepSeek"
 if "chat_history" not in st.session_state: st.session_state["chat_history"] = []
+
+# ========== SVG ICONS ==========
+SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
+SVG_CHECK = """<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>"""
+SVG_INFO = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2B4C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>"""
 
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
@@ -209,12 +189,10 @@ button[key="card_settings_btn"]::before {
 </style>
 """
 
-# ========== SVG ICONS ==========
-SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
-
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
     try:
+        uploaded_file.seek(0)
         if uploaded_file.name.endswith('.txt'):
             return uploaded_file.getvalue().decode("utf-8")
         elif uploaded_file.name.endswith('.pdf'):
@@ -241,7 +219,7 @@ def _call_openai_transcribe(audio_bytes, filename="audio.mp3"):
         resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, timeout=180)
         if resp.status_code == 200:
             return resp.json().get("text", "")
-        st.error(f"OpenAI fallback error: {resp.text}")
+        st.error(f"OpenAI transcription error: {resp.text}")
         return None
     except Exception as e:
         st.error(f"OpenAI connection error: {e}")
@@ -259,7 +237,7 @@ def _call_groq_whisper(audio_bytes, filename="audio.mp3"):
         return None
 
 def _transcribe_single_segment_task(idx, seg_path):
-    """Worker task to transcribe one segment and clean up the file."""
+    """Worker task to transcribe one segment in parallel and clean up the file."""
     try:
         with open(seg_path, "rb") as f:
             seg_bytes = f.read()
@@ -271,6 +249,10 @@ def _transcribe_single_segment_task(idx, seg_path):
             except: pass
 
 def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, status_placeholder):
+    if not audio_bytes:
+        st.error("Audio data is empty. Please select or record an audio file again.")
+        return None
+
     progress_bar.progress(10, text="Preprocessing audio container (10%)...")
     
     ext = os.path.splitext(original_filename)[1] or ".m4a"
@@ -299,22 +281,21 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
             return None
 
         comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
-        progress_bar.progress(45, text="Evaluating audio duration & routing (45%)...")
+        progress_bar.progress(45, text="Evaluating audio duration and routing (45%)...")
 
         if comp_size_mb <= 10.0 and GROQ_API_KEY:
-            status_placeholder.info("⚡ Processing via Groq Whisper Primary...")
+            status_placeholder.markdown(f"{SVG_INFO} Processing via Groq Whisper Primary...", unsafe_allow_html=True)
             progress_bar.progress(70, text="Transcribing via Groq Whisper (70%)...")
             with open(compressed_mp3, "rb") as f:
                 c_bytes = f.read()
             text = _call_groq_whisper(c_bytes, "audio.mp3")
             if text:
-                progress_bar.progress(100, text="Transcription completed (100%)!")
+                progress_bar.progress(100, text="Transcription completed (100%).")
                 status_placeholder.empty()
-                increment_daily_audio_count()
                 return text
-            status_placeholder.warning("⚠️ Groq rate limit reached. Switching automatically to OpenAI...")
+            status_placeholder.markdown(f"{SVG_ALERT} Groq rate limit reached. Switching automatically to OpenAI parallel processing...", unsafe_allow_html=True)
 
-        status_placeholder.info("🚀 Chunking and transcribing in parallel via OpenAI...")
+        status_placeholder.markdown(f"{SVG_INFO} Chunking and transcribing in parallel via OpenAI...", unsafe_allow_html=True)
         progress_bar.progress(55, text="Chunking audio segments for parallel processing (55%)...")
         
         segment_pattern = src_path + "_seg_%03d.mp3"
@@ -346,10 +327,9 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
                 pct = int(55 + (completed_count / total_segs) * 40)
                 progress_bar.progress(pct, text=f"Transcribed {completed_count}/{total_segs} chunks in parallel ({pct}%)...")
 
-        progress_bar.progress(100, text="Transcription completed successfully (100%)!")
+        progress_bar.progress(100, text="Transcription completed successfully (100%).")
         time.sleep(0.3)
         status_placeholder.empty()
-        increment_daily_audio_count()
         return " ".join([part for part in transcript_parts if part])
 
     except Exception as e:
@@ -531,7 +511,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
     if engine == "Non-AI - Python Heuristic":
         time.sleep(0.5)
         res_df, res_other = heuristic_non_ai_extraction(transcript)
-        progress_bar.progress(100, text="Extraction completed (100%)!")
+        progress_bar.progress(100, text="Extraction completed (100%).")
         time.sleep(0.2)
         progress_bar.empty()
         return res_df, res_other
@@ -539,7 +519,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
     df, other = extract_with_deepseek(transcript)
     
     if df is not None and not df.empty:
-        progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%)...")
+        progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%).")
         time.sleep(0.3)
         progress_bar.empty()
         return df, other
@@ -552,7 +532,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
 def query_transcript_assistant(transcript, user_question, chat_history):
     """DeepSeek-powered chatbot to query details from the transcript."""
     if not DEEPSEEK_API_KEY:
-        return "⚠️ DeepSeek API Key is missing. Please add it to your Streamlit secrets to use the assistant."
+        return "DeepSeek API Key is missing. Please add it to your Streamlit secrets to use the assistant."
     
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
@@ -969,10 +949,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Fetch current daily count
-daily_audio_used = get_daily_audio_count()
-audio_quota_reached = daily_audio_used >= MAX_DAILY_AUDIO
-
 # ---- Meeting Details Card ----
 with st.container(border=True):
     head_col1, head_col2 = st.columns([9.3, 0.7])
@@ -1009,8 +985,7 @@ with st.container(border=True):
                             st.rerun()
 
             with set_col2:
-                st.markdown("**Daily Quota & Diagnostics**")
-                st.write(f"• **Daily Audio Usage:** `{daily_audio_used} / {MAX_DAILY_AUDIO}` transcriptions")
+                st.markdown("**Diagnostics & Usage**")
                 st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
                 
                 if st.session_state["last_api_call"]:
@@ -1062,29 +1037,28 @@ with st.container(border=True):
     with r2_c5: conf_desig = st.text_input("Designation", value="", placeholder="e.g. Managing Director")
 
     # Three Tabs
-    tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text (Unlimited)"])
+    tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text"])
 
-    # TAB 1: UPLOAD AUDIO (RATE LIMITED)
+    # TAB 1: UPLOAD AUDIO
     with tab_upload:
-        if audio_quota_reached:
-            st.warning(f"⚠️ Daily audio transcription quota ({MAX_DAILY_AUDIO}/{MAX_DAILY_AUDIO}) reached. You can still use the **Upload Text** tab without any limits!")
-        else:
-            st.caption(f"Audio transcription quota: **{daily_audio_used}/{MAX_DAILY_AUDIO}** used today.")
-            u_col1, u_col2 = st.columns([5, 1.5])
-            with u_col1:
-                uploaded_file = st.file_uploader(
-                    "Upload audio file (200MB limit supported)",
-                    type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
-                    help="Audio uploads up to 200MB are supported."
-                )
-            if uploaded_file:
-                with u_col2:
-                    st.write("")
-                    st.write("")
-                    if st.button("Transcribe Audio", key="btn_tx_upload"):
+        u_col1, u_col2 = st.columns([5, 1.5])
+        with u_col1:
+            uploaded_file = st.file_uploader(
+                "Upload audio file (200MB limit supported)",
+                type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"],
+                help="Audio uploads up to 200MB are supported."
+            )
+        with u_col2:
+            st.write("")
+            st.write("")
+            if st.button("Transcribe Audio", key="btn_tx_upload"):
+                if uploaded_file is not None:
+                    uploaded_file.seek(0)
+                    file_bytes = uploaded_file.read()
+                    if file_bytes:
                         p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
                         p_status = st.empty()
-                        transcript = transcribe_audio_pipeline(uploaded_file.read(), uploaded_file.name, p_bar, p_status)
+                        transcript = transcribe_audio_pipeline(file_bytes, uploaded_file.name, p_bar, p_status)
                         p_bar.empty()
                         p_status.empty()
                         if transcript:
@@ -1093,35 +1067,46 @@ with st.container(border=True):
                             st.session_state["other_discussions"] = ""
                             st.session_state["chat_history"] = []
                             st.rerun()
+                    else:
+                        st.warning("Uploaded file is empty. Please select a valid audio file.")
+                else:
+                    st.warning("Please upload an audio file first.")
 
-    # TAB 2: RECORD AUDIO (RATE LIMITED)
+    # TAB 2: RECORD AUDIO
     with tab_record:
-        if audio_quota_reached:
-            st.warning(f"⚠️ Daily audio transcription quota ({MAX_DAILY_AUDIO}/{MAX_DAILY_AUDIO}) reached. You can still use the **Upload Text** tab without any limits!")
-        else:
-            st.caption(f"Audio transcription quota: **{daily_audio_used}/{MAX_DAILY_AUDIO}** used today.")
-            r_col1, r_col2, r_col3 = st.columns([4, 1.5, 1.5])
-            with r_col1:
-                recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
-            if recorded_audio:
-                rec_bytes = recorded_audio.read()
-                with r_col2:
-                    st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
-                with r_col3:
-                    if st.button("Transcribe Audio", key="btn_tx_record"):
-                        p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
-                        p_status = st.empty()
-                        transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
-                        p_bar.empty()
-                        p_status.empty()
-                        if transcript:
-                            st.session_state["transcript"] = transcript
-                            st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
-                            st.session_state["other_discussions"] = ""
-                            st.session_state["chat_history"] = []
-                            st.rerun()
+        r_col1, r_col2, r_col3 = st.columns([4, 1.5, 1.5])
+        with r_col1:
+            recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
+        
+        rec_bytes = None
+        if recorded_audio is not None:
+            recorded_audio.seek(0)
+            rec_bytes = recorded_audio.read()
 
-    # TAB 3: TEXT UPLOAD (UNLIMITED)
+        with r_col2:
+            if rec_bytes:
+                st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{meeting_date.strftime('%Y%m%d')}.wav", mime="audio/wav")
+            else:
+                st.button("Save Recording (.wav)", disabled=True)
+                
+        with r_col3:
+            if st.button("Transcribe Audio", key="btn_tx_record"):
+                if rec_bytes:
+                    p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
+                    p_status = st.empty()
+                    transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
+                    p_bar.empty()
+                    p_status.empty()
+                    if transcript:
+                        st.session_state["transcript"] = transcript
+                        st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
+                        st.session_state["other_discussions"] = ""
+                        st.session_state["chat_history"] = []
+                        st.rerun()
+                else:
+                    st.warning("Please record audio before initiating transcription.")
+
+    # TAB 3: TEXT UPLOAD
     with tab_text:
         text_col1, text_col2 = st.columns([5, 1.5])
         with text_col1:
@@ -1140,7 +1125,7 @@ with st.container(border=True):
                 if pasted_text and pasted_text.strip():
                     extracted_str += "\n" + pasted_text.strip()
                 
-                p_bar.progress(100, text="Document processed (100%)!")
+                p_bar.progress(100, text="Document processed (100%).")
                 time.sleep(0.2)
                 p_bar.empty()
                 if extracted_str.strip():
@@ -1194,7 +1179,7 @@ if st.session_state["transcript"]:
                 <script>
                 document.getElementById("copy-btn").addEventListener("click", function() {{
                     navigator.clipboard.writeText({json.dumps(st.session_state["transcript"])}).then(function() {{
-                        document.getElementById("copy-btn").innerText = "Copied! ✅";
+                        document.getElementById("copy-btn").innerHTML = 'Copied! {SVG_CHECK}';
                         setTimeout(() => document.getElementById("copy-btn").innerText = "Copy Text", 2000);
                     }});
                 }});
@@ -1265,7 +1250,7 @@ if not st.session_state["df"].empty:
                 with r_top_left:
                     st.markdown(f"**Discussion Item #{idx + 1}**")
                 with r_top_right:
-                    if st.button("✕ Delete", key=f"del_{idx}", help="Remove this discussion item"):
+                    if st.button("Delete Item", key=f"del_{idx}", help="Remove this discussion item"):
                         item_to_delete = idx
 
                 c1, c2 = st.columns([1.2, 1.2])
@@ -1310,7 +1295,7 @@ if not st.session_state["df"].empty:
             st.session_state["df"] = pd.DataFrame(updated_records)
 
         # Add new item button
-        if st.button("➕ Add New Discussion Item", key="btn_add_item"):
+        if st.button("Add New Discussion Item", key="btn_add_item"):
             new_row = pd.DataFrame([{
                 "Discussion Points": "",
                 "Action Plan": "",
