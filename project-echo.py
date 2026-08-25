@@ -32,6 +32,20 @@ os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
+# Simple Password Gate at the start of app execution
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
+if not st.session_state["authenticated"]:
+    pw_input = st.text_input("Enter Team Access Key to use Project Echo:", type="password")
+    if st.button("Log In"):
+        if pw_input == st.secrets.get("APP_PASSWORD", "3ch0"):
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Invalid access key. Contact the administrator.")
+    st.stop()  # Prevents unauthorized access to app functions
+    
 # API Keys loaded strictly from Streamlit Cloud Secrets
 DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
