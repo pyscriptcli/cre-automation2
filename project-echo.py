@@ -26,8 +26,6 @@ if not os.path.exists(_config_file):
 
 # API Keys & Endpoints
 GEMINI_API_KEY = "AIzaSyDlBkIdAth2AesZ9rr3xTe7t_IXl2_IEQM"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-
 GROQ_API_KEY = "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"
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -150,24 +148,21 @@ def transcribe_audio(audio_bytes):
         return None
 
 def extract_with_gemini(transcript):
-    """Primary Engine: Google Gemini 1.5 Flash (1M token context, handles full Taglish meetings seamlessly)."""
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY
-    }
+    """Primary Engine: Google Gemini 1.5 / 2.0 Flash via standard REST API with camelCase schema."""
+    gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
     
     prompt = f"""You are an executive assistant for PRIME Philippines extracting Minutes of the Meeting (MOM).
 The transcript contains Tagalog and English (Taglish) discussion regarding property sourcing, sites (A1 sites), reports, tax maps, LGUs, trade areas, and client updates.
-Translate all discussion points and action plans into clear, professional corporate English.
+Translate all colloquial and Taglish dialogue into clear, professional corporate English.
 
-You MUST extract at least 3 to 8 clear, distinct table items covering all topics discussed.
+Extract at least 3 to 10 clear, distinct table items covering all discussed tasks, updates, and deliverables.
 
-Output valid JSON ONLY with this schema:
+Output valid JSON ONLY matching this schema:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Core discussion topic, report update, or milestone",
-      "Action Plan": "Concrete next step, deliverable, format to provide, or requirement",
+      "Discussion Points": "Core discussion topic, site status, or milestone",
+      "Action Plan": "Concrete next step, format to provide, report to send, or requirement",
       "Indicative Delivery Date": "Specific date, timeline (e.g., Friday, Q1 2027), or 'TBD'",
       "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or name)"
     }}
@@ -179,32 +174,42 @@ Transcript:
 {transcript}"""
 
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
+        "contents": [
+            {
+                "parts": [{"text": prompt}]
+            }
+        ],
         "generationConfig": {
-            "response_mime_type": "application/json",
+            "responseMimeType": "application/json",
             "temperature": 0.1
         }
     }
     
-    try:
-        resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=60)
-        if resp.status_code == 200:
-            result = resp.json()
-            raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-            data = json.loads(raw_text)
-            items = data.get("table_items", [])
-            if items:
-                df = pd.DataFrame(items)
-                for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                    if col not in df.columns:
-                        df[col] = ""
-                return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
-    except Exception:
-        pass
+    for model_name in gemini_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        headers = {"Content-Type": "application/json"}
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=60)
+            if resp.status_code == 200:
+                result = resp.json()
+                raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+                clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+                clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+                data = json.loads(clean_text)
+                items = data.get("table_items", [])
+                if items and len(items) > 0:
+                    df = pd.DataFrame(items)
+                    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+                        if col not in df.columns:
+                            df[col] = ""
+                    return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
+        except Exception:
+            continue
+            
     return None, None
 
 def extract_with_groq_backup(transcript):
-    """Backup Engine: Groq 70B & 8B with single-pass corporate extraction."""
+    """Backup Engine: Groq LLaMA models."""
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
@@ -252,7 +257,7 @@ Transcript:
                 match = re.search(r"\{.*\}", clean_text, re.DOTALL)
                 data = json.loads(match.group(0)) if match else json.loads(clean_text)
                 items = data.get("table_items", [])
-                if items:
+                if items and len(items) > 0:
                     df = pd.DataFrame(items)
                     for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
                         if col not in df.columns:
@@ -274,7 +279,7 @@ def extract_structured_insights(transcript):
     if df_groq is not None and not df_groq.empty:
         return df_groq, other_disc_groq
 
-    st.error("Extraction failed on both Gemini and Groq. Please check transcript and retry.")
+    st.error("Extraction encountered an issue on both APIs. Please verify your transcript and retry.")
     return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
 
 def set_cell_shading(cell, color_hex):
@@ -519,7 +524,7 @@ if st.session_state["transcript"]:
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                with st.spinner("Generating Minutes of the Meeting..."):
+                with st.spinner("Generating Minutes of the Meeting with Gemini..."):
                     extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
