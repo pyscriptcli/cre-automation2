@@ -147,21 +147,65 @@ def transcribe_audio(audio_bytes):
             st.error(f"Transcription failed: {error_msg}")
         return None
 
+def normalize_llm_json_to_df(data):
+    """Universal parser: Converts any LLM JSON format into the standardized MOM DataFrame."""
+    items = None
+    other_disc = ""
+    
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict):
+        for key in ["table_items", "items", "minutes", "table", "data", "discussion_items", "discussions", "action_items"]:
+            if key in data and isinstance(data[key], list) and len(data[key]) > 0:
+                items = data[key]
+                break
+        if items is None:
+            for v in data.values():
+                if isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+                    items = v
+                    break
+        other_disc = str(data.get("other_discussions", "") or data.get("notes", "") or data.get("summary", ""))
+
+    if not items or not isinstance(items, list):
+        return None, ""
+
+    df = pd.DataFrame(items)
+    col_mapping = {}
+    for c in df.columns:
+        c_clean = str(c).lower().replace("_", " ").replace("-", " ")
+        if any(k in c_clean for k in ["discuss", "point", "topic", "milestone"]):
+            col_mapping[c] = "Discussion Points"
+        elif any(k in c_clean for k in ["action", "plan", "step", "deliverable"]):
+            col_mapping[c] = "Action Plan"
+        elif any(k in c_clean for k in ["date", "time", "delivery", "deadline"]):
+            col_mapping[c] = "Indicative Delivery Date"
+        elif any(k in c_clean for k in ["person", "charge", "pic", "assign", "who", "responsible"]):
+            col_mapping[c] = "Person-in-charge"
+
+    df = df.rename(columns=col_mapping)
+    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+        if col not in df.columns:
+            df[col] = ""
+            
+    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
+    return df, other_disc
+
 def extract_with_gemini(transcript):
-    """Primary Engine: Google Gemini 1.5 / 2.0 Flash via standard REST API with camelCase schema."""
-    gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+    """Primary Extraction Engine using Google Gemini Flash."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    headers = {"Content-Type": "application/json"}
     
     prompt = f"""You are an executive assistant for PRIME Philippines extracting Minutes of the Meeting (MOM).
 The transcript contains Tagalog and English (Taglish) discussion regarding property sourcing, sites (A1 sites), reports, tax maps, LGUs, trade areas, and client updates.
-Translate all colloquial and Taglish dialogue into clear, professional corporate English.
+Translate all colloquial dialogue into professional corporate English.
 
 Extract at least 3 to 10 clear, distinct table items covering all discussed tasks, updates, and deliverables.
 
-Output valid JSON ONLY matching this schema:
+Output valid JSON ONLY with this schema:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Core discussion topic, site status, or milestone",
+      "Discussion Points": "Core discussion topic, report update, or milestone",
       "Action Plan": "Concrete next step, format to provide, report to send, or requirement",
       "Indicative Delivery Date": "Specific date, timeline (e.g., Friday, Q1 2027), or 'TBD'",
       "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or name)"
@@ -174,64 +218,49 @@ Transcript:
 {transcript}"""
 
     payload = {
-        "contents": [
-            {
-                "parts": [{"text": prompt}]
-            }
-        ],
+        "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "responseMimeType": "application/json",
             "temperature": 0.1
         }
     }
     
-    for model_name in gemini_models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
-        headers = {"Content-Type": "application/json"}
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=60)
-            if resp.status_code == 200:
-                result = resp.json()
-                raw_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-                clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-                clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-                data = json.loads(clean_text)
-                items = data.get("table_items", [])
-                if items and len(items) > 0:
-                    df = pd.DataFrame(items)
-                    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                        if col not in df.columns:
-                            df[col] = ""
-                    return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
-        except Exception:
-            continue
-            
-    return None, None
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        if resp.status_code == 200:
+            raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+            data = json.loads(clean_text)
+            return normalize_llm_json_to_df(data)
+        else:
+            st.warning(f"Gemini Notice ({resp.status_code}): Switching to backup engine.")
+    except Exception as e:
+        st.warning(f"Gemini connection error: {e}. Switching to backup engine.")
+        
+    return None, ""
 
 def extract_with_groq_backup(transcript):
-    """Backup Engine: Groq LLaMA models."""
+    """Backup Engine using Groq LLaMA models."""
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
     
-    system_prompt = (
-        "You are an executive assistant extracting Minutes of the Meeting (MOM). "
-        "The transcript contains Tagalog and English (Taglish). Translate dialogue into professional English. "
-        "Extract all key discussion points and action items. Respond ONLY with valid JSON."
-    )
-    
-    user_prompt = f"""Extract all Minutes of the Meeting items into valid JSON:
+    prompt = f"""You are an executive assistant for PRIME Philippines. Extract Minutes of the Meeting from this Taglish transcript.
+Translate dialogue to professional English. Extract all discussion points, site updates, reports, deliverables, and timelines.
+
+Output valid JSON ONLY matching:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Core discussion topic, report, or milestone",
+      "Discussion Points": "Core discussion topic or milestone",
       "Action Plan": "Specific follow-up action or deliverable",
       "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or Unassigned)"
+      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or name)"
     }}
   ],
-  "other_discussions": "Summary of other points discussed"
+  "other_discussions": "Summary of secondary points"
 }}
 
 Transcript:
@@ -242,8 +271,8 @@ Transcript:
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "system", "content": "You output strictly valid JSON."},
+                {"role": "user", "content": prompt}
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.1
@@ -256,19 +285,16 @@ Transcript:
                 clean_text = re.sub(r"\s*```$", "", clean_text).strip()
                 match = re.search(r"\{.*\}", clean_text, re.DOTALL)
                 data = json.loads(match.group(0)) if match else json.loads(clean_text)
-                items = data.get("table_items", [])
-                if items and len(items) > 0:
-                    df = pd.DataFrame(items)
-                    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                        if col not in df.columns:
-                            df[col] = ""
-                    return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
+                df, other = normalize_llm_json_to_df(data)
+                if df is not None and not df.empty:
+                    return df, other
         except Exception:
             continue
-    return None, None
+            
+    return None, ""
 
 def extract_structured_insights(transcript):
-    """Main extraction coordinator: Runs Gemini as Primary, Groq as Backup."""
+    """Main extraction coordinator: Primary (Gemini) -> Backup (Groq)."""
     # 1. Primary: Gemini
     df, other_disc = extract_with_gemini(transcript)
     if df is not None and not df.empty:
