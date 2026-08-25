@@ -6,6 +6,7 @@ import pandas as pd
 import datetime
 import re
 from io import BytesIO
+import PyPDF2
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -105,10 +106,33 @@ h3 {
     border-color: #D4AF37 !important; color: #D4AF37 !important;
     background-color: #1A1A1A !important;
 }
+.stTextArea textarea {
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+}
 </style>
 """
 
 # ========== CORE LOGIC ==========
+def extract_text_from_file(uploaded_file):
+    """Extract text from TXT, PDF, or DOCX files."""
+    try:
+        if uploaded_file.name.endswith('.txt'):
+            return uploaded_file.getvalue().decode("utf-8")
+        elif uploaded_file.name.endswith('.pdf'):
+            reader = PyPDF2.PdfReader(uploaded_file)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            return text
+        elif uploaded_file.name.endswith('.docx'):
+            doc = Document(uploaded_file)
+            return "\n".join([para.text for para in doc.paragraphs])
+        return ""
+    except Exception as e:
+        st.error(f"Error reading file: {e}")
+        return ""
+
 def transcribe_audio(audio_bytes):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
     files = {"file": ("audio.wav", audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
@@ -116,15 +140,14 @@ def transcribe_audio(audio_bytes):
     if resp.status_code == 200:
         return resp.json().get("text", "")
     else:
-        # Better Rate Limit Handling
         error_msg = resp.json().get("error", {}).get("message", resp.text)
         if "rate limit" in error_msg.lower():
-            st.error("Groq Transcription Rate Limit Reached. Please wait a few minutes or paste your transcript in the 'Paste Transcript' tab.")
+            st.error("Groq Transcription Rate Limit Reached. Please wait a few minutes or use the 'Upload Text' tab.")
         else:
             st.error(f"Transcription failed: {error_msg}")
         return None
 
-def chunk_text(text, max_chars=3500, overlap=250):
+def chunk_text(text, max_chars=12000, overlap=500):
     if len(text) <= max_chars:
         return [text]
     chunks = []
@@ -135,22 +158,17 @@ def chunk_text(text, max_chars=3500, overlap=250):
         start += max_chars - overlap
     return chunks
 
-def extract_json_from_groq(prompt):
+def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]):
+    """Executes robust JSON extraction targeting Groq models."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
     
-    last_error = None
     for model in models:
         payload = {
             "model": model,
             "messages": [
                 {
                     "role": "system",
-                    "content": (
-                        "You are an executive assistant extracting Minutes of the Meeting. "
-                        "Translate colloquial conversation and capture deliverables. "
-                        "Respond ONLY with a JSON object strictly matching the schema."
-                    )
+                    "content": "You are an executive assistant extracting Minutes of the Meeting. Translate colloquial terms and capture precise deliverables. Respond ONLY with a valid JSON object matching the schema."
                 },
                 {"role": "user", "content": prompt}
             ],
@@ -167,69 +185,59 @@ def extract_json_from_groq(prompt):
                 if match:
                     return json.loads(match.group(0))
                 return json.loads(clean_text)
-            else:
-                last_error = resp.text
-        except Exception as e:
-            last_error = str(e)
+        except Exception:
             continue
     return None
 
-def extract_structured_insights_robust(transcript):
-    chunks = chunk_text(transcript, max_chars=3500, overlap=250)
-    chunk_cache = []
+def extract_structured_insights_layered(transcript):
+    """
+    LAYERED FALLBACK EXTRACTION
+    Layer 1: Attempt full transcript in a single pass (most reliable if under limits).
+    Layer 2: If it fails, fallback to chunking.
+    Layer 3: If API totally fails, output a manual draft to ensure editor loads.
+    """
+    safe_transcript = transcript[:30000] # Safe limit for 8k token windows
     
-    progress_container = st.empty()
-    bar = progress_container.progress(0, text="Initializing multi-chunk analysis...")
-    
-    for idx, chunk in enumerate(chunks):
-        bar.progress(
-            int((idx) / len(chunks) * 100), 
-            text=f"Processing Part {idx + 1} of {len(chunks)}..."
-        )
-        
-        prompt = f"""You are extracting Minutes of the Meeting from Part {idx+1}/{len(chunks)} of a transcript.
-Extract all topics, progress points, follow-ups, and deliverables into JSON.
-
-JSON Schema:
+    prompt = f"""Extract all Minutes of the Meeting (MOM) items from this transcript into valid JSON.
+Format MUST strictly follow:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Core discussion topic or milestone",
-      "Action Plan": "Detailed follow-up or actionable deliverable",
-      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g., PRIME, Client name, or unassigned)"
+      "Discussion Points": "Key discussion item, milestone, or topic",
+      "Action Plan": "Concrete next steps or requirements",
+      "Indicative Delivery Date": "Specific date, quarter, or 'TBD'",
+      "Person-in-charge": "Responsible person/entity"
     }}
   ],
-  "other_discussions": "Summary of other conversational or informal points"
+  "other_discussions": "Summary of other discussions or secondary topics"
 }}
 
-Transcript Content:
-{chunk}"""
+Transcript:
+{safe_transcript}"""
 
-        res = extract_json_from_groq(prompt)
-        if res:
-            chunk_cache.append(res)
-
-    bar.progress(100, text="Finalizing and merging Minutes of the Meeting...")
-    
+    # --- LAYER 1: Single Pass ---
+    res = call_groq_json(prompt)
     all_table_items = []
     all_other_discussions = []
-    
-    for c in chunk_cache:
-        items = c.get("table_items", [])
-        if isinstance(items, list):
-            for itm in items:
-                if itm.get("Discussion Points") or itm.get("Action Plan"):
-                    all_table_items.append(itm)
-        disc = c.get("other_discussions", "")
-        if disc and disc.strip():
-            all_other_discussions.append(disc.strip())
 
-    progress_container.empty()
+    if res and isinstance(res.get("table_items"), list) and len(res.get("table_items")) > 0:
+        all_table_items = res["table_items"]
+        if res.get("other_discussions"):
+            all_other_discussions.append(res.get("other_discussions"))
+    else:
+        # --- LAYER 2: Chunking Fallback ---
+        chunks = chunk_text(transcript, max_chars=12000, overlap=500)
+        for chunk in chunks:
+            chunk_prompt = prompt.replace(safe_transcript, chunk)
+            chunk_res = call_groq_json(chunk_prompt)
+            if chunk_res and isinstance(chunk_res.get("table_items"), list):
+                all_table_items.extend(chunk_res["table_items"])
+                if chunk_res.get("other_discussions"):
+                    all_other_discussions.append(chunk_res.get("other_discussions"))
 
-    # GUARANTEED FALLBACK: If Groq failed or hit limits, output a blank draft so the editor shows up
+    # --- LAYER 3: Guaranteed Manual Draft Fallback ---
     if not all_table_items:
-        st.warning("Auto-extraction yielded no items (possibly due to API rate limits). Generated a manual draft.")
+        st.warning("Auto-extraction yielded no discrete items (possibly due to API limits or conversational structure). Generated a manual draft.")
         all_table_items = [{
             "Discussion Points": "Meeting Overview & Key Deliverables",
             "Action Plan": "Pending (Manual Entry Required)",
@@ -364,7 +372,6 @@ def export_to_word(df, meeting_details, other_discussions):
         doc.add_heading("Other Discussions:", level=2)
         doc.add_paragraph(other_discussions)
 
-    # Dynamic Signatures
     doc.add_paragraph()
     doc.add_paragraph("Prepared by:")
     doc.add_paragraph("_______________________________")
@@ -401,50 +408,39 @@ if "other_discussions" not in st.session_state: st.session_state["other_discussi
 with st.container(border=True):
     st.markdown('<h3>Meeting Details & Audio</h3>', unsafe_allow_html=True)
     
-    # ROW 1: Date | Location | Start | End | Prepared By
+    # ROW 1
     r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.3, 2.0, 1.1, 1.1, 1.5, 1.5])
-    with r1_c1:
-        meeting_date = st.date_input("Date", value=datetime.date.today())
-    with r1_c2:
-        meeting_location = st.text_input("Location", value="Greatwork Mega Tower Boardroom")
+    with r1_c1: meeting_date = st.date_input("Date", value=datetime.date.today())
+    with r1_c2: meeting_location = st.text_input("Location", value="Greatwork Mega Tower Boardroom")
     with r1_c3:
         start_time_idx = TIME_OPTIONS.index("02:30 PM") if "02:30 PM" in TIME_OPTIONS else 29
         start_time = st.selectbox("Start", options=TIME_OPTIONS, index=start_time_idx)
     with r1_c4:
         end_time_idx = TIME_OPTIONS.index("05:00 PM") if "05:00 PM" in TIME_OPTIONS else 34
         end_time = st.selectbox("End", options=TIME_OPTIONS, index=end_time_idx)
-    with r1_c5:
-        prep_name = st.text_input("Prepared By (Name)", placeholder="e.g. John Doe")
-    with r1_c6:
-        prep_desig = st.text_input("Designation", placeholder="e.g. Associate")
+    with r1_c5: prep_name = st.text_input("Prepared By (Name)", placeholder="e.g. John Doe")
+    with r1_c6: prep_desig = st.text_input("Designation", placeholder="e.g. Associate")
 
-    # ROW 2: Client | CRD Team | External Attendees | Confirmed By
+    # ROW 2
     r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
-    with r2_c1:
-        client_name = st.text_input("Client / Company", placeholder="XYZ Company")
-    with r2_c2:
-        selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=CRD_MEMBERS)
-    with r2_c3:
-        ext_attendees_raw = st.text_input("External Attendees", placeholder="e.g. Mr. ABCD, Jane Doe")
-    with r2_c4:
-        conf_name = st.text_input("Confirmed By (Name)", placeholder="e.g. Client Rep")
-    with r2_c5:
-        conf_desig = st.text_input("Designation", placeholder="e.g. Managing Director")
+    with r2_c1: client_name = st.text_input("Client / Company", placeholder="XYZ Company")
+    with r2_c2: selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=CRD_MEMBERS)
+    with r2_c3: ext_attendees_raw = st.text_input("External Attendees", placeholder="e.g. Mr. ABCD, Jane Doe")
+    with r2_c4: conf_name = st.text_input("Confirmed By (Name)", placeholder="e.g. Client Rep")
+    with r2_c5: conf_desig = st.text_input("Designation", placeholder="e.g. Managing Director")
 
-    # Audio Section: Upload, Live Record, Paste Text
-    tab_upload, tab_record, tab_text = st.tabs(["Upload Audio File", "Record Live Audio", "Paste Transcript"])
-    active_audio_bytes = None
+    # Three Clean Tabs
+    tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text"])
 
     with tab_upload:
         u_col1, u_col2 = st.columns([5, 1.5])
         with u_col1:
             uploaded_file = st.file_uploader("Upload audio file", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"], label_visibility="collapsed")
         if uploaded_file:
-            active_audio_bytes = uploaded_file.read()
             with u_col2:
                 if st.button("Transcribe Audio", key="btn_tx_upload"):
                     with st.spinner("Transcribing with Groq Whisper..."):
-                        transcript = transcribe_audio(active_audio_bytes)
+                        transcript = transcribe_audio(uploaded_file.read())
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -456,18 +452,13 @@ with st.container(border=True):
         with r_col1:
             recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
         if recorded_audio:
-            active_audio_bytes = recorded_audio.read()
+            rec_bytes = recorded_audio.read()
             with r_col2:
-                st.download_button(
-                    label="Save Recording (.wav)",
-                    data=active_audio_bytes,
-                    file_name=f"Recording_{datetime.date.today().strftime('%Y%m%d')}.wav",
-                    mime="audio/wav"
-                )
+                st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{datetime.date.today().strftime('%Y%m%d')}.wav", mime="audio/wav")
             with r_col3:
                 if st.button("Transcribe Audio", key="btn_tx_record"):
                     with st.spinner("Transcribing with Groq Whisper..."):
-                        transcript = transcribe_audio(active_audio_bytes)
+                        transcript = transcribe_audio(rec_bytes)
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -477,28 +468,38 @@ with st.container(border=True):
     with tab_text:
         text_col1, text_col2 = st.columns([5, 1.5])
         with text_col1:
-            pasted_text = st.text_area("Paste or type transcript text here:", height=68, label_visibility="collapsed")
+            uploaded_text_file = st.file_uploader("Upload Document (.txt, .docx, .pdf)", type=["txt", "docx", "pdf"])
+            pasted_text = st.text_area("Or Paste Transcript Here", height=100, placeholder="Paste transcript text directly here...")
         with text_col2:
+            st.write("") # Spacer
+            st.write("") # Spacer
             if st.button("Process Text", key="btn_tx_text"):
+                extracted_str = ""
+                if uploaded_text_file:
+                    extracted_str = extract_text_from_file(uploaded_text_file)
                 if pasted_text and pasted_text.strip():
-                    st.session_state["transcript"] = pasted_text.strip()
+                    extracted_str += "\n" + pasted_text.strip()
+                
+                if extracted_str.strip():
+                    st.session_state["transcript"] = extracted_str.strip()
                     st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                     st.session_state["other_discussions"] = ""
                     st.rerun()
                 else:
-                    st.warning("Please paste some text first.")
+                    st.warning("Please upload a file or paste text to proceed.")
 
-# ---- Step 2: Full Transcript Clean UI ----
+# ---- Step 2: Full Transcript UI ----
 if st.session_state["transcript"]:
     with st.container(border=True):
         st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
         
-        # Native code block with copy button
-        st.code(st.session_state["transcript"], language="text")
+        # Uses a tall standard text_area to natively wrap lines instead of a horizontal code block
+        st.text_area("Transcript Content", st.session_state["transcript"], height=350, label_visibility="collapsed")
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                extracted_df, other_disc = extract_structured_insights_robust(st.session_state["transcript"])
+                with st.spinner("Extracting insights..."):
+                    extracted_df, other_disc = extract_structured_insights_layered(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
@@ -523,7 +524,7 @@ if not st.session_state["df"].empty:
         )
         st.session_state["df"] = edited_df
 
-        st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=80)
+        st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=100)
 
         meeting_details = {
             "date": meeting_date.strftime("%B %d, %Y"),
