@@ -32,7 +32,7 @@ with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
 # API Keys & Endpoints
-DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "sk-7b4c611f153f4fe0adc1a1cbd13a2930")
+
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "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")
