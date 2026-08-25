@@ -84,21 +84,50 @@ html, body, [class*="css"] {
 }
 
 .stApp > header { display: none !important; }
-.block-container { padding-top: 5.5rem !important; }
+.block-container { padding-top: 5.2rem !important; }
 
-.echo-topbar {
+/* Fixed Topbar */
+.echo-topbar-wrapper {
     position: fixed; top: 0; left: 0; right: 0; height: 60px;
     background-color: #161616;
     border-bottom: 1px solid #333333;
-    display: flex; align-items: center; padding: 0 2rem;
     z-index: 999999; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2rem;
 }
-.echo-topbar h1 {
+
+.echo-title {
     font-family: 'Playfair Display', serif !important;
     font-style: italic !important; font-weight: 400 !important;
     font-size: 1.35rem !important; color: #FFFFFF !important; margin: 0 !important;
 }
-.echo-topbar h1 span { color: #D4AF37 !important; }
+.echo-title span { color: #D4AF37 !important; }
+
+/* Topbar Settings Button Styling */
+div[data-testid="stHorizontalBlock"]:has(button[key="topbar_settings_btn"]) {
+    position: fixed !important;
+    top: 10px !important;
+    right: 2rem !important;
+    z-index: 1000000 !important;
+    width: auto !important;
+}
+
+button[key="topbar_settings_btn"] {
+    background: transparent !important;
+    border: 1px solid #444444 !important;
+    border-radius: 50% !important;
+    width: 40px !important;
+    height: 40px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.3s ease !important;
+}
+button[key="topbar_settings_btn"]:hover {
+    border-color: #D4AF37 !important;
+    background-color: #222222 !important;
+}
 
 h3 {
     font-family: 'Playfair Display', serif !important;
@@ -149,7 +178,6 @@ h3 {
 """
 
 # ========== SVG ICONS ==========
-SVG_SETTINGS = """<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#222222" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>"""
 SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
 SVG_SPINNER = """<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><style>@keyframes spin { 100% { transform: rotate(360deg); } }</style><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>"""
 
@@ -189,42 +217,40 @@ def _call_groq_whisper(audio_bytes, filename="audio.mp3"):
         return None
 
 def transcribe_audio_pipeline(audio_bytes, original_filename, progress_container=None):
-    """
-    Zero-RAM-Spike Fast Audio Pipeline:
-    1. Direct upload to Groq if already <= 24MB.
-    2. Subprocess FFmpeg downsampling directly on disk if > 24MB.
-    3. Disk-based segment slicing if compressed file remains > 24MB.
-    """
     file_size_mb = len(audio_bytes) / (1024 * 1024)
 
-    # Fast Path 1: Direct dispatch for files under 24MB
     if file_size_mb <= 24.0:
         if progress_container:
             progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Sending audio directly to Groq Whisper ({file_size_mb:.1f} MB)...</span></div>', unsafe_allow_html=True)
         return _call_groq_whisper(audio_bytes, original_filename)
 
-    # Path 2: Subprocess Disk Downsampling
     ext = os.path.splitext(original_filename)[1] or ".m4a"
     with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as src:
         src.write(audio_bytes)
         src_path = src.name
 
-    compressed_mp3 = src_path + "_compressed.mp3"
+    compressed_mp3 = src_path + "_whisper_ready.mp3"
     
     if progress_container:
-        progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Compressing {file_size_mb:.1f} MB audio to mono 16kHz via FFmpeg stream...</span></div>', unsafe_allow_html=True)
+        progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Compressing {file_size_mb:.1f} MB audio to mono 16kHz (CPU & RAM protected)...</span></div>', unsafe_allow_html=True)
 
     try:
-        # Fast 1-pass conversion without loading PCM audio arrays into Python RAM
-        subprocess.run([
-            "ffmpeg", "-y", "-i", src_path,
-            "-vn", "-ac", "1", "-ar", "16000", "-b:a", "24k",
+        cmd = [
+            "ffmpeg", "-y",
+            "-threads", "1",
+            "-preset", "ultrafast",
+            "-i", src_path,
+            "-vn",
+            "-ac", "1",
+            "-ar", "16000",
+            "-c:a", "libmp3lame",
+            "-b:a", "24k",
             compressed_mp3
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        ]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
         comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
 
-        # Single dispatch if compressed file is now <= 24MB
         if comp_size_mb <= 24.0:
             if progress_container:
                 progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Transcribing compressed file ({comp_size_mb:.1f} MB) with Groq Whisper...</span></div>', unsafe_allow_html=True)
@@ -232,9 +258,8 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_container
                 c_bytes = f.read()
             return _call_groq_whisper(c_bytes, "compressed.mp3")
 
-        # Path 3: Segment Slicing on disk if still > 24MB (3+ hour recordings)
         if progress_container:
-            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Slicing long recording into safe 15-minute segments...</span></div>', unsafe_allow_html=True)
+            progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Slicing multi-hour recording into safe 15-minute segments...</span></div>', unsafe_allow_html=True)
 
         segment_pattern = src_path + "_seg_%03d.mp3"
         subprocess.run([
@@ -266,10 +291,12 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_container
         st.warning(f"Audio processing fallback: {e}")
         return _call_groq_whisper(audio_bytes, original_filename)
     finally:
-        try: os.remove(src_path)
-        except: pass
-        try: os.remove(compressed_mp3)
-        except: pass
+        if os.path.exists(src_path):
+            try: os.remove(src_path)
+            except: pass
+        if os.path.exists(compressed_mp3):
+            try: os.remove(compressed_mp3)
+            except: pass
 
 def normalize_llm_json_to_df(data):
     items = None
@@ -816,11 +843,56 @@ def export_to_pdf(df, meeting_details, other_discussions):
 # ========== STREAMLIT UI SETUP ==========
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# Top Bar (Title + Right In-line Settings Button)
 st.markdown("""
-<div class="echo-topbar">
- <h1>Project <span>Echo</span></h1>
+<div class="echo-topbar-wrapper">
+ <h1 class="echo-title">Project <span>Echo</span></h1>
 </div>
 """, unsafe_allow_html=True)
+
+# Right In-Line Settings Action Button (Positioned over Topbar)
+topbar_cols = st.columns([0.94, 0.06])
+with topbar_cols[1]:
+    if st.button("⚙️", key="topbar_settings_btn", help="Open Engine & Regeneration Settings"):
+        st.session_state["show_settings"] = not st.session_state["show_settings"]
+        st.rerun()
+
+# Top Settings Drawer
+if st.session_state["show_settings"]:
+    with st.container(border=True):
+        st.markdown('<h3>Engine Configuration & Usage Diagnostics</h3>', unsafe_allow_html=True)
+        set_col1, set_col2 = st.columns([1.5, 1.5])
+        
+        with set_col1:
+            engine_options = [
+                "DeepSeek (Primary)",
+                "Python Heuristic (Non-AI)"
+            ]
+            selected_eng = st.selectbox(
+                "Extraction Engine",
+                options=engine_options,
+                index=engine_options.index(st.session_state["selected_engine"]) if st.session_state["selected_engine"] in engine_options else 0
+            )
+            st.session_state["selected_engine"] = selected_eng
+
+            if st.button("Regenerate MOM", key="btn_regen_mom"):
+                if st.session_state["transcript"]:
+                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng)
+                    if not extracted_df.empty:
+                        st.session_state["df"] = extracted_df
+                        st.session_state["other_discussions"] = other_disc
+                        st.rerun()
+
+        with set_col2:
+            st.markdown("**Token Usage Diagnostics**")
+            st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
+            
+            if st.session_state["last_api_call"]:
+                last_call = st.session_state["last_api_call"]
+                st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
+                st.write("• **DeepSeek Server Status:** `Active & Ready`")
+            else:
+                st.write("• **DeepSeek Server Status:** `Ready`")
 
 # ---- Compact Details & Audio (Blank Defaults) ----
 with st.container(border=True):
@@ -928,57 +1000,10 @@ if st.session_state["transcript"]:
                     st.session_state["other_discussions"] = other_disc
                     st.rerun()
 
-# ---- Step 3: Minutes of Meeting Editor with SVG Settings ----
+# ---- Step 3: Minutes of Meeting Editor ----
 if not st.session_state["df"].empty:
     with st.container(border=True):
-        h_col1, h_col2 = st.columns([9.4, 0.6])
-        with h_col1:
-            st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
-        with h_col2:
-            st.markdown(
-                f'<div style="text-align: right; padding-top: 5px;">{SVG_SETTINGS}</div>', 
-                unsafe_allow_html=True
-            )
-            if st.button("Settings", key="btn_toggle_settings", help="Open Engine & Regeneration Settings"):
-                st.session_state["show_settings"] = not st.session_state["show_settings"]
-                st.rerun()
-
-        # Engine Settings & Usage Drawer
-        if st.session_state["show_settings"]:
-            with st.expander("Engine Configuration & Usage Diagnostics", expanded=True):
-                set_col1, set_col2 = st.columns([1.5, 1.5])
-                
-                with set_col1:
-                    engine_options = [
-                        "DeepSeek (Primary)",
-                        "Python Heuristic (Non-AI)"
-                    ]
-                    selected_eng = st.selectbox(
-                        "Extraction Engine",
-                        options=engine_options,
-                        index=engine_options.index(st.session_state["selected_engine"]) if st.session_state["selected_engine"] in engine_options else 0
-                    )
-                    st.session_state["selected_engine"] = selected_eng
-
-                    if st.button("Regenerate MOM", key="btn_regen_mom"):
-                        if st.session_state["transcript"]:
-                            extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng)
-                            if not extracted_df.empty:
-                                st.session_state["df"] = extracted_df
-                                st.session_state["other_discussions"] = other_disc
-                                st.rerun()
-
-                with set_col2:
-                    st.markdown("**Token Usage Diagnostics**")
-                    st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
-                    
-                    if st.session_state["last_api_call"]:
-                        last_call = st.session_state["last_api_call"]
-                        st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
-                        st.write("• **DeepSeek Server Status:** `Active & Ready`")
-                    else:
-                        st.write("• **DeepSeek Server Status:** `Ready`")
-                st.markdown("---")
+        st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
 
         edited_df = st.data_editor(
             st.session_state["df"],
