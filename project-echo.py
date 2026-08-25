@@ -32,7 +32,7 @@ os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
-# API Keys loaded strictly from Streamlit Cloud Secrets (no hardcoded keys)
+# API Keys loaded strictly from Streamlit Cloud Secrets
 DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions"
 
@@ -41,6 +41,7 @@ GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
+OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
 CRD_MEMBERS = [
     "Sondi Tuazon",
@@ -164,7 +165,7 @@ button[key="card_settings_btn"]::before {
     height: 17px;
     background-color: #C5A059;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -375,7 +376,6 @@ def extract_with_deepseek(transcript):
         "Content-Type": "application/json"
     }
 
-    # Upgraded system prompt to ensure high-level executive corporate English synthesis
     system_prompt = (
         "You are an expert executive assistant for PRIME Philippines tasked with producing comprehensive, "
         "high-level executive Minutes of the Meeting (MOM). "
@@ -494,7 +494,6 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
         progress_bar.empty()
         return res_df, res_other
 
-    # Processing strictly via DeepSeek
     df, other = extract_with_deepseek(transcript)
     
     if df is not None and not df.empty:
@@ -626,14 +625,12 @@ def export_to_word(df, meeting_details, other_discussions):
     p_intro.paragraph_format.space_after = Pt(10)
     for r in p_intro.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
 
-    # Force Table Formatting to strict widths so text wraps correctly in Word Document!
     table = doc.add_table(rows=len(df)+1, cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.style = "Table Grid"
     table.autofit = False
     table.allow_autofit = False
 
-    # Allocated strictly to ensure 100% Word Document Wrapping
     col_widths = [Inches(2.5), Inches(2.2), Inches(1.1), Inches(1.2)]
 
     headers = ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]
@@ -1059,26 +1056,54 @@ with st.container(border=True):
 # ---- Step 2: Full Transcript UI ----
 if st.session_state["transcript"]:
     with st.container(border=True):
-        f_col1, f_col2, f_col3 = st.columns([6.8, 1.6, 1.6])
+        f_col1, f_col2, f_col3 = st.columns([7.6, 1.2, 1.2])
         with f_col1:
-            st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
+            st.markdown('<h3 style="margin-top:0.3rem;">Full Transcript</h3>', unsafe_allow_html=True)
             
         with f_col2:
-            # HTML/JS approach for reliable "Copy to Clipboard" without page reruns
             copy_html = f"""
-            <button id="copy-btn" style="width: 100%; padding: 0.4rem 1.5rem; background-color: #222222; color: #FFFFFF; border: 1px solid #444444; border-radius: 50px; font-family: 'Montserrat', sans-serif; font-weight: 500; cursor: pointer; transition: all 0.3s ease;">
-                Copy Text
-            </button>
-            <script>
-            document.getElementById("copy-btn").addEventListener("click", function() {{
-                navigator.clipboard.writeText({json.dumps(st.session_state["transcript"])}).then(function() {{
-                    document.getElementById("copy-btn").innerText = "Copied! ✅";
-                    setTimeout(() => document.getElementById("copy-btn").innerText = "Copy Text", 2000);
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <style>
+            body {{ margin: 0; padding: 0; box-sizing: border-box; font-family: 'Montserrat', sans-serif; }}
+            button {{
+                width: 100%;
+                height: 41px;
+                background-color: #222222;
+                color: #FFFFFF;
+                border: 1px solid #444444;
+                border-radius: 50px;
+                font-size: 15px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+            }}
+            button:hover {{
+                border-color: #D4AF37;
+                color: #D4AF37;
+                background-color: #1A1A1A;
+            }}
+            </style>
+            </head>
+            <body>
+                <button id="copy-btn">Copy Text</button>
+                <script>
+                document.getElementById("copy-btn").addEventListener("click", function() {{
+                    navigator.clipboard.writeText({json.dumps(st.session_state["transcript"])}).then(function() {{
+                        document.getElementById("copy-btn").innerText = "Copied! ✅";
+                        setTimeout(() => document.getElementById("copy-btn").innerText = "Copy Text", 2000);
+                    }});
                 }});
-            }});
-            </script>
+                </script>
+            </body>
+            </html>
             """
-            components.html(copy_html, height=45)
+            components.html(copy_html, height=41)
             
         with f_col3:
             st.download_button(
@@ -1104,8 +1129,13 @@ if not st.session_state["df"].empty:
     with st.container(border=True):
         st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
 
-        # NOTE: Streamlit's st.data_editor uses a Canvas element, meaning it does not auto-wrap text into multiple lines
-        # natively on the screen. To view/edit the full text, double-click a cell. (This limitation does not affect the Word Document).
+        st.markdown(
+            "<p style='font-size:0.85rem; color:#666; margin-bottom: 0.5rem;'>"
+            "<i>*Note: Double-click any cell to view and edit its full wrapped text. "
+            "Streamlit's native grid editor limits visual multiline wrapping.</i></p>", 
+            unsafe_allow_html=True
+        )
+
         edited_df = st.data_editor(
             st.session_state["df"],
             num_rows="dynamic",
