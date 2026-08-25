@@ -1,5 +1,7 @@
 import os
 import time
+import math
+import io
 import streamlit as st
 import requests
 import json
@@ -8,6 +10,7 @@ import datetime
 import re
 from io import BytesIO
 import PyPDF2
+from pydub import AudioSegment
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
@@ -22,13 +25,12 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 # ========== CONFIG ==========
 st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
 
-# --- PROGRAMMATIC LIGHT MODE LOCK ---
+# --- PROGRAMMATIC CONFIG & UPLOAD LIMIT LOCK (Up to 1GB uploads) ---
 _config_dir = ".streamlit"
 _config_file = os.path.join(_config_dir, "config.toml")
-if not os.path.exists(_config_file):
-    os.makedirs(_config_dir, exist_ok=True)
-    with open(_config_file, "w", encoding="utf-8") as f:
-        f.write('[theme]\nbase="light"\n')
+os.makedirs(_config_dir, exist_ok=True)
+with open(_config_file, "w", encoding="utf-8") as f:
+    f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 1000\n')
 
 # API Keys & Endpoints loaded via st.secrets with fallback defaults
 DEEPSEEK_API_KEY = st.secrets.get("DEEPSEEK_API_KEY", "sk-7b4c611f153f4fe0adc1a1cbd13a2930")
@@ -153,19 +155,60 @@ def extract_text_from_file(uploaded_file):
         st.error(f"Error reading file: {e}")
         return ""
 
-def transcribe_audio(audio_bytes):
+def _call_groq_whisper(audio_bytes):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    files = {"file": ("audio.wav", audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
+    files = {"file": ("chunk.mp3", audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
     resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files)
     if resp.status_code == 200:
         return resp.json().get("text", "")
     else:
         error_msg = resp.json().get("error", {}).get("message", resp.text)
         if "rate limit" in error_msg.lower():
-            st.error("Transcription rate limit reached. Please wait or use the 'Upload Text' tab.")
-        else:
-            st.error(f"Transcription failed: {error_msg}")
+            st.warning("Whisper rate limit hit. Waiting 10s before continuing...")
+            time.sleep(10)
+            resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files)
+            if resp.status_code == 200:
+                return resp.json().get("text", "")
+        st.error(f"Transcription error: {error_msg}")
         return None
+
+def transcribe_audio(audio_bytes, progress_bar=None):
+    """
+    Handles unlimited audio size (100MB - 200MB+) by converting to mono 16kHz 32kbps MP3
+    and slicing into safe segments compliant with Groq's 25MB ceiling.
+    """
+    try:
+        sound = AudioSegment.from_file(io.BytesIO(audio_bytes))
+        sound = sound.set_channels(1)        # Downmix to mono (halves size)
+        sound = sound.set_frame_rate(16000)  # Standard 16kHz for Whisper
+        
+        # 10 minutes per chunk (approx 2.4 MB per segment at 32k)
+        chunk_length_ms = 10 * 60 * 1000  
+        total_chunks = math.ceil(len(sound) / chunk_length_ms)
+        
+        full_transcript = []
+        
+        for i in range(total_chunks):
+            start = i * chunk_length_ms
+            end = min((i + 1) * chunk_length_ms, len(sound))
+            
+            chunk = sound[start:end]
+            chunk_buffer = io.BytesIO()
+            chunk.export(chunk_buffer, format="mp3", bitrate="32k")
+            chunk_bytes = chunk_buffer.getvalue()
+            
+            if progress_bar:
+                progress_bar.progress(int(((i + 1) / total_chunks) * 100), text=f"Transcribing Audio Segment {i + 1} of {total_chunks}...")
+            
+            text = _call_groq_whisper(chunk_bytes)
+            if text:
+                full_transcript.append(text)
+            time.sleep(1.0)
+            
+        return " ".join(full_transcript)
+    except Exception as e:
+        st.warning(f"Fast streaming fallthrough: {e}. Processing via single-pass...")
+        return _call_groq_whisper(audio_bytes)
 
 def normalize_llm_json_to_df(data):
     items = None
@@ -352,7 +395,6 @@ def set_cell_shading(cell, color_hex):
     cell._tc.get_or_add_tcPr().append(shd)
 
 def export_to_word(df, meeting_details, other_discussions):
-    # Template preservation strategy: check if template exists
     template_files = ["MOM_Template.docx", "MOM Template.docx"]
     template_path = next((f for f in template_files if os.path.exists(f)), None)
 
@@ -418,7 +460,6 @@ def export_to_word(df, meeting_details, other_discussions):
     prime_atts = meeting_details.get("prime_attendees", [])
     ext_atts = meeting_details.get("external_attendees", [])
     
-    # Format attendees with alignment tabs
     p_att = doc.add_paragraph()
     p_att.paragraph_format.space_after = Pt(2)
     p_att.paragraph_format.tab_stops.add_tab_stop(Inches(1.35), WD_TAB_ALIGNMENT.LEFT)
@@ -760,12 +801,13 @@ with st.container(border=True):
     with tab_upload:
         u_col1, u_col2 = st.columns([5, 1.5])
         with u_col1:
-            uploaded_file = st.file_uploader("Upload audio file", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"], label_visibility="collapsed")
+            uploaded_file = st.file_uploader("Upload audio file (Up to 1GB supported)", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"], label_visibility="collapsed")
         if uploaded_file:
             with u_col2:
                 if st.button("Transcribe Audio", key="btn_tx_upload"):
-                    with st.spinner("Transcribing with Groq Whisper..."):
-                        transcript = transcribe_audio(uploaded_file.read())
+                    tx_progress = st.progress(0, text="Preprocessing & Compressing Audio Stream...")
+                    transcript = transcribe_audio(uploaded_file.read(), tx_progress)
+                    tx_progress.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
@@ -782,8 +824,9 @@ with st.container(border=True):
                 st.download_button(label="Save Recording (.wav)", data=rec_bytes, file_name=f"Recording_{datetime.date.today().strftime('%Y%m%d')}.wav", mime="audio/wav")
             with r_col3:
                 if st.button("Transcribe Audio", key="btn_tx_record"):
-                    with st.spinner("Transcribing with Groq Whisper..."):
-                        transcript = transcribe_audio(rec_bytes)
+                    tx_progress = st.progress(0, text="Preprocessing Recording...")
+                    transcript = transcribe_audio(rec_bytes, tx_progress)
+                    tx_progress.empty()
                     if transcript:
                         st.session_state["transcript"] = transcript
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
