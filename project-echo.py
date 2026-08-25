@@ -39,7 +39,7 @@ if "authenticated" not in st.session_state:
 if not st.session_state["authenticated"]:
     pw_input = st.text_input("Enter Team Access Key to use Project Echo:", type="password")
     if st.button("Log In"):
-        if pw_input == st.secrets.get("APP_PASSWORD", "3ch0"):
+        if pw_input == st.secrets.get("APP_PASSWORD", "crd3ch0"):
             st.session_state["authenticated"] = True
             st.rerun()
         else:
