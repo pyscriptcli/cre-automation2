@@ -4,6 +4,7 @@ import requests
 import json
 import pandas as pd
 import re
+import datetime
 from io import BytesIO
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -25,56 +26,43 @@ GROQ_API_KEY = "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"
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# ========== CUSTOM CSS INJECTION (Typo-fixed) ==========
+# ========== CUSTOM CSS INJECTION ==========
 CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Playfair+Display:ital,wght@1,400;1,500&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Montserrat', sans-serif !important;
-}
-
+html, body, [class*="css"] { font-family: 'Montserrat', sans-serif !important; }
 .stApp {
     background-color: #F4F2EC; 
-    background-image: 
-        linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
-    background-size: 80px 80px;
-    color: #333333;
+    background-image: linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+    background-size: 80px 80px; color: #333333;
 }
-
 .stApp > header { display: none !important; }
 .block-container { padding-top: 6rem !important; }
 
 .echo-topbar {
     position: fixed; top: 0; left: 0; right: 0; height: 70px;
     background-color: #161616;
-    background-image: 
-        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-    background-size: 80px 80px;
-    border-bottom: 1px solid #333333;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 80px 80px; border-bottom: 1px solid #333333;
     display: flex; align-items: center; padding: 0 2rem;
     z-index: 999999; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 .echo-topbar .logo-wrapper { display: flex; align-items: center; gap: 0.75rem; }
 .echo-topbar h1 {
-    font-family: 'Playfair Display', serif !important;
-    font-style: italic !important; font-weight: 400 !important;
-    font-size: 1.5rem !important; color: #FFFFFF !important; margin: 0 !important; padding: 0 !important;
+    font-family: 'Playfair Display', serif !important; font-style: italic !important;
+    font-weight: 400 !important; font-size: 1.5rem !important; color: #FFFFFF !important; margin: 0 !important; padding: 0 !important;
 }
 .echo-topbar h1 span { color: #D4AF37 !important; }
 
 h3 {
-    font-family: 'Playfair Display', serif !important;
-    font-style: italic !important; font-weight: 400 !important; 
-    color: #1A2B4C !important; letter-spacing: 0.02em; margin-bottom: 0.5rem;
+    font-family: 'Playfair Display', serif !important; font-style: italic !important;
+    font-weight: 400 !important; color: #1A2B4C !important; letter-spacing: 0.02em; margin-bottom: 0.5rem;
 }
 
 [data-testid="stVerticalBlockBorderWrapper"] {
     background-color: #FFFFFF !important; border-radius: 16px !important;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06) !important;
-    border: 1px solid rgba(0, 0, 0, 0.03) !important; 
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06) !important; border: 1px solid rgba(0, 0, 0, 0.03) !important; 
     padding: 1.5rem !important; margin-bottom: 1.5rem !important;
 }
 
@@ -104,17 +92,6 @@ h3 {
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.02) !important;
 }
 
-.editor-toolbar {
-    display: flex; gap: 15px; padding: 12px 20px; background-color: #FDFDFD;
-    border: 1px solid #E5E5E5; border-radius: 8px 8px 0 0;
-    align-items: center; border-bottom: none; justify-content: space-between;
-}
-.toolbar-left, .toolbar-right { display: flex; gap: 15px; align-items: center; }
-.toolbar-icon { cursor: pointer; stroke: #A0A0A0; transition: stroke 0.2s ease; }
-.toolbar-icon:hover { stroke: #D4AF37; }
-.toolbar-icon.delete-icon:hover { stroke: #D9534F; }
-.toolbar-divider { width: 1px; height: 20px; background-color: #E5E5E5; margin: 0 5px; }
-
 [data-testid="stDataFrame"] { border-radius: 0 0 8px 8px; overflow: hidden; border: 1px solid #E5E5E5; }
 
 .chat-scroll-container { max-height: 480px; overflow-y: auto; padding-right: 8px; margin-bottom: 1rem; }
@@ -136,11 +113,34 @@ def transcribe_audio(audio_bytes):
         st.error(f"Transcription failed: {resp.text}")
         return None
 
+def parse_json_robust(text):
+    """Bulletproof JSON extraction for LLM outputs."""
+    # Strip markdown code blocks
+    text = re.sub(r'^```json\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
+    text = text.strip()
+    
+    # 1. Try direct parse
+    try: return json.loads(text)
+    except json.JSONDecodeError: pass
+        
+    # 2. Extract first { ... } block
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        try: return json.loads(match.group(0))
+        except json.JSONDecodeError: pass
+            
+    # 3. If it returned an array instead of object, wrap it
+    match = re.search(r'\[.*\]', text, re.DOTALL)
+    if match:
+        try: 
+            items = json.loads(match.group(0))
+            return {"action_items": items, "other_discussions": ""}
+        except json.JSONDecodeError: pass
+            
+    return None
+
 def extract_structured_insights(transcript, user_instruction="", current_df=None):
-    """
-    AI Engine: Optimized for MOM Template extraction.
-    Uses Primary Llama model, falls back to secondary model if it fails.
-    """
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     
     context_data = ""
@@ -148,63 +148,57 @@ def extract_structured_insights(transcript, user_instruction="", current_df=None
         context_data = f"\nCurrent Table State:\n{current_df.to_json(orient='records')}\n"
 
     prompt = f"""
-    You are an AI Executive Assistant generating Minutes of the Meeting (MOM).
-    Analyze the transcript and return a valid JSON object with two keys: "table_items" and "other_discussions".
+    You are an expert AI executive assistant. Extract meeting minutes from the transcript.
+    Return a valid JSON object with exactly two keys: "action_items" and "other_discussions".
     
-    "table_items" must be an array of objects with this exact schema:
+    "action_items" must be an array of objects:
     [
       {{
-        "Discussion Points": "Clear description of the point, topic, or deliverable",
+        "Discussion Points": "Main topic or deliverable discussed",
         "Action Plan": "Concrete next steps or requirements",
         "Indicative Delivery Date": "Specific date, timeframe (e.g., Q1 2027), or 'TBD'",
-        "Person-in-charge": "Name or role assigned (or 'Unassigned')"
+        "Person-in-charge": "Name or team assigned (e.g., PRIME, XYZ, John Doe)"
       }}
     ]
     
-    "other_discussions" must be a string summarizing any secondary topics not requiring direct action items.
+    "other_discussions" must be a string summarizing secondary topics not requiring direct action.
     
     Transcript:
     {transcript}
     {context_data}
     User Instruction:
-    {user_instruction if user_instruction else "Extract primary discussion points, action plans, dates, and assignees. Summarize other discussions."}
+    {user_instruction if user_instruction else "Extract all action items, dates, and assignees. Summarize other discussions."}
     
-    Respond ONLY with the raw JSON object. Do not wrap in markdown or backticks.
+    Output ONLY raw JSON. No markdown, no explanations.
     """
 
     payload = {
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2
+        "temperature": 0.1
     }
     
-    # Try Primary Model, fallback to Backup Model
-    models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
+    # Primary: 70B (Best at JSON), Fallback: 8B
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
     
     for model in models:
         payload["model"] = model
         try:
             resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload)
             if resp.status_code == 200:
-                raw_content = resp.json()["choices"][0]["message"]["content"].strip()
-                clean_json = re.sub(r"^```json\s*|^```\s*|\s*```$", "", raw_content, flags=re.MULTILINE).strip()
-                data = json.loads(clean_json)
+                raw_content = resp.json()["choices"][0]["message"]["content"]
+                data = parse_json_robust(raw_content)
                 
-                # Parse Table Items
-                items = data.get("table_items", [])
-                df = pd.DataFrame(items)
-                for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-                    if col not in df.columns:
-                        df[col] = ""
-                df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
-                
-                # Parse Other Discussions
-                other_disc = data.get("other_discussions", "")
-                
-                return df, other_disc
+                if data:
+                    items = data.get("action_items", [])
+                    df = pd.DataFrame(items)
+                    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+                        if col not in df.columns: df[col] = ""
+                    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
+                    return df, data.get("other_discussions", "")
         except Exception as e:
             continue
             
-    st.warning("AI Extraction failed on all models.")
+    st.warning("AI Extraction failed. Please try again or edit manually.")
     return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
 
 def export_to_word(df, transcript, meeting_details, other_discussions):
@@ -219,12 +213,19 @@ def export_to_word(df, transcript, meeting_details, other_discussions):
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
     # Metadata
-    doc.add_paragraph(f"Date: {meeting_details.get('date', '____________')}")
+    date_str = meeting_details.get("date", "____________")
+    doc.add_paragraph(f"Date: {date_str}")
     doc.add_paragraph(f"Location: {meeting_details.get('location', '____________')}")
-    doc.add_paragraph(f"Attended by: {meeting_details.get('attendees', '____________')}")
+    
+    # Attendees formatting
+    attendees = meeting_details.get("attendees", "____________")
+    att_para = doc.add_paragraph()
+    att_run = att_para.add_run("Attended by: ")
+    att_run.bold = True
+    att_para.add_run(attendees)
     
     # Intro
-    doc.add_paragraph(f"During the meeting held last {meeting_details.get('date', '____________')}, PRIME Philippines, represented by the attendee/s shown above, met with {company} to discuss opportunities for collaboration.")
+    doc.add_paragraph(f"During the meeting held last {date_str}, PRIME Philippines, represented by the attendee/s shown above, met with {company} to discuss opportunities for collaboration.")
     
     # Table
     doc.add_paragraph()
@@ -295,15 +296,49 @@ if "chat_history" not in st.session_state: st.session_state["chat_history"] = []
 if "meeting_details" not in st.session_state: 
     st.session_state["meeting_details"] = {"date": "", "location": "", "company_name": "", "attendees": ""}
 
+# CRD Team Preset
+CRD_TEAM = [
+    "Sondi Tuazon", "Kristina Balajadia", "Meliza Zapata", "Dykstra Pineda", 
+    "Cedtrix Rena", "Carlo Medina", "Dave Policarpio", "Irish Rima"
+]
+
 # ---- Step 1: Meeting Details & Audio ----
 with st.container(border=True):
     st.markdown('<h3 style="display: flex; align-items: center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Meeting Details & Audio Input</h3>', unsafe_allow_html=True)
     
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1: st.session_state["meeting_details"]["date"] = st.text_input("Date", value=st.session_state["meeting_details"]["date"])
-    with col_m2: st.session_state["meeting_details"]["location"] = st.text_input("Location", value=st.session_state["meeting_details"]["location"])
-    with col_m3: st.session_state["meeting_details"]["company_name"] = st.text_input("Client/Company", value=st.session_state["meeting_details"]["company_name"])
-    with col_m4: st.session_state["meeting_details"]["attendees"] = st.text_input("Attendees", value=st.session_state["meeting_details"]["attendees"])
+    # Date & Time Pickers
+    col_dt1, col_dt2, col_dt3 = st.columns([2, 1, 1])
+    with col_dt1:
+        meeting_date = st.date_input("Meeting Date", value=datetime.date.today())
+    with col_dt2:
+        start_time = st.time_input("Start Time", value=datetime.time(14, 0))
+    with col_dt3:
+        end_time = st.time_input("End Time", value=datetime.time(17, 0))
+        
+    # Format Date/Time string for Word Doc
+    date_str = meeting_date.strftime("%B %d, %Y")
+    time_str = f"{start_time.strftime('%I:%M%p').lstrip('0').lower()} to {end_time.strftime('%I:%M%p').lstrip('0').lower()}"
+    st.session_state["meeting_details"]["date"] = f"{date_str}, {time_str}"
+    
+    col_loc, col_comp = st.columns(2)
+    with col_loc: st.session_state["meeting_details"]["location"] = st.text_input("Location", value=st.session_state["meeting_details"].get("location", ""))
+    with col_comp: st.session_state["meeting_details"]["company_name"] = st.text_input("Client/Company", value=st.session_state["meeting_details"].get("company_name", ""))
+    
+    # Attendees Management
+    st.markdown("##### Attendees")
+    selected_team = st.multiselect(
+        "Internal Team (CRD) - Uncheck if absent", 
+        CRD_TEAM, 
+        default=CRD_TEAM,
+        help="All CRD members are selected by default. Uncheck those who did not attend."
+    )
+    external_attendees = st.text_input("External Attendees / Guests", placeholder="e.g., Mr. ABCD (XYZ Company), John Doe")
+    
+    # Combine Attendees
+    all_attendees = selected_team.copy()
+    if external_attendees:
+        all_attendees.extend([name.strip() for name in external_attendees.split(",") if name.strip()])
+    st.session_state["meeting_details"]["attendees"] = ", ".join(all_attendees) if all_attendees else "None"
     
     st.divider()
     tab1, tab2 = st.tabs(["Upload File", "Record Audio"])
@@ -326,7 +361,7 @@ with st.container(border=True):
                     st.session_state["transcript"] = transcript
                     st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                     st.session_state["other_discussions"] = ""
-                    st.session_state["chat_history"] = [{"role": "assistant", "content": "Transcription complete. Click 'Generate MOM' to extract the Minutes of the Meeting."}]
+                    st.session_state["chat_history"] = [] # Cleared initial message as requested
                     st.rerun()
 
 # ---- Step 2: Transcript & Generation ----
@@ -383,7 +418,6 @@ if not st.session_state["df"].empty or st.session_state["transcript"]:
         with st.container(border=True):
             st.markdown('<h3 style="display: flex; align-items: center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 12px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> MOM Editor</h3>', unsafe_allow_html=True)
             
-            # Live Interactive Data Editor
             edited_df = st.data_editor(
                 st.session_state["df"],
                 num_rows="dynamic",
