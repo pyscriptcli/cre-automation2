@@ -13,6 +13,7 @@ APP_URLS = [
     "https://openflux-playground.streamlit.app",
     "https://open-map-builder.streamlit.app",
     "https://openflux.streamlit.app",
+    "https://project-echo.streamlit.app",
 ]
 
 async def wake_up_app(url):
