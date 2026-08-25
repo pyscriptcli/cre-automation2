@@ -20,7 +20,6 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-import streamlit.components.v1 as components
 
 # ========== CONFIG ==========
 st.set_page_config(page_title="Project Echo", layout="wide", initial_sidebar_state="collapsed")
@@ -164,10 +163,19 @@ button[key="card_settings_btn"]::before {
     height: 17px;
     background-color: #C5A059;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
+}
+
+button[key="card_settings_btn"]:hover {
+    background-color: #F8F5EE !important;
+    border-color: #A07828 !important;
+}
+
+button[key="card_settings_btn"]:hover::before {
+    background-color: #A07828 !important;
 }
 
 .stTextArea textarea {
@@ -262,6 +270,7 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
         progress_bar.progress(45, text="Evaluating audio duration & routing (45%)...")
 
+        # Routing Logic: Short files (<= 10MB) via Groq primary; long recordings (> 10MB) via OpenAI
         if comp_size_mb <= 10.0 and GROQ_API_KEY:
             status_placeholder.info("⚡ Processing via Groq Whisper Primary...")
             progress_bar.progress(70, text="Transcribing via Groq Whisper (70%)...")
@@ -274,6 +283,7 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
                 return text
             status_placeholder.warning("⚠️ Groq rate limit reached. Switching automatically to OpenAI...")
 
+        # Long audio pipeline via OpenAI with 600s segments
         status_placeholder.info("🚀 Processing recording via OpenAI...")
         progress_bar.progress(55, text="Preparing audio segments for OpenAI (55%)...")
         
@@ -375,7 +385,6 @@ def extract_with_deepseek(transcript):
         "Content-Type": "application/json"
     }
 
-    # Upgraded system prompt to ensure high-level executive corporate English synthesis
     system_prompt = (
         "You are an expert executive assistant for PRIME Philippines tasked with producing comprehensive, "
         "high-level executive Minutes of the Meeting (MOM). "
@@ -439,6 +448,7 @@ Transcript:
 
 def heuristic_non_ai_extraction(transcript):
     sentences = re.split(r'(?<=[.!?]) +', transcript)
+    
     action_keywords = ['send', 'prepare', 'submit', 'update', 'review', 'check', 'email', 'kailangan', 'gagawin', 'ipapasa', 'provide', 'target', 'ipresent', 'kukunin']
     date_keywords = ['tomorrow', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'q1', 'q2', 'q3', 'q4', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'bukas', 'deadline']
     
@@ -494,7 +504,7 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
         progress_bar.empty()
         return res_df, res_other
 
-    # Processing strictly via DeepSeek
+    # Uses DeepSeek exclusively as the LLM completion engine
     df, other = extract_with_deepseek(transcript)
     
     if df is not None and not df.empty:
@@ -626,14 +636,14 @@ def export_to_word(df, meeting_details, other_discussions):
     p_intro.paragraph_format.space_after = Pt(10)
     for r in p_intro.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
 
-    # Force Table Formatting to strict widths so text wraps correctly in Word Document!
+    # Force Table formatting to wrap properly
     table = doc.add_table(rows=len(df)+1, cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.style = "Table Grid"
     table.autofit = False
     table.allow_autofit = False
 
-    # Allocated strictly to ensure 100% Word Document Wrapping
+    # Allocate strict column widths (Total ~7.0 Inches)
     col_widths = [Inches(2.5), Inches(2.2), Inches(1.1), Inches(1.2)]
 
     headers = ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]
@@ -908,6 +918,7 @@ with st.container(border=True):
             set_col1, set_col2 = st.columns([1.5, 1.5])
             
             with set_col1:
+                # Removed OpenAI API from generation engine options
                 engine_options = [
                     "AI - DeepSeek",
                     "Non-AI - Python Heuristic"
@@ -950,6 +961,7 @@ with st.container(border=True):
         custom_loc = st.text_input("Location", value="", placeholder="e.g. Boardroom", label_visibility="collapsed")
         meeting_location = custom_loc.strip() if custom_loc.strip() else ("" if loc_preset == LOCATION_PRESETS[0] else loc_preset)
 
+    # Custom AM/PM Selectors for Time Inputs
     with r1_c3:
         st.markdown("<p style='font-size:0.88rem; margin-bottom:0.2rem; color:#333; font-weight:500;'>Start Time</p>", unsafe_allow_html=True)
         sc1, sc2, sc3 = st.columns([1, 1, 1.3])
@@ -1059,30 +1071,13 @@ with st.container(border=True):
 # ---- Step 2: Full Transcript UI ----
 if st.session_state["transcript"]:
     with st.container(border=True):
-        f_col1, f_col2, f_col3 = st.columns([6.8, 1.6, 1.6])
+        f_col1, f_col2 = st.columns([8, 2])
         with f_col1:
             st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
-            
         with f_col2:
-            # HTML/JS approach for reliable "Copy to Clipboard" without page reruns
-            copy_html = f"""
-            <button id="copy-btn" style="width: 100%; padding: 0.4rem 1.5rem; background-color: #222222; color: #FFFFFF; border: 1px solid #444444; border-radius: 50px; font-family: 'Montserrat', sans-serif; font-weight: 500; cursor: pointer; transition: all 0.3s ease;">
-                Copy Text
-            </button>
-            <script>
-            document.getElementById("copy-btn").addEventListener("click", function() {{
-                navigator.clipboard.writeText({json.dumps(st.session_state["transcript"])}).then(function() {{
-                    document.getElementById("copy-btn").innerText = "Copied! ✅";
-                    setTimeout(() => document.getElementById("copy-btn").innerText = "Copy Text", 2000);
-                }});
-            }});
-            </script>
-            """
-            components.html(copy_html, height=45)
-            
-        with f_col3:
+            # Replaced standard button with Download functionality
             st.download_button(
-                label="Download Text",
+                label="Download Transcript",
                 data=st.session_state["transcript"],
                 file_name=f"Transcript_{meeting_date.strftime('%Y%m%d')}.txt",
                 mime="text/plain",
@@ -1092,7 +1087,7 @@ if st.session_state["transcript"]:
         st.text_area("Transcript Content", st.session_state["transcript"], height=350, label_visibility="collapsed")
         
         if st.session_state["df"].empty:
-            if st.button("Generate MOM", key="btn_gen_mom"):
+            if st.button("Generate MOM"):
                 extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], st.session_state["selected_engine"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
@@ -1104,13 +1099,10 @@ if not st.session_state["df"].empty:
     with st.container(border=True):
         st.markdown('<h3>Minutes of Meeting Editor</h3>', unsafe_allow_html=True)
 
-        # NOTE: Streamlit's st.data_editor uses a Canvas element, meaning it does not auto-wrap text into multiple lines
-        # natively on the screen. To view/edit the full text, double-click a cell. (This limitation does not affect the Word Document).
         edited_df = st.data_editor(
             st.session_state["df"],
             num_rows="dynamic",
             use_container_width=True,
-            hide_index=True,
             key="mom_editor",
             column_config={
                 "Discussion Points": st.column_config.TextColumn("Discussion Points", width="large"),
@@ -1123,6 +1115,7 @@ if not st.session_state["df"].empty:
 
         st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=100)
 
+        # Utilize the custom strings generated from our new AM/PM split layout dropdowns
         time_range_str = f"{start_str} to {end_str}"
 
         meeting_details = {
