@@ -120,7 +120,6 @@ def transcribe_audio(audio_bytes):
         return None
 
 def chunk_text(text, max_chars=3500, overlap=250):
-    """Splits transcripts safely into conversational chunks."""
     if len(text) <= max_chars:
         return [text]
     chunks = []
@@ -132,7 +131,6 @@ def chunk_text(text, max_chars=3500, overlap=250):
     return chunks
 
 def extract_json_from_groq(prompt):
-    """Executes robust extraction targeting Groq models."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
     models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]
     
@@ -168,10 +166,6 @@ def extract_json_from_groq(prompt):
     return None
 
 def extract_structured_insights_robust(transcript):
-    """
-    Two-stage cache extraction: Process chunk 1, chunk 2... store in cache,
-    and only once all chunks are complete, compile the final MOM.
-    """
     chunks = chunk_text(transcript, max_chars=3500, overlap=250)
     chunk_cache = []
     
@@ -209,7 +203,6 @@ Transcript Content:
 
     bar.progress(100, text="Finalizing and merging Minutes of the Meeting...")
     
-    # Store in memory cache
     all_table_items = []
     all_other_discussions = []
     
@@ -260,7 +253,6 @@ def export_to_word(df, meeting_details, other_discussions):
             fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
             fp.add_run().add_picture("footer.png", width=Inches(7.0))
 
-    # Title
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r_title = p_title.add_run("MINUTES OF THE MEETING")
@@ -356,7 +348,6 @@ def export_to_word(df, meeting_details, other_discussions):
         doc.add_heading("Other Discussions:", level=2)
         doc.add_paragraph(other_discussions)
 
-    # Dynamic Signatures
     doc.add_paragraph()
     doc.add_paragraph("Prepared by:")
     doc.add_paragraph("_______________________________")
@@ -393,7 +384,7 @@ if "other_discussions" not in st.session_state: st.session_state["other_discussi
 with st.container(border=True):
     st.markdown('<h3>Meeting Details & Audio</h3>', unsafe_allow_html=True)
     
-    # ROW 1: Date | Location | Start | End | Prepared By (Name & Desig)
+    # ROW 1: Date | Location | Start | End | Prepared By
     r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.3, 2.0, 1.1, 1.1, 1.5, 1.5])
     with r1_c1:
         meeting_date = st.date_input("Date", value=datetime.date.today())
@@ -410,7 +401,7 @@ with st.container(border=True):
     with r1_c6:
         prep_desig = st.text_input("Designation", placeholder="e.g. Associate")
 
-    # ROW 2: Client | CRD Team | External Attendees | Confirmed By (Name & Desig)
+    # ROW 2: Client | CRD Team | External Attendees | Confirmed By
     r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
     with r2_c1:
         client_name = st.text_input("Client / Company", placeholder="XYZ Company")
@@ -423,7 +414,7 @@ with st.container(border=True):
     with r2_c5:
         conf_desig = st.text_input("Designation", placeholder="e.g. Managing Director")
 
-    # Audio Section: Upload or Live Record
+    # Audio Section
     tab_upload, tab_record = st.tabs(["Upload Audio File", "Record Live Audio"])
     active_audio_bytes = None
 
@@ -466,30 +457,13 @@ with st.container(border=True):
                         st.session_state["other_discussions"] = ""
                         st.rerun()
 
-# ---- Step 2: Full Transcript with Copy Button ----
+# ---- Step 2: Full Transcript Clean UI ----
 if st.session_state["transcript"]:
     with st.container(border=True):
-        col_t_head, col_t_copy = st.columns([9.5, 0.5])
-        with col_t_head:
-            st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
-        with col_t_copy:
-            # Native clipboard copy icon button
-            escaped_text = json.dumps(st.session_state["transcript"])
-            st.markdown(
-                f"""
-                <button onclick='navigator.clipboard.writeText({escaped_text})' 
-                        title="Copy Transcript"
-                        style="background:none; border:none; cursor:pointer; padding:6px; margin-top:2px;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                </button>
-                """,
-                unsafe_allow_html=True
-            )
-            
-        st.text_area("Transcript Content", st.session_state["transcript"], height=140, label_visibility="collapsed")
+        st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
+        
+        # Streamlit's native full-width code view with integrated copy-to-clipboard button
+        st.code(st.session_state["transcript"], language="text")
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
