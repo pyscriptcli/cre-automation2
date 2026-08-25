@@ -76,7 +76,7 @@ if "chat_history" not in st.session_state: st.session_state["chat_history"] = []
 
 # ========== SVG ICONS ==========
 SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
-SVG_CHECK = """<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>"""
+SVG_CHECK = """<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>"""
 SVG_INFO = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A2B4C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>"""
 
 # ========== CUSTOM CSS ==========
@@ -142,7 +142,6 @@ h3 {
     background-color: #1A1A1A !important;
 }
 
-/* Small SVG-only Settings Icon Button in the Card Header */
 div[data-testid="stButton"]:has(button[key="card_settings_btn"]) {
     display: flex !important;
     justify-content: flex-end !important;
@@ -182,7 +181,6 @@ button[key="card_settings_btn"]::before {
     line-height: 1.6 !important;
 }
 
-/* Time Picker Clean Layout */
 [data-testid="column"] .stSelectbox {
     margin-bottom: 0 !important;
 }
@@ -214,30 +212,33 @@ def _call_openai_transcribe(audio_bytes, filename="audio.mp3"):
         st.error("OpenAI API Key is missing. Please add it to your Streamlit Cloud Secrets.")
         return None
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
-    files = {"file": (filename, audio_bytes), "model": (None, "whisper-1"), "response_format": (None, "json")}
+    files = {"file": (filename, audio_bytes, "audio/mpeg")}
+    data = {"model": "whisper-1", "response_format": "json"}
     try:
-        resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, timeout=180)
+        resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, data=data, timeout=180)
         if resp.status_code == 200:
             return resp.json().get("text", "")
-        st.error(f"OpenAI transcription error: {resp.text}")
+        st.error(f"OpenAI transcription error ({resp.status_code}): {resp.text}")
         return None
     except Exception as e:
         st.error(f"OpenAI connection error: {e}")
         return None
 
 def _call_groq_whisper(audio_bytes, filename="audio.mp3"):
+    if not GROQ_API_KEY:
+        return None
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-    files = {"file": (filename, audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
+    files = {"file": (filename, audio_bytes, "audio/mpeg")}
+    data = {"model": "whisper-large-v3-turbo", "response_format": "json"}
     try:
-        resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=60)
+        resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, data=data, timeout=60)
         if resp.status_code == 200:
             return resp.json().get("text", "")
         return None
-    except:
+    except Exception:
         return None
 
 def _transcribe_single_segment_task(idx, seg_path):
-    """Worker task to transcribe one segment in parallel and clean up the file."""
     try:
         with open(seg_path, "rb") as f:
             seg_bytes = f.read()
@@ -248,53 +249,89 @@ def _transcribe_single_segment_task(idx, seg_path):
             try: os.remove(seg_path)
             except: pass
 
+def check_ffmpeg_available():
+    try:
+        res = subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return res.returncode == 0
+    except Exception:
+        return False
+
 def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, status_placeholder):
-    if not audio_bytes:
-        st.error("Audio data is empty. Please select or record an audio file again.")
+    if not audio_bytes or len(audio_bytes) == 0:
+        st.error("Audio data is empty. Please check the file and try again.")
+        return None
+
+    raw_size_mb = len(audio_bytes) / (1024 * 1024)
+    ffmpeg_available = check_ffmpeg_available()
+
+    # Fast path: Under 25MB without requiring ffmpeg compression
+    if raw_size_mb <= 24.0:
+        progress_bar.progress(30, text="Evaluating transcription engine (30%)...")
+        
+        # Primary: Groq Whisper
+        if GROQ_API_KEY:
+            status_placeholder.markdown(f"{SVG_INFO} Routing via Groq Whisper Primary...", unsafe_allow_html=True)
+            progress_bar.progress(60, text="Transcribing via Groq Whisper (60%)...")
+            text = _call_groq_whisper(audio_bytes, original_filename)
+            if text and text.strip():
+                progress_bar.progress(100, text="Transcription completed (100%).")
+                status_placeholder.empty()
+                return text.strip()
+            status_placeholder.markdown(f"{SVG_ALERT} Groq unavailable. Falling back to OpenAI...", unsafe_allow_html=True)
+
+        # Fallback: OpenAI Direct
+        if OPENAI_API_KEY:
+            status_placeholder.markdown(f"{SVG_INFO} Transcribing via OpenAI...", unsafe_allow_html=True)
+            progress_bar.progress(70, text="Transcribing via OpenAI (70%)...")
+            text = _call_openai_transcribe(audio_bytes, original_filename)
+            if text and text.strip():
+                progress_bar.progress(100, text="Transcription completed (100%).")
+                status_placeholder.empty()
+                return text.strip()
+            return None
+        else:
+            st.error("Both Groq and OpenAI API keys are missing or invalid in st.secrets.")
+            return None
+
+    # Heavy path: Files > 25MB requiring compression / chunking
+    if not ffmpeg_available:
+        st.error(f"File size is {raw_size_mb:.1f}MB, which exceeds the 25MB API limit, and 'ffmpeg' is not installed on this system. Please upload a smaller audio file or install ffmpeg.")
         return None
 
     progress_bar.progress(10, text="Preprocessing audio container (10%)...")
-    
     ext = os.path.splitext(original_filename)[1] or ".m4a"
     with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as src:
         src.write(audio_bytes)
         src_path = src.name
 
     compressed_mp3 = src_path + "_compressed.mp3"
-    progress_bar.progress(25, text="Compressing audio to 16kHz Mono 24k MP3 (25%)...")
+    progress_bar.progress(25, text="Compressing audio to 16kHz Mono MP3 (25%)...")
 
     try:
         cmd = [
-            "ffmpeg", "-y",
-            "-threads", "1",
-            "-i", src_path,
-            "-vn",
-            "-ac", "1",
-            "-ar", "16000",
-            "-c:a", "libmp3lame",
-            "-b:a", "24k",
-            compressed_mp3
+            "ffmpeg", "-y", "-threads", "1",
+            "-i", src_path, "-vn", "-ac", "1", "-ar", "16000",
+            "-c:a", "libmp3lame", "-b:a", "24k", compressed_mp3
         ]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if res.returncode != 0:
-            st.error(f"FFmpeg compression error: {res.stderr[:200]}")
+            st.error(f"FFmpeg compression failed: {res.stderr[:200]}")
             return None
 
         comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
-        progress_bar.progress(45, text="Evaluating audio duration and routing (45%)...")
 
-        if comp_size_mb <= 10.0 and GROQ_API_KEY:
-            status_placeholder.markdown(f"{SVG_INFO} Processing via Groq Whisper Primary...", unsafe_allow_html=True)
+        if comp_size_mb <= 24.0 and GROQ_API_KEY:
+            status_placeholder.markdown(f"{SVG_INFO} Transcribing compressed audio via Groq Whisper...", unsafe_allow_html=True)
             progress_bar.progress(70, text="Transcribing via Groq Whisper (70%)...")
             with open(compressed_mp3, "rb") as f:
                 c_bytes = f.read()
             text = _call_groq_whisper(c_bytes, "audio.mp3")
-            if text:
+            if text and text.strip():
                 progress_bar.progress(100, text="Transcription completed (100%).")
                 status_placeholder.empty()
-                return text
-            status_placeholder.markdown(f"{SVG_ALERT} Groq rate limit reached. Switching automatically to OpenAI parallel processing...", unsafe_allow_html=True)
+                return text.strip()
 
+        # Chunk and transcribe in parallel
         status_placeholder.markdown(f"{SVG_INFO} Chunking and transcribing in parallel via OpenAI...", unsafe_allow_html=True)
         progress_bar.progress(55, text="Chunking audio segments for parallel processing (55%)...")
         
@@ -310,11 +347,14 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         segments = sorted([os.path.join(seg_dir, f) for f in os.listdir(seg_dir) if f.startswith(base_name)])
 
         total_segs = len(segments)
+        if total_segs == 0:
+            st.error("Failed to generate audio segments.")
+            return None
+
         transcript_parts = [None] * total_segs
         completed_count = 0
+        max_workers = min(5, total_segs)
 
-        # Parallel Worker Execution
-        max_workers = min(5, total_segs) if total_segs > 0 else 1
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_idx = {
                 executor.submit(_transcribe_single_segment_task, idx, seg): idx
@@ -325,12 +365,13 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
                 transcript_parts[idx] = segment_transcript
                 completed_count += 1
                 pct = int(55 + (completed_count / total_segs) * 40)
-                progress_bar.progress(pct, text=f"Transcribed {completed_count}/{total_segs} chunks in parallel ({pct}%)...")
+                progress_bar.progress(pct, text=f"Transcribed {completed_count}/{total_segs} chunks ({pct}%)...")
 
         progress_bar.progress(100, text="Transcription completed successfully (100%).")
         time.sleep(0.3)
         status_placeholder.empty()
-        return " ".join([part for part in transcript_parts if part])
+        full_res = " ".join([part for part in transcript_parts if part and part.strip()])
+        return full_res.strip() if full_res else None
 
     except Exception as e:
         st.error(f"Audio processing failure: {e}")
@@ -530,7 +571,6 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
     return df_fb, other_fb
 
 def query_transcript_assistant(transcript, user_question, chat_history):
-    """DeepSeek-powered chatbot to query details from the transcript."""
     if not DEEPSEEK_API_KEY:
         return "DeepSeek API Key is missing. Please add it to your Streamlit secrets to use the assistant."
     
@@ -563,7 +603,7 @@ def query_transcript_assistant(transcript, user_question, chat_history):
         if resp.status_code == 200:
             res_json = resp.json()
             return res_json["choices"][0]["message"]["content"].strip()
-        return f"Error: {resp.status_code} - {resp.text}"
+        return f"Error ({resp.status_code}): {resp.text}"
     except Exception as e:
         return f"Connection error: {e}"
 
@@ -955,7 +995,7 @@ with st.container(border=True):
     with head_col1:
         st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
     with head_col2:
-        if st.button("", key="card_settings_btn", help="Open MoM Generation Engine & Token Diagnostics"):
+        if st.button("", key="card_settings_btn", help="Open MoM Generation Engine & Diagnostics"):
             st.session_state["show_settings"] = not st.session_state["show_settings"]
             st.rerun()
 
@@ -996,7 +1036,7 @@ with st.container(border=True):
                     st.write("• **Engine Status:** `Ready`")
         st.markdown("---")
     
-    # ROW 1: Clean Date Picker, Blank Location with Presets, Simple Time Pickers, Prepared By
+    # ROW 1
     r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.2, 2.0, 1.6, 1.6, 1.2, 1.2])
     
     with r1_c1:
@@ -1053,24 +1093,25 @@ with st.container(border=True):
             st.write("")
             if st.button("Transcribe Audio", key="btn_tx_upload"):
                 if uploaded_file is not None:
-                    uploaded_file.seek(0)
-                    file_bytes = uploaded_file.read()
-                    if file_bytes:
+                    file_bytes = uploaded_file.getvalue()
+                    if file_bytes and len(file_bytes) > 0:
                         p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
                         p_status = st.empty()
                         transcript = transcribe_audio_pipeline(file_bytes, uploaded_file.name, p_bar, p_status)
                         p_bar.empty()
                         p_status.empty()
-                        if transcript:
-                            st.session_state["transcript"] = transcript
+                        if transcript and transcript.strip():
+                            st.session_state["transcript"] = transcript.strip()
                             st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                             st.session_state["other_discussions"] = ""
                             st.session_state["chat_history"] = []
                             st.rerun()
+                        else:
+                            st.error("Transcription returned empty text. Please verify your audio file and API credentials.")
                     else:
                         st.warning("Uploaded file is empty. Please select a valid audio file.")
                 else:
-                    st.warning("Please upload an audio file first.")
+                    st.warning("Please select an audio file first.")
 
     # TAB 2: RECORD AUDIO
     with tab_record:
@@ -1078,10 +1119,7 @@ with st.container(border=True):
         with r_col1:
             recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
         
-        rec_bytes = None
-        if recorded_audio is not None:
-            recorded_audio.seek(0)
-            rec_bytes = recorded_audio.read()
+        rec_bytes = recorded_audio.getvalue() if recorded_audio is not None else None
 
         with r_col2:
             if rec_bytes:
@@ -1091,18 +1129,20 @@ with st.container(border=True):
                 
         with r_col3:
             if st.button("Transcribe Audio", key="btn_tx_record"):
-                if rec_bytes:
+                if rec_bytes and len(rec_bytes) > 0:
                     p_bar = st.progress(0, text="Initializing audio pipeline (0%)...")
                     p_status = st.empty()
                     transcript = transcribe_audio_pipeline(rec_bytes, "recording.wav", p_bar, p_status)
                     p_bar.empty()
                     p_status.empty()
-                    if transcript:
-                        st.session_state["transcript"] = transcript
+                    if transcript and transcript.strip():
+                        st.session_state["transcript"] = transcript.strip()
                         st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                         st.session_state["other_discussions"] = ""
                         st.session_state["chat_history"] = []
                         st.rerun()
+                    else:
+                        st.error("Transcription returned empty text. Please record again.")
                 else:
                     st.warning("Please record audio before initiating transcription.")
 
@@ -1213,7 +1253,6 @@ if st.session_state["transcript"]:
         st.markdown('<h3>Meeting Transcript Q&A Assistant</h3>', unsafe_allow_html=True)
         st.caption("Ask questions, check specific discussions, or clarify details from the meeting transcript.")
         
-        # Display chat history
         for msg in st.session_state["chat_history"]:
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
@@ -1286,7 +1325,6 @@ if not st.session_state["df"].empty:
                     "Person-in-charge": pic_val
                 })
 
-        # Handle deletion or sync
         if item_to_delete is not None:
             updated_records.pop(item_to_delete)
             st.session_state["df"] = pd.DataFrame(updated_records)
@@ -1294,7 +1332,6 @@ if not st.session_state["df"].empty:
         else:
             st.session_state["df"] = pd.DataFrame(updated_records)
 
-        # Add new item button
         if st.button("Add New Discussion Item", key="btn_add_item"):
             new_row = pd.DataFrame([{
                 "Discussion Points": "",
@@ -1323,7 +1360,7 @@ if not st.session_state["df"].empty:
             "conf_desig": conf_desig.strip()
         }
 
-        # Dual Export Section (Word DOCX and PDF)
+        # Dual Export Section
         exp_col1, exp_col2 = st.columns(2)
         
         with exp_col1:
