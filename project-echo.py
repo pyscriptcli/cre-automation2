@@ -115,7 +115,6 @@ h3 {
 
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
-    """Extract text from TXT, PDF, or DOCX files."""
     try:
         if uploaded_file.name.endswith('.txt'):
             return uploaded_file.getvalue().decode("utf-8")
@@ -147,7 +146,8 @@ def transcribe_audio(audio_bytes):
             st.error(f"Transcription failed: {error_msg}")
         return None
 
-def chunk_text(text, max_chars=12000, overlap=500):
+def chunk_text(text, max_chars=5000, overlap=500):
+    """Dynamically splits transcripts based on length to guarantee sequential processing."""
     if len(text) <= max_chars:
         return [text]
     chunks = []
@@ -158,9 +158,10 @@ def chunk_text(text, max_chars=12000, overlap=500):
         start += max_chars - overlap
     return chunks
 
-def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]):
-    """Executes robust JSON extraction targeting Groq models."""
+def call_groq_json(prompt):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    # Prioritize 70b model for better translation of Tagalog/Taglish transcripts
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"] 
     
     for model in models:
         payload = {
@@ -168,7 +169,7 @@ def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versat
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are an executive assistant extracting Minutes of the Meeting. Translate colloquial terms and capture precise deliverables. Respond ONLY with a valid JSON object matching the schema."
+                    "content": "You are an executive assistant extracting Minutes of the Meeting. The transcript may contain Tagalog and English (Taglish). Translate concepts into professional English. Respond ONLY with a valid JSON object matching the schema."
                 },
                 {"role": "user", "content": prompt}
             ],
@@ -189,55 +190,63 @@ def call_groq_json(prompt, models=["llama-3.1-8b-instant", "llama-3.3-70b-versat
             continue
     return None
 
-def extract_structured_insights_layered(transcript):
+def extract_structured_insights_robust(transcript):
     """
-    LAYERED FALLBACK EXTRACTION
-    Layer 1: Attempt full transcript in a single pass (most reliable if under limits).
-    Layer 2: If it fails, fallback to chunking.
-    Layer 3: If API totally fails, output a manual draft to ensure editor loads.
+    STRICT SEQUENTIAL CHUNKING:
+    1. Create chunks based on transcript length.
+    2. Process chunk 1 -> cache, chunk 2 -> cache, etc.
+    3. Combine chunks.
+    4. Return for the Editor.
     """
-    safe_transcript = transcript[:30000] # Safe limit for 8k token windows
+    chunks = chunk_text(transcript, max_chars=5000, overlap=500)
     
-    prompt = f"""Extract all Minutes of the Meeting (MOM) items from this transcript into valid JSON.
-Format MUST strictly follow:
+    all_table_items = []
+    all_other_discussions = []
+    
+    # UI Progress Bar
+    progress_container = st.empty()
+    bar = progress_container.progress(0, text="Initializing sequential analysis...")
+    
+    # Process sequentially
+    for idx, chunk in enumerate(chunks):
+        bar.progress(
+            int((idx) / len(chunks) * 100), 
+            text=f"Processing Part {idx + 1} of {len(chunks)}..."
+        )
+        
+        prompt = f"""Extract Minutes of the Meeting from Part {idx+1}/{len(chunks)} of a transcript.
+Extract ANY discussion topics, updates, or deliverables. If there is no strict action plan, put "None".
+
+JSON Schema:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Key discussion item, milestone, or topic",
-      "Action Plan": "Concrete next steps or requirements",
-      "Indicative Delivery Date": "Specific date, quarter, or 'TBD'",
-      "Person-in-charge": "Responsible person/entity"
+      "Discussion Points": "Core discussion topic, update, or milestone",
+      "Action Plan": "Detailed follow-up, deliverable, or 'None'",
+      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
+      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or Unassigned)"
     }}
   ],
-  "other_discussions": "Summary of other discussions or secondary topics"
+  "other_discussions": "Summary of other conversational points, or leave empty"
 }}
 
-Transcript:
-{safe_transcript}"""
+Transcript Content:
+{chunk}"""
 
-    # --- LAYER 1: Single Pass ---
-    res = call_groq_json(prompt)
-    all_table_items = []
-    all_other_discussions = []
+        res = call_groq_json(prompt)
+        
+        # Store in cache
+        if res and isinstance(res.get("table_items"), list):
+            all_table_items.extend(res["table_items"])
+        if res and res.get("other_discussions"):
+            all_other_discussions.append(res.get("other_discussions").strip())
 
-    if res and isinstance(res.get("table_items"), list) and len(res.get("table_items")) > 0:
-        all_table_items = res["table_items"]
-        if res.get("other_discussions"):
-            all_other_discussions.append(res.get("other_discussions"))
-    else:
-        # --- LAYER 2: Chunking Fallback ---
-        chunks = chunk_text(transcript, max_chars=12000, overlap=500)
-        for chunk in chunks:
-            chunk_prompt = prompt.replace(safe_transcript, chunk)
-            chunk_res = call_groq_json(chunk_prompt)
-            if chunk_res and isinstance(chunk_res.get("table_items"), list):
-                all_table_items.extend(chunk_res["table_items"])
-                if chunk_res.get("other_discussions"):
-                    all_other_discussions.append(chunk_res.get("other_discussions"))
-
-    # --- LAYER 3: Guaranteed Manual Draft Fallback ---
+    # Finish processing
+    bar.progress(100, text="Finalizing and combining Minutes of the Meeting...")
+    
+    # Final Layer Fallback: Only triggers if the entire API process totally failed on every chunk
     if not all_table_items:
-        st.warning("Auto-extraction yielded no discrete items (possibly due to API limits or conversational structure). Generated a manual draft.")
+        st.warning("Auto-extraction yielded no discrete items. Generated a manual draft.")
         all_table_items = [{
             "Discussion Points": "Meeting Overview & Key Deliverables",
             "Action Plan": "Pending (Manual Entry Required)",
@@ -245,6 +254,7 @@ Transcript:
             "Person-in-charge": "Unassigned"
         }]
 
+    # Format the merged DataFrame
     df = pd.DataFrame(all_table_items)
     for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
         if col not in df.columns:
@@ -252,6 +262,9 @@ Transcript:
             
     df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
     merged_other = "\n\n".join(all_other_discussions)
+    
+    progress_container.empty()
+    
     return df, merged_other
 
 def set_cell_shading(cell, color_hex):
@@ -429,7 +442,7 @@ with st.container(border=True):
     with r2_c4: conf_name = st.text_input("Confirmed By (Name)", placeholder="e.g. Client Rep")
     with r2_c5: conf_desig = st.text_input("Designation", placeholder="e.g. Managing Director")
 
-    # Three Clean Tabs
+    # Three Tabs
     tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text"])
 
     with tab_upload:
@@ -493,13 +506,12 @@ if st.session_state["transcript"]:
     with st.container(border=True):
         st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
         
-        # Uses a tall standard text_area to natively wrap lines instead of a horizontal code block
-        st.text_area("Transcript Content", st.session_state["transcript"], height=350, label_visibility="collapsed")
+        # Display transcript with clean line wrapping natively
+        st.code(st.session_state["transcript"], language="text")
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                with st.spinner("Extracting insights..."):
-                    extracted_df, other_disc = extract_structured_insights_layered(st.session_state["transcript"])
+                extracted_df, other_disc = extract_structured_insights_robust(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
