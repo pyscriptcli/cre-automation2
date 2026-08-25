@@ -40,7 +40,6 @@ GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
-OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
 CRD_MEMBERS = [
     "Sondi Tuazon",
@@ -182,6 +181,11 @@ button[key="card_settings_btn"]:hover::before {
 .stTextArea textarea {
     font-size: 0.95rem !important;
     line-height: 1.6 !important;
+}
+
+/* Time Picker Clean Layout */
+[data-testid="column"] .stSelectbox {
+    margin-bottom: 0 !important;
 }
 </style>
 """
@@ -371,7 +375,6 @@ def normalize_llm_json_to_df(data):
     df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
     return df, other_disc
 
-# High-Level Executive Prompt for DeepSeek Completion
 def extract_with_deepseek(transcript):
     if not DEEPSEEK_API_KEY:
         st.error("DeepSeek API Key is missing. Please add it to your Streamlit Cloud Secrets.")
@@ -385,7 +388,7 @@ def extract_with_deepseek(transcript):
     system_prompt = (
         "You are an expert executive assistant for PRIME Philippines tasked with producing comprehensive, "
         "high-level executive Minutes of the Meeting (MOM). "
-        "The transcript contains Tagalog, English, and Taglish dialogue which you will translate and synthesize to all english"
+        "The transcript contains Tagalog, English, and Taglish dialogue. "
         "Analyze the full conversation context and translate all colloquial, informal, and mixed-language statements "
         "into polished, high-level corporate English. "
         "Synthesize all key agreements, status reports, core discussion points, definitive action plans, "
@@ -393,7 +396,7 @@ def extract_with_deepseek(transcript):
         "Output valid JSON only matching the exact schema provided."
     )
 
-    user_prompt = f"""Synthesize the following meeting transcript into formal, short and direct high-level Minutes of Meeting (MOM) formatted as valid JSON:
+    user_prompt = f"""Synthesize the following meeting transcript into formal, high-level Minutes of Meeting (MOM) formatted as valid JSON:
 
 Schema:
 {{
@@ -440,78 +443,6 @@ Transcript:
             st.warning(f"DeepSeek Notice ({resp.status_code}): {resp.text}")
     except Exception as e:
         st.warning(f"DeepSeek connection error: {e}")
-
-    return None, ""
-
-# High-Level Executive Prompt for OpenAI Completion
-def extract_with_openai_completion(transcript):
-    if not OPENAI_API_KEY:
-        st.error("OpenAI API Key is missing. Please add it to your Streamlit Cloud Secrets.")
-        return None, ""
-
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    system_prompt = (
-        "You are an expert executive assistant for PRIME Philippines tasked with producing comprehensive, "
-        "high-level executive Minutes of the Meeting (MOM). "
-        "The transcript contains Tagalog, English, and Taglish dialogue. "
-        "Analyze the full conversation context and translate all colloquial, informal, and mixed-language statements "
-        "into polished, high-level corporate English. "
-        "Synthesize all key agreements, status reports, core discussion points, definitive action plans, "
-        "indicative delivery timelines, and assigned persons-in-charge without omitting critical business context. "
-        "Output valid JSON only matching the exact schema provided."
-    )
-
-    user_prompt = f"""Synthesize the following meeting transcript into formal, high-level Minutes of Meeting (MOM) formatted as valid JSON:
-
-Schema:
-{{
-  "table_items": [
-    {{
-      "Discussion Points": "Formal summary of key milestones, operational updates, or strategic topics discussed",
-      "Action Plan": "Concrete, actionable executive deliverables and next steps (state 'None' if purely informational)",
-      "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
-      "Person-in-charge": "Designated individual, department (e.g., PRIME Philippines, Client name), or 'Unassigned'"
-    }}
-  ],
-  "other_discussions": "High-level summary of peripheral discussions, informal remarks, or general alignment"
-}}
-
-Transcript:
-{transcript[:28000]}"""
-
-    payload = {
-        "model": "gpt-4o-mini",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.1,
-        "max_tokens": 1800
-    }
-
-    try:
-        resp = requests.post(OPENAI_CHAT_URL, headers=headers, json=payload, timeout=120)
-        if resp.status_code == 200:
-            res_json = resp.json()
-            usage = res_json.get("usage", {})
-            st.session_state["tokens_used"] += usage.get("total_tokens", len(transcript) // 4)
-            st.session_state["last_api_call"] = datetime.datetime.now()
-
-            raw_text = res_json["choices"][0]["message"]["content"].strip()
-            clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-            match = re.search(r"\{.*\}", clean_text, re.DOTALL)
-            data = json.loads(match.group(0)) if match else json.loads(clean_text)
-            return normalize_llm_json_to_df(data)
-        else:
-            st.warning(f"OpenAI Notice ({resp.status_code}): {resp.text}")
-    except Exception as e:
-        st.warning(f"OpenAI connection error: {e}")
 
     return None, ""
 
@@ -573,10 +504,8 @@ def extract_structured_insights(transcript, engine="AI - DeepSeek"):
         progress_bar.empty()
         return res_df, res_other
 
-    if "DeepSeek" in engine:
-        df, other = extract_with_deepseek(transcript)
-    else:
-        df, other = extract_with_openai_completion(transcript)
+    # Uses DeepSeek exclusively as the LLM completion engine
+    df, other = extract_with_deepseek(transcript)
     
     if df is not None and not df.empty:
         progress_bar.progress(100, text="Finalizing Minutes of the Meeting (100%)...")
@@ -707,13 +636,20 @@ def export_to_word(df, meeting_details, other_discussions):
     p_intro.paragraph_format.space_after = Pt(10)
     for r in p_intro.runs: r.font.name = "Arial"; r.font.size = Pt(9.5)
 
+    # Force Table formatting to wrap properly
     table = doc.add_table(rows=len(df)+1, cols=4)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.style = "Table Grid"
+    table.autofit = False
+    table.allow_autofit = False
+
+    # Allocate strict column widths (Total ~7.0 Inches)
+    col_widths = [Inches(2.5), Inches(2.2), Inches(1.1), Inches(1.2)]
 
     headers = ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]
     for i, header in enumerate(headers):
         cell = table.rows[0].cells[i]
+        cell.width = col_widths[i]
         cell.text = header
         set_cell_shading(cell, "FFFF00")
         p = cell.paragraphs[0]
@@ -730,6 +666,7 @@ def export_to_word(df, meeting_details, other_discussions):
         cells[2].text = str(row.get("Indicative Delivery Date", ""))
         cells[3].text = str(row.get("Person-in-charge", ""))
         for c_idx, cell in enumerate(cells):
+            cell.width = col_widths[c_idx]
             p = cell.paragraphs[0]
             if c_idx in [2, 3]: p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             if p.runs:
@@ -981,9 +918,9 @@ with st.container(border=True):
             set_col1, set_col2 = st.columns([1.5, 1.5])
             
             with set_col1:
+                # Removed OpenAI API from generation engine options
                 engine_options = [
                     "AI - DeepSeek",
-                    "AI - OpenAI (GPT-4o-mini)",
                     "Non-AI - Python Heuristic"
                 ]
                 selected_eng = st.selectbox(
@@ -1014,7 +951,7 @@ with st.container(border=True):
         st.markdown("---")
     
     # ROW 1: Clean Date Picker, Blank Location with Presets, Simple Time Pickers, Prepared By
-    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.4, 2.2, 1.1, 1.1, 1.4, 1.4])
+    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.2, 2.0, 1.6, 1.6, 1.2, 1.2])
     
     with r1_c1:
         meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
@@ -1024,11 +961,22 @@ with st.container(border=True):
         custom_loc = st.text_input("Location", value="", placeholder="e.g. Boardroom", label_visibility="collapsed")
         meeting_location = custom_loc.strip() if custom_loc.strip() else ("" if loc_preset == LOCATION_PRESETS[0] else loc_preset)
 
+    # Custom AM/PM Selectors for Time Inputs
     with r1_c3:
-        start_time_val = st.time_input("Start Time", value=None)
+        st.markdown("<p style='font-size:0.88rem; margin-bottom:0.2rem; color:#333; font-weight:500;'>Start Time</p>", unsafe_allow_html=True)
+        sc1, sc2, sc3 = st.columns([1, 1, 1.3])
+        sh = sc1.selectbox("SH", [f"{i:02d}" for i in range(1,13)], key="sh", label_visibility="collapsed")
+        sm = sc2.selectbox("SM", [f"{i:02d}" for i in range(0,60,5)], key="sm", label_visibility="collapsed")
+        sap = sc3.selectbox("SAP", ["AM", "PM"], key="sap", label_visibility="collapsed")
+        start_str = f"{sh}:{sm} {sap}"
 
     with r1_c4:
-        end_time_val = st.time_input("End Time", value=None)
+        st.markdown("<p style='font-size:0.88rem; margin-bottom:0.2rem; color:#333; font-weight:500;'>End Time</p>", unsafe_allow_html=True)
+        ec1, ec2, ec3 = st.columns([1, 1, 1.3])
+        eh = ec1.selectbox("EH", [f"{i:02d}" for i in range(1,13)], key="eh", label_visibility="collapsed")
+        em = ec2.selectbox("EM", [f"{i:02d}" for i in range(0,60,5)], key="em", label_visibility="collapsed")
+        eap = ec3.selectbox("EAP", ["AM", "PM"], key="eap", label_visibility="collapsed")
+        end_str = f"{eh}:{em} {eap}"
 
     with r1_c5:
         prep_name = st.text_input("Prepared By (Name)", value="", placeholder="e.g. John Doe")
@@ -1123,7 +1071,19 @@ with st.container(border=True):
 # ---- Step 2: Full Transcript UI ----
 if st.session_state["transcript"]:
     with st.container(border=True):
-        st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
+        f_col1, f_col2 = st.columns([8, 2])
+        with f_col1:
+            st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
+        with f_col2:
+            # Replaced standard button with Download functionality
+            st.download_button(
+                label="Download Transcript",
+                data=st.session_state["transcript"],
+                file_name=f"Transcript_{meeting_date.strftime('%Y%m%d')}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+
         st.text_area("Transcript Content", st.session_state["transcript"], height=350, label_visibility="collapsed")
         
         if st.session_state["df"].empty:
@@ -1155,13 +1115,8 @@ if not st.session_state["df"].empty:
 
         st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=100)
 
-        # Build clean formatted time string from native time picker
-        start_str = start_time_val.strftime("%I:%M %p") if start_time_val else ""
-        end_str = end_time_val.strftime("%I:%M %p") if end_time_val else ""
-        if start_str and end_str:
-            time_range_str = f"{start_str} to {end_str}"
-        else:
-            time_range_str = start_str or end_str or ""
+        # Utilize the custom strings generated from our new AM/PM split layout dropdowns
+        time_range_str = f"{start_str} to {end_str}"
 
         meeting_details = {
             "date": meeting_date.strftime("%B %d, %Y"),
