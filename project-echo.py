@@ -121,9 +121,12 @@ def transcribe_audio(audio_bytes):
 
 def extract_structured_insights(transcript):
     """
-    Robust Groq MOM extraction with dual JSON cleanup & fallback.
+    Robust Groq MOM extraction that automatically iterates active models on Groq.
     """
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
     
     prompt = f"""Extract Minutes of Meeting (MOM) from this transcript and output valid JSON ONLY with this schema:
 {{
@@ -141,38 +144,50 @@ def extract_structured_insights(transcript):
 Transcript:
 {transcript}"""
 
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": "You are a professional assistant. You ONLY output valid JSON."},
-            {"role": "user", "content": prompt}
-        ],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.1
-    }
+    candidate_models = [
+        "llama-3.1-8b-instant",
+        "llama3-70b-8192",
+        "llama3-8b-8192",
+        "mixtral-8x7b-32768"
+    ]
 
-    try:
-        resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
-        if resp.status_code != 200:
-            st.error(f"Groq API Error ({resp.status_code}): {resp.text}")
-            return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
-        
-        raw_text = resp.json()["choices"][0]["message"]["content"].strip()
-        clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-        clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-        data = json.loads(clean_text)
+    last_error = ""
 
-        items = data.get("table_items", [])
-        df = pd.DataFrame(items)
-        for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-            if col not in df.columns:
-                df[col] = ""
-        df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
-        return df, data.get("other_discussions", "")
-        
-    except Exception as e:
-        st.error(f"Parsing Error: {str(e)}")
-        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+    for model in candidate_models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are a professional executive assistant. You output valid JSON strictly following the requested schema without markdown backticks."},
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1
+        }
+
+        try:
+            resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
+            if resp.status_code == 200:
+                raw_text = resp.json()["choices"][0]["message"]["content"].strip()
+                clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+                clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+                data = json.loads(clean_text)
+
+                items = data.get("table_items", [])
+                df = pd.DataFrame(items)
+                for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+                    if col not in df.columns:
+                        df[col] = ""
+                df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]]
+                return df, data.get("other_discussions", "")
+            else:
+                last_error = f"{model} ({resp.status_code}): {resp.text}"
+                continue
+        except Exception as e:
+            last_error = f"{model} error: {str(e)}"
+            continue
+
+    st.error(f"All model requests failed. Last error: {last_error}")
+    return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -319,7 +334,7 @@ with st.container(border=True):
     # ROW 1: Date | Location | Start Time | End Time
     r1_col1, r1_col2, r1_col3, r1_col4 = st.columns([1.5, 2.5, 1.2, 1.2])
     with r1_col1:
-        meeting_date = st.date_input("Date", value=datetime.date.today())
+        meeting_date = st.date_input("Meeting Date", value=datetime.date.today())
     with r1_col2:
         meeting_location = st.text_input("Location", value="Greatwork Mega Tower Boardroom")
     with r1_col3:
@@ -332,27 +347,46 @@ with st.container(border=True):
     # ROW 2: Client | CRD Team Dropdown | External Attendees
     r2_col1, r2_col2, r2_col3 = st.columns([1.5, 2.5, 2.4])
     with r2_col1:
-        client_name = st.text_input("Client / Company", placeholder="XYZ Company")
+        client_name = st.text_input("Client / Company Name", placeholder="XYZ Company")
     with r2_col2:
         selected_crd = st.multiselect("CRD Team Attendees", options=CRD_MEMBERS, default=CRD_MEMBERS)
     with r2_col3:
         ext_attendees_raw = st.text_input("External Attendees", placeholder="e.g. Mr. ABCD, Jane Doe")
 
-    # Audio input row
-    aud_col1, aud_col2 = st.columns([4, 1.5])
-    with aud_col1:
-        uploaded = st.file_uploader("Audio File", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"], label_visibility="collapsed")
-    with aud_col2:
-        if uploaded and st.button("Transcribe Audio"):
-            with st.spinner("Transcribing..."):
-                transcript = transcribe_audio(uploaded.read())
+    # Audio Section: Upload or Live Record
+    tab_upload, tab_record = st.tabs(["Upload Audio File", "Record Live Audio"])
+    active_audio_bytes = None
+
+    with tab_upload:
+        uploaded_file = st.file_uploader("Upload audio file", type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm"], label_visibility="collapsed")
+        if uploaded_file:
+            active_audio_bytes = uploaded_file.read()
+
+    with tab_record:
+        rec_col1, rec_col2 = st.columns([3, 1])
+        with rec_col1:
+            recorded_audio = st.audio_input("Record audio directly", label_visibility="collapsed")
+        if recorded_audio:
+            active_audio_bytes = recorded_audio.read()
+            with rec_col2:
+                st.download_button(
+                    label="Save Recording (.wav)",
+                    data=active_audio_bytes,
+                    file_name=f"Recording_{datetime.date.today().strftime('%Y%m%d')}.wav",
+                    mime="audio/wav"
+                )
+
+    if active_audio_bytes:
+        if st.button("Transcribe Audio"):
+            with st.spinner("Transcribing with Groq Whisper..."):
+                transcript = transcribe_audio(active_audio_bytes)
             if transcript:
                 st.session_state["transcript"] = transcript
                 st.session_state["df"] = pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"])
                 st.session_state["other_discussions"] = ""
                 st.rerun()
 
-# ---- Step 2: Transcript & Generation ----
+# ---- Step 2: Transcript & MOM Generation ----
 if st.session_state["transcript"]:
     with st.container(border=True):
         st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
