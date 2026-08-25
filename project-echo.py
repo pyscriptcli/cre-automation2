@@ -98,7 +98,7 @@ if "chat_history" not in st.session_state:
 
 # State for Auto-Populated Meeting Details
 if "meeting_date" not in st.session_state:
-    st.session_state["meeting_date"] = datetime.date(2026, 8, 25)
+    st.session_state["meeting_date"] = datetime.date.today()
 if "meeting_location_custom" not in st.session_state:
     st.session_state["meeting_location_custom"] = ""
 if "meeting_location_preset" not in st.session_state:
@@ -131,9 +131,9 @@ html, body, [class*="css"] {
 .stApp {
     background-color: #F3EFE6; 
     background-image: 
-        linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
-    background-size: 72px 72px;
+        linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+    background-size: 80px 80px;
     color: #2D2D2D;
 }
 
@@ -181,32 +181,35 @@ button[data-baseweb="tab"] p {
     font-size: 1.05rem !important;
 }
 
+/* Symmetrical Grid Column Stretches - Force containers to equal heights */
+[data-testid="stHorizontalBlock"] {
+    align-items: stretch !important;
+}
+
+[data-testid="stHorizontalBlock"] > [data-testid="column"] {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+[data-testid="stHorizontalBlock"] > [data-testid="column"] > div[data-testid="stVerticalBlock"] {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+[data-testid="stHorizontalBlock"] > [data-testid="column"] > div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+    flex: 1 !important;
+    height: 100% !important;
+}
+
 /* Card Depth with Prominent Right-Side & Bottom Drop Shadows */
 div[data-testid="stVerticalBlockBorderWrapper"] {
     background-color: #FFFFFF !important; 
     border-radius: 12px !important;
-    box-shadow: 10px 10px 24px rgba(0, 0, 0, 0.08), 2px 2px 6px rgba(0, 0, 0, 0.04) !important;
-    border: 1px solid rgba(0, 0, 0, 0.06) !important; 
-    padding: 1.25rem !important; 
+    box-shadow: 14px 8px 24px rgba(0, 0, 0, 0.06), 4px 4px 10px rgba(0, 0, 0, 0.03) !important;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important; 
+    padding: 1.5rem !important; 
     margin-bottom: 1.25rem !important;
-}
-
-/* Top Row Cards Symmetrical Fixed Height & Layout */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(div.top-card-anchor) {
-    min-height: 480px !important;
-    height: 480px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: flex-start !important;
-}
-
-/* Bottom Row Cards Symmetrical Fixed Height & Layout */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(div.bottom-card-anchor) {
-    min-height: 550px !important;
-    height: 550px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
 }
 
 /* Uniform Small Pill Buttons */
@@ -232,21 +235,32 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(div.bottom-card-anchor) {
     background-color: #1A1A1A !important;
 }
 
+/* Danger Pill Button (Delete) */
 button[key^="del_"] {
-    min-height: 32px !important;
-    height: 32px !important;
-    padding: 0.2rem 0.5rem !important;
-    background-color: #F7F5F0 !important;
-    color: #A03030 !important;
-    border: 1px solid rgba(160, 48, 48, 0.25) !important;
+    background-color: #FDF9F9 !important;
+    color: #B23A3A !important;
+    border: 1px solid rgba(178, 58, 58, 0.25) !important;
 }
 
 button[key^="del_"]:hover {
-    background-color: #A03030 !important;
+    background-color: #B23A3A !important;
     color: #FFFFFF !important;
-    border-color: #A03030 !important;
+    border-color: #B23A3A !important;
 }
 
+/* Auto-Populate Special Button Styling */
+button[key="btn_auto_populate"] {
+    background-color: #F8F5EE !important;
+    color: #A07828 !important;
+    border: 1px solid #D4AF37 !important;
+}
+
+button[key="btn_auto_populate"]:hover {
+    background-color: #D4AF37 !important;
+    color: #FFFFFF !important;
+}
+
+/* Small SVG-only Settings Icon Button in the Card Header */
 div[data-testid="stButton"]:has(button[key="card_settings_btn"]) {
     display: flex !important;
     justify-content: flex-end !important;
@@ -275,7 +289,7 @@ button[key="card_settings_btn"]::before {
     height: 17px;
     background-color: #C5A059;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
     -webkit-mask-size: contain;
     mask-size: contain;
     transition: background-color 0.2s ease;
@@ -349,9 +363,6 @@ button[key="card_settings_btn"]::before {
 }
 </style>
 """
-
-# ========== SVG ICONS ==========
-SVG_ALERT = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>"""
 
 # ========== CORE LOGIC ==========
 def extract_text_from_file(uploaded_file):
@@ -539,6 +550,60 @@ def normalize_llm_json_to_df(data):
     df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
     return df, other_disc
 
+def extract_metadata_with_deepseek(transcript):
+    if not DEEPSEEK_API_KEY:
+        st.error("DeepSeek API Key is missing.")
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    system_prompt = (
+        "You are an AI assistant for PRIME Philippines. Analyze the meeting transcript (which may contain Taglish/Filipino) "
+        "and extract the meeting metadata. Match CRD team attendees strictly to this list: "
+        f"{', '.join(CRD_MEMBERS)}. "
+        "Output ONLY a valid JSON object matching the schema."
+    )
+
+    user_prompt = f"""Extract metadata from this transcript into valid JSON:
+Schema:
+{{
+  "client_name": "Company/Client name or empty string",
+  "location": "Meeting location or preset if mentioned or empty string",
+  "crd_attendees": ["Exact matching names from CRD member list"],
+  "external_attendees": "Comma-separated list of external attendee names",
+  "prepared_by": "Name of attendee from PRIME taking notes or empty string",
+  "confirmed_by": "Primary external attendee/client rep or empty string"
+}}
+
+Transcript:
+{transcript[:15000]}"""
+
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1,
+        "max_tokens": 500
+    }
+
+    try:
+        resp = requests.post(DEEPSEEK_CHAT_URL, headers=headers, json=payload, timeout=45)
+        if resp.status_code == 200:
+            res_json = resp.json()
+            raw_text = res_json["choices"][0]["message"]["content"].strip()
+            clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+            return json.loads(clean_text)
+    except Exception as e:
+        st.error(f"Error auto-populating metadata: {e}")
+    return None
+
 def extract_with_deepseek(transcript):
     if not DEEPSEEK_API_KEY:
         st.error("DeepSeek API Key is missing. Please add it to your Streamlit Cloud Secrets.")
@@ -609,60 +674,6 @@ Transcript:
         st.warning(f"DeepSeek connection error: {e}")
 
     return None, ""
-
-def extract_metadata_with_deepseek(transcript):
-    if not DEEPSEEK_API_KEY:
-        st.error("DeepSeek API Key is missing.")
-        return None
-
-    headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    system_prompt = (
-        "You are an AI assistant for PRIME Philippines. Analyze the meeting transcript (which may contain Taglish/Filipino) "
-        "and extract the meeting metadata. Match CRD team attendees strictly to this list: "
-        f"{', '.join(CRD_MEMBERS)}. "
-        "Output ONLY a valid JSON object matching the schema."
-    )
-
-    user_prompt = f"""Extract metadata from this transcript into valid JSON:
-Schema:
-{{
-  "client_name": "Company/Client name or empty string",
-  "location": "Meeting location or preset if mentioned or empty string",
-  "crd_attendees": ["Exact matching names from CRD member list"],
-  "external_attendees": "Comma-separated list of external attendee names",
-  "prepared_by": "Name of attendee from PRIME taking notes or empty string",
-  "confirmed_by": "Primary external attendee/client rep or empty string"
-}}
-
-Transcript:
-{transcript[:15000]}"""
-
-    payload = {
-        "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.1,
-        "max_tokens": 500
-    }
-
-    try:
-        resp = requests.post(DEEPSEEK_CHAT_URL, headers=headers, json=payload, timeout=45)
-        if resp.status_code == 200:
-            res_json = resp.json()
-            raw_text = res_json["choices"][0]["message"]["content"].strip()
-            clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-            return json.loads(clean_text)
-    except Exception as e:
-        st.error(f"Error auto-populating metadata: {e}")
-    return None
 
 def heuristic_non_ai_extraction(transcript):
     sentences = re.split(r'(?<=[.!?]) +', transcript)
@@ -1182,8 +1193,7 @@ col_upload, col_details = st.columns(2)
 # LEFT CONTAINER: Audio & Text Upload Section
 with col_upload:
     with st.container(border=True):
-        st.markdown('<div class="top-card-anchor" style="display:none;"></div>', unsafe_allow_html=True)
-        st.markdown('<h3>Input & Transcription</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 style="margin-top:0.2rem;">Input & Transcription</h3>', unsafe_allow_html=True)
         
         tab_upload, tab_record, tab_text = st.tabs(["Upload Audio", "Record Audio", "Upload Text"])
 
@@ -1260,13 +1270,12 @@ with col_upload:
 # RIGHT CONTAINER: Meeting Details Card (with Auto-Populate Button)
 with col_details:
     with st.container(border=True):
-        st.markdown('<div class="top-card-anchor" style="display:none;"></div>', unsafe_allow_html=True)
         
         # Header + Auto-populate button (when transcript exists) + Settings Button
         if st.session_state["transcript"]:
             head_col1, head_col_auto, head_col2 = st.columns([5.5, 3.5, 1.0])
             with head_col_auto:
-                if st.button("Auto-Fill from Transcript", key="btn_auto_populate", help="Analyze transcript to automatically populate client, location, and attendees"):
+                if st.button("Populate from Transcript", key="btn_auto_populate", help="Analyze transcript to automatically populate client, location, and attendees"):
                     with st.spinner("Extracting metadata..."):
                         meta = extract_metadata_with_deepseek(st.session_state["transcript"])
                         if meta:
@@ -1292,7 +1301,7 @@ with col_details:
             head_col1, head_col2 = st.columns([9.0, 1.0])
             
         with head_col1:
-            st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
+            st.markdown('<h3 style="margin-top:0.2rem;">Meeting Details</h3>', unsafe_allow_html=True)
         with head_col2:
             if st.button("", key="card_settings_btn", help="Open MoM Generation Engine & Token Diagnostics"):
                 st.session_state["show_settings"] = not st.session_state["show_settings"]
@@ -1386,7 +1395,6 @@ if st.session_state["transcript"]:
     # LEFT CONTAINER: Full Transcript
     with row_left:
         with st.container(border=True):
-            st.markdown('<div class="bottom-card-anchor" style="display:none;"></div>', unsafe_allow_html=True)
             
             ft_head, ft_btn1, ft_btn2 = st.columns([6, 2, 2])
             with ft_head:
@@ -1464,7 +1472,6 @@ if st.session_state["transcript"]:
     # RIGHT CONTAINER: Ask Echo (AI on Left, User on Right, Symmetrical)
     with row_right:
         with st.container(border=True):
-            st.markdown('<div class="bottom-card-anchor" style="display:none;"></div>', unsafe_allow_html=True)
             
             st.markdown('<h3 style="margin-top:0.2rem;">Ask Echo</h3>', unsafe_allow_html=True)
             st.caption("Ask specific questions regarding action items, timelines, deliverables, or remarks.")
@@ -1562,7 +1569,7 @@ if not st.session_state["df"].empty:
                     )
                 with c_del:
                     st.write("<div style='height: 38px;'></div>", unsafe_allow_html=True)
-                    if st.button("Delete", key=f"del_{idx}", help=f"Remove item {idx+1}"):
+                    if st.button("Remove", key=f"del_{idx}", help=f"Remove item {idx+1}"):
                         row_to_delete = idx
         
         # Handle Deletion
