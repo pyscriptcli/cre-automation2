@@ -146,126 +146,107 @@ def transcribe_audio(audio_bytes):
             st.error(f"Transcription failed: {error_msg}")
         return None
 
-def chunk_text(text, max_chars=5000, overlap=500):
-    """Dynamically splits transcripts based on length to guarantee sequential processing."""
-    if len(text) <= max_chars:
-        return [text]
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + max_chars
-        chunks.append(text[start:end])
-        start += max_chars - overlap
-    return chunks
-
-def call_groq_json(prompt):
+def groq_completion(prompt, system_instruction, json_mode=False):
+    """Unified call to Groq with model failovers."""
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    # Prioritize 70b model for better translation of Tagalog/Taglish transcripts
-    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"] 
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
     
     for model in models:
         payload = {
             "model": model,
             "messages": [
-                {
-                    "role": "system",
-                    "content": "You are an executive assistant extracting Minutes of the Meeting. The transcript may contain Tagalog and English (Taglish). Translate concepts into professional English. Respond ONLY with a valid JSON object matching the schema."
-                },
+                {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "response_format": {"type": "json_object"},
             "temperature": 0.1
         }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+            
         try:
             resp = requests.post(GROQ_CHAT_URL, headers=headers, json=payload, timeout=60)
             if resp.status_code == 200:
-                raw_text = resp.json()["choices"][0]["message"]["content"].strip()
-                clean_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-                clean_text = re.sub(r"\s*```$", "", clean_text).strip()
-                match = re.search(r"\{.*\}", clean_text, re.DOTALL)
-                if match:
-                    return json.loads(match.group(0))
-                return json.loads(clean_text)
+                return resp.json()["choices"][0]["message"]["content"].strip()
         except Exception:
             continue
     return None
 
-def extract_structured_insights_robust(transcript):
+def extract_two_step_pipeline(transcript):
     """
-    STRICT SEQUENTIAL CHUNKING:
-    1. Create chunks based on transcript length.
-    2. Process chunk 1 -> cache, chunk 2 -> cache, etc.
-    3. Combine chunks.
-    4. Return for the Editor.
+    OPTION 2: TWO-STEP PIPELINE
+    Step 1: Translate and condense the Taglish/colloquial transcript into structured English bullet points.
+    Step 2: Parse the clean English notes into the target MOM JSON table schema.
     """
-    chunks = chunk_text(transcript, max_chars=5000, overlap=500)
+    progress_bar = st.progress(0, text="Step 1/2: Translating & condensing meeting discussion...")
     
-    all_table_items = []
-    all_other_discussions = []
+    # Step 1 Prompt: Translate & Condense
+    step1_sys = (
+        "You are an expert executive assistant. Analyze this meeting transcript (which may contain Tagalog/Taglish). "
+        "Translate all informal dialogue into clear, professional English meeting minutes. "
+        "Extract every discussion topic, report update, action item, deadline, and assigned person. "
+        "Output structured bullet points grouped by topic."
+    )
+    step1_prompt = f"Transcript:\n{transcript[:25000]}"
     
-    # UI Progress Bar
-    progress_container = st.empty()
-    bar = progress_container.progress(0, text="Initializing sequential analysis...")
+    clean_notes = groq_completion(step1_prompt, step1_sys, json_mode=False)
     
-    # Process sequentially
-    for idx, chunk in enumerate(chunks):
-        bar.progress(
-            int((idx) / len(chunks) * 100), 
-            text=f"Processing Part {idx + 1} of {len(chunks)}..."
-        )
-        
-        prompt = f"""Extract Minutes of the Meeting from Part {idx+1}/{len(chunks)} of a transcript.
-Extract ANY discussion topics, updates, or deliverables. If there is no strict action plan, put "None".
-
-JSON Schema:
+    if not clean_notes:
+        progress_bar.empty()
+        st.error("Failed to summarize transcript. Please retry.")
+        return pd.DataFrame(columns=["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]), ""
+    
+    progress_bar.progress(50, text="Step 2/2: Formatting Minutes of the Meeting into table...")
+    
+    # Step 2 Prompt: Format to JSON Schema
+    step2_sys = (
+        "You are a data formatting specialist. Convert the provided meeting summary into a valid JSON object. "
+        "Ensure EVERY discussion topic and action plan from the summary is represented."
+    )
+    step2_prompt = f"""Convert these clean meeting notes into a JSON object matching this schema:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Core discussion topic, update, or milestone",
-      "Action Plan": "Detailed follow-up, deliverable, or 'None'",
+      "Discussion Points": "Core discussion topic, report, or milestone",
+      "Action Plan": "Specific follow-up action, next step, or deliverable (put 'None' if none)",
       "Indicative Delivery Date": "Specific date, timeline, or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g., PRIME, Client, or Unassigned)"
+      "Person-in-charge": "Responsible entity (e.g. PRIME, Client name, or Unassigned)"
     }}
   ],
-  "other_discussions": "Summary of other conversational points, or leave empty"
+  "other_discussions": "Summary of informal or secondary points"
 }}
 
-Transcript Content:
-{chunk}"""
+Meeting Notes:
+{clean_notes}"""
 
-        res = call_groq_json(prompt)
-        
-        # Store in cache
-        if res and isinstance(res.get("table_items"), list):
-            all_table_items.extend(res["table_items"])
-        if res and res.get("other_discussions"):
-            all_other_discussions.append(res.get("other_discussions").strip())
+    json_raw = groq_completion(step2_prompt, step2_sys, json_mode=True)
+    progress_bar.progress(100, text="Finalizing Minutes of the Meeting...")
+    progress_bar.empty()
 
-    # Finish processing
-    bar.progress(100, text="Finalizing and combining Minutes of the Meeting...")
-    
-    # Final Layer Fallback: Only triggers if the entire API process totally failed on every chunk
-    if not all_table_items:
-        st.warning("Auto-extraction yielded no discrete items. Generated a manual draft.")
-        all_table_items = [{
-            "Discussion Points": "Meeting Overview & Key Deliverables",
-            "Action Plan": "Pending (Manual Entry Required)",
-            "Indicative Delivery Date": "TBD",
-            "Person-in-charge": "Unassigned"
-        }]
-
-    # Format the merged DataFrame
-    df = pd.DataFrame(all_table_items)
-    for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
-        if col not in df.columns:
-            df[col] = ""
+    if json_raw:
+        try:
+            clean_text = re.sub(r"^```(?:json)?\s*", "", json_raw)
+            clean_text = re.sub(r"\s*```$", "", clean_text).strip()
+            match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+            data = json.loads(match.group(0)) if match else json.loads(clean_text)
             
-    df = df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates()
-    merged_other = "\n\n".join(all_other_discussions)
-    
-    progress_container.empty()
-    
-    return df, merged_other
+            items = data.get("table_items", [])
+            if items:
+                df = pd.DataFrame(items)
+                for col in ["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]:
+                    if col not in df.columns:
+                        df[col] = ""
+                return df[["Discussion Points", "Action Plan", "Indicative Delivery Date", "Person-in-charge"]].drop_duplicates(), data.get("other_discussions", "")
+        except Exception:
+            pass
+
+    # Fallback to display notes directly if JSON parsing encounters issues
+    fallback_df = pd.DataFrame([{
+        "Discussion Points": "Meeting Summary & Discussion Points",
+        "Action Plan": clean_notes[:350] + "...",
+        "Indicative Delivery Date": "TBD",
+        "Person-in-charge": "PRIME / Client"
+    }])
+    return fallback_df, clean_notes
 
 def set_cell_shading(cell, color_hex):
     shd = parse_xml(f'<w:shd xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:fill="{color_hex}"/>')
@@ -484,8 +465,8 @@ with st.container(border=True):
             uploaded_text_file = st.file_uploader("Upload Document (.txt, .docx, .pdf)", type=["txt", "docx", "pdf"])
             pasted_text = st.text_area("Or Paste Transcript Here", height=100, placeholder="Paste transcript text directly here...")
         with text_col2:
-            st.write("") # Spacer
-            st.write("") # Spacer
+            st.write("") 
+            st.write("") 
             if st.button("Process Text", key="btn_tx_text"):
                 extracted_str = ""
                 if uploaded_text_file:
@@ -505,13 +486,11 @@ with st.container(border=True):
 if st.session_state["transcript"]:
     with st.container(border=True):
         st.markdown('<h3>Full Transcript</h3>', unsafe_allow_html=True)
-        
-        # Display transcript with clean line wrapping natively
-        st.code(st.session_state["transcript"], language="text")
+        st.text_area("Transcript Content", st.session_state["transcript"], height=350, label_visibility="collapsed")
         
         if st.session_state["df"].empty:
             if st.button("Generate MOM"):
-                extracted_df, other_disc = extract_structured_insights_robust(st.session_state["transcript"])
+                extracted_df, other_disc = extract_two_step_pipeline(st.session_state["transcript"])
                 if not extracted_df.empty:
                     st.session_state["df"] = extracted_df
                     st.session_state["other_discussions"] = other_disc
