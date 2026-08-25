@@ -383,8 +383,14 @@ def extract_with_openai_completion(transcript):
 
     # Highly optimized prompt to minimize token usage
     system_prompt = (
-        "You are an executive assistant for PRIME Philippines. Extract Minutes of the Meeting (MOM). "
-        "Translate Taglish into corporate English concisely. Output valid JSON only."
+        "You are an expert executive assistant for PRIME Philippines tasked with producing comprehensive, "
+        "high-level executive Minutes of the Meeting (MOM). "
+        "The transcript contains Tagalog, English, and Taglish dialogue. "
+        "Analyze the full conversation context and translate all colloquial, informal, and mixed-language statements "
+        "into polished, high-level corporate English. "
+        "Synthesize all key agreements, status reports, core discussion points, definitive action plans, "
+        "indicative delivery timelines, and assigned persons-in-charge without omitting critical business context. "
+        "Output valid JSON only matching the exact schema provided."
     )
 
     user_prompt = f"""Format the transcript into MOM JSON schema:
