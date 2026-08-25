@@ -31,14 +31,11 @@ os.makedirs(_config_dir, exist_ok=True)
 with open(_config_file, "w", encoding="utf-8") as f:
     f.write('[theme]\nbase="light"\n[server]\nmaxUploadSize = 200\n')
 
-# API Keys & Endpoints loaded via st.secrets with fallback defaults
+# API Keys loaded strictly from Streamlit Cloud Secrets
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 GROQ_AUDIO_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
-if not OPENAI_API_KEY and "OPENAI_API_KEY" in st.secrets:
-    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-
 OPENAI_AUDIO_URL = "https://api.openai.com/v1/audio/transcriptions"
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
@@ -218,44 +215,25 @@ def _call_openai_transcribe(audio_bytes, filename="audio.mp3"):
         resp = requests.post(OPENAI_AUDIO_URL, headers=headers, files=files, timeout=180)
         if resp.status_code == 200:
             return resp.json().get("text", "")
-        st.error(f"OpenAI fallback error: {resp.text}")
+        st.error(f"OpenAI transcription error ({resp.status_code}): {resp.text}")
         return None
     except Exception as e:
         st.error(f"OpenAI connection error: {e}")
         return None
 
-def _call_groq_whisper(audio_bytes, filename="audio.mp3", status_placeholder=None):
+def _call_groq_whisper(audio_bytes, filename="audio.mp3"):
     headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
     files = {"file": (filename, audio_bytes), "model": (None, "whisper-large-v3-turbo"), "response_format": (None, "json")}
-    
-    max_retries = 2
-    for attempt in range(max_retries):
-        try:
-            resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=180)
-            if resp.status_code == 200:
-                return resp.json().get("text", "")
-            
-            error_data = resp.json().get("error", {})
-            error_msg = error_data.get("message", resp.text)
-            
-            # Fallback automatically to OpenAI on rate limit or 429
-            if "rate limit" in error_msg.lower() or resp.status_code == 429:
-                if status_placeholder:
-                    status_placeholder.warning("⚠️ Groq rate limit reached. Automatically switching to OpenAI gpt-4o-mini-transcribe...")
-                time.sleep(1.5)
-                return _call_openai_transcribe(audio_bytes, filename)
-
-            st.error(f"Transcription error: {error_msg}")
-            return None
-        except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(2)
-                continue
-            st.warning("⚠️ Groq connection failure. Switching to OpenAI fallback...")
-            return _call_openai_transcribe(audio_bytes, filename)
-    return None
+    try:
+        resp = requests.post(GROQ_AUDIO_URL, headers=headers, files=files, timeout=60)
+        if resp.status_code == 200:
+            return resp.json().get("text", "")
+        return None
+    except:
+        return None
 
 def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, status_placeholder):
+    file_size_mb = len(audio_bytes) / (1024 * 1024)
     progress_bar.progress(10, text="Preprocessing audio container (10%)...")
     
     ext = os.path.splitext(original_filename)[1] or ".m4a"
@@ -283,11 +261,32 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
             st.error(f"FFmpeg compression error: {res.stderr[:200]}")
             return None
 
-        progress_bar.progress(55, text="Splitting recording into safe Whisper batches (55%)...")
+        comp_size_mb = os.path.getsize(compressed_mp3) / (1024 * 1024)
+        progress_bar.progress(45, text="Evaluating audio duration & routing (45%)...")
+
+        # ROUTING LOGIC:
+        # If compressed file is <= 10MB (typically <= 45-60 mins of speech), try Groq Whisper first.
+        # If it's a long recording (> 10MB) or Groq encounters quota limits, use OpenAI directly.
+        if comp_size_mb <= 10.0 and GROQ_API_KEY:
+            status_placeholder.info("⚡ Processing via Groq Whisper Primary...")
+            progress_bar.progress(70, text="Transcribing via Groq Whisper (70%)...")
+            with open(compressed_mp3, "rb") as f:
+                c_bytes = f.read()
+            text = _call_groq_whisper(c_bytes, "audio.mp3")
+            if text:
+                progress_bar.progress(100, text="Transcription completed (100%)!")
+                status_placeholder.empty()
+                return text
+            status_placeholder.warning("⚠️ Groq unavailable or quota exceeded. Switching to OpenAI...")
+
+        # Long audio pipeline via OpenAI with 600s chunks
+        status_placeholder.info("🚀 Processing recording via OpenAI...")
+        progress_bar.progress(55, text="Preparing audio segments for OpenAI (55%)...")
+        
         segment_pattern = src_path + "_seg_%03d.mp3"
         subprocess.run([
             "ffmpeg", "-y", "-i", compressed_mp3,
-            "-f", "segment", "-segment_time", "120", "-c", "copy",
+            "-f", "segment", "-segment_time", "600", "-c", "copy",
             segment_pattern
         ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
@@ -300,19 +299,20 @@ def transcribe_audio_pipeline(audio_bytes, original_filename, progress_bar, stat
         
         for idx, seg in enumerate(segments):
             pct = int(55 + ((idx + 1) / total_segs) * 40)
-            progress_bar.progress(pct, text=f"Transcribing audio segment {idx + 1} of {total_segs} ({pct}%)...")
+            progress_bar.progress(pct, text=f"Transcribing segment {idx + 1} of {total_segs} ({pct}%)...")
             
             with open(seg, "rb") as f:
                 seg_bytes = f.read()
-            t = _call_groq_whisper(seg_bytes, f"part_{idx}.mp3", status_placeholder)
+            t = _call_openai_transcribe(seg_bytes, f"part_{idx}.mp3")
             if t:
                 full_transcript.append(t)
-            time.sleep(0.3)
+            time.sleep(0.2)
             try: os.remove(seg)
             except: pass
 
         progress_bar.progress(100, text="Transcription completed successfully (100%)!")
         time.sleep(0.3)
+        status_placeholder.empty()
         return " ".join(full_transcript)
 
     except Exception as e:
@@ -381,32 +381,27 @@ def extract_with_openai_completion(transcript):
         "Content-Type": "application/json"
     }
 
+    # Highly optimized prompt to minimize token usage
     system_prompt = (
-        "You are an expert executive assistant for PRIME Philippines extracting Minutes of the Meeting (MOM). "
-        "The transcript contains Tagalog and English (Taglish) dialogue. "
-        "Understand the core thought and context, translating all colloquial conversation into polished, professional corporate English. "
-        "Extract every discussion topic, report update, action plan, delivery date, and person-in-charge. "
-        "Respond ONLY with a valid JSON object matching the requested schema."
+        "You are an executive assistant for PRIME Philippines. Extract Minutes of the Meeting (MOM). "
+        "Translate Taglish into corporate English concisely. Output valid JSON only."
     )
 
-    user_prompt = f"""Extract the Minutes of Meeting from this transcript into valid JSON.
-Extract 4 to 10 clear, distinct items covering all topics discussed.
-
-JSON Schema:
+    user_prompt = f"""Format the transcript into MOM JSON schema:
 {{
   "table_items": [
     {{
-      "Discussion Points": "Core discussion topic, report update, or milestone",
-      "Action Plan": "Concrete next step, deliverable, or requirement (put 'None' if none)",
-      "Indicative Delivery Date": "Specific date, timeline (e.g. Friday, Q1 2027), or 'TBD'",
-      "Person-in-charge": "Responsible entity (e.g. PRIME, Client name, or Unassigned)"
+      "Discussion Points": "Core discussion or report topic",
+      "Action Plan": "Deliverable or action (or 'None')",
+      "Indicative Delivery Date": "Timeline or 'TBD'",
+      "Person-in-charge": "Responsible party or 'Unassigned'"
     }}
   ],
-  "other_discussions": "Summary of informal remarks, administrative notes, or general context"
+  "other_discussions": "Concise administrative summary"
 }}
 
 Transcript:
-{transcript[:35000]}"""
+{transcript[:28000]}"""
 
     payload = {
         "model": "gpt-4o-mini",
@@ -415,7 +410,8 @@ Transcript:
             {"role": "user", "content": user_prompt}
         ],
         "response_format": {"type": "json_object"},
-        "temperature": 0.2
+        "temperature": 0.1,
+        "max_tokens": 1600
     }
 
     try:
