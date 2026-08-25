@@ -49,12 +49,15 @@ CRD_MEMBERS = [
     "Irish Rima"
 ]
 
-# 12-Hour AM/PM Time Options with blank default
-TIME_OPTIONS = [""]
-for h in range(24):
-    for m in (0, 30):
-        t = datetime.time(h, m)
-        TIME_OPTIONS.append(t.strftime("%I:%M %p"))
+LOCATION_PRESETS = [
+    "GreatWork Mega Tower 32F - Secret Room",
+    "GreatWork Mega Tower 32F - Small Meeting Room",
+    "GreatWork Mega Tower 24F - Meeting Room",
+    "GreatWork Mega Tower 32F - Board Room",
+    "GreatWork Mega Tower 32F - Co-working",
+    "Online Meeting",
+    "Other (Custom Location)"
+]
 
 # Initialize Session State Variables
 if "transcript" not in st.session_state: st.session_state["transcript"] = ""
@@ -63,7 +66,7 @@ if "other_discussions" not in st.session_state: st.session_state["other_discussi
 if "show_settings" not in st.session_state: st.session_state["show_settings"] = False
 if "tokens_used" not in st.session_state: st.session_state["tokens_used"] = 0
 if "last_api_call" not in st.session_state: st.session_state["last_api_call"] = None
-if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "DeepSeek (Primary)"
+if "selected_engine" not in st.session_state: st.session_state["selected_engine"] = "AI - DeepSeek"
 
 # ========== CUSTOM CSS ==========
 CUSTOM_CSS = """
@@ -103,56 +106,6 @@ html, body, [class*="css"] {
 }
 .echo-title span { color: #D4AF37 !important; }
 
-/* Anchor Topbar Settings Button directly inside the Echo bar */
-div[data-testid="stButton"]:has(button[key="topbar_settings_btn"]) {
-    position: fixed !important;
-    top: 12px !important;
-    right: 2rem !important;
-    z-index: 999999 !important;
-    width: auto !important;
-}
-
-button[key="topbar_settings_btn"] {
-    background-color: #222222 !important;
-    border: 1px solid #444444 !important;
-    border-radius: 6px !important;
-    color: #F4F2EC !important;
-    padding: 0.35rem 0.95rem !important;
-    font-size: 0.82rem !important;
-    font-weight: 500 !important;
-    letter-spacing: 0.5px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 8px !important;
-    cursor: pointer !important;
-    transition: all 0.25s ease !important;
-}
-
-/* Crisp Vector SVG Gear Icon via CSS background */
-button[key="topbar_settings_btn"]::before {
-    content: "";
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    background-color: #F4F2EC;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-    transition: background-color 0.25s ease;
-}
-
-button[key="topbar_settings_btn"]:hover {
-    border-color: #D4AF37 !important;
-    color: #D4AF37 !important;
-    background-color: #1A1A1A !important;
-}
-
-button[key="topbar_settings_btn"]:hover::before {
-    background-color: #D4AF37 !important;
-}
-
 h3 {
     font-family: 'Playfair Display', serif !important;
     font-style: italic !important; font-weight: 400 !important; 
@@ -177,6 +130,41 @@ h3 {
     border-color: #D4AF37 !important; color: #D4AF37 !important;
     background-color: #1A1A1A !important;
 }
+
+/* Specific styling for the card settings button */
+button[key="card_settings_btn"] {
+    background-color: #FFFFFF !important;
+    color: #222222 !important;
+    border: 1px solid #CCCCCC !important;
+    border-radius: 6px !important;
+    padding: 0.25rem 0.75rem !important;
+    font-size: 0.8rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+}
+button[key="card_settings_btn"]::before {
+    content: "";
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    background-color: #222222;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    transition: background-color 0.25s ease;
+}
+button[key="card_settings_btn"]:hover {
+    border-color: #D4AF37 !important;
+    color: #D4AF37 !important;
+    background-color: #1A1A1A !important;
+}
+button[key="card_settings_btn"]:hover::before {
+    background-color: #D4AF37 !important;
+}
+
 .stTextArea textarea {
     font-size: 0.95rem !important;
     line-height: 1.6 !important;
@@ -477,11 +465,11 @@ def heuristic_non_ai_extraction(transcript):
     other_text = "\n\n".join(other_discussions[:4])
     return df, other_text
 
-def extract_structured_insights(transcript, engine="DeepSeek (Primary)"):
+def extract_structured_insights(transcript, engine="AI - DeepSeek"):
     progress_container = st.empty()
     progress_container.markdown(f'<div class="loading-banner">{SVG_SPINNER} <span>Translating Taglish conversation & structuring MOM with {engine}...</span></div>', unsafe_allow_html=True)
 
-    if engine == "Python Heuristic (Non-AI)":
+    if engine == "Non-AI - Python Heuristic":
         time.sleep(0.5)
         res_df, res_other = heuristic_non_ai_extraction(transcript)
         progress_container.empty()
@@ -874,60 +862,72 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Settings Button rendered cleanly with text and CSS SVG Mask
-if st.button("Settings", key="topbar_settings_btn", help="Settings"):
-    st.session_state["show_settings"] = not st.session_state["show_settings"]
-    st.rerun()
-
-# Top Settings Drawer
-if st.session_state["show_settings"]:
-    with st.container(border=True):
-        st.markdown('<h3>Settings/h3>', unsafe_allow_html=True)
-        set_col1, set_col2 = st.columns([1.5, 1.5])
-        
-        with set_col1:
-            engine_options = [
-                "AI - Deepseek",
-                "AI - Python Heuristic"
-            ]
-            selected_eng = st.selectbox(
-                "MoM Generation Engine",
-                options=engine_options,
-                index=engine_options.index(st.session_state["selected_engine"]) if st.session_state["selected_engine"] in engine_options else 0
-            )
-            st.session_state["selected_engine"] = selected_eng
-
-            if st.button("Regenerate MOM", key="btn_regen_mom"):
-                if st.session_state["transcript"]:
-                    extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng)
-                    if not extracted_df.empty:
-                        st.session_state["df"] = extracted_df
-                        st.session_state["other_discussions"] = other_disc
-                        st.rerun()
-
-        with set_col2:
-            st.markdown("**Token Usage Diagnostics**")
-            st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
-            
-            if st.session_state["last_api_call"]:
-                last_call = st.session_state["last_api_call"]
-                st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
-                st.write("• **DeepSeek Server Status:** `Active & Ready`")
-            else:
-                st.write("• **DeepSeek Server Status:** `Ready`")
-
-# ---- Compact Details & Audio (Blank Defaults) ----
+# ---- Meeting Details Card ----
 with st.container(border=True):
-    st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
+    # Header & Settings button in upper right corner of the card
+    head_col1, head_col2 = st.columns([8.2, 1.8])
+    with head_col1:
+        st.markdown('<h3>Meeting Details</h3>', unsafe_allow_html=True)
+    with head_col2:
+        if st.button("Settings", key="card_settings_btn", help="Open MoM Generation Engine & Token Diagnostics"):
+            st.session_state["show_settings"] = not st.session_state["show_settings"]
+            st.rerun()
+
+    # Settings Drawer
+    if st.session_state["show_settings"]:
+        with st.expander("Settings & Engine Diagnostics", expanded=True):
+            set_col1, set_col2 = st.columns([1.5, 1.5])
+            
+            with set_col1:
+                engine_options = [
+                    "AI - DeepSeek",
+                    "Non-AI - Python Heuristic"
+                ]
+                selected_eng = st.selectbox(
+                    "MoM Generation Engine",
+                    options=engine_options,
+                    index=engine_options.index(st.session_state["selected_engine"]) if st.session_state["selected_engine"] in engine_options else 0
+                )
+                st.session_state["selected_engine"] = selected_eng
+
+                if st.button("Regenerate MOM", key="btn_regen_mom"):
+                    if st.session_state["transcript"]:
+                        extracted_df, other_disc = extract_structured_insights(st.session_state["transcript"], selected_eng)
+                        if not extracted_df.empty:
+                            st.session_state["df"] = extracted_df
+                            st.session_state["other_discussions"] = other_disc
+                            st.rerun()
+
+            with set_col2:
+                st.markdown("**Token Usage Diagnostics**")
+                st.write(f"• **Session Tokens Processed:** `{st.session_state['tokens_used']:,}`")
+                
+                if st.session_state["last_api_call"]:
+                    last_call = st.session_state["last_api_call"]
+                    st.write(f"• **Last Request Time:** `{last_call.strftime('%I:%M:%S %p')}`")
+                    st.write("• **DeepSeek Server Status:** `Active & Ready`")
+                else:
+                    st.write("• **DeepSeek Server Status:** `Ready`")
+        st.markdown("---")
     
-    # ROW 1
-    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.3, 2.0, 1.1, 1.1, 1.5, 1.5])
-    with r1_c1: meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25))
-    with r1_c2: meeting_location = st.text_input("Location", value="", placeholder="e.g. Boardroom")
-    with r1_c3: start_time = st.selectbox("Start", options=TIME_OPTIONS, index=0)
-    with r1_c4: end_time = st.selectbox("End", options=TIME_OPTIONS, index=0)
-    with r1_c5: prep_name = st.text_input("Prepared By (Name)", value="", placeholder="e.g. John Doe")
-    with r1_c6: prep_desig = st.text_input("Designation", value="", placeholder="e.g. Associate")
+    # ROW 1: Date (August 25, 2026), Presets Location, Native Time Pickers, Prepared By
+    r1_c1, r1_c2, r1_c3, r1_c4, r1_c5, r1_c6 = st.columns([1.5, 2.2, 1.1, 1.1, 1.5, 1.5])
+    with r1_c1:
+        meeting_date = st.date_input("Date", value=datetime.date(2026, 8, 25), format="MMMM DD, YYYY")
+    with r1_c2:
+        loc_choice = st.selectbox("Location Preset", options=LOCATION_PRESETS, index=0)
+        if loc_choice == "Other (Custom Location)":
+            meeting_location = st.text_input("Custom Location", value="", placeholder="Enter location...")
+        else:
+            meeting_location = loc_choice
+    with r1_c3:
+        start_time_val = st.time_input("Start Time", value=None)
+    with r1_c4:
+        end_time_val = st.time_input("End Time", value=None)
+    with r1_c5:
+        prep_name = st.text_input("Prepared By (Name)", value="", placeholder="e.g. John Doe")
+    with r1_c6:
+        prep_desig = st.text_input("Designation", value="", placeholder="e.g. Associate")
 
     # ROW 2
     r2_c1, r2_c2, r2_c3, r2_c4, r2_c5 = st.columns([1.5, 2.0, 2.0, 1.5, 1.5])
@@ -1043,8 +1043,13 @@ if not st.session_state["df"].empty:
 
         st.session_state["other_discussions"] = st.text_area("Other Discussions", value=st.session_state["other_discussions"], height=100)
 
-        # Build formatted time range only if provided
-        time_range_str = f"{start_time} to {end_time}" if (start_time and end_time) else (start_time or end_time or "")
+        # Build clean formatted time string from native time picker
+        start_str = start_time_val.strftime("%I:%M %p") if start_time_val else ""
+        end_str = end_time_val.strftime("%I:%M %p") if end_time_val else ""
+        if start_str and end_str:
+            time_range_str = f"{start_str} to {end_str}"
+        else:
+            time_range_str = start_str or end_str or ""
 
         meeting_details = {
             "date": meeting_date.strftime("%B %d, %Y"),
