@@ -117,7 +117,9 @@ payment_methods = [method for method, checked in zip(["Cash", "Check", "Online P
 urgency_status = "Urgent" if urgent else "Not urgent" if not_urgent else ""
 
 def has_signature(canvas_result):
-    return canvas_result.image_data is not None if canvas_result else False
+    if canvas_result is not None and canvas_result.json_data is not None:
+        return len(canvas_result.json_data.get("objects", [])) > 0
+    return False
 
 form_data = {
     "Document_Info": {"Company": "PROPERTY INTERACTIVE MARKETING ENTERPRISE", "Entity": "PRIME Philippines, REALTY CORP", "Form_Type": "REQUEST FOR PAYMENT"},
