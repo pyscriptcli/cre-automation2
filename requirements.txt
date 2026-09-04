@@ -31,3 +31,5 @@ PyPDF2==3.0.1
 streamlit
 pandas
 streamlit-drawable-canvas
+Pillow
+numpy
