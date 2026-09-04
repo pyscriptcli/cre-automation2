@@ -2,136 +2,153 @@ import streamlit as st
 import pandas as pd
 import json
 
-st.set_page_config(page_title="Request for Payment Form", layout="wide")
+st.set_page_config(page_title="Request For Payment", layout="wide")
 
-with st.container(border=True):
-    # --- Header ---
-    c_head1, c_head2 = st.columns([3, 1])
-    with c_head1:
-        st.markdown("<h2 style='text-align: center; margin-bottom: 0;'>PROPERTY INTERACTIVE MARKETING ENTERPRISE</h2>", unsafe_allow_html=True)
-        st.markdown("<h2 style='text-align: center; margin-top: 0;'>REALTY CORP</h2>", unsafe_allow_html=True)
-    with c_head2:
-        st.markdown("<div style='background-color: navy; color: white; text-align: center; padding: 10px; font-weight: bold; border-radius: 5px;'>REQUEST FOR PAYMENT</div>", unsafe_allow_html=True)
+# Custom CSS to mimic the PDF borders and exact layout
+st.markdown("""
+    <style>
+    .stApp { max-width: 1000px; margin: 0 auto; }
+    .header-text { color: #002B5B; font-weight: bold; text-align: center; }
+    .title-box { background-color: #002B5B; color: white; padding: 5px; text-align: center; font-weight: bold; font-size: 20px;}
+    .bordered-container { border: 2px solid black; padding: 15px; margin-bottom: 10px; }
+    .red-text { color: red; font-style: italic; font-size: 12px; }
+    </style>
+""", unsafe_allow_html=True)
 
-    # --- Top Fields ---
-    c_date, c_payee, c_dept = st.columns([1, 2, 2])
-    date = c_date.text_input("Date", label_visibility="collapsed", placeholder="DATE:")
-    payee = c_payee.text_input("Payee", label_visibility="collapsed", placeholder="PAYEE:")
-    department = c_dept.text_input("Department", label_visibility="collapsed", placeholder="DEPARTMENT:")
-
-    # --- Items Table ---
+with st.container():
+    # Header Section
+    col1, col2 = st.columns([3, 2])
+    with col1:
+        st.markdown("<div class='header-text' style='font-size:22px;'>PROPERTY INTERACTIVE MARKETING ENTERPRISE</div>", unsafe_allow_html=True)
+        st.markdown("<div class='header-text' style='font-size:20px;'>REALTY CORP</div>", unsafe_allow_html=True)
+    with col2:
+        st.markdown("<div style='text-align: right; color:#002B5B; font-weight:bold; font-size:24px; margin-bottom:5px;'>PRIME <span style='font-size:12px'>Philippines</span>>></div>", unsafe_allow_html=True)
+        st.markdown("<div class='title-box'>REQUEST FOR PAYMENT</div>", unsafe_allow_html=True)
+    
     st.markdown("---")
-    data = pd.DataFrame(
-        [{"ITEMS/DESCRIPTION": "", "QTY": 0, "UNIT": "", "UNIT PRICE": 0.0, "AMOUNT": 0.0}]
-    )
-    edited_df = st.data_editor(
-        data,
-        num_rows="dynamic",
-        hide_index=True,
-        use_container_width=True,
-        column_config={
-            "ITEMS/DESCRIPTION": st.column_config.TextColumn("ITEMS/DESCRIPTION", width="large"),
-            "QTY": st.column_config.NumberColumn("QTY", min_value=0, step=1),
-            "UNIT": st.column_config.TextColumn("UNIT"),
-            "UNIT PRICE": st.column_config.NumberColumn("UNIT PRICE", min_value=0.0, format="%.2f"),
-            "AMOUNT": st.column_config.NumberColumn("AMOUNT", min_value=0.0, format="%.2f"),
-        }
-    )
 
-    total_amount = edited_df["AMOUNT"].fillna(0).sum()
-    c_total_label, c_total_val = st.columns([5, 1])
-    with c_total_val:
-        st.markdown(f"**TOTAL AMOUNT:** {total_amount:.2f}")
+    # Top Inputs
+    col_date, col_empty = st.columns([1, 3])
+    with col_date:
+        date = st.date_input("DATE:")
+    
+    col_payee, col_dept = st.columns([2, 1])
+    with col_payee:
+        payee = st.text_input("PAYEE:")
+    with col_dept:
+        department = st.text_input("DEPARTMENT:")
 
-    # --- Purpose ---
     st.markdown("---")
-    purpose = st.text_area("Purpose", label_visibility="collapsed", placeholder="Purpose:", height=80)
 
-    # --- Payment Details ---
-    st.markdown("---")
-    c_pay_left, c_pay_right = st.columns(2)
-
-    with c_pay_left:
-        c_cash, c_check, c_online = st.columns(3)
-        cash = c_cash.checkbox("Cash")
-        check = c_check.checkbox("Check")
-        online = c_online.checkbox("Online Payment/Bank Transfer")
-
-        st.markdown("<span style='color: red;'>*if not applicable kindly put N/A</span>", unsafe_allow_html=True)
-
-        bank = st.text_input("Bank", placeholder="Bank")
-        account_name = st.text_input("Account Name", placeholder="Account Name")
-        account_number = st.text_input("Account Number", placeholder="Account Number")
-
-    with c_pay_right:
-        st.markdown("**Remarks:**")
-        c_urgent, c_not_urgent = st.columns(2)
-        urgent = c_urgent.checkbox("Urgent")
-        not_urgent = c_not_urgent.checkbox("Not urgent")
-        date_needed = st.text_input("Date Needed (M-D-Y):", placeholder="Date Needed (M-D-Y):")
-
-    # --- Signatures ---
-    st.markdown("---")
-    c_sig1, c_sig2, c_sig3 = st.columns(3)
-
-    with c_sig1:
-        st.markdown("**Requested By:**")
-        req_name = st.text_input("Req Name", label_visibility="collapsed", placeholder="Signature Over Printed Name")
-        req_remarks = st.text_area("Req Remarks", label_visibility="collapsed", placeholder="Remarks:", height=68)
-
-    with c_sig2:
-        st.markdown("**Approved By:**")
-        app_name = st.text_input("App Name", label_visibility="collapsed", placeholder="Signature Over Printed Name")
-        st.caption("*Team Leader/ Co-TL*")
-
-    with c_sig3:
-        st.markdown("**Received By:**")
-        rec_name = st.text_input("Rec Name", label_visibility="collapsed", placeholder="Signature Over Printed Name")
-        st.caption("*Finance Officer*")
-
-    # --- Submit Button ---
-    st.markdown("---")
-    if st.button("Submit Request", type="primary", use_container_width=True):
-        form_data = {
-            "header": {
-                "date": date,
-                "payee": payee,
-                "department": department
-            },
-            "items": edited_df.to_dict(orient="records"),
-            "total_amount": total_amount,
-            "purpose": purpose,
-            "payment_details": {
-                "cash": cash,
-                "check": check,
-                "online": online,
-                "bank": bank,
-                "account_name": account_name,
-                "account_number": account_number
-            },
-            "remarks": {
-                "urgent": urgent,
-                "not_urgent": not_urgent,
-                "date_needed": date_needed
-            },
-            "signatures": {
-                "requested_by": {
-                    "signature": req_name,
-                    "remarks": req_remarks
-                },
-                "approved_by": {
-                    "signature": app_name
-                },
-                "received_by": {
-                    "signature": rec_name
-                }
-            }
-        }
-
-        st.json(form_data)
-        st.download_button(
-            label="Download JSON",
-            data=json.dumps(form_data, indent=4),
-            file_name="request_for_payment.json",
-            mime="application/json"
+    # Data Table
+    if 'items_df' not in st.session_state:
+        st.session_state.items_df = pd.DataFrame(
+            [["", 0, "", 0.0, 0.0] for _ in range(5)],
+            columns=["ITEMS/DESCRIPTION", "QTY", "UNIT", "UNIT PRICE", "AMOUNT"]
         )
+
+    edited_df = st.data_editor(
+        st.session_state.items_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # Force numeric conversion to avoid serialization errors
+    edited_df['AMOUNT'] = pd.to_numeric(edited_df['AMOUNT'], errors='coerce').fillna(0)
+    total_amount = float(edited_df['AMOUNT'].sum())  # Cast to native float
+    
+    st.markdown(f"<div style='text-align: right; font-weight: bold; border-top: 1px solid black; padding-top: 5px;'>TOTAL AMOUNT &nbsp;&nbsp;&nbsp;&nbsp; {total_amount:,.2f}</div>", unsafe_allow_html=True)
+    
+    st.markdown("---")
+
+    # Purpose
+    purpose = st.text_area("Purpose:", height=100)
+
+    # Payment Details
+    st.markdown("Payment Details:")
+    col_c1, col_c2, col_c3 = st.columns(3)
+    with col_c1:
+        cash = st.checkbox("Cash")
+    with col_c2:
+        check = st.checkbox("Check")
+    with col_c3:
+        online = st.checkbox("Online Payment/Bank Transfer")
+
+    col_bank1, col_bank2 = st.columns([2, 1])
+    with col_bank1:
+        st.markdown("<div class='red-text'>*If not applicable kindly put N/A</div>", unsafe_allow_html=True)
+        bank = st.text_input("Bank")
+        account_name = st.text_input("Account Name")
+        account_number = st.text_input("Account Number")
+    
+    with col_bank2:
+        st.markdown("Remarks:")
+        urgent = st.checkbox("Urgent")
+        not_urgent = st.checkbox("Not urgent")
+        date_needed = st.date_input("Date Needed (M-D-Y):")
+
+    st.markdown("---")
+
+    # Signatures
+    col_sig1, col_sig2, col_sig3 = st.columns(3)
+    with col_sig1:
+        st.write("Requested By:")
+        req_name = st.text_input("Signature Over Printed Name", key="req")
+        req_remarks = st.text_input("Remarks:")
+    with col_sig2:
+        st.write("Approved By:")
+        app_name = st.text_input("Signature Over Printed Name", key="app")
+        st.caption("Team Leader/Co-TL")
+    with col_sig3:
+        st.write("Received By:")
+        rec_name = st.text_input("Signature Over Printed Name", key="rec")
+        st.caption("Finance Officer")
+
+# Serialize Output Safely
+payment_methods = []
+if cash: payment_methods.append("Cash")
+if check: payment_methods.append("Check")
+if online: payment_methods.append("Online Payment/Bank Transfer")
+
+urgency_status = "Urgent" if urgent else "Not urgent" if not_urgent else ""
+
+form_data = {
+    "Document_Info": {
+        "Company": "PROPERTY INTERACTIVE MARKETING ENTERPRISE",
+        "Entity": "PRIME Philippines, REALTY CORP",
+        "Form_Type": "REQUEST FOR PAYMENT"
+    },
+    "Basic_Details": {
+        "Date": str(date),
+        "Payee": payee,
+        "Department": department
+    },
+    "Items": edited_df.fillna("").astype(str).to_dict(orient="records"),
+    "Total_Amount": total_amount,
+    "Purpose": purpose,
+    "Payment_Details": {
+        "Method": payment_methods,
+        "Bank": bank,
+        "Account_Name": account_name,
+        "Account_Number": account_number
+    },
+    "Status": {
+        "Urgency": urgency_status,
+        "Date_Needed": str(date_needed)
+    },
+    "Signatures": {
+        "Requested_By": {"Name": req_name, "Remarks": req_remarks},
+        "Approved_By": {"Name": app_name, "Role": "Team Leader/Co-TL"},
+        "Received_By": {"Name": rec_name, "Role": "Finance Officer"}
+    }
+}
+
+json_output = json.dumps(form_data, indent=4)
+
+st.download_button(
+    label="Export to JSON",
+    data=json_output,
+    file_name="RFP_Output.json",
+    mime="application/json"
+)
