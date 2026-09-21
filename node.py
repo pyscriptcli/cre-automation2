@@ -505,10 +505,20 @@ leaflet_template = """
         }
 
         const basemaps = {
-            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-            carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 })
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors' 
+            }),
+            satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { 
+                maxZoom: 20,
+                attribution: '&copy; Google' 
+            }),
+            carto: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', { 
+                maxZoom: 16,
+                attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ' 
+            })
         };
+
         basemaps[(localStorage.getItem('ts_persistent_basemap') || 'osm')].addTo(map);
         
         function switchActiveBasemap(targetKey) {
