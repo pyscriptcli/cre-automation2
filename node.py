@@ -118,9 +118,16 @@ st.markdown("""
         }
 
         /* ----------------------------------------------------------------
-           SIDEBAR -- scrollable, collapsible, expandable
+           SIDEBAR -- STATIC & NON-COLLAPSIBLE (Modern Web Guidance)
         ---------------------------------------------------------------- */
         [data-testid="stSidebar"] {
+            width: 310px !important;
+            min-width: 310px !important;
+            max-width: 310px !important;
+            flex: 0 0 310px !important;
+            transform: none !important;
+            margin-left: 0 !important;
+            transition: none !important;
             background-color: var(--prime-warm-white) !important;
             border-right: 2px solid var(--prime-gold) !important;
             box-shadow: 2px 0 20px rgba(0, 51, 102, 0.08) !important;
@@ -128,132 +135,57 @@ st.markdown("""
             position: relative !important;
         }
 
-        [data-testid="stSidebar"][aria-expanded="true"] {
-            min-width: 280px !important;
-            max-width: 320px !important;
+        /* Permanently suppress any native collapse / expand controls */
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="collapsedControl"],
+        button[data-testid="stSidebarCollapseButton"],
+        button[data-testid="stSidebarCollapsedControl"],
+        [data-testid="stSidebarHeader"] button,
+        [data-testid="stHeader"] [data-testid="collapsedControl"] {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            opacity: 0 !important;
         }
 
+        /* Sidebar scroll container with modern scrollbar and overscroll containment */
         [data-testid="stSidebarContent"] {
             background-color: var(--prime-warm-white) !important;
             color: var(--prime-blue) !important;
             padding: 0 12px 3rem 12px !important;
-            height: 100vh !important;
-            max-height: 100vh !important;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
             overflow-y: auto !important;
             overflow-x: hidden !important;
+            overscroll-behavior: contain !important;
+            scrollbar-gutter: stable !important;
             scrollbar-width: thin !important;
             scrollbar-color: rgba(0, 51, 102, 0.25) transparent !important;
         }
 
-        [data-testid="stSidebarContent"]::-webkit-scrollbar { width: 4px !important; }
-        [data-testid="stSidebarContent"]::-webkit-scrollbar-track { background: transparent !important; }
-        [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb {
-            background-color: rgba(0, 51, 102, 0.18) !important;
-            border-radius: 0 !important;
-        }
-        [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb:hover {
-            background-color: var(--prime-gold) !important;
-        }
-
-        /* Collapse button inside sidebar header */
-        [data-testid="stSidebarCollapseButton"] {
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            position: absolute !important;
-            top: 8px !important;
-            right: 8px !important;
-            z-index: 999 !important;
-        }
-
-        [data-testid="stSidebarCollapseButton"] button {
-            background-color: transparent !important;
-            color: var(--prime-warm-white) !important;
-            border: none !important;
-            border-radius: 0 !important;
-            box-shadow: none !important;
-            cursor: pointer !important;
-            padding: 4px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            transition: all 0.2s ease !important;
-        }
-
-        [data-testid="stSidebarCollapseButton"] button:hover {
-            background-color: rgba(201, 171, 76, 0.25) !important;
-        }
-
-        [data-testid="stSidebarCollapseButton"] button svg,
-        [data-testid="stSidebarCollapseButton"] button span {
-            fill: var(--prime-warm-white) !important;
-            color: var(--prime-warm-white) !important;
-            font-size: 18px !important;
-        }
-
-        [data-testid="stSidebarCollapseButton"] button:hover svg,
-        [data-testid="stSidebarCollapseButton"] button:hover span {
-            fill: var(--prime-gold) !important;
-            color: var(--prime-gold) !important;
-        }
-
-        /* HIDE expand button completely while sidebar is open */
-        [data-testid="stSidebar"][aria-expanded="true"] ~ * [data-testid="collapsedControl"],
-        .stApp:has([data-testid="stSidebar"][aria-expanded="true"]) [data-testid="collapsedControl"] {
-            display: none !important;
-        }
-
-        /* Expand button: shown when sidebar is collapsed */
-        [data-testid="collapsedControl"] {
-            position: fixed !important;
-            top: 10px !important;
-            left: 10px !important;
-            z-index: 999999 !important;
-            pointer-events: all !important;
-        }
-
-        [data-testid="collapsedControl"] button {
-            background-color: var(--prime-blue) !important;
-            color: var(--prime-warm-white) !important;
-            border: 1.5px solid var(--prime-gold) !important;
-            border-radius: 0 !important;
-            box-shadow: 0 2px 10px rgba(0, 51, 102, 0.25) !important;
-            cursor: pointer !important;
-            padding: 6px 8px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            transition: all 0.2s ease !important;
-            pointer-events: all !important;
-        }
-
-        [data-testid="collapsedControl"] button:hover {
-            background-color: var(--prime-gold) !important;
-            color: var(--prime-blue) !important;
-            border-color: var(--prime-gold) !important;
-        }
-
-        [data-testid="collapsedControl"] button svg,
-        [data-testid="collapsedControl"] button span {
-            fill: var(--prime-warm-white) !important;
-            color: var(--prime-warm-white) !important;
-            font-size: 18px !important;
-        }
-
-        [data-testid="collapsedControl"] button:hover svg,
-        [data-testid="collapsedControl"] button:hover span {
-            fill: var(--prime-blue) !important;
-            color: var(--prime-blue) !important;
+        /* Fallback for WebKit browsers */
+        @supports not (scrollbar-color: auto) {
+            [data-testid="stSidebarContent"]::-webkit-scrollbar { width: 5px !important; }
+            [data-testid="stSidebarContent"]::-webkit-scrollbar-track { background: transparent !important; }
+            [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb {
+                background-color: rgba(0, 51, 102, 0.18) !important;
+                border-radius: 0 !important;
+            }
+            [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb:hover {
+                background-color: var(--prime-gold) !important;
+            }
         }
 
         /* ----------------------------------------------------------------
-           LAYOUT -- flex viewport, map fills remaining space
+           LAYOUT -- continuous flex viewport (100% width to avoid scrollbar jump)
         ---------------------------------------------------------------- */
         [data-testid="stAppViewContainer"] {
             display: flex !important;
             flex-direction: row !important;
-            width: 100vw !important;
-            height: 100vh !important;
+            width: 100% !important;
+            height: 100dvh !important;
             overflow: hidden !important;
         }
 
@@ -261,7 +193,7 @@ st.markdown("""
             flex: 1 1 0% !important;
             width: 100% !important;
             min-width: 0 !important;
-            height: 100vh !important;
+            height: 100dvh !important;
             overflow: hidden !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -279,7 +211,7 @@ st.markdown("""
         }
 
         iframe {
-            height: 100vh !important;
+            height: 100dvh !important;
             width: 100% !important;
             border: none !important;
             display: block !important;
@@ -644,15 +576,16 @@ st.markdown("""
         .brand-title {
             font-family: 'Cormorant Garamond', Georgia, serif !important;
             font-style: italic !important;
-            font-weight: 300 !important;
+            font-weight: 400 !important;
             color: var(--prime-warm-white) !important;
-            font-size: 28px !important;
+            font-size: 26px !important;
             text-align: center !important;
             background-color: var(--prime-blue) !important;
             border-bottom: 2px solid var(--prime-gold) !important;
-            padding: 14px 12px 10px !important;
-            margin: -0px -12px 14px -12px !important;
+            padding: 14px 12px 12px !important;
+            margin: 0 -12px 14px -12px !important;
             letter-spacing: -0.01em !important;
+            user-select: none !important;
         }
 
         /* ----------------------------------------------------------------
