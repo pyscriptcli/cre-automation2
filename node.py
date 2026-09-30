@@ -37,36 +37,75 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,400,0,0');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
+
+        /* ================================================================
+           PRIME PHILIPPINES Ã¢â‚¬â€ PALETTE OF SOVEREIGN INTELLIGENCE
+           Backgrounds: #003366 (PRIME Blue) or #FFFCFB (Warm White) ONLY
+           Accent:      #C9AB4C (PRIME Gold) Ã¢â‚¬â€ never a background fill
+           Text:        #003366 (Blue) or #181D1E (Gray) Ã¢â‚¬â€ never #000000
+           Radius:      0 everywhere Ã¢â‚¬â€ Edges Stay Sharp
+        ================================================================ */
 
         :root, [data-theme="dark"], [data-theme="light"], .stApp {
             color-scheme: light !important;
-            --brand-midnight: #003366 !important;
-            --brand-gold: #C9AB4C !important;
-            --white-clean: #ffffff !important;
-            --bg-offwhite: #f8fafc !important;
-            --text-muted: #888780 !important;
-            --soft-shadow: 0 4px 12px rgba(0, 51, 102, 0.08) !important;
-            --primary-color: #003366 !important;
-            --background-color: #ffffff !important;
-            --secondary-background-color: #f8fafc !important;
-            --text-color: #003366 !important;
+            --prime-blue:       #003366;
+            --prime-warm-white: #FFFCFB;
+            --prime-gold:       #C9AB4C;
+            --prime-gray:       #181D1E;
+            --prime-muted:      rgba(0, 51, 102, 0.45);
+            --prime-divider:    rgba(0, 51, 102, 0.10);
+            --prime-shadow:     0 4px 16px rgba(0, 51, 102, 0.10);
+            --prime-radius:     0;
+            /* Legacy aliases kept for any inline references */
+            --brand-midnight:   #003366;
+            --brand-gold:       #C9AB4C;
+            --white-clean:      #FFFCFB;
+            --bg-offwhite:      #FFFCFB;
+            --text-muted:       rgba(0, 51, 102, 0.45);
+            --soft-shadow:      0 4px 16px rgba(0, 51, 102, 0.10);
         }
-        
-        html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main, .block-container {
-            background-color: var(--white-clean) !important;
-            color: var(--brand-midnight) !important;
-            font-family: 'Montserrat', sans-serif !important;
+
+        html, body,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"],
+        .main, .block-container {
+            background-color: var(--prime-warm-white) !important;
+            color: var(--prime-blue) !important;
+            font-family: 'Montserrat', Arial, Helvetica, sans-serif !important;
             color-scheme: light !important;
         }
-        
-        /* --- SIDEBAR STRUCTURE: SCROLLABLE, COLLAPSIBLE & EXPANDABLE --- */
+
+        /* ----------------------------------------------------------------
+           STREAMLIT HEADER Ã¢â‚¬â€ transparent shell, never height:0
+           Keep natural height so collapsedControl is clickable
+        ---------------------------------------------------------------- */
+        [data-testid="stHeader"], header {
+            background: transparent !important;
+            border-bottom: none !important;
+            box-shadow: none !important;
+            pointer-events: none !important;
+        }
+
+        /* Re-enable pointer events ONLY for the collapse expand button */
+        [data-testid="collapsedControl"],
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="stHeader"] [data-testid="collapsedControl"] {
+            pointer-events: all !important;
+        }
+
+        [data-testid="stToolbar"], #stDecoration,
+        [data-testid="stMainMenu"], [data-testid="stStatusWidget"] {
+            display: none !important;
+        }
+
+        /* ----------------------------------------------------------------
+           SIDEBAR Ã¢â‚¬â€ scrollable, collapsible, expandable
+        ---------------------------------------------------------------- */
         [data-testid="stSidebar"] {
-            background-color: var(--bg-offwhite) !important;
-            color: var(--brand-midnight) !important;
-            border-right: 1px solid rgba(0, 51, 102, 0.08) !important;
-            box-shadow: 2px 0 15px rgba(0,0,0,0.03) !important;
+            background-color: var(--prime-warm-white) !important;
+            border-right: 2px solid var(--prime-gold) !important;
+            box-shadow: 2px 0 20px rgba(0, 51, 102, 0.08) !important;
             z-index: 100 !important;
         }
 
@@ -75,11 +114,10 @@ st.markdown("""
             max-width: 320px !important;
         }
 
-        /* Make sidebar body scrollable with modern styled scrollbar */
         [data-testid="stSidebarContent"] {
-            background-color: var(--bg-offwhite) !important;
-            color: var(--brand-midnight) !important;
-            padding: 16px 12px 3rem 12px !important;
+            background-color: var(--prime-warm-white) !important;
+            color: var(--prime-blue) !important;
+            padding: 0 12px 3rem 12px !important;
             height: 100vh !important;
             max-height: 100vh !important;
             overflow-y: auto !important;
@@ -88,27 +126,21 @@ st.markdown("""
             scrollbar-color: rgba(0, 51, 102, 0.25) transparent !important;
         }
 
-        [data-testid="stSidebarContent"]::-webkit-scrollbar {
-            width: 6px !important;
-        }
-        [data-testid="stSidebarContent"]::-webkit-scrollbar-track {
-            background: transparent !important;
-        }
+        [data-testid="stSidebarContent"]::-webkit-scrollbar { width: 4px !important; }
+        [data-testid="stSidebarContent"]::-webkit-scrollbar-track { background: transparent !important; }
         [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb {
-            background-color: rgba(0, 51, 102, 0.2) !important;
-            border-radius: 4px !important;
+            background-color: rgba(0, 51, 102, 0.18) !important;
+            border-radius: 0 !important;
         }
         [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb:hover {
-            background-color: var(--brand-gold) !important;
+            background-color: var(--prime-gold) !important;
         }
 
-        /* SIDEBAR TOGGLE & COLLAPSE CONTROLS */
+        /* Collapse / Expand toggle buttons */
         [data-testid="stSidebarCollapseButton"] {
             display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
-            align-items: center !important;
-            justify-content: center !important;
         }
 
         [data-testid="collapsedControl"] {
@@ -116,56 +148,46 @@ st.markdown("""
             visibility: visible !important;
             opacity: 1 !important;
             position: fixed !important;
-            top: 12px !important;
-            left: 12px !important;
-            z-index: 99999 !important;
+            top: 10px !important;
+            left: 10px !important;
+            z-index: 9999999 !important;
+            pointer-events: all !important;
         }
 
         [data-testid="stSidebarCollapseButton"] button,
         [data-testid="collapsedControl"] button {
-            background-color: var(--white-clean) !important;
-            color: var(--brand-midnight) !important;
-            border: 1px solid rgba(0, 51, 102, 0.18) !important;
-            border-radius: 4px !important;
-            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.12) !important;
+            background-color: var(--prime-blue) !important;
+            color: var(--prime-warm-white) !important;
+            border: 2px solid var(--prime-gold) !important;
+            border-radius: 0 !important;
+            box-shadow: 0 2px 12px rgba(0, 51, 102, 0.25) !important;
             cursor: pointer !important;
             transition: all 0.2s ease !important;
-            padding: 4px !important;
+            padding: 6px !important;
+            pointer-events: all !important;
         }
 
         [data-testid="stSidebarCollapseButton"] button:hover,
         [data-testid="collapsedControl"] button:hover {
-            background-color: var(--bg-offwhite) !important;
-            border-color: var(--brand-gold) !important;
-            box-shadow: 0 3px 12px rgba(201, 171, 76, 0.25) !important;
+            background-color: var(--prime-gold) !important;
+            border-color: var(--prime-gold) !important;
         }
 
         [data-testid="stSidebarCollapseButton"] svg,
         [data-testid="collapsedControl"] svg {
-            fill: var(--brand-midnight) !important;
-            color: var(--brand-midnight) !important;
-            stroke: var(--brand-midnight) !important;
+            fill: var(--prime-warm-white) !important;
+            color: var(--prime-warm-white) !important;
         }
 
-        /* Transparent Streamlit header (leaves collapsedControl visible) */
-        [data-testid="stHeader"], header {
-            background: transparent !important;
-            color: transparent !important;
-            height: 0px !important;
-            min-height: 0px !important;
-            border: none !important;
-            box-shadow: none !important;
-        }
-        [data-testid="stToolbar"], #stDecoration {
-            display: none !important;
+        [data-testid="stSidebarCollapseButton"] button:hover svg,
+        [data-testid="collapsedControl"] button:hover svg {
+            fill: var(--prime-blue) !important;
+            color: var(--prime-blue) !important;
         }
 
-        p, label, h1, h2, h3, h4, h5, h6, .stMarkdown {
-            color: var(--brand-midnight) !important;
-            font-family: 'Montserrat', sans-serif !important;
-        }
-
-        /* Continuous Flex Viewport Layout */
+        /* ----------------------------------------------------------------
+           LAYOUT Ã¢â‚¬â€ flex viewport, map fills remaining space
+        ---------------------------------------------------------------- */
         [data-testid="stAppViewContainer"] {
             display: flex !important;
             flex-direction: row !important;
@@ -180,16 +202,19 @@ st.markdown("""
             min-width: 0 !important;
             height: 100vh !important;
             overflow: hidden !important;
-            margin: 0px !important;
-            padding: 0px !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
-        .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer {
-            padding: 0px !important;
-            margin: 0px !important;
+        .block-container,
+        [data-testid="stAppViewBlockContainer"],
+        [data-testid="stVerticalBlock"],
+        .stElementContainer {
+            padding: 0 !important;
+            margin: 0 !important;
             max-width: 100% !important;
             height: 100% !important;
-            gap: 0rem !important;
+            gap: 0 !important;
         }
 
         iframe {
@@ -198,8 +223,18 @@ st.markdown("""
             border: none !important;
             display: block !important;
         }
-        
-        /* --- FORM CONTROLS & INPUT FIELDS LOCKED TO LIGHT THEME --- */
+
+        /* ----------------------------------------------------------------
+           TYPOGRAPHY Ã¢â‚¬â€ Montserrat UI, Cormorant titles
+        ---------------------------------------------------------------- */
+        p, label, h1, h2, h3, h4, h5, h6, .stMarkdown, span {
+            color: var(--prime-blue) !important;
+            font-family: 'Montserrat', Arial, Helvetica, sans-serif !important;
+        }
+
+        /* ----------------------------------------------------------------
+           FORM CONTROLS Ã¢â‚¬â€ PRIME Warm White surfaces, sharp edges
+        ---------------------------------------------------------------- */
         [data-testid="stTextInput"] div[data-baseweb="base-input"],
         [data-testid="stTextInput"] div[data-baseweb="input"],
         [data-testid="stNumberInput"] div[data-baseweb="base-input"],
@@ -208,11 +243,10 @@ st.markdown("""
         div[data-baseweb="base-input"],
         div[data-baseweb="input"],
         div[data-testid="stTextInputRootElement"] {
-            background-color: var(--white-clean) !important;
-            border: 1px solid rgba(0, 51, 102, 0.22) !important;
-            border-radius: 3px !important;
+            background-color: var(--prime-warm-white) !important;
+            border: 1px solid rgba(0, 51, 102, 0.28) !important;
+            border-radius: 0 !important;
             box-shadow: none !important;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within,
@@ -220,8 +254,8 @@ st.markdown("""
         [data-testid="stNumberInputContainer"]:focus-within,
         div[data-baseweb="input"]:focus-within,
         div[data-baseweb="base-input"]:focus-within {
-            border-color: var(--brand-gold) !important;
-            box-shadow: 0 0 0 1px var(--brand-gold) !important;
+            border-color: var(--prime-gold) !important;
+            box-shadow: 0 0 0 1px var(--prime-gold) !important;
         }
 
         [data-testid="stTextInput"] input,
@@ -230,21 +264,19 @@ st.markdown("""
         div[data-baseweb="input"] input,
         div[data-testid="stNumberInputContainer"] input,
         input {
-            background-color: var(--white-clean) !important;
-            color: var(--brand-midnight) !important;
-            -webkit-text-fill-color: var(--brand-midnight) !important;
+            background-color: var(--prime-warm-white) !important;
+            color: var(--prime-blue) !important;
+            -webkit-text-fill-color: var(--prime-blue) !important;
             font-family: 'Montserrat', sans-serif !important;
             font-size: 11px !important;
             font-weight: 600 !important;
+            border-radius: 0 !important;
         }
 
-        input::placeholder,
-        input::-webkit-input-placeholder,
-        input::-moz-placeholder,
-        input:-ms-input-placeholder {
-            color: var(--text-muted) !important;
-            -webkit-text-fill-color: var(--text-muted) !important;
-            font-weight: 500 !important;
+        input::placeholder {
+            color: var(--prime-muted) !important;
+            -webkit-text-fill-color: var(--prime-muted) !important;
+            font-weight: 400 !important;
             font-size: 10px !important;
             opacity: 1 !important;
         }
@@ -255,275 +287,311 @@ st.markdown("""
         [data-testid="stWidgetLabel"] label {
             font-size: 9px !important;
             font-weight: 700 !important;
-            color: var(--brand-midnight) !important;
-            letter-spacing: 0.5px !important;
+            color: var(--prime-muted) !important;
+            letter-spacing: 1px !important;
             text-transform: uppercase !important;
-            margin-bottom: 2px !important;
+            margin-bottom: 3px !important;
+            font-family: 'Montserrat', sans-serif !important;
         }
 
         /* Number Input +/- Buttons */
         div[data-testid="stNumberInputContainer"] button,
         button[data-testid="stNumberInputStepDown"],
         button[data-testid="stNumberInputStepUp"] {
-            background-color: var(--bg-offwhite) !important;
-            color: var(--brand-midnight) !important;
+            background-color: var(--prime-warm-white) !important;
+            color: var(--prime-blue) !important;
             border: none !important;
-            border-left: 1px solid rgba(0, 51, 102, 0.15) !important;
-            border-radius: 0px !important;
-            min-width: 24px !important;
-            transition: background-color 0.15s ease;
+            border-left: 1px solid rgba(0, 51, 102, 0.18) !important;
+            border-radius: 0 !important;
+            min-width: 26px !important;
         }
 
         div[data-testid="stNumberInputContainer"] button:hover,
         button[data-testid="stNumberInputStepDown"]:hover,
         button[data-testid="stNumberInputStepUp"]:hover {
-            background-color: rgba(201, 171, 76, 0.18) !important;
+            background-color: rgba(201, 171, 76, 0.15) !important;
         }
 
         div[data-testid="stNumberInputContainer"] button svg,
         button[data-testid="stNumberInputStepDown"] svg,
         button[data-testid="stNumberInputStepUp"] svg {
-            fill: var(--brand-midnight) !important;
-            stroke: var(--brand-midnight) !important;
-            color: var(--brand-midnight) !important;
+            fill: var(--prime-blue) !important;
+            stroke: var(--prime-blue) !important;
         }
 
-        /* Buttons & Popovers */
-        div.stButton > button[kind="secondary"], [data-testid="stPopover"] > button {
-            background-color: var(--brand-midnight) !important;
-            border: 1px solid var(--brand-midnight) !important;
-            border-radius: 2px !important;
+        /* ----------------------------------------------------------------
+           BUTTONS Ã¢â‚¬â€ PRIME Blue on Warm White, Gold accent, sharp corners
+        ---------------------------------------------------------------- */
+        div.stButton > button[kind="secondary"],
+        [data-testid="stPopover"] > button {
+            background-color: var(--prime-blue) !important;
+            border: 1px solid var(--prime-blue) !important;
+            border-radius: 0 !important;
             width: 100% !important;
-            padding: 4px !important;
-            box-shadow: var(--soft-shadow) !important;
+            padding: 8px 6px !important;
+            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.15) !important;
+            letter-spacing: 1.5px !important;
         }
-        div.stButton > button[kind="secondary"]:hover, [data-testid="stPopover"] > button:hover {
-            background-color: var(--brand-gold) !important;
-            border-color: var(--brand-gold) !important;
+
+        div.stButton > button[kind="secondary"]:hover,
+        [data-testid="stPopover"] > button:hover {
+            background-color: var(--prime-gold) !important;
+            border-color: var(--prime-gold) !important;
         }
-        div.stButton > button[kind="secondary"] p, [data-testid="stPopover"] > button p, [data-testid="stPopover"] > button div, div.stDownloadButton > button p {
-            color: var(--white-clean) !important;
-            font-weight: 700 !important;
+
+        div.stButton > button[kind="secondary"] p,
+        [data-testid="stPopover"] > button p,
+        [data-testid="stPopover"] > button div,
+        div.stDownloadButton > button p {
+            color: var(--prime-warm-white) !important;
+            font-weight: 800 !important;
             font-size: 9px !important;
             text-transform: uppercase !important;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px !important;
         }
-        
+
+        div.stButton > button[kind="secondary"]:hover p,
+        [data-testid="stPopover"] > button:hover p {
+            color: var(--prime-blue) !important;
+        }
+
         div.stDownloadButton > button {
-            background-color: var(--brand-midnight) !important;
+            background-color: var(--prime-blue) !important;
             border: none !important;
-            border-radius: 2px !important;
+            border-radius: 0 !important;
             width: 100% !important;
-            padding: 4px !important;
+            padding: 8px 6px !important;
         }
+
         div.stDownloadButton > button:hover {
-            background-color: var(--brand-gold) !important;
+            background-color: var(--prime-gold) !important;
         }
-        
+
         div.stButton > button[kind="primary"] {
             background: transparent !important;
             border: none !important;
-            color: var(--text-muted) !important;
+            color: var(--prime-muted) !important;
             padding: 0 !important;
             margin-top: 2px;
         }
+
         div.stButton > button[kind="primary"] p {
-            color: var(--text-muted) !important;
+            color: var(--prime-muted) !important;
             font-size: 9px !important;
             font-weight: 600;
             text-transform: uppercase;
+            letter-spacing: 1px;
         }
-        
-        /* Expanders (Commercial & Offices, Retail, Residential, etc.) */
+
+        /* ----------------------------------------------------------------
+           EXPANDERS (POI categories) Ã¢â‚¬â€ sharp, Warm White
+        ---------------------------------------------------------------- */
         [data-testid="stSidebar"] [data-testid="stExpander"],
         [data-testid="stSidebar"] details,
         div[data-testid="stExpander"],
-        details[data-testid="stExpander"],
-        .st-expander {
-            background-color: var(--white-clean) !important;
-            border: 1px solid rgba(0, 51, 102, 0.1) !important;
-            border-radius: 3px !important;
-            margin-bottom: 3px !important;
-            box-shadow: 0 1px 3px rgba(0, 51, 102, 0.04) !important;
+        details[data-testid="stExpander"] {
+            background-color: var(--prime-warm-white) !important;
+            border: 1px solid var(--prime-divider) !important;
+            border-radius: 0 !important;
+            margin-bottom: 2px !important;
             overflow: hidden !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stExpander"] summary,
         [data-testid="stSidebar"] details > summary,
-        div[data-testid="stExpander"] summary,
-        details[data-testid="stExpander"] summary {
-            background-color: var(--white-clean) !important;
-            color: var(--brand-midnight) !important;
-            padding: 6px 10px !important;
-            border-radius: 2px !important;
-            transition: background-color 0.15s ease;
+        div[data-testid="stExpander"] summary {
+            background-color: var(--prime-warm-white) !important;
+            color: var(--prime-blue) !important;
+            padding: 7px 10px !important;
+            border-radius: 0 !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover,
-        [data-testid="stSidebar"] details > summary:hover,
         div[data-testid="stExpander"] summary:hover {
-            background-color: #f1f5f9 !important;
+            background-color: rgba(0, 51, 102, 0.04) !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stExpander"] summary p,
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary span,
-        div[data-testid="stExpander"] summary p,
-        div[data-testid="stExpander"] summary span {
-            color: var(--brand-midnight) !important;
-            font-size: 10px !important;
+        div[data-testid="stExpander"] summary p {
+            color: var(--prime-blue) !important;
+            font-size: 9px !important;
             font-weight: 700 !important;
-            letter-spacing: 0.5px !important;
+            letter-spacing: 1px !important;
             text-transform: uppercase !important;
         }
 
-        [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"],
         [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] svg,
         div[data-testid="stExpanderToggleIcon"] svg,
         div[data-testid="stExpander"] summary svg {
-            color: var(--brand-midnight) !important;
-            fill: var(--brand-midnight) !important;
-            stroke: var(--brand-midnight) !important;
+            fill: var(--prime-blue) !important;
+            color: var(--prime-blue) !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"],
         div[data-testid="stExpanderDetails"] {
-            background-color: var(--white-clean) !important;
-            border-top: 1px solid rgba(0, 51, 102, 0.06) !important;
+            background-color: var(--prime-warm-white) !important;
+            border-top: 1px solid var(--prime-divider) !important;
             padding: 6px 8px !important;
         }
-        
-        /* Checkboxes (Unchecked & Checked States Locked to Light) */
+
+        /* ----------------------------------------------------------------
+           CHECKBOXES Ã¢â‚¬â€ sharp, Warm White unchecked, Blue checked
+        ---------------------------------------------------------------- */
         .stCheckbox {
             display: flex !important;
             align-items: center !important;
             margin-bottom: 2px !important;
         }
+
         .stCheckbox label {
             display: inline-flex !important;
             align-items: center !important;
             gap: 6px !important;
-            margin: 0px !important;
-            padding: 0px !important;
+            margin: 0 !important;
+            padding: 0 !important;
             cursor: pointer !important;
         }
+
         .stCheckbox label p {
             font-size: 10px !important;
             font-weight: 500 !important;
-            color: var(--brand-midnight) !important;
+            color: var(--prime-blue) !important;
             display: inline-block !important;
             margin: 0 !important;
-            line-height: 1.2 !important;
+            line-height: 1.3 !important;
         }
+
         div[data-baseweb="checkbox"] { align-self: center !important; }
 
-        /* Checkbox Box - UNCHECKED */
         div[data-testid="stCheckbox"] div[role="checkbox"],
         div[data-baseweb="checkbox"] > div:first-child,
-        div[data-baseweb="checkbox"] span:first-child,
         div[data-testid="stCheckbox"] [role="checkbox"][aria-checked="false"] {
-            background-color: var(--white-clean) !important;
-            border: 1.5px solid rgba(0, 51, 102, 0.35) !important;
-            border-radius: 2px !important;
-            transition: all 0.15s ease !important;
+            background-color: var(--prime-warm-white) !important;
+            border: 1.5px solid rgba(0, 51, 102, 0.40) !important;
+            border-radius: 0 !important;
         }
 
         div[data-testid="stCheckbox"]:hover div[role="checkbox"],
         div[data-baseweb="checkbox"]:hover > div:first-child {
-            border-color: var(--brand-midnight) !important;
-            background-color: var(--bg-offwhite) !important;
+            border-color: var(--prime-blue) !important;
         }
 
-        /* Checkbox Box - CHECKED */
         div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"],
-        div[data-baseweb="checkbox"] input:checked + div, 
+        div[data-baseweb="checkbox"] input:checked + div,
         div[data-baseweb="checkbox"] div[aria-checked="true"],
         div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] > div,
-        div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] { 
-            background-color: var(--brand-midnight) !important; 
-            border-color: var(--brand-midnight) !important; 
+        div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] {
+            background-color: var(--prime-blue) !important;
+            border-color: var(--prime-blue) !important;
+            border-radius: 0 !important;
         }
 
         div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] svg,
         div[data-baseweb="checkbox"] input:checked + div svg,
         div[data-baseweb="checkbox"] [aria-checked="true"] svg {
-            fill: var(--white-clean) !important;
-            stroke: var(--white-clean) !important;
-            color: var(--white-clean) !important;
+            fill: var(--prime-warm-white) !important;
+            stroke: var(--prime-warm-white) !important;
         }
-        
-        /* Popover & File Uploader */
+
+        /* ----------------------------------------------------------------
+           POPOVERS & FILE UPLOADER
+        ---------------------------------------------------------------- */
         div[data-testid="stPopoverBody"] {
-            background-color: var(--white-clean) !important;
-            border: 1px solid rgba(0, 51, 102, 0.15) !important;
-            box-shadow: var(--soft-shadow) !important;
-            border-radius: 4px !important;
-            color: var(--brand-midnight) !important;
+            background-color: var(--prime-warm-white) !important;
+            border: 1px solid var(--prime-divider) !important;
+            box-shadow: var(--prime-shadow) !important;
+            border-radius: 0 !important;
+            color: var(--prime-blue) !important;
         }
 
         section[data-testid="stFileUploaderDropzone"] {
-            background-color: var(--bg-offwhite) !important;
+            background-color: var(--prime-warm-white) !important;
             border: 1.5px dashed rgba(0, 51, 102, 0.25) !important;
-            border-radius: 4px !important;
+            border-radius: 0 !important;
         }
 
         section[data-testid="stFileUploaderDropzone"]:hover {
-            border-color: var(--brand-gold) !important;
-            background-color: var(--white-clean) !important;
+            border-color: var(--prime-gold) !important;
         }
 
         section[data-testid="stFileUploaderDropzone"] div,
         section[data-testid="stFileUploaderDropzone"] span,
         section[data-testid="stFileUploaderDropzone"] small,
         section[data-testid="stFileUploaderDropzone"] p {
-            color: var(--brand-midnight) !important;
+            color: var(--prime-blue) !important;
         }
 
         section[data-testid="stFileUploaderDropzone"] button {
-            background-color: var(--brand-midnight) !important;
-            color: var(--white-clean) !important;
+            background-color: var(--prime-blue) !important;
+            color: var(--prime-warm-white) !important;
             border: none !important;
-            border-radius: 2px !important;
+            border-radius: 0 !important;
             font-weight: 700 !important;
             font-size: 9px !important;
             text-transform: uppercase !important;
-            letter-spacing: 0.5px !important;
+            letter-spacing: 1px !important;
         }
 
         section[data-testid="stFileUploaderDropzone"] button:hover {
-            background-color: var(--brand-gold) !important;
+            background-color: var(--prime-gold) !important;
         }
 
-        /* Select / Dropdown Menus */
+        /* ----------------------------------------------------------------
+           SELECT / DROPDOWN
+        ---------------------------------------------------------------- */
         div[data-baseweb="select"] {
-            background-color: var(--white-clean) !important;
-            border: 1px solid rgba(0, 51, 102, 0.2) !important;
-            border-radius: 3px !important;
-            color: var(--brand-midnight) !important;
+            background-color: var(--prime-warm-white) !important;
+            border: 1px solid rgba(0, 51, 102, 0.22) !important;
+            border-radius: 0 !important;
+            color: var(--prime-blue) !important;
         }
 
         div[data-baseweb="select"] * {
-            color: var(--brand-midnight) !important;
+            color: var(--prime-blue) !important;
             background-color: transparent !important;
         }
 
-        div[data-baseweb="popover"],
-        ul[data-baseweb="menu"] {
-            background-color: var(--white-clean) !important;
-            border: 1px solid rgba(0, 51, 102, 0.15) !important;
-            box-shadow: var(--soft-shadow) !important;
+        div[data-baseweb="popover"], ul[data-baseweb="menu"] {
+            background-color: var(--prime-warm-white) !important;
+            border: 1px solid var(--prime-divider) !important;
+            box-shadow: var(--prime-shadow) !important;
+            border-radius: 0 !important;
         }
 
         li[data-baseweb="menu-item"] {
-            color: var(--brand-midnight) !important;
-            background-color: var(--white-clean) !important;
+            color: var(--prime-blue) !important;
+            background-color: var(--prime-warm-white) !important;
         }
 
         li[data-baseweb="menu-item"]:hover {
-            background-color: var(--bg-offwhite) !important;
-            color: var(--brand-midnight) !important;
+            background-color: rgba(0, 51, 102, 0.06) !important;
         }
-        
-        .brand-title { font-family: 'Cormorant Garamond', serif !important; font-style: italic; color: var(--brand-midnight); font-size: 30px; text-align: center; border-bottom: 1px solid var(--brand-gold); padding-bottom: 6px; margin-bottom: 10px; }
+
+        /* ----------------------------------------------------------------
+           BRAND TITLE Ã¢â‚¬â€ Cormorant Garamond Italic (sidebar header)
+        ---------------------------------------------------------------- */
+        .brand-title {
+            font-family: 'Cormorant Garamond', Georgia, serif !important;
+            font-style: italic !important;
+            font-weight: 300 !important;
+            color: var(--prime-warm-white) !important;
+            font-size: 28px !important;
+            text-align: center !important;
+            background-color: var(--prime-blue) !important;
+            border-bottom: 2px solid var(--prime-gold) !important;
+            padding: 14px 12px 10px !important;
+            margin: -0px -12px 14px -12px !important;
+            letter-spacing: -0.01em !important;
+        }
+
+        /* ----------------------------------------------------------------
+           HR DIVIDERS
+        ---------------------------------------------------------------- */
+        hr {
+            border: none !important;
+            border-top: 1px solid var(--prime-divider) !important;
+            margin: 10px 0 !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -617,7 +685,7 @@ with st.sidebar:
 
     if scan_triggered:
         if not selected_tags:
-            st.error("Select ≥ 1 layer.")
+            st.error("Select Ã¢â€°Â¥ 1 layer.")
         else:
             st.session_state.scan_active_loading = True
             records = []
@@ -751,19 +819,19 @@ leaflet_template = """
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #ffffff; overflow: hidden; font-family: 'Montserrat', sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #FFFCFB; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
         /* Centered Loading Splash Overlay UI */
         #map-loading-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(255, 255, 255, 0.75); z-index: 9999; 
+            background: rgba(255, 252, 251, 0.82); z-index: 9999; 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.3s ease; pointer-events: all;
         }
         .loading-spinner {
-            width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.1);
+            width: 40px; height: 40px; border: 4px solid rgba(0, 51, 102, 0.12);
             border-left-color: #003366; border-radius: 50%; animation: spin 1s linear infinite;
             margin-bottom: 12px;
         }
@@ -771,10 +839,11 @@ leaflet_template = """
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         #scan-results-panel { 
-            position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; 
-            max-height: calc(100vh - 20px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.12); 
+            position: absolute; top: 10px; right: 10px; z-index: 1000; background: #FFFCFB; width: 310px; 
+            max-height: calc(100vh - 20px); border-radius: 0; border: 1px solid rgba(0, 51, 102, 0.18); 
+            border-top: 2px solid #C9AB4C;
             background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; 
-            box-shadow: 0 4px 16px rgba(0, 51, 102, 0.1); 
+            box-shadow: 0 4px 20px rgba(0, 51, 102, 0.12); 
             transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.2s ease, box-shadow 0.2s ease;
         }
 
@@ -782,7 +851,7 @@ leaflet_template = """
             max-height: 38px !important;
             width: auto !important;
             min-width: 170px !important;
-            box-shadow: 0 2px 10px rgba(0, 51, 102, 0.15) !important;
+            box-shadow: 0 2px 10px rgba(0, 51, 102, 0.18) !important;
         }
 
         #scan-results-panel.collapsed #workspace-content-body {
@@ -797,47 +866,47 @@ leaflet_template = """
             display: none !important;
         }
 
-        .results-header { background: #003366; color: #ffffff; padding: 9px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; user-select: none; }
+        .results-header { background: #003366; color: #FFFCFB; padding: 9px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1.5px; user-select: none; }
         .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; max-height: 250px; }
-        .layer-category-block { border-bottom: 1px solid #f0f0f0; }
-        .layer-category-header { background: #ffffff; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+        .layer-category-block { border-bottom: 1px solid rgba(0,51,102,0.08); }
+        .layer-category-header { background: #FFFCFB; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
         .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
-        .layer-category-items { padding: 0; background: #f8fafc; }
+        .layer-category-items { padding: 0; background: rgba(0,51,102,0.03); }
         .layer-category-items.collapsed { display: none !important; }
         
-        .results-item { padding: 4px 8px 4px 16px; font-size: 9px; font-weight: 600; color: #888780; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
-        .results-item:hover { background: #ffffff; color: #003366; }
+        .results-item { padding: 4px 8px 4px 16px; font-size: 9px; font-weight: 600; color: rgba(0,51,102,0.55); display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid rgba(0,51,102,0.06); }
+        .results-item:hover { background: #FFFCFB; color: #003366; }
         
-        .action-icon-trigger { cursor: pointer; padding: 2px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 2px; transition: all 0.15s; }
-        .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.05); }
-        .action-icon-trigger svg { fill: #888780; width: 12px; height: 12px; }
+        .action-icon-trigger { cursor: pointer; padding: 2px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 0; transition: all 0.15s; }
+        .action-icon-trigger:hover { background: rgba(0, 51, 102, 0.06); }
+        .action-icon-trigger svg { fill: rgba(0,51,102,0.45); width: 12px; height: 12px; }
         .action-icon-trigger:hover svg { fill: #003366; }
         .action-icon-trigger.delete-btn:hover svg { fill: #AA2E20; }
 
-        .poi-text-label { background: #fff; border: 1px solid #003366; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .poi-text-label { background: #FFFCFB; border: 1px solid #003366; padding: 2px 4px; border-radius: 0; font-size: 9px; font-family: 'Montserrat', sans-serif; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,51,102,0.1); }
         .hide-labels .poi-text-label { display: none !important; }
         .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
         
-        .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
+        .config-block-wrapper { padding: 6px 12px; background: #FFFCFB; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
         .config-headline { 
-            font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; 
+            font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 1px; 
             margin-bottom: 2px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
             user-select: none;
         }
         .config-headline:hover { color: #C9AB4C; }
-        .sec-toggle { font-size: 8px; color: #888780; transition: transform 0.2s ease; }
+        .sec-toggle { font-size: 8px; color: rgba(0,51,102,0.45); transition: transform 0.2s ease; }
         .config-block-wrapper.section-collapsed .config-flex-row { display: none !important; }
         .config-block-wrapper.section-collapsed .sec-toggle { transform: rotate(-90deg); }
 
         .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 600; color: #003366; gap: 6px; }
-        .config-flex-row select, .config-flex-row input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
-        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
+        .config-flex-row select, .config-flex-row input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #FFFCFB; border: 1px solid rgba(0, 51, 102, 0.18); border-radius: 0; padding: 2px 4px; outline: none; }
+        .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.12); border-radius: 0; outline: none; }
         .slider-control-element::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #003366; cursor: pointer; }
 
-        .group-cluster-block { background: #f1f5f9; border-left: 3px solid #C9AB4C; margin-bottom: 4px; border-bottom: 1px solid rgba(0,51,102,0.08); }
-        .group-cluster-header { background: #e2e8f0; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .group-cluster-block { background: rgba(0,51,102,0.04); border-left: 3px solid #C9AB4C; margin-bottom: 4px; border-bottom: 1px solid rgba(0,51,102,0.08); }
+        .group-cluster-header { background: rgba(0,51,102,0.07); padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
         .group-cluster-title { font-size: 9px; font-weight: 800; color: #003366; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
-        .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #ffffff; border: 1px solid #003366; z-index: 2000; border-radius: 3px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); padding: 10px; }
+        .cluster-popover-modal { display: none; position: absolute; top: 40px; left: 10px; right: 10px; background: #FFFCFB; border: 1px solid #003366; border-top: 2px solid #C9AB4C; z-index: 2000; border-radius: 0; box-shadow: 0 4px 20px rgba(0,51,102,0.18); padding: 10px; }
         .cluster-popover-modal.active { display: block; }
         .cluster-selection-row { display: flex; align-items: center; gap: 8px; font-size: 9px; padding: 4px 0; color: #003366; font-weight: 600; }
     </style>
@@ -854,13 +923,13 @@ leaflet_template = """
         <div id="scan-results-panel">
             <div class="results-header" onclick="toggleWorkspacePanel(event)" style="cursor: pointer; user-select: none;">
                 <div style="display: flex; align-items: center; gap: 6px;">
-                    <span id="workspace-toggle-arrow" style="font-size: 9px; transition: transform 0.2s ease; display: inline-block;">▼</span>
+                    <span id="workspace-toggle-arrow" style="font-size: 9px; transition: transform 0.2s ease; display: inline-block;">Ã¢â€“Â¼</span>
                     <span>WORKSPACE</span>
                     <span id="results-count" style="color:#C9AB4C; font-weight: 800; font-size: 10px; margin-left: 2px;">0</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;" onclick="event.stopPropagation();">
                     <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 5px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
-                    <button id="workspace-toggle-btn" onclick="toggleWorkspacePanel(event)" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); color: #ffffff; border-radius: 3px; font-size: 12px; font-weight: bold; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; line-height: 1;" title="Collapse/Expand Workspace">−</button>
+                    <button id="workspace-toggle-btn" onclick="toggleWorkspacePanel(event)" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); color: #ffffff; border-radius: 3px; font-size: 12px; font-weight: bold; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; line-height: 1;" title="Collapse/Expand Workspace">Ã¢Ë†â€™</button>
                 </div>
             </div>
 
@@ -878,7 +947,7 @@ leaflet_template = """
                 </div>
                 
                 <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
-                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Basemap Controller</span><span class="sec-toggle">▼</span></div>
+                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Basemap Controller</span><span class="sec-toggle">Ã¢â€“Â¼</span></div>
                     <div class="config-flex-row">
                         <span>Tile Style:</span>
                         <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
@@ -893,7 +962,7 @@ leaflet_template = """
                 </div>
                 
                 <div class="config-block-wrapper">
-                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Global Markers</span><span class="sec-toggle">▼</span></div>
+                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Global Markers</span><span class="sec-toggle">Ã¢â€“Â¼</span></div>
                     <div class="config-flex-row">
                         <span>Style:</span>
                         <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
@@ -917,7 +986,7 @@ leaflet_template = """
                 </div>
 
                 <div class="config-block-wrapper">
-                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Target Coordinates & Radius Layer</span><span class="sec-toggle">▼</span></div>
+                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Target Coordinates & Radius Layer</span><span class="sec-toggle">Ã¢â€“Â¼</span></div>
                     <div class="config-flex-row">
                         <span>Target:</span>
                         <select onchange="patchTargetCenterConfig('style', this.value)">
@@ -967,7 +1036,7 @@ leaflet_template = """
             const isCollapsed = panel.classList.toggle('collapsed');
             localStorage.setItem('workspace_collapsed', isCollapsed ? 'true' : 'false');
             if (toggleBtn) {
-                toggleBtn.innerText = isCollapsed ? '+' : '−';
+                toggleBtn.innerText = isCollapsed ? '+' : 'Ã¢Ë†â€™';
                 toggleBtn.title = isCollapsed ? 'Expand Workspace' : 'Collapse Workspace';
             }
             setTimeout(function() { if (map) map.invalidateSize(); }, 300);
@@ -1050,7 +1119,7 @@ leaflet_template = """
             if (centerMarker) map.removeLayer(centerMarker);
             const d = targetConfig.size; const c = targetConfig.color;
             const htmlElement = targetConfig.style === "star" 
-                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">★</div>`
+                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">Ã¢Ëœâ€¦</div>`
                 : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
             
             centerMarker = L.marker([__LAT__, __LON__], { 
@@ -1217,13 +1286,13 @@ leaflet_template = """
                     <div class="group-cluster-block" id="cluster-block-${clusterName}">
                         <div class="group-cluster-header">
                             <div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')">
-                                <span style="color:#C9AB4C;">⚡</span>
+                                <span style="color:#C9AB4C;">Ã¢Å¡Â¡</span>
                                 <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span>
                             </div>
                             <div style="display:flex; align-items:center; gap:2px;">
                                 <a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a>
                                 <a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a>
-                                <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">▼</span>
+                                <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">Ã¢â€“Â¼</span>
                             </div>
                         </div>
                         
@@ -1286,7 +1355,7 @@ leaflet_template = """
                         <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
                         <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
                         <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
-                        <span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">▼</span>
+                        <span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">Ã¢â€“Â¼</span>
                     </div>
                 </div>
                 <div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);">
@@ -1322,7 +1391,7 @@ leaflet_template = """
 
         window.toggleAccordionCollapse = function(catKey) {
             const panel = document.getElementById('items-' + catKey); const chev = document.getElementById('chevron-' + catKey);
-            if(panel) { panel.classList.toggle('collapsed'); chev.innerText = panel.classList.contains('collapsed') ? '▼' : '▲'; }
+            if(panel) { panel.classList.toggle('collapsed'); chev.innerText = panel.classList.contains('collapsed') ? 'Ã¢â€“Â¼' : 'Ã¢â€“Â²'; }
         };
 
         window.togglePoiVisibility = function(uid) { const p = pts.find(item => item.uid === uid); if (p) { p.visible = (p.visible === false); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
