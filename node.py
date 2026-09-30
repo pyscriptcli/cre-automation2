@@ -135,18 +135,22 @@ st.markdown("""
             position: relative !important;
         }
 
-        /* Permanently suppress any native collapse / expand controls */
+        /* Permanently suppress any native collapse / expand controls & empty header */
+        [data-testid="stSidebarHeader"],
+        [data-testid="stSidebarHeader"] *,
         [data-testid="stSidebarCollapseButton"],
         [data-testid="collapsedControl"],
         button[data-testid="stSidebarCollapseButton"],
         button[data-testid="stSidebarCollapsedControl"],
-        [data-testid="stSidebarHeader"] button,
         [data-testid="stHeader"] [data-testid="collapsedControl"] {
             display: none !important;
             visibility: hidden !important;
             pointer-events: none !important;
             width: 0 !important;
             height: 0 !important;
+            min-height: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
             opacity: 0 !important;
         }
 
@@ -154,28 +158,34 @@ st.markdown("""
         [data-testid="stSidebarContent"] {
             background-color: var(--prime-warm-white) !important;
             color: var(--prime-blue) !important;
-            padding: 0 12px 3rem 12px !important;
+            padding: 0 14px 3rem 14px !important;
             height: 100dvh !important;
             max-height: 100dvh !important;
             overflow-y: auto !important;
             overflow-x: hidden !important;
             overscroll-behavior: contain !important;
-            scrollbar-gutter: stable !important;
             scrollbar-width: thin !important;
-            scrollbar-color: rgba(0, 51, 102, 0.25) transparent !important;
+            scrollbar-color: rgba(0, 51, 102, 0.2) transparent !important;
         }
 
-        /* Fallback for WebKit browsers */
-        @supports not (scrollbar-color: auto) {
-            [data-testid="stSidebarContent"]::-webkit-scrollbar { width: 5px !important; }
-            [data-testid="stSidebarContent"]::-webkit-scrollbar-track { background: transparent !important; }
-            [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb {
-                background-color: rgba(0, 51, 102, 0.18) !important;
-                border-radius: 0 !important;
-            }
-            [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb:hover {
-                background-color: var(--prime-gold) !important;
-            }
+        /* Modern subtle scrollbar with no ugly native arrow buttons */
+        [data-testid="stSidebarContent"]::-webkit-scrollbar {
+            width: 5px !important;
+        }
+        [data-testid="stSidebarContent"]::-webkit-scrollbar-track {
+            background: transparent !important;
+        }
+        [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 51, 102, 0.18) !important;
+            border-radius: 0 !important;
+        }
+        [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb:hover {
+            background-color: var(--prime-gold) !important;
+        }
+        [data-testid="stSidebarContent"]::-webkit-scrollbar-button {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
         }
 
         /* ----------------------------------------------------------------
@@ -318,18 +328,21 @@ st.markdown("""
         div.stButton > button[kind="secondary"],
         [data-testid="stPopover"] > button {
             background-color: var(--prime-blue) !important;
-            border: 1px solid var(--prime-blue) !important;
+            border: 1.5px solid var(--prime-gold) !important;
             border-radius: 0 !important;
             width: 100% !important;
-            padding: 8px 6px !important;
-            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.15) !important;
+            padding: 10px 8px !important;
+            box-shadow: 0 3px 10px rgba(0, 51, 102, 0.18) !important;
             letter-spacing: 1.5px !important;
+            transition: all 0.15s ease !important;
+            margin-bottom: 4px !important;
         }
 
         div.stButton > button[kind="secondary"]:hover,
         [data-testid="stPopover"] > button:hover {
             background-color: var(--prime-gold) !important;
             border-color: var(--prime-gold) !important;
+            box-shadow: 0 4px 14px rgba(201, 171, 76, 0.3) !important;
         }
 
         div.stButton > button[kind="secondary"] p,
@@ -350,30 +363,50 @@ st.markdown("""
 
         div.stDownloadButton > button {
             background-color: var(--prime-blue) !important;
-            border: none !important;
+            border: 1px solid var(--prime-blue) !important;
             border-radius: 0 !important;
             width: 100% !important;
             padding: 8px 6px !important;
+            transition: all 0.15s ease !important;
         }
 
         div.stDownloadButton > button:hover {
             background-color: var(--prime-gold) !important;
+            border-color: var(--prime-gold) !important;
+        }
+
+        div.stDownloadButton > button:hover p {
+            color: var(--prime-blue) !important;
         }
 
         div.stButton > button[kind="primary"] {
             background: transparent !important;
-            border: none !important;
+            border: 1px solid rgba(0, 51, 102, 0.22) !important;
+            border-radius: 0 !important;
             color: var(--prime-muted) !important;
-            padding: 0 !important;
-            margin-top: 2px;
+            padding: 6px 8px !important;
+            margin-top: 6px !important;
+            margin-bottom: 12px !important;
+            width: 100% !important;
+            transition: all 0.15s ease !important;
+        }
+
+        div.stButton > button[kind="primary"]:hover {
+            background: rgba(170, 46, 32, 0.08) !important;
+            border-color: #AA2E20 !important;
         }
 
         div.stButton > button[kind="primary"] p {
             color: var(--prime-muted) !important;
             font-size: 9px !important;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1.5px !important;
+            margin: 0 !important;
+        }
+
+        div.stButton > button[kind="primary"]:hover p {
+            color: #AA2E20 !important;
         }
 
         /* ----------------------------------------------------------------
@@ -582,10 +615,11 @@ st.markdown("""
             text-align: center !important;
             background-color: var(--prime-blue) !important;
             border-bottom: 2px solid var(--prime-gold) !important;
-            padding: 14px 12px 12px !important;
-            margin: 0 -12px 14px -12px !important;
+            padding: 16px 14px 14px 14px !important;
+            margin: 0 -14px 16px -14px !important;
             letter-spacing: -0.01em !important;
             user-select: none !important;
+            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.12) !important;
         }
 
         /* ----------------------------------------------------------------
