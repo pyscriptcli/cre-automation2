@@ -38,13 +38,33 @@ st.set_page_config(
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Montserrat:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+        /* Protect Material Symbols font on all icon elements so ligatures render correctly */
+        .material-symbols-rounded,
+        [data-testid="stIconMaterial"],
+        [data-testid="stExpanderToggleIcon"],
+        [data-testid="stExpanderToggleIcon"] *,
+        [data-testid="stSidebarCollapseButton"] *,
+        [data-testid="collapsedControl"] * {
+            font-family: 'Material Symbols Rounded' !important;
+            font-weight: normal !important;
+            font-style: normal !important;
+            line-height: 1 !important;
+            text-transform: none !important;
+            letter-spacing: normal !important;
+            word-wrap: normal !important;
+            white-space: nowrap !important;
+            direction: ltr !important;
+            -webkit-font-smoothing: antialiased !important;
+        }
 
         /* ================================================================
-           PRIME PHILIPPINES Ã¢â‚¬â€ PALETTE OF SOVEREIGN INTELLIGENCE
+           PRIME PHILIPPINES -- PALETTE OF SOVEREIGN INTELLIGENCE
            Backgrounds: #003366 (PRIME Blue) or #FFFCFB (Warm White) ONLY
-           Accent:      #C9AB4C (PRIME Gold) Ã¢â‚¬â€ never a background fill
-           Text:        #003366 (Blue) or #181D1E (Gray) Ã¢â‚¬â€ never #000000
-           Radius:      0 everywhere Ã¢â‚¬â€ Edges Stay Sharp
+           Accent:      #C9AB4C (PRIME Gold) -- never a background fill
+           Text:        #003366 (Blue) or #181D1E (Gray) -- never #000000
+           Radius:      0 everywhere -- Edges Stay Sharp
         ================================================================ */
 
         :root, [data-theme="dark"], [data-theme="light"], .stApp {
@@ -57,7 +77,6 @@ st.markdown("""
             --prime-divider:    rgba(0, 51, 102, 0.10);
             --prime-shadow:     0 4px 16px rgba(0, 51, 102, 0.10);
             --prime-radius:     0;
-            /* Legacy aliases kept for any inline references */
             --brand-midnight:   #003366;
             --brand-gold:       #C9AB4C;
             --white-clean:      #FFFCFB;
@@ -77,20 +96,19 @@ st.markdown("""
         }
 
         /* ----------------------------------------------------------------
-           STREAMLIT HEADER Ã¢â‚¬â€ transparent shell, never height:0
-           Keep natural height so collapsedControl is clickable
+           STREAMLIT HEADER -- transparent shell
         ---------------------------------------------------------------- */
         [data-testid="stHeader"], header {
             background: transparent !important;
             border-bottom: none !important;
             box-shadow: none !important;
+            height: 0px !important;
+            overflow: visible !important;
             pointer-events: none !important;
         }
 
-        /* Re-enable pointer events ONLY for the collapse expand button */
         [data-testid="collapsedControl"],
-        [data-testid="stSidebarCollapseButton"],
-        [data-testid="stHeader"] [data-testid="collapsedControl"] {
+        [data-testid="stSidebarCollapseButton"] {
             pointer-events: all !important;
         }
 
@@ -100,13 +118,14 @@ st.markdown("""
         }
 
         /* ----------------------------------------------------------------
-           SIDEBAR Ã¢â‚¬â€ scrollable, collapsible, expandable
+           SIDEBAR -- scrollable, collapsible, expandable
         ---------------------------------------------------------------- */
         [data-testid="stSidebar"] {
             background-color: var(--prime-warm-white) !important;
             border-right: 2px solid var(--prime-gold) !important;
             box-shadow: 2px 0 20px rgba(0, 51, 102, 0.08) !important;
             z-index: 100 !important;
+            position: relative !important;
         }
 
         [data-testid="stSidebar"][aria-expanded="true"] {
@@ -136,57 +155,99 @@ st.markdown("""
             background-color: var(--prime-gold) !important;
         }
 
-        /* Collapse / Expand toggle buttons */
+        /* Collapse button inside sidebar header */
         [data-testid="stSidebarCollapseButton"] {
             display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
+            position: absolute !important;
+            top: 8px !important;
+            right: 8px !important;
+            z-index: 999 !important;
         }
 
-        [data-testid="collapsedControl"] {
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            position: fixed !important;
-            top: 10px !important;
-            left: 10px !important;
-            z-index: 9999999 !important;
-            pointer-events: all !important;
-        }
-
-        [data-testid="stSidebarCollapseButton"] button,
-        [data-testid="collapsedControl"] button {
-            background-color: var(--prime-blue) !important;
+        [data-testid="stSidebarCollapseButton"] button {
+            background-color: transparent !important;
             color: var(--prime-warm-white) !important;
-            border: 2px solid var(--prime-gold) !important;
+            border: none !important;
             border-radius: 0 !important;
-            box-shadow: 0 2px 12px rgba(0, 51, 102, 0.25) !important;
+            box-shadow: none !important;
             cursor: pointer !important;
+            padding: 4px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             transition: all 0.2s ease !important;
-            padding: 6px !important;
-            pointer-events: all !important;
         }
 
-        [data-testid="stSidebarCollapseButton"] button:hover,
-        [data-testid="collapsedControl"] button:hover {
-            background-color: var(--prime-gold) !important;
-            border-color: var(--prime-gold) !important;
+        [data-testid="stSidebarCollapseButton"] button:hover {
+            background-color: rgba(201, 171, 76, 0.25) !important;
         }
 
-        [data-testid="stSidebarCollapseButton"] svg,
-        [data-testid="collapsedControl"] svg {
+        [data-testid="stSidebarCollapseButton"] button svg,
+        [data-testid="stSidebarCollapseButton"] button span {
             fill: var(--prime-warm-white) !important;
             color: var(--prime-warm-white) !important;
+            font-size: 18px !important;
         }
 
         [data-testid="stSidebarCollapseButton"] button:hover svg,
-        [data-testid="collapsedControl"] button:hover svg {
+        [data-testid="stSidebarCollapseButton"] button:hover span {
+            fill: var(--prime-gold) !important;
+            color: var(--prime-gold) !important;
+        }
+
+        /* HIDE expand button completely while sidebar is open */
+        [data-testid="stSidebar"][aria-expanded="true"] ~ * [data-testid="collapsedControl"],
+        .stApp:has([data-testid="stSidebar"][aria-expanded="true"]) [data-testid="collapsedControl"] {
+            display: none !important;
+        }
+
+        /* Expand button: shown when sidebar is collapsed */
+        [data-testid="collapsedControl"] {
+            position: fixed !important;
+            top: 10px !important;
+            left: 10px !important;
+            z-index: 999999 !important;
+            pointer-events: all !important;
+        }
+
+        [data-testid="collapsedControl"] button {
+            background-color: var(--prime-blue) !important;
+            color: var(--prime-warm-white) !important;
+            border: 1.5px solid var(--prime-gold) !important;
+            border-radius: 0 !important;
+            box-shadow: 0 2px 10px rgba(0, 51, 102, 0.25) !important;
+            cursor: pointer !important;
+            padding: 6px 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.2s ease !important;
+            pointer-events: all !important;
+        }
+
+        [data-testid="collapsedControl"] button:hover {
+            background-color: var(--prime-gold) !important;
+            color: var(--prime-blue) !important;
+            border-color: var(--prime-gold) !important;
+        }
+
+        [data-testid="collapsedControl"] button svg,
+        [data-testid="collapsedControl"] button span {
+            fill: var(--prime-warm-white) !important;
+            color: var(--prime-warm-white) !important;
+            font-size: 18px !important;
+        }
+
+        [data-testid="collapsedControl"] button:hover svg,
+        [data-testid="collapsedControl"] button:hover span {
             fill: var(--prime-blue) !important;
             color: var(--prime-blue) !important;
         }
 
         /* ----------------------------------------------------------------
-           LAYOUT Ã¢â‚¬â€ flex viewport, map fills remaining space
+           LAYOUT -- flex viewport, map fills remaining space
         ---------------------------------------------------------------- */
         [data-testid="stAppViewContainer"] {
             display: flex !important;
@@ -225,15 +286,15 @@ st.markdown("""
         }
 
         /* ----------------------------------------------------------------
-           TYPOGRAPHY Ã¢â‚¬â€ Montserrat UI, Cormorant titles
+           TYPOGRAPHY -- Montserrat UI (no span override to protect icons)
         ---------------------------------------------------------------- */
-        p, label, h1, h2, h3, h4, h5, h6, .stMarkdown, span {
+        p, label, h1, h2, h3, h4, h5, h6, .stMarkdown {
             color: var(--prime-blue) !important;
             font-family: 'Montserrat', Arial, Helvetica, sans-serif !important;
         }
 
         /* ----------------------------------------------------------------
-           FORM CONTROLS Ã¢â‚¬â€ PRIME Warm White surfaces, sharp edges
+           FORM CONTROLS -- PRIME Warm White surfaces, sharp edges
         ---------------------------------------------------------------- */
         [data-testid="stTextInput"] div[data-baseweb="base-input"],
         [data-testid="stTextInput"] div[data-baseweb="input"],
@@ -320,7 +381,7 @@ st.markdown("""
         }
 
         /* ----------------------------------------------------------------
-           BUTTONS Ã¢â‚¬â€ PRIME Blue on Warm White, Gold accent, sharp corners
+           BUTTONS -- PRIME Blue on Warm White, Gold accent, sharp corners
         ---------------------------------------------------------------- */
         div.stButton > button[kind="secondary"],
         [data-testid="stPopover"] > button {
@@ -384,7 +445,7 @@ st.markdown("""
         }
 
         /* ----------------------------------------------------------------
-           EXPANDERS (POI categories) Ã¢â‚¬â€ sharp, Warm White
+           EXPANDERS (POI categories) -- sharp, Warm White
         ---------------------------------------------------------------- */
         [data-testid="stSidebar"] [data-testid="stExpander"],
         [data-testid="stSidebar"] details,
@@ -420,11 +481,21 @@ st.markdown("""
             text-transform: uppercase !important;
         }
 
+        [data-testid="stExpanderToggleIcon"] {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-width: 18px !important;
+            color: var(--prime-blue) !important;
+        }
+
+        [data-testid="stExpanderToggleIcon"] *,
         [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] svg,
         div[data-testid="stExpanderToggleIcon"] svg,
         div[data-testid="stExpander"] summary svg {
             fill: var(--prime-blue) !important;
             color: var(--prime-blue) !important;
+            font-size: 16px !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"],
@@ -435,7 +506,7 @@ st.markdown("""
         }
 
         /* ----------------------------------------------------------------
-           CHECKBOXES Ã¢â‚¬â€ sharp, Warm White unchecked, Blue checked
+           CHECKBOXES -- sharp, Warm White unchecked, Blue checked
         ---------------------------------------------------------------- */
         .stCheckbox {
             display: flex !important;
@@ -568,7 +639,7 @@ st.markdown("""
         }
 
         /* ----------------------------------------------------------------
-           BRAND TITLE Ã¢â‚¬â€ Cormorant Garamond Italic (sidebar header)
+           BRAND TITLE -- Cormorant Garamond Italic (sidebar header)
         ---------------------------------------------------------------- */
         .brand-title {
             font-family: 'Cormorant Garamond', Georgia, serif !important;
@@ -685,7 +756,7 @@ with st.sidebar:
 
     if scan_triggered:
         if not selected_tags:
-            st.error("Select Ã¢â€°Â¥ 1 layer.")
+            st.error("Select >= 1 layer.")
         else:
             st.session_state.scan_active_loading = True
             records = []
@@ -923,13 +994,13 @@ leaflet_template = """
         <div id="scan-results-panel">
             <div class="results-header" onclick="toggleWorkspacePanel(event)" style="cursor: pointer; user-select: none;">
                 <div style="display: flex; align-items: center; gap: 6px;">
-                    <span id="workspace-toggle-arrow" style="font-size: 9px; transition: transform 0.2s ease; display: inline-block;">Ã¢â€“Â¼</span>
+                    <span id="workspace-toggle-arrow" style="font-size: 9px; transition: transform 0.2s ease; display: inline-block;">&#9660;</span>
                     <span>WORKSPACE</span>
                     <span id="results-count" style="color:#C9AB4C; font-weight: 800; font-size: 10px; margin-left: 2px;">0</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;" onclick="event.stopPropagation();">
                     <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 5px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
-                    <button id="workspace-toggle-btn" onclick="toggleWorkspacePanel(event)" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); color: #ffffff; border-radius: 3px; font-size: 12px; font-weight: bold; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; line-height: 1;" title="Collapse/Expand Workspace">Ã¢Ë†â€™</button>
+                    <button id="workspace-toggle-btn" onclick="toggleWorkspacePanel(event)" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); color: #ffffff; border-radius: 3px; font-size: 12px; font-weight: bold; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; line-height: 1;" title="Collapse/Expand Workspace">&minus;</button>
                 </div>
             </div>
 
@@ -947,7 +1018,7 @@ leaflet_template = """
                 </div>
                 
                 <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
-                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Basemap Controller</span><span class="sec-toggle">Ã¢â€“Â¼</span></div>
+                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Basemap Controller</span><span class="sec-toggle">&#9660;</span></div>
                     <div class="config-flex-row">
                         <span>Tile Style:</span>
                         <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
@@ -962,7 +1033,7 @@ leaflet_template = """
                 </div>
                 
                 <div class="config-block-wrapper">
-                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Global Markers</span><span class="sec-toggle">Ã¢â€“Â¼</span></div>
+                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Global Markers</span><span class="sec-toggle">&#9660;</span></div>
                     <div class="config-flex-row">
                         <span>Style:</span>
                         <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
@@ -986,7 +1057,7 @@ leaflet_template = """
                 </div>
 
                 <div class="config-block-wrapper">
-                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Target Coordinates & Radius Layer</span><span class="sec-toggle">Ã¢â€“Â¼</span></div>
+                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Target Coordinates & Radius Layer</span><span class="sec-toggle">&#9660;</span></div>
                     <div class="config-flex-row">
                         <span>Target:</span>
                         <select onchange="patchTargetCenterConfig('style', this.value)">
@@ -1036,7 +1107,7 @@ leaflet_template = """
             const isCollapsed = panel.classList.toggle('collapsed');
             localStorage.setItem('workspace_collapsed', isCollapsed ? 'true' : 'false');
             if (toggleBtn) {
-                toggleBtn.innerText = isCollapsed ? '+' : 'Ã¢Ë†â€™';
+                toggleBtn.innerHTML = isCollapsed ? '+' : '&minus;';
                 toggleBtn.title = isCollapsed ? 'Expand Workspace' : 'Collapse Workspace';
             }
             setTimeout(function() { if (map) map.invalidateSize(); }, 300);
@@ -1119,7 +1190,7 @@ leaflet_template = """
             if (centerMarker) map.removeLayer(centerMarker);
             const d = targetConfig.size; const c = targetConfig.color;
             const htmlElement = targetConfig.style === "star" 
-                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">Ã¢Ëœâ€¦</div>`
+                ? `<div style="background-color: ${c}; color: #ffffff; width: ${d}px; height: ${d}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${d*0.5}px; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">&#9733;</div>`
                 : `<div style="background-color: ${c}; width: ${d}px; height: ${d}px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`;
             
             centerMarker = L.marker([__LAT__, __LON__], { 
@@ -1286,13 +1357,13 @@ leaflet_template = """
                     <div class="group-cluster-block" id="cluster-block-${clusterName}">
                         <div class="group-cluster-header">
                             <div class="group-cluster-title" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')">
-                                <span style="color:#C9AB4C;">Ã¢Å¡Â¡</span>
+                                <span style="color:#C9AB4C;">&#9889;</span>
                                 <span>${clusterName} <span style="font-weight:500; font-size:8px; opacity:0.75;">(${aggregatedCount} PINS)</span></span>
                             </div>
                             <div style="display:flex; align-items:center; gap:2px;">
                                 <a class="action-icon-trigger" title="Hide/Show Group" onclick="toggleClusterGroupVisibility('${clusterName}', ${groupIsVisible})">${eyeSvg}</a>
                                 <a class="action-icon-trigger delete-btn" title="Dissolve Group" onclick="destroyClusterGroupReference('${clusterName}')">${trashSvg}</a>
-                                <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">Ã¢â€“Â¼</span>
+                                <span id="chevron-cluster-items-${clusterName}" onclick="toggleAccordionCollapse('cluster-items-${clusterName}')" style="font-size: 8px; color:#003366; margin-left:4px; cursor:pointer;">&#9660;</span>
                             </div>
                         </div>
                         
@@ -1355,7 +1426,7 @@ leaflet_template = """
                         <a class="action-icon-trigger" title="Rename" onclick="promptRenameLayer('${catName}')">${editSvg}</a>
                         <a class="action-icon-trigger" title="Hide/Show" onclick="toggleLayerWorkspaceVisibility('${catName}', ${isLayerVisible})">${eyeSvg}</a>
                         <a class="action-icon-trigger delete-btn" title="Delete" onclick="triggerLayerDeletion('${catName}')">${trashSvg}</a>
-                        <span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">Ã¢â€“Â¼</span>
+                        <span id="chevron-${catName}" onclick="toggleAccordionCollapse('${catName}')" style="font-size: 8px; color:#C9AB4C; margin-left:4px; cursor:pointer;">&#9660;</span>
                     </div>
                 </div>
                 <div class="config-block-wrapper" style="background:#ffffff; border-bottom:1px dashed rgba(0,51,102,0.05);">
@@ -1391,7 +1462,7 @@ leaflet_template = """
 
         window.toggleAccordionCollapse = function(catKey) {
             const panel = document.getElementById('items-' + catKey); const chev = document.getElementById('chevron-' + catKey);
-            if(panel) { panel.classList.toggle('collapsed'); chev.innerText = panel.classList.contains('collapsed') ? 'Ã¢â€“Â¼' : 'Ã¢â€“Â²'; }
+            if(panel) { panel.classList.toggle('collapsed'); chev.innerHTML = panel.classList.contains('collapsed') ? '&#9660;' : '&#9650;'; }
         };
 
         window.togglePoiVisibility = function(uid) { const p = pts.find(item => item.uid === uid); if (p) { p.visible = (p.visible === false); compileLayersAndRenderPoints(); rebuildSidebarControlLayout(); } };
