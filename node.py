@@ -61,34 +61,143 @@ st.markdown("""
             color-scheme: light !important;
         }
         
-        [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
+        /* --- SIDEBAR STRUCTURE: SCROLLABLE, COLLAPSIBLE & EXPANDABLE --- */
+        [data-testid="stSidebar"] {
             background-color: var(--bg-offwhite) !important;
             color: var(--brand-midnight) !important;
             border-right: 1px solid rgba(0, 51, 102, 0.08) !important;
-            width: 280px !important;
-            min-width: 280px !important;
-            max-width: 280px !important;
-            transform: none !important;
-            visibility: visible !important;
-            overflow: hidden !important;
             box-shadow: 2px 0 15px rgba(0,0,0,0.03) !important;
+            z-index: 100 !important;
         }
-        
-        [data-testid="stSidebarCollapseButton"], [data-testid="collapsedControl"] { display: none !important; }
-        ::-webkit-scrollbar { width: 0px !important; background: transparent !important; }
-        * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
-        
+
+        [data-testid="stSidebar"][aria-expanded="true"] {
+            min-width: 280px !important;
+            max-width: 320px !important;
+        }
+
+        /* Make sidebar body scrollable with modern styled scrollbar */
+        [data-testid="stSidebarContent"] {
+            background-color: var(--bg-offwhite) !important;
+            color: var(--brand-midnight) !important;
+            padding: 16px 12px 3rem 12px !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(0, 51, 102, 0.25) transparent !important;
+        }
+
+        [data-testid="stSidebarContent"]::-webkit-scrollbar {
+            width: 6px !important;
+        }
+        [data-testid="stSidebarContent"]::-webkit-scrollbar-track {
+            background: transparent !important;
+        }
+        [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 51, 102, 0.2) !important;
+            border-radius: 4px !important;
+        }
+        [data-testid="stSidebarContent"]::-webkit-scrollbar-thumb:hover {
+            background-color: var(--brand-gold) !important;
+        }
+
+        /* SIDEBAR TOGGLE & COLLAPSE CONTROLS */
+        [data-testid="stSidebarCollapseButton"] {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        [data-testid="collapsedControl"] {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: fixed !important;
+            top: 12px !important;
+            left: 12px !important;
+            z-index: 99999 !important;
+        }
+
+        [data-testid="stSidebarCollapseButton"] button,
+        [data-testid="collapsedControl"] button {
+            background-color: var(--white-clean) !important;
+            color: var(--brand-midnight) !important;
+            border: 1px solid rgba(0, 51, 102, 0.18) !important;
+            border-radius: 4px !important;
+            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.12) !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+            padding: 4px !important;
+        }
+
+        [data-testid="stSidebarCollapseButton"] button:hover,
+        [data-testid="collapsedControl"] button:hover {
+            background-color: var(--bg-offwhite) !important;
+            border-color: var(--brand-gold) !important;
+            box-shadow: 0 3px 12px rgba(201, 171, 76, 0.25) !important;
+        }
+
+        [data-testid="stSidebarCollapseButton"] svg,
+        [data-testid="collapsedControl"] svg {
+            fill: var(--brand-midnight) !important;
+            color: var(--brand-midnight) !important;
+            stroke: var(--brand-midnight) !important;
+        }
+
+        /* Transparent Streamlit header (leaves collapsedControl visible) */
+        [data-testid="stHeader"], header {
+            background: transparent !important;
+            color: transparent !important;
+            height: 0px !important;
+            min-height: 0px !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        [data-testid="stToolbar"], #stDecoration {
+            display: none !important;
+        }
+
         p, label, h1, h2, h3, h4, h5, h6, .stMarkdown {
             color: var(--brand-midnight) !important;
             font-family: 'Montserrat', sans-serif !important;
         }
-        
-        [data-testid="stHeader"], header, #stDecoration { display: none !important; }
-        
-        [data-testid="stAppViewContainer"] { display: flex !important; flex-direction: row !important; width: 100vw !important; height: 100vh !important; overflow: hidden !important; }
-        [data-testid="stMain"] { flex-grow: 1 !important; width: calc(100vw - 280px) !important; height: 100vh !important; overflow: hidden !important; margin: 0px !important; padding: 0px !important; }
-        .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer { padding: 0px !important; margin: 0px !important; max-width: 100% !important; gap: 0rem !important; }
-        iframe { height: 100vh !important; width: 100% !important; border: none !important; display: block !important; }
+
+        /* Continuous Flex Viewport Layout */
+        [data-testid="stAppViewContainer"] {
+            display: flex !important;
+            flex-direction: row !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+        }
+
+        [data-testid="stMain"] {
+            flex: 1 1 0% !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+            margin: 0px !important;
+            padding: 0px !important;
+        }
+
+        .block-container, [data-testid="stAppViewBlockContainer"], [data-testid="stVerticalBlock"], .stElementContainer {
+            padding: 0px !important;
+            margin: 0px !important;
+            max-width: 100% !important;
+            height: 100% !important;
+            gap: 0rem !important;
+        }
+
+        iframe {
+            height: 100vh !important;
+            width: 100% !important;
+            border: none !important;
+            display: block !important;
+        }
         
         /* --- FORM CONTROLS & INPUT FIELDS LOCKED TO LIGHT THEME --- */
         [data-testid="stTextInput"] div[data-baseweb="base-input"],
@@ -663,12 +772,33 @@ leaflet_template = """
 
         #scan-results-panel { 
             position: absolute; top: 10px; right: 10px; z-index: 1000; background: #ffffff; width: 310px; 
-            max-height: calc(100vh - 40px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.1); 
+            max-height: calc(100vh - 20px); border-radius: 4px; border: 1px solid rgba(0, 51, 102, 0.12); 
             background-clip: padding-box; display: flex; flex-direction: column; overflow: hidden; 
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.08); 
+            box-shadow: 0 4px 16px rgba(0, 51, 102, 0.1); 
+            transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.2s ease, box-shadow 0.2s ease;
         }
-        .results-header { background: #003366; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; }
-        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; }
+
+        #scan-results-panel.collapsed {
+            max-height: 38px !important;
+            width: auto !important;
+            min-width: 170px !important;
+            box-shadow: 0 2px 10px rgba(0, 51, 102, 0.15) !important;
+        }
+
+        #scan-results-panel.collapsed #workspace-content-body {
+            display: none !important;
+        }
+
+        #scan-results-panel.collapsed #workspace-toggle-arrow {
+            transform: rotate(-90deg);
+        }
+
+        #scan-results-panel.collapsed #group-layers-trigger-btn {
+            display: none !important;
+        }
+
+        .results-header { background: #003366; color: #ffffff; padding: 9px 12px; font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; border-bottom: 2px solid #C9AB4C; letter-spacing: 1px; user-select: none; }
+        .results-list { overflow-y: auto; flex-grow: 1; padding-bottom: 0px; max-height: 250px; }
         .layer-category-block { border-bottom: 1px solid #f0f0f0; }
         .layer-category-header { background: #ffffff; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
         .layer-header-left { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: #003366; text-transform: uppercase; flex-grow: 1; overflow: hidden;}
@@ -689,7 +819,16 @@ leaflet_template = """
         .color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); }
         
         .config-block-wrapper { padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid rgba(0, 51, 102, 0.08); display: flex; flex-direction: column; gap: 4px; }
-        .config-headline { font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+        .config-headline { 
+            font-size: 8px; font-weight: 800; color: #003366; text-transform: uppercase; letter-spacing: 0.5px; 
+            margin-bottom: 2px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+            user-select: none;
+        }
+        .config-headline:hover { color: #C9AB4C; }
+        .sec-toggle { font-size: 8px; color: #888780; transition: transform 0.2s ease; }
+        .config-block-wrapper.section-collapsed .config-flex-row { display: none !important; }
+        .config-block-wrapper.section-collapsed .sec-toggle { transform: rotate(-90deg); }
+
         .config-flex-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 600; color: #003366; gap: 6px; }
         .config-flex-row select, .config-flex-row input { font-size: 9px; font-family: 'Montserrat', sans-serif; color: #003366; background: #ffffff; border: 1px solid rgba(0, 51, 102, 0.15); border-radius: 2px; padding: 1px 3px; outline: none; }
         .slider-control-element { flex-grow: 1; margin: 0; -webkit-appearance: none; height: 4px; background: rgba(0,51,102,0.1); border-radius: 2px; outline: none; }
@@ -713,89 +852,95 @@ leaflet_template = """
         <div id="map"></div>
 
         <div id="scan-results-panel">
-            <div class="results-header">
-                <span>WORKSPACE</span>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 4px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
-                    <span id="results-count" style="color:#C9AB4C;">0</span>
+            <div class="results-header" onclick="toggleWorkspacePanel(event)" style="cursor: pointer; user-select: none;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span id="workspace-toggle-arrow" style="font-size: 9px; transition: transform 0.2s ease; display: inline-block;">▼</span>
+                    <span>WORKSPACE</span>
+                    <span id="results-count" style="color:#C9AB4C; font-weight: 800; font-size: 10px; margin-left: 2px;">0</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;" onclick="event.stopPropagation();">
+                    <span id="group-layers-trigger-btn" onclick="openClusterModalWindow()" style="color: #ffffff; font-size: 8px; font-weight: 700; border: 1px solid #C9AB4C; padding: 2px 5px; border-radius: 2px; cursor: pointer;">GROUP LAYERS</span>
+                    <button id="workspace-toggle-btn" onclick="toggleWorkspacePanel(event)" style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); color: #ffffff; border-radius: 3px; font-size: 12px; font-weight: bold; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; line-height: 1;" title="Collapse/Expand Workspace">−</button>
                 </div>
             </div>
 
-            <div id="cluster-modal-overlay" class="cluster-popover-modal">
-                <div style="font-size: 9px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 8px;">CREATE LAYER CLUSTER GROUP</div>
-                <div style="margin-bottom: 8px;">
-                    <input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);">
+            <div id="workspace-content-body" style="overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column;">
+                <div id="cluster-modal-overlay" class="cluster-popover-modal">
+                    <div style="font-size: 9px; font-weight: 800; color: #003366; border-bottom: 1px solid #C9AB4C; padding-bottom: 4px; margin-bottom: 8px;">CREATE LAYER CLUSTER GROUP</div>
+                    <div style="margin-bottom: 8px;">
+                        <input type="text" id="new-cluster-name-input" placeholder="Enter cluster namespace..." style="width: calc(100% - 10px); font-family: Montserrat; font-size: 9px; padding: 4px; border: 1px solid rgba(0,51,102,0.2);">
+                    </div>
+                    <div id="cluster-checkbox-target-mount" style="max-height: 140px; overflow-y: auto; margin-bottom: 8px;"></div>
+                    <div style="display: flex; gap: 4px;">
+                        <button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button>
+                        <button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button>
+                    </div>
                 </div>
-                <div id="cluster-checkbox-target-mount" style="max-height: 140px; overflow-y: auto; margin-bottom: 8px;"></div>
-                <div style="display: flex; gap: 4px;">
-                    <button onclick="commitStructuralLayerCluster()" style="flex:1; background: #003366; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">BUILD</button>
-                    <button onclick="closeClusterModalWindow()" style="flex:1; background: #888780; color:#fff; border:none; padding: 4px; font-size:9px; font-weight:700; cursor:pointer;">CANCEL</button>
+                
+                <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
+                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Basemap Controller</span><span class="sec-toggle">▼</span></div>
+                    <div class="config-flex-row">
+                        <span>Tile Style:</span>
+                        <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
+                            <option value="osm">OpenStreetMap</option>
+                            <option value="satellite">Satellite View</option>
+                            <option value="carto">Carto Light</option>
+                        </select>
+                        <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                            <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
+                        </label>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="config-block-wrapper" style="border-bottom: 2px solid var(--brand-gold);">
-                <div class="config-headline">Basemap Controller</div>
-                <div class="config-flex-row">
-                    <span>Tile Style:</span>
-                    <select id="basemap-select" onchange="switchActiveBasemap(this.value)">
-                        <option value="osm">OpenStreetMap</option>
-                        <option value="satellite">Satellite View</option>
-                        <option value="carto">Carto Light</option>
-                    </select>
-                    <label style="font-size:9px; font-weight:700; color:#003366; display:flex; align-items:center; gap:3px; cursor:pointer;">
-                        <input type="checkbox" id="label-toggle-chk" onchange="toggleLabelsMatrix(this.checked)" style="accent-color: #003366;"> Labels
-                    </label>
+                
+                <div class="config-block-wrapper">
+                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Global Markers</span><span class="sec-toggle">▼</span></div>
+                    <div class="config-flex-row">
+                        <span>Style:</span>
+                        <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
+                            <option value="dots">Dots</option>
+                            <option value="pin">Pin Location</option>
+                            <option value="modern-pin">Modern Drop-Pin</option>
+                        </select>
+                        <span>Size:</span>
+                        <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
+                    </div>
+                    <div class="config-flex-row">
+                        <span>Color:</span>
+                        <input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)">
+                        <select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;">
+                            <option value="">Preset</option>
+                            <option value="#003366">Midnight</option>
+                            <option value="#C9AB4C">Gold</option>
+                            <option value="#AA2E20">Crimson</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="config-block-wrapper">
-                <div class="config-headline">Global Markers</div>
-                <div class="config-flex-row">
-                    <span>Style:</span>
-                    <select id="gl-marker-style" onchange="patchGlobalMarkerStyle(this.value)">
-                        <option value="dots">Dots</option>
-                        <option value="pin">Pin Location</option>
-                        <option value="modern-pin">Modern Drop-Pin</option>
-                    </select>
-                    <span>Size:</span>
-                    <input type="range" min="10" max="40" value="__GLOBAL_MARKER_SIZE__" class="slider-control-element" id="gl-marker-size" oninput="patchGlobalMarkerSize(this.value)">
-                </div>
-                <div class="config-flex-row">
-                    <span>Color:</span>
-                    <input type="color" id="gl-marker-color" value="__GLOBAL_MARKER_COLOR__" onchange="patchGlobalMarkerColor(this.value)">
-                    <select onchange="document.getElementById('gl-marker-color').value=this.value; patchGlobalMarkerColor(this.value);" style="width:70px;">
-                        <option value="">Preset</option>
-                        <option value="#003366">Midnight</option>
-                        <option value="#C9AB4C">Gold</option>
-                        <option value="#AA2E20">Crimson</option>
-                    </select>
-                </div>
-            </div>
 
-            <div class="config-block-wrapper">
-                <div class="config-headline">Target Coordinates & Radius Layer</div>
-                <div class="config-flex-row">
-                    <span>Target:</span>
-                    <select onchange="patchTargetCenterConfig('style', this.value)">
-                        <option value="star">Star</option>
-                        <option value="circle">Dot</option>
-                    </select>
-                    <input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)">
-                    <input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)">
+                <div class="config-block-wrapper">
+                    <div class="config-headline" onclick="toggleConfigSection(this)"><span>Target Coordinates & Radius Layer</span><span class="sec-toggle">▼</span></div>
+                    <div class="config-flex-row">
+                        <span>Target:</span>
+                        <select onchange="patchTargetCenterConfig('style', this.value)">
+                            <option value="star">Star</option>
+                            <option value="circle">Dot</option>
+                        </select>
+                        <input type="color" value="#003366" onchange="patchTargetCenterConfig('color', this.value)">
+                        <input type="range" min="10" max="60" value="24" class="slider-control-element" oninput="patchTargetCenterConfig('size', this.value)">
+                    </div>
+                    <div class="config-flex-row">
+                        <span>Radius Fill:</span>
+                        <input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)">
+                        <span>Opacity:</span>
+                        <input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
+                    </div>
+                    <div class="config-flex-row">
+                        <span>Thickness:</span>
+                        <input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)">
+                    </div>
                 </div>
-                <div class="config-flex-row">
-                    <span>Radius Fill:</span>
-                    <input type="color" value="#003366" onchange="patchRadiusLayerConfig('color', this.value)">
-                    <span>Opacity:</span>
-                    <input type="range" min="0" max="1" step="0.01" value="0.08" class="slider-control-element" oninput="patchRadiusLayerConfig('fill_opacity', this.value)">
-                </div>
-                <div class="config-flex-row">
-                    <span>Thickness:</span>
-                    <input type="range" min="0.5" max="8" step="0.5" value="1.5" class="slider-control-element" oninput="patchRadiusLayerConfig('weight', this.value)">
-                </div>
+                
+                <div class="results-list" id="results-list-box"></div>
             </div>
-            
-            <div class="results-list" id="results-list-box"></div>
         </div>
     </div>
 
@@ -805,6 +950,48 @@ leaflet_template = """
             attributionControl: false, 
             preferCanvas: true 
         }).setView([__LAT__, __LON__], 14);
+
+        window.addEventListener('resize', function() {
+            if (map) map.invalidateSize();
+        });
+        if (window.ResizeObserver) {
+            new ResizeObserver(function() {
+                if (map) map.invalidateSize();
+            }).observe(document.getElementById('map-container'));
+        }
+
+        window.toggleWorkspacePanel = function(event) {
+            if (event) event.stopPropagation();
+            const panel = document.getElementById('scan-results-panel');
+            const toggleBtn = document.getElementById('workspace-toggle-btn');
+            const isCollapsed = panel.classList.toggle('collapsed');
+            localStorage.setItem('workspace_collapsed', isCollapsed ? 'true' : 'false');
+            if (toggleBtn) {
+                toggleBtn.innerText = isCollapsed ? '+' : '−';
+                toggleBtn.title = isCollapsed ? 'Expand Workspace' : 'Collapse Workspace';
+            }
+            setTimeout(function() { if (map) map.invalidateSize(); }, 300);
+        };
+
+        window.toggleConfigSection = function(headlineEl) {
+            const parent = headlineEl.closest('.config-block-wrapper');
+            if (parent) {
+                parent.classList.toggle('section-collapsed');
+            }
+        };
+
+        const savedWsState = localStorage.getItem('workspace_collapsed');
+        if (savedWsState === 'true') {
+            const panel = document.getElementById('scan-results-panel');
+            if (panel) {
+                panel.classList.add('collapsed');
+                const toggleBtn = document.getElementById('workspace-toggle-btn');
+                if (toggleBtn) {
+                    toggleBtn.innerText = '+';
+                    toggleBtn.title = 'Expand Workspace';
+                }
+            }
+        }
 
         let layerMeta = __LAYER_META_JSON__;
         let targetConfig = __TARGET_CONFIG_JSON__;
