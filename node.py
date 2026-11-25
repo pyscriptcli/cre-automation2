@@ -1,17 +1,13 @@
 import streamlit as st
-import time
-from concurrent.futures import ThreadPoolExecutor, wait
-import requests
 import re
 import json
 import html
-import traceback
-from queue import Queue, Empty
-from threading import Event, Thread
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
-from urllib.parse import urlparse
+import math
+from urllib.parse import urlencode, urlparse
 import os
+from queue import Empty, Queue
+from threading import Event, Thread
+from time import monotonic
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
@@ -260,53 +256,31 @@ st.markdown("""
         /* ----------------------------------------------------------------
            FORM CONTROLS -- PRIME Warm White surfaces, sharp edges
         ---------------------------------------------------------------- */
-        /* Scan progress dialog: Claude Code CLI-inspired activity console */
+        /* Compact PRIME scan progress dialog */
         [data-testid="stDialog"] > div,
         div[role="dialog"] {
-            width: min(92vw, 760px) !important;
-            max-width: 760px !important;
+            width: min(92vw, 380px) !important;
+            max-width: 380px !important;
         }
         [data-testid="stDialog"] > div,
         div[role="dialog"] > div {
-            background: white !important;
-            color: #202020 !important;
+            background: #ffffff !important;
+            color: #1b1d1e !important;
+            border: 1px solid rgba(0, 51, 102, 0.12) !important;
+            border-top: 2px solid #c9ab4c !important;
+            border-radius: 6px !important;
+            box-shadow: none !important;
         }
         [data-testid="stDialog"] h2,
         div[role="dialog"] h2 {
-            color: #202020 !important;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
-            letter-spacing: -0.02em !important;
+            color: #003366 !important;
+            font-family: 'Cormorant Garamond', Georgia, serif !important;
+            font-weight: 600 !important;
         }
         [data-testid="stDialog"] [data-testid="stMarkdownContainer"] {
             max-height: 64vh !important;
             overflow-y: auto !important;
             overflow-x: hidden !important;
-            padding: 0 4px 4px !important;
-        }
-        .claude-console { background:#fafaf8; color:#302f2c; border:1px solid #deddd8; padding:16px; max-height:55vh; overflow:auto; font:13px/1.6 Consolas, monospace; }
-        [role="dialog"]:has(.claude-console-head) h2 { position:absolute !important; width:1px !important; height:1px !important; overflow:hidden; clip-path:inset(50%); margin:0 !important; }
-        .scan-ring { display:inline-block; width:12px; height:12px; border:2px solid #ccd5dd; border-top-color:#003366; border-radius:50%; animation:scan-turn .85s linear infinite; vertical-align:middle; }
-        @keyframes scan-turn { to { transform:rotate(360deg); } }
-        @media (prefers-reduced-motion:reduce) { .scan-ring { animation:none; } }
-        .claude-console-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; padding-bottom:10px; border-bottom:1px solid #deddd8; }
-        .claude-console-head span { color:#595751; }
-        .claude-event { display:flex; gap:9px; align-items:baseline; padding:5px 0; color:#57534e; }
-        .scan-mark { width:1em; flex:none; text-align:center; color:#87817a; }
-        .scan-current { color:#29241f; font-weight:600; }
-        .scan-current .scan-mark { color:#ad512a; display:inline-block; animation:scan-turn 1.6s steps(8,end) infinite; }
-        .scan-arrive { animation:scan-arrive .24s ease-out both; }
-        .scan-dots { display:inline-block; overflow:hidden; vertical-align:bottom; width:3ch; animation:scan-dots 1.4s steps(1,end) infinite; color:#ad512a; }
-        @keyframes scan-dots { 0% { clip-path:inset(0 100% 0 0); } 25% { clip-path:inset(0 65% 0 0); } 50% { clip-path:inset(0 32% 0 0); } 75%,100% { clip-path:inset(0); } }
-        @keyframes scan-arrive { from { opacity:.35; transform:translateY(3px); } to { opacity:1; transform:none; } }
-        @media (prefers-reduced-motion:reduce) { .scan-arrive,.scan-current .scan-mark,.scan-dots { animation:none; } }
-
-        @keyframes claude-pulse { 50% { opacity: .45; } }
-        [data-testid="stDialog"] pre,
-        [data-testid="stDialog"] code,
-        div[role="dialog"] pre {
-            white-space: pre-wrap !important;
-            overflow-wrap: anywhere !important;
-            word-break: normal !important;
         }
 
         [data-testid="stTextInput"] div[data-baseweb="base-input"],
@@ -716,6 +690,10 @@ if 'last_scan_lon' not in st.session_state: st.session_state.last_scan_lon = 120
 if 'layer_meta' not in st.session_state: st.session_state.layer_meta = {}
 if 'layer_groups' not in st.session_state: st.session_state.layer_groups = {}
 if 'scan_active_loading' not in st.session_state: st.session_state.scan_active_loading = False
+if 'turbo_event_queue' not in st.session_state: st.session_state.turbo_event_queue = None
+if 'turbo_scan_active' not in st.session_state: st.session_state.turbo_scan_active = False
+if 'turbo_scan_notice' not in st.session_state: st.session_state.turbo_scan_notice = None
+if 'turbo_cancel_event' not in st.session_state: st.session_state.turbo_cancel_event = None
 
 if 'target_config' not in st.session_state:
     st.session_state.target_config = {"size": 24, "color": "#003366", "style": "star"}
@@ -740,49 +718,160 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
-def scan_chunks(queries, cancel, events):
-    places = {}
-    for index, query in enumerate(queries, 1):
-        if cancel.is_set():
-            return
-        events.put(("status", f"Searching group {index} of {len(queries)}."))
-        elements = send_area_query(query, cancel, events)
-        if elements is None or cancel.is_set():
-            return
+
+def build_overpass_query(filters, radius, lat, lon):
+    clauses = [
+        f"  nwr[{tag}](around:{int(radius)},{lat},{lon});"
+        for tag in filters
+    ]
+    return "[out:json][timeout:180];\n(\n" + "\n".join(clauses) + "\n);\nout center;"
+
+
+def build_overpass_turbo_url(query, lat, lon, radius):
+    zoom = max(1, min(17, int(math.log2(
+        15_000_000 * max(0.01, math.cos(math.radians(lat))) / radius
+    ))))
+    params = urlencode({
+        "Q": query,
+        "C": f"{lat};{lon};{zoom}",
+        "R": "",
+    })
+    return f"https://overpass-turbo.eu/?{params}"
+
+
+def run_query_in_overpass_turbo(turbo_url, events, cancel_event=None):
+    """Run Turbo headlessly and stop the browser request when cancelled."""
+    cancel_event = cancel_event or Event()
+    browser = None
+    result_kind = "failed"
+    result_value = None
+
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                channel="msedge",
+                headless=True,
+            )
+            try:
+                page = browser.new_page()
+                response_ready = Event()
+                query_responses = []
+
+                def capture_query_response(response):
+                    if urlparse(response.url).path.rstrip("/") in {
+                        "/interpreter",
+                        "/api/interpreter",
+                    }:
+                        query_responses.append(response)
+                        response_ready.set()
+
+                page.on("response", capture_query_response)
+                # Turbo's app keeps loading after the document commits. Its R URL
+                # parameter starts the query once Turbo initializes.
+                page.goto(turbo_url, wait_until="commit", timeout=60_000)
+                response_deadline = monotonic() + 240
+
+                while not response_ready.is_set():
+                    if cancel_event.is_set():
+                        result_kind = "cancelled"
+                        break
+                    if monotonic() >= response_deadline:
+                        raise TimeoutError("Timed out waiting for the Overpass Turbo query.")
+                    # Playwright's sync API dispatches response callbacks while its
+                    # own methods run, so pump it in short intervals while polling.
+                    page.wait_for_timeout(250)
+
+                if cancel_event.is_set():
+                    result_kind = "cancelled"
+                elif query_responses:
+                    response = query_responses[-1]
+                    if not response.ok:
+                        raise RuntimeError(
+                            f"Overpass Turbo query failed with HTTP {response.status}."
+                        )
+                    result_value = response.json()
+                    if not isinstance(result_value, dict) or not isinstance(
+                        result_value.get("elements"), list
+                    ):
+                        raise ValueError(
+                            "Overpass Turbo returned data in an unexpected format."
+                        )
+                    result_kind = "done"
+                else:
+                    result_kind = "failed"
+                    result_value = "Overpass Turbo returned no query response."
+            finally:
+                browser.close()
+                browser = None
+    except Exception as error:
+        result_kind = "cancelled" if cancel_event.is_set() else "failed"
+        result_value = None if result_kind == "cancelled" else str(error)
+
+    if cancel_event.is_set() and result_kind == "done":
+        result_kind, result_value = "cancelled", None
+    events.put((result_kind, result_value))
+
+
+def import_map_records(data):
+    if isinstance(data, dict) and isinstance(data.get("elements"), list):
+        elements = data["elements"]
+        records = []
         for element in elements:
-            places[(element["type"], element["id"])] = element
-        events.put(("status", f"Group {index} returned {len(elements):,} map features."))
-    events.put(("done", list(places.values())))
+            if not isinstance(element, dict):
+                continue
+            center = element.get("center") or {}
+            lat = element.get("lat", center.get("lat"))
+            lon = element.get("lon", center.get("lon"))
+            if lat is None or lon is None:
+                continue
+            lat, lon = float(lat), float(lon)
+            if not math.isfinite(lat) or not math.isfinite(lon) or abs(lat) > 90 or abs(lon) > 180:
+                continue
+            tags = element.get("tags") or {}
+            feature_type = (
+                tags.get("amenity") or tags.get("shop") or tags.get("building")
+                or tags.get("office") or tags.get("tourism") or tags.get("leisure")
+                or tags.get("landuse") or tags.get("place") or element.get("type", "Node")
+            )
+            records.append({
+                "lat": lat,
+                "lon": lon,
+                "name": str(tags.get("name") or "Unknown"),
+                "type": str(feature_type),
+                "visible": True,
+                "uid": len(records),
+                "osm_type": element.get("type", ""),
+                "osm_id": element.get("id"),
+                "tags": tags,
+            })
+        if not records:
+            raise ValueError("The Overpass JSON contains no mappable point or centered feature.")
+        return records
 
-
-def send_area_query(query, cancel, events):
-    """Run one combined area query and retry transient failures on another provider."""
-    providers = ("overpass-api.de", "overpass.private.coffee")
-    for attempt, host in enumerate(providers * 2):
-        if cancel.is_set():
-            return
-        events.put(("status", f"Sending query to {host}."))
-        try:
-            response = requests.post(f"https://{host}/api/interpreter", data={"data": query},
-                                     headers={"User-Agent": "OpenNode/3.1"}, timeout=(6, 35))
-            events.put(("log", f"{host} HTTP {response.status_code}\n{response.text}"))
-            if response.status_code == 400:
-                events.put(("failed", "Overpass rejected the query. See the scan log for details."))
-                return
-            response.raise_for_status()
-            data = response.json()
-            if not isinstance(data, dict) or data.get("remark") or not isinstance(data.get("elements"), list):
-                raise ValueError("The provider returned an incomplete result.")
-            if not cancel.is_set():
-                return data["elements"]
-            return
-        except (requests.RequestException, ValueError) as error:
-            events.put(("log", str(error)))
-            if attempt < 3:
-                events.put(("status", f"{host} could not complete the query. Trying another provider."))
-                if cancel.wait(2 ** attempt):
-                    return
-    events.put(("failed", "Neither public map service completed the request. Try again shortly."))
+    rows = data.get("scanned_records", data) if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        raise ValueError("Choose an Overpass Turbo JSON export or Open Node JSON file.")
+    records = []
+    for row in rows:
+        if not isinstance(row, dict) or row.get("lat") is None or row.get("lon") is None:
+            continue
+        lat, lon = float(row["lat"]), float(row["lon"])
+        if not math.isfinite(lat) or not math.isfinite(lon) or abs(lat) > 90 or abs(lon) > 180:
+            continue
+        records.append({
+            **row,
+            "lat": lat,
+            "lon": lon,
+            "name": str(row.get("name") or "Unknown"),
+            "type": str(row.get("type") or "Unclassified"),
+            "visible": row.get("visible", True),
+            "uid": len(records),
+        })
+    if not records:
+        raise ValueError("The JSON file contains no mappable records.")
+    return records
 
 
 def compile_features_kml(features):
@@ -794,157 +883,189 @@ def compile_features_kml(features):
         kml += f"<Placemark><name>{name}</name><description>{class_type}</description><Point><coordinates>{f['lon']},{f['lat']},0</coordinates></Point></Placemark>"
     return kml + '</Document></kml>'
 
+
+@st.dialog("Scan in progress", width="small")
+def show_turbo_scan_dialog():
+    st.status("Overpass Turbo is running your query…", state="running", expanded=False)
+    st.caption("Results will be imported here automatically when the query finishes.")
+    if st.button(
+        "CANCEL SCAN",
+        type="secondary",
+        use_container_width=True,
+        key="cancel_turbo_scan_button",
+    ):
+        cancel_event = st.session_state.turbo_cancel_event
+        if cancel_event is not None:
+            cancel_event.set()
+        st.session_state.turbo_scan_active = False
+        st.session_state.turbo_event_queue = None
+        st.session_state.turbo_cancel_event = None
+        st.session_state.turbo_scan_notice = ("info", "Scan cancelled.")
+        st.rerun()
+
+
 # -----------------------------------------------------------------------------
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    
-    selected_tags = []
-    scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
-    
-    scan_status = st.empty()
-    if st.session_state.get("scan_message"):
-        message = st.session_state.scan_message
-        if message.startswith("Scan failed"):
-            scan_status.error(message)
-        elif message.startswith("Partial scan"):
-            scan_status.warning(message)
+    if st.session_state.turbo_scan_notice:
+        notice_type, notice_text = st.session_state.turbo_scan_notice
+        if notice_type == "error":
+            st.error(notice_text)
+        elif notice_type == "info":
+            st.info(notice_text)
         else:
-            scan_status.info(message)
-    if st.session_state.get("last_scan_log"):
-        st.download_button(
-            "Download raw scan log", st.session_state.last_scan_log,
-            file_name="overpass-scan.log", mime="text/plain", on_click="ignore",
-        )
+            st.success(notice_text)
+        st.session_state.turbo_scan_notice = None
 
-    location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
-    radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
+    st.subheader("SEARCH AREA")
+    location_input = st.text_input(
+        "COORDINATES (LATITUDE, LONGITUDE)",
+        value=st.session_state.geo_coords,
+        key="geo_coords_input",
+        help="Enter decimal latitude, longitude. Example: 14.5995, 120.9842",
+    )
+    radius_val = st.number_input(
+        "RADIUS (METERS)",
+        min_value=100,
+        max_value=50000,
+        value=st.session_state.geo_radius,
+        step=100,
+        key="geo_radius_input",
+    )
     st.session_state.geo_radius = radius_val
 
-    coord_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", location_input)
+    lat_coord, lon_coord = 14.5995, 120.9842
+    coord_match = re.match(
+        r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$",
+        location_input,
+    )
+    coordinates_valid = False
     if coord_match:
-        lat_coord, lon_coord = float(coord_match.group(1)), float(coord_match.group(2))
-        st.session_state.geo_coords = location_input
-    else:
-        fallback_match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", st.session_state.geo_coords)
-        lat_coord, lon_coord = (float(fallback_match.group(1)), float(fallback_match.group(2))) if fallback_match else (14.5995, 120.9842)
+        input_lat, input_lon = float(coord_match.group(1)), float(coord_match.group(2))
+        coordinates_valid = -90 <= input_lat <= 90 and -180 <= input_lon <= 180
+        if coordinates_valid:
+            lat_coord, lon_coord = input_lat, input_lon
+            st.session_state.geo_coords = location_input
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-    search_query = st.text_input("SEARCH TAGS", placeholder="Search parameters...").lower()
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-    
+    search_query = st.text_input("SEARCH POIs", placeholder="Search parameters...").lower()
+    selected_tags = []
+
     for cat_name, node_items in POI_CONFIG.items():
         matched = [item for item in node_items if search_query in item[0].lower()]
         if matched:
-            with st.expander(cat_name, expanded=(len(search_query) > 0)):
+            with st.expander(cat_name, expanded=bool(search_query)):
                 for label, tag in matched:
-                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"): selected_tags.append(tag)
+                    if st.checkbox(label, key=f"chk_{cat_name}_{label}"):
+                        selected_tags.append(tag)
 
-    st.markdown("<div style='font-weight: 700; font-size: 11px; margin-top: 15px; margin-bottom: 8px; color: #003366; letter-spacing: 1px;'>ADVANCED POIs</div>", unsafe_allow_html=True)
-    with st.container():
-        for cat_name, node_items in ADVANCED_CONFIG.items():
-            matched = [item for item in node_items if search_query in item[0].lower()]
-            if matched:
-                with st.expander(cat_name, expanded=(len(search_query) > 0)):
-                    for label, tag in matched:
-                        if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
+    for cat_name, node_items in ADVANCED_CONFIG.items():
+        matched = [item for item in node_items if search_query in item[0].lower()]
+        if matched:
+            with st.expander(cat_name, expanded=bool(search_query)):
+                for label, tag in matched:
+                    if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"):
+                        selected_tags.append(tag)
 
-    if scan_triggered and "active_scan" not in st.session_state:
-        if not selected_tags:
-            st.error("Select at least one POI layer before scanning.")
-        elif not coord_match or not (-90 <= lat_coord <= 90 and -180 <= lon_coord <= 180):
-            st.error("Enter valid latitude and longitude coordinates.")
-        else:
-            filters = list(dict.fromkeys(selected_tags))
-            around = f"(around:{int(radius_val)},{lat_coord},{lon_coord})"
-            queries = []
-            for offset in range(0, len(filters), 3):
-                clauses = "\n".join(f"nwr[{tag}]{around};" for tag in filters[offset:offset + 3])
-                queries.append(f"[out:json][timeout:25];(\n{clauses}\n);out center;")
-            job = dict(cancel=Event(), events=Queue(), started=time.monotonic(),
-                       history=["Built the area query."], log=queries.copy(), count=len(filters),
-                       radius=radius_val, lat=lat_coord, lon=lon_coord)
-            st.session_state.active_scan = job
-            Thread(target=scan_chunks, args=(queries, job["cancel"], job["events"]), daemon=True).start()
+    can_build_query = coordinates_valid and bool(selected_tags)
+    if can_build_query:
+        filters = list(dict.fromkeys(selected_tags))
+        overpass_query = build_overpass_query(filters, radius_val, lat_coord, lon_coord)
+        turbo_url = build_overpass_turbo_url(overpass_query, lat_coord, lon_coord, radius_val)
+        scan_clicked = st.button(
+            "SCAN AREA",
+            type="secondary",
+            use_container_width=True,
+            disabled=st.session_state.turbo_scan_active,
+            key="scan_btn",
+        )
+        if scan_clicked:
+            events = Queue()
+            cancel_event = Event()
+            st.session_state.turbo_event_queue = events
+            st.session_state.turbo_cancel_event = cancel_event
+            st.session_state.turbo_scan_active = True
+            Thread(
+                target=run_query_in_overpass_turbo,
+                args=(turbo_url, events, cancel_event),
+                daemon=True,
+            ).start()
+    else:
+        st.button(
+            "SCAN AREA",
+            type="secondary",
+            use_container_width=True,
+            disabled=True,
+            key="scan_btn",
+        )
+        if not coordinates_valid:
+            st.caption("Enter valid latitude and longitude coordinates.")
+        elif not selected_tags:
+            st.caption("Select at least one POI before scanning.")
 
-    if "active_scan" in st.session_state:
-        @st.dialog("Scanning area", dismissible=False)
-        def run_scan_dialog():
-            @st.fragment(run_every=1)
-            def progress():
-                job = st.session_state.get("active_scan")
-                if job is None:
-                    return
-                seconds = int(time.monotonic() - job["started"])
-                elapsed = f"{seconds // 3600:02d}:{seconds // 60 % 60:02d}:{seconds % 60:02d}"
-                all_elements = None
-                while True:
-                    try:
-                        kind, value = job["events"].get_nowait()
-                    except Empty:
-                        break
-                    if kind == "status":
-                        job["history"].append(value)
-                    elif kind == "log":
-                        job["log"].append(value)
-                    elif kind == "failed":
-                        st.session_state.scan_message = f"Scan failed. {value} Previous results are still displayed."
-                        st.session_state.last_scan_log = "\n\n".join(job["log"])
-                        del st.session_state.active_scan
-                        st.rerun()
-                    elif kind == "done":
-                        all_elements = value
-                history = job["history"]
-                fresh = len(history) != job.get("visible_event_count", 0)
-                job["visible_event_count"] = len(history)
-                rows = []
-                for index, message in enumerate(history):
-                    active = index == len(history) - 1 and all_elements is None
-                    classes = "claude-event scan-current" if active else "claude-event"
-                    if active and fresh:
-                        classes += " scan-arrive"
-                    glyph = "✳" if active else "·"
-                    dots = '<span aria-hidden="true" class="scan-dots">...</span>' if active else ""
-                    label = message.rstrip(".") if active else message
-                    rows.append(f'<div class="{classes}"><span aria-hidden="true" class="scan-mark">{glyph}</span>'
-                                f'<span>{html.escape(label)}{dots}</span></div>')
-                header, cancel_col = st.columns([5, 1], vertical_alignment="center")
-                with header:
-                    st.html(f'<div class="claude-console-head"><i class="scan-ring" aria-hidden="true"></i><b>Scanning area</b> '
-                            f'<span>{job["count"]} filters · {job["radius"]:,} m radius · {elapsed} elapsed</span></div>')
-                with cancel_col:
-                    if st.button("Cancel", key="cancel_area_scan", use_container_width=True):
-                        job["cancel"].set()
-                        del st.session_state.active_scan
-                        st.session_state.scan_message = "Scan canceled. Previous results are still displayed."
-                        st.rerun()
-                st.html(f'<div class="claude-console">{"".join(rows)}</div>')
-                if all_elements is None:
-                    return
-                records = []
-                for element in all_elements:
-                    center = element.get("center") or {}
-                    element_lat = element.get("lat", center.get("lat"))
-                    element_lon = element.get("lon", center.get("lon"))
-                    if element_lat is None or element_lon is None:
-                        continue
-                    tags = element.get("tags") or {}
-                    records.append({
-                        "lat": float(element_lat), "lon": float(element_lon),
-                        "name": str(tags.get("name") or "Unknown"),
-                        "type": str(tags.get("amenity") or tags.get("shop") or tags.get("building") or tags.get("office") or tags.get("tourism") or "Node"),
-                        "visible": True, "uid": len(records),
-                    })
-                st.session_state.scanned_records = records
-                st.session_state.last_scan_lat = job["lat"]
-                st.session_state.last_scan_lon = job["lon"]
-                st.session_state.last_scan_log = "\n\n".join(job["log"])
-                st.session_state.scan_message = f"Scan complete. Found {len(records):,} places in {elapsed}."
-                del st.session_state.active_scan
+    if st.session_state.turbo_scan_active:
+        show_turbo_scan_dialog()
+
+        @st.fragment(run_every=1)
+        def monitor_turbo_scan():
+            events = st.session_state.turbo_event_queue
+            if not st.session_state.turbo_scan_active:
+                return
+            if events is None:
+                st.session_state.turbo_scan_active = False
+                st.session_state.turbo_scan_notice = (
+                    "error",
+                    "The Overpass Turbo job was interrupted before results returned. Run it again.",
+                )
+                st.session_state.turbo_cancel_event = None
                 st.rerun()
-            progress()
-        run_scan_dialog()
-    st.markdown("<br>", unsafe_allow_html=True)
+                return
+            try:
+                kind, value = events.get_nowait()
+            except Empty:
+                return
+
+            st.session_state.turbo_scan_active = False
+            st.session_state.turbo_event_queue = None
+            st.session_state.turbo_cancel_event = None
+            if kind == "cancelled":
+                st.session_state.turbo_scan_notice = ("info", "Scan cancelled.")
+                st.rerun()
+                return
+            if kind == "failed":
+                st.session_state.turbo_scan_notice = (
+                    "error",
+                    f"Overpass Turbo could not finish the query. {value}",
+                )
+                st.rerun()
+                return
+
+            try:
+                records = import_map_records(value)
+            except (ValueError, TypeError) as error:
+                st.session_state.turbo_scan_notice = (
+                    "error",
+                    f"Overpass Turbo returned data that could not be mapped. {error}",
+                )
+                st.rerun()
+                return
+
+            st.session_state.scanned_records = records
+            st.session_state.last_scan_lat = lat_coord
+            st.session_state.last_scan_lon = lon_coord
+            st.session_state.layer_meta = {}
+            st.session_state.layer_groups = {}
+            st.session_state.turbo_scan_notice = (
+                "success",
+                f"Imported {len(records):,} map features from Overpass Turbo."
+            )
+            st.rerun()
+
+        monitor_turbo_scan()
+
+    st.caption("Overpass Turbo runs in the background. Its results import here automatically when the query finishes.")
+
     def clear_all_data():
         st.session_state.pop("scan_message", None)
         st.session_state.scanned_records = []
@@ -959,25 +1080,42 @@ with st.sidebar:
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
-    # Filter only fully visible pins for strict map-sync exports
-    visible_only_records = [p for p in st.session_state.scanned_records if p.get('visible', True)]
-    
-    with col1: st.download_button("RADIUS", json.dumps(visible_only_records), "scan.json", "application/json", use_container_width=True)
-    with col2: st.download_button("MARKERS", compile_features_kml(st.session_state.scanned_records), "POIs.kml", "application/vnd.google-earth.kml+xml", use_container_width=True)
+    visible_only_records = [
+        record for record in st.session_state.scanned_records
+        if record.get("visible", True)
+    ]
+    with col1:
+        st.download_button(
+            "RADIUS",
+            json.dumps(visible_only_records),
+            "scan.json",
+            "application/json",
+            use_container_width=True,
+        )
+    with col2:
+        st.download_button(
+            "MARKERS",
+            compile_features_kml(st.session_state.scanned_records),
+            "POIs.kml",
+            "application/vnd.google-earth.kml+xml",
+            use_container_width=True,
+        )
 
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-
-    with st.popover("IMPORT FILE", use_container_width=True):
+    with st.popover("IMPORT OVERPASS JSON", use_container_width=True):
+        st.caption("In Overpass Turbo, choose Export, then Data, then raw data. Upload the downloaded JSON here.")
         imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
-        if imported_file is not None:
-            if st.button("LOAD", type="secondary", use_container_width=True):
-                try:
-                    data = json.load(imported_file)
-                    st.session_state.scanned_records = data.get("scanned_records", data)
-                    st.session_state.geo_coords = data.get("coords", st.session_state.geo_coords)
-                    st.session_state.geo_radius = data.get("radius", st.session_state.geo_radius)
-                    st.rerun()
-                except Exception: st.error("Invalid File")
+        if imported_file is not None and st.button("LOAD RESULTS", type="secondary", use_container_width=True):
+            try:
+                imported_data = json.load(imported_file)
+                st.session_state.scanned_records = import_map_records(imported_data)
+                st.session_state.layer_meta = {}
+                st.session_state.layer_groups = {}
+                st.session_state.scan_active_loading = False
+                st.session_state.last_scan_lat = lat_coord
+                st.session_state.last_scan_lon = lon_coord
+                st.success(f"Loaded {len(st.session_state.scanned_records):,} map features.")
+            except (ValueError, TypeError, json.JSONDecodeError) as error:
+                st.error(f"Could not import this JSON file. {error}")
 
 # -----------------------------------------------------------------------------
 # 4. MAP FRAME RENDERING ENGINE & INTERACTION ARCHITECTURE
