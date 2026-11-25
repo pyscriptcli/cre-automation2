@@ -1,7 +1,16 @@
 import streamlit as st
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
 import requests
 import re
 import json
+import html
+import traceback
+from queue import Queue, Empty
+from threading import Event, Thread
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from urllib.parse import urlparse
 import os
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
@@ -60,7 +69,6 @@ st.markdown("""
         }
 
         /* ================================================================
-           PRIME PHILIPPINES -- PALETTE OF SOVEREIGN INTELLIGENCE
            Backgrounds: #003366 (PRIME Blue) or #FFFCFB (Warm White) ONLY
            Accent:      #C9AB4C (PRIME Gold) -- never a background fill
            Text:        #003366 (Blue) or #181D1E (Gray) -- never #000000
@@ -166,6 +174,18 @@ st.markdown("""
             overscroll-behavior: contain !important;
             scrollbar-width: thin !important;
             scrollbar-color: rgba(0, 51, 102, 0.2) transparent !important;
+            padding-bottom: 64px !important;
+        }
+
+        /* Keep the primary action visible while the sidebar controls scroll. */
+        [data-testid="stSidebar"] .st-key-scan_btn [data-testid="stButton"] {
+            position: fixed !important;
+            left: 14px !important;
+            bottom: 10px !important;
+            width: 282px !important;
+            z-index: 1000 !important;
+            padding: 8px 0 0 !important;
+            background: var(--prime-warm-white) !important;
         }
 
         /* Modern subtle scrollbar with no ugly native arrow buttons */
@@ -220,6 +240,8 @@ st.markdown("""
             gap: 0 !important;
         }
 
+        [data-testid="stMainBlockContainer"] { padding: 0 !important; margin: 0 !important; }
+
         iframe {
             height: 100dvh !important;
             width: 100% !important;
@@ -238,6 +260,55 @@ st.markdown("""
         /* ----------------------------------------------------------------
            FORM CONTROLS -- PRIME Warm White surfaces, sharp edges
         ---------------------------------------------------------------- */
+        /* Scan progress dialog: Claude Code CLI-inspired activity console */
+        [data-testid="stDialog"] > div,
+        div[role="dialog"] {
+            width: min(92vw, 760px) !important;
+            max-width: 760px !important;
+        }
+        [data-testid="stDialog"] > div,
+        div[role="dialog"] > div {
+            background: white !important;
+            color: #202020 !important;
+        }
+        [data-testid="stDialog"] h2,
+        div[role="dialog"] h2 {
+            color: #202020 !important;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+            letter-spacing: -0.02em !important;
+        }
+        [data-testid="stDialog"] [data-testid="stMarkdownContainer"] {
+            max-height: 64vh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            padding: 0 4px 4px !important;
+        }
+        .claude-console { background:#fafaf8; color:#302f2c; border:1px solid #deddd8; padding:16px; max-height:55vh; overflow:auto; font:13px/1.6 Consolas, monospace; }
+        [role="dialog"]:has(.claude-console-head) h2 { position:absolute !important; width:1px !important; height:1px !important; overflow:hidden; clip-path:inset(50%); margin:0 !important; }
+        .scan-ring { display:inline-block; width:12px; height:12px; border:2px solid #ccd5dd; border-top-color:#003366; border-radius:50%; animation:scan-turn .85s linear infinite; vertical-align:middle; }
+        @keyframes scan-turn { to { transform:rotate(360deg); } }
+        @media (prefers-reduced-motion:reduce) { .scan-ring { animation:none; } }
+        .claude-console-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; padding-bottom:10px; border-bottom:1px solid #deddd8; }
+        .claude-console-head span { color:#595751; }
+        .claude-event { display:flex; gap:9px; align-items:baseline; padding:5px 0; color:#57534e; }
+        .scan-mark { width:1em; flex:none; text-align:center; color:#87817a; }
+        .scan-current { color:#29241f; font-weight:600; }
+        .scan-current .scan-mark { color:#ad512a; display:inline-block; animation:scan-turn 1.6s steps(8,end) infinite; }
+        .scan-arrive { animation:scan-arrive .24s ease-out both; }
+        .scan-dots { display:inline-block; overflow:hidden; vertical-align:bottom; width:3ch; animation:scan-dots 1.4s steps(1,end) infinite; color:#ad512a; }
+        @keyframes scan-dots { 0% { clip-path:inset(0 100% 0 0); } 25% { clip-path:inset(0 65% 0 0); } 50% { clip-path:inset(0 32% 0 0); } 75%,100% { clip-path:inset(0); } }
+        @keyframes scan-arrive { from { opacity:.35; transform:translateY(3px); } to { opacity:1; transform:none; } }
+        @media (prefers-reduced-motion:reduce) { .scan-arrive,.scan-current .scan-mark,.scan-dots { animation:none; } }
+
+        @keyframes claude-pulse { 50% { opacity: .45; } }
+        [data-testid="stDialog"] pre,
+        [data-testid="stDialog"] code,
+        div[role="dialog"] pre {
+            white-space: pre-wrap !important;
+            overflow-wrap: anywhere !important;
+            word-break: normal !important;
+        }
+
         [data-testid="stTextInput"] div[data-baseweb="base-input"],
         [data-testid="stTextInput"] div[data-baseweb="input"],
         [data-testid="stNumberInput"] div[data-baseweb="base-input"],
@@ -323,23 +394,41 @@ st.markdown("""
         }
 
         /* ----------------------------------------------------------------
-           BUTTONS -- PRIME Blue on Warm White, Gold accent, sharp corners
+           BUTTONS -- shared dimensions and centered labels
         ---------------------------------------------------------------- */
-        div.stButton > button[kind="secondary"],
+        div.stButton,
+        div.stDownloadButton,
+        [data-testid="stPopover"] {
+            width: 100% !important;
+        }
+
+        div.stButton > button,
+        div.stDownloadButton > button,
         [data-testid="stPopover"] > button {
+            box-sizing: border-box !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            min-height: 38px !important;
+            height: 38px !important;
+            padding: 0 10px !important;
+            border-radius: 0 !important;
+            line-height: 1 !important;
+            transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+        }
+
+        div.stButton > button[kind="secondary"],
+        [data-testid="stPopover"] > button,
+        div.stDownloadButton > button {
             background-color: var(--prime-blue) !important;
             border: 1.5px solid var(--prime-gold) !important;
-            border-radius: 0 !important;
-            width: 100% !important;
-            padding: 10px 8px !important;
             box-shadow: 0 3px 10px rgba(0, 51, 102, 0.18) !important;
-            letter-spacing: 1.5px !important;
-            transition: all 0.15s ease !important;
-            margin-bottom: 4px !important;
         }
 
         div.stButton > button[kind="secondary"]:hover,
-        [data-testid="stPopover"] > button:hover {
+        [data-testid="stPopover"] > button:hover,
+        div.stDownloadButton > button:hover {
             background-color: var(--prime-gold) !important;
             border-color: var(--prime-gold) !important;
             box-shadow: 0 4px 14px rgba(201, 171, 76, 0.3) !important;
@@ -354,27 +443,12 @@ st.markdown("""
             font-size: 9px !important;
             text-transform: uppercase !important;
             letter-spacing: 1.5px !important;
+            line-height: 1 !important;
+            margin: 0 !important;
         }
 
         div.stButton > button[kind="secondary"]:hover p,
-        [data-testid="stPopover"] > button:hover p {
-            color: var(--prime-blue) !important;
-        }
-
-        div.stDownloadButton > button {
-            background-color: var(--prime-blue) !important;
-            border: 1px solid var(--prime-blue) !important;
-            border-radius: 0 !important;
-            width: 100% !important;
-            padding: 8px 6px !important;
-            transition: all 0.15s ease !important;
-        }
-
-        div.stDownloadButton > button:hover {
-            background-color: var(--prime-gold) !important;
-            border-color: var(--prime-gold) !important;
-        }
-
+        [data-testid="stPopover"] > button:hover p,
         div.stDownloadButton > button:hover p {
             color: var(--prime-blue) !important;
         }
@@ -382,13 +456,8 @@ st.markdown("""
         div.stButton > button[kind="primary"] {
             background: transparent !important;
             border: 1px solid rgba(0, 51, 102, 0.22) !important;
-            border-radius: 0 !important;
             color: var(--prime-muted) !important;
-            padding: 6px 8px !important;
-            margin-top: 6px !important;
-            margin-bottom: 12px !important;
-            width: 100% !important;
-            transition: all 0.15s ease !important;
+            box-shadow: none !important;
         }
 
         div.stButton > button[kind="primary"]:hover {
@@ -402,13 +471,13 @@ st.markdown("""
             font-weight: 700 !important;
             text-transform: uppercase !important;
             letter-spacing: 1.5px !important;
+            line-height: 1 !important;
             margin: 0 !important;
         }
 
         div.stButton > button[kind="primary"]:hover p {
             color: #AA2E20 !important;
         }
-
         /* ----------------------------------------------------------------
            EXPANDERS (POI categories) -- sharp, Warm White
         ---------------------------------------------------------------- */
@@ -671,6 +740,51 @@ POI_CONFIG = {
 
 ADVANCED_CONFIG = {}
 
+def scan_chunks(queries, cancel, events):
+    places = {}
+    for index, query in enumerate(queries, 1):
+        if cancel.is_set():
+            return
+        events.put(("status", f"Searching group {index} of {len(queries)}."))
+        elements = send_area_query(query, cancel, events)
+        if elements is None or cancel.is_set():
+            return
+        for element in elements:
+            places[(element["type"], element["id"])] = element
+        events.put(("status", f"Group {index} returned {len(elements):,} map features."))
+    events.put(("done", list(places.values())))
+
+
+def send_area_query(query, cancel, events):
+    """Run one combined area query and retry transient failures on another provider."""
+    providers = ("overpass-api.de", "overpass.private.coffee")
+    for attempt, host in enumerate(providers * 2):
+        if cancel.is_set():
+            return
+        events.put(("status", f"Sending query to {host}."))
+        try:
+            response = requests.post(f"https://{host}/api/interpreter", data={"data": query},
+                                     headers={"User-Agent": "OpenNode/3.1"}, timeout=(6, 35))
+            events.put(("log", f"{host} HTTP {response.status_code}\n{response.text}"))
+            if response.status_code == 400:
+                events.put(("failed", "Overpass rejected the query. See the scan log for details."))
+                return
+            response.raise_for_status()
+            data = response.json()
+            if not isinstance(data, dict) or data.get("remark") or not isinstance(data.get("elements"), list):
+                raise ValueError("The provider returned an incomplete result.")
+            if not cancel.is_set():
+                return data["elements"]
+            return
+        except (requests.RequestException, ValueError) as error:
+            events.put(("log", str(error)))
+            if attempt < 3:
+                events.put(("status", f"{host} could not complete the query. Trying another provider."))
+                if cancel.wait(2 ** attempt):
+                    return
+    events.put(("failed", "Neither public map service completed the request. Try again shortly."))
+
+
 def compile_features_kml(features):
     kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Scanned POIs</name>'
     for f in features:
@@ -684,11 +798,25 @@ def compile_features_kml(features):
 # 3. SIDEBAR CONTROLS & GEOPROCESSING
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div class="brand-title">Open Node</div>', unsafe_allow_html=True)
     
     selected_tags = []
     scan_triggered = st.button("SCAN AREA", type="secondary", use_container_width=True, key="scan_btn")
     
+    scan_status = st.empty()
+    if st.session_state.get("scan_message"):
+        message = st.session_state.scan_message
+        if message.startswith("Scan failed"):
+            scan_status.error(message)
+        elif message.startswith("Partial scan"):
+            scan_status.warning(message)
+        else:
+            scan_status.info(message)
+    if st.session_state.get("last_scan_log"):
+        st.download_button(
+            "Download raw scan log", st.session_state.last_scan_log,
+            file_name="overpass-scan.log", mime="text/plain", on_click="ignore",
+        )
+
     location_input = st.text_input("COORDINATES", value=st.session_state.geo_coords, key="geo_coords_input")
     radius_val = st.number_input("RADIUS (METERS)", min_value=100, max_value=50000, value=st.session_state.geo_radius, key="geo_radius_input", step=100)
     st.session_state.geo_radius = radius_val
@@ -721,86 +849,113 @@ with st.sidebar:
                     for label, tag in matched:
                         if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"): selected_tags.append(tag)
 
-    if scan_triggered:
+    if scan_triggered and "active_scan" not in st.session_state:
         if not selected_tags:
-            st.error("Select >= 1 layer.")
+            st.error("Select at least one POI layer before scanning.")
+        elif not coord_match or not (-90 <= lat_coord <= 90 and -180 <= lon_coord <= 180):
+            st.error("Enter valid latitude and longitude coordinates.")
         else:
-            st.session_state.scan_active_loading = True
-            records = []
-            success = False
-            
-            try:
-                import osmnx as ox
-                tags_dict = {}
-                for tag in selected_tags:
-                    clean = tag.replace('"', '')
-                    if '=' in clean:
-                        k, v = clean.split('=', 1)
-                        if '|' in v: v = [x.strip() for x in v.split('|')]
-                        tags_dict[k] = v
-                    else:
-                        tags_dict[clean] = True
-                        
-                gdf = ox.geometries_from_point((lat_coord, lon_coord), tags_dict, dist=radius_val)
-                if not gdf.empty:
-                    for idx, row in gdf.iterrows():
-                        if hasattr(row.geometry, 'centroid'):
-                            c_lat, c_lon = row.geometry.centroid.y, row.geometry.centroid.x
-                        else: continue
-                        name = row.get('name', 'Unknown')
-                        if isinstance(name, float): name = 'Unknown'
-                        
-                        matched_type = 'Node'
-                        for k in tags_dict.keys():
-                            if k in row and row[k]:
-                                matched_type = str(row[k])
-                                break
-                        records.append({
-                            "lat": c_lat, "lon": c_lon, "name": str(name), 
-                            "type": matched_type, "visible": True, "uid": len(records)
-                        })
-                    st.session_state.scanned_records = records
-                    st.session_state.last_scan_lat = lat_coord
-                    st.session_state.last_scan_lon = lon_coord
-                    success = True
-            except Exception: pass
+            filters = list(dict.fromkeys(selected_tags))
+            around = f"(around:{int(radius_val)},{lat_coord},{lon_coord})"
+            queries = []
+            for offset in range(0, len(filters), 3):
+                clauses = "\n".join(f"nwr[{tag}]{around};" for tag in filters[offset:offset + 3])
+                queries.append(f"[out:json][timeout:25];(\n{clauses}\n);out center;")
+            job = dict(cancel=Event(), events=Queue(), started=time.monotonic(),
+                       history=["Built the area query."], log=queries.copy(), count=len(filters),
+                       radius=radius_val, lat=lat_coord, lon=lon_coord)
+            st.session_state.active_scan = job
+            Thread(target=scan_chunks, args=(queries, job["cancel"], job["events"]), daemon=True).start()
 
-            if not success:
-                url = "https://overpass-api.de/api/interpreter"
-                statements = "\n".join([f"  nwr[{tag}](around:{radius_val},{lat_coord},{lon_coord});" for tag in selected_tags])
-                ql = f"[out:json][timeout:90];(\n{statements}\n);\nout center;"
-                try:
-                    res = requests.post(url, data={"data": ql}, headers={"User-Agent": "OpenNode/3.1"}, timeout=90)
-                    if res.status_code == 200:
-                        for el in res.json().get('elements', []):
-                            e_lat = el.get('lat') or el.get('center', {}).get('lat')
-                            e_lon = el.get('lon') or el.get('center', {}).get('lon')
-                            if e_lat and e_lon:
-                                tags = el.get('tags', {})
-                                records.append({
-                                    "lat": e_lat, "lon": e_lon, "name": tags.get('name', 'Unknown'), 
-                                    "type": tags.get('amenity') or tags.get('shop') or tags.get('building') or 'Node',
-                                    "visible": True, "uid": len(records)
-                                })
-                        st.session_state.scanned_records = records
-                        st.session_state.last_scan_lat = lat_coord
-                        st.session_state.last_scan_lon = lon_coord
-                        success = True
-                except Exception: pass
-            
-            st.session_state.scan_active_loading = False
-            if success: st.rerun()
-
+    if "active_scan" in st.session_state:
+        @st.dialog("Scanning area", dismissible=False)
+        def run_scan_dialog():
+            @st.fragment(run_every=1)
+            def progress():
+                job = st.session_state.get("active_scan")
+                if job is None:
+                    return
+                seconds = int(time.monotonic() - job["started"])
+                elapsed = f"{seconds // 3600:02d}:{seconds // 60 % 60:02d}:{seconds % 60:02d}"
+                all_elements = None
+                while True:
+                    try:
+                        kind, value = job["events"].get_nowait()
+                    except Empty:
+                        break
+                    if kind == "status":
+                        job["history"].append(value)
+                    elif kind == "log":
+                        job["log"].append(value)
+                    elif kind == "failed":
+                        st.session_state.scan_message = f"Scan failed. {value} Previous results are still displayed."
+                        st.session_state.last_scan_log = "\n\n".join(job["log"])
+                        del st.session_state.active_scan
+                        st.rerun()
+                    elif kind == "done":
+                        all_elements = value
+                history = job["history"]
+                fresh = len(history) != job.get("visible_event_count", 0)
+                job["visible_event_count"] = len(history)
+                rows = []
+                for index, message in enumerate(history):
+                    active = index == len(history) - 1 and all_elements is None
+                    classes = "claude-event scan-current" if active else "claude-event"
+                    if active and fresh:
+                        classes += " scan-arrive"
+                    glyph = "✳" if active else "·"
+                    dots = '<span aria-hidden="true" class="scan-dots">...</span>' if active else ""
+                    label = message.rstrip(".") if active else message
+                    rows.append(f'<div class="{classes}"><span aria-hidden="true" class="scan-mark">{glyph}</span>'
+                                f'<span>{html.escape(label)}{dots}</span></div>')
+                header, cancel_col = st.columns([5, 1], vertical_alignment="center")
+                with header:
+                    st.html(f'<div class="claude-console-head"><i class="scan-ring" aria-hidden="true"></i><b>Scanning area</b> '
+                            f'<span>{job["count"]} filters · {job["radius"]:,} m radius · {elapsed} elapsed</span></div>')
+                with cancel_col:
+                    if st.button("Cancel", key="cancel_area_scan", use_container_width=True):
+                        job["cancel"].set()
+                        del st.session_state.active_scan
+                        st.session_state.scan_message = "Scan canceled. Previous results are still displayed."
+                        st.rerun()
+                st.html(f'<div class="claude-console">{"".join(rows)}</div>')
+                if all_elements is None:
+                    return
+                records = []
+                for element in all_elements:
+                    center = element.get("center") or {}
+                    element_lat = element.get("lat", center.get("lat"))
+                    element_lon = element.get("lon", center.get("lon"))
+                    if element_lat is None or element_lon is None:
+                        continue
+                    tags = element.get("tags") or {}
+                    records.append({
+                        "lat": float(element_lat), "lon": float(element_lon),
+                        "name": str(tags.get("name") or "Unknown"),
+                        "type": str(tags.get("amenity") or tags.get("shop") or tags.get("building") or tags.get("office") or tags.get("tourism") or "Node"),
+                        "visible": True, "uid": len(records),
+                    })
+                st.session_state.scanned_records = records
+                st.session_state.last_scan_lat = job["lat"]
+                st.session_state.last_scan_lon = job["lon"]
+                st.session_state.last_scan_log = "\n\n".join(job["log"])
+                st.session_state.scan_message = f"Scan complete. Found {len(records):,} places in {elapsed}."
+                del st.session_state.active_scan
+                st.rerun()
+            progress()
+        run_scan_dialog()
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("CLEAR ALL", type="primary", key="clear_btn"):
+    def clear_all_data():
+        st.session_state.pop("scan_message", None)
         st.session_state.scanned_records = []
         st.session_state.layer_meta = {}
         st.session_state.layer_groups = {}
         st.session_state.scan_active_loading = False
-        for key in list(st.session_state.keys()):
-            if key.startswith("chk_"): st.session_state[key] = False
-        st.rerun()
+        for widget_key in list(st.session_state.keys()):
+            if widget_key.startswith("chk_"):
+                st.session_state[widget_key] = False
 
+    st.button("CLEAR ALL", type="primary", key="clear_btn", on_click=clear_all_data)
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
@@ -859,6 +1014,9 @@ leaflet_template = """
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #FFFCFB; overflow: hidden; font-family: 'Montserrat', sans-serif; }
         #map-container { position: relative; width: 100%; height: 100vh; }
+        #map-container:fullscreen { width: 100vw; height: 100vh; background: #FFFCFB; }
+        #map-container:fullscreen #scan-results-panel { display: none !important; }
+        #map-fullscreen-toggle { position: absolute; top: 12px; left: 12px; z-index: 1500; border: 1px solid #C9AB4C; background: #003366; color: #FFFCFB; padding: 9px 12px; font: 700 11px Montserrat, sans-serif; letter-spacing: 1px; cursor: pointer; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
         /* Centered Loading Splash Overlay UI */
@@ -951,6 +1109,7 @@ leaflet_template = """
 </head>
 <body>
     <div id="map-container">
+        <button id="map-fullscreen-toggle" type="button" aria-label="Show map fullscreen">FULLSCREEN</button>
         <div id="map-loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
             <div class="loading-text">Scanning Area...</div>
@@ -1057,6 +1216,25 @@ leaflet_template = """
             attributionControl: false, 
             preferCanvas: true 
         }).setView([__LAT__, __LON__], 14);
+
+        const mapFrame = document.getElementById('map-container');
+        const fullscreenToggle = document.getElementById('map-fullscreen-toggle');
+        async function toggleMapFullscreen() {
+            try {
+                if (!document.fullscreenElement) await mapFrame.requestFullscreen();
+                else await document.exitFullscreen();
+            } catch (error) {
+                fullscreenToggle.textContent = 'Fullscreen unavailable';
+                setTimeout(() => fullscreenToggle.textContent = 'FULLSCREEN', 2500);
+            }
+        }
+        fullscreenToggle.addEventListener('click', toggleMapFullscreen);
+        document.addEventListener('fullscreenchange', () => {
+            const active = document.fullscreenElement === mapFrame;
+            fullscreenToggle.textContent = active ? 'EXIT FULLSCREEN' : 'FULLSCREEN';
+            fullscreenToggle.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Show map fullscreen');
+            setTimeout(() => map.invalidateSize(), 100);
+        });
 
         window.addEventListener('resize', function() {
             if (map) map.invalidateSize();
@@ -1497,3 +1675,18 @@ leaflet_html = (leaflet_template
                 .replace("__GEOJSON__", geojson_str))
 
 st.components.v1.html(leaflet_html, height=850, scrolling=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
