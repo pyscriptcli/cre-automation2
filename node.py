@@ -489,7 +489,7 @@ st.markdown("""
 
         div.stButton > button,
         div.stDownloadButton > button,
-        [data-testid="stPopover"] > button {
+        [data-testid="stPopover"] button {
             box-sizing: border-box !important;
             display: inline-flex !important;
             align-items: center !important;
@@ -504,7 +504,7 @@ st.markdown("""
         }
 
         div.stButton > button[kind="secondary"],
-        [data-testid="stPopover"] > button,
+        [data-testid="stPopover"] button,
         div.stDownloadButton > button {
             background-color: var(--prime-blue) !important;
             border: 1.5px solid var(--prime-gold) !important;
@@ -512,7 +512,7 @@ st.markdown("""
         }
 
         div.stButton > button[kind="secondary"]:hover,
-        [data-testid="stPopover"] > button:hover,
+        [data-testid="stPopover"] button:hover,
         div.stDownloadButton > button:hover {
             background-color: var(--prime-gold) !important;
             border-color: var(--prime-gold) !important;
@@ -520,8 +520,8 @@ st.markdown("""
         }
 
         div.stButton > button[kind="secondary"] p,
-        [data-testid="stPopover"] > button p,
-        [data-testid="stPopover"] > button div,
+        [data-testid="stPopover"] button p,
+        [data-testid="stPopover"] button,
         div.stDownloadButton > button p {
             color: var(--prime-warm-white) !important;
             font-weight: 800 !important;
@@ -533,7 +533,7 @@ st.markdown("""
         }
 
         div.stButton > button[kind="secondary"]:hover p,
-        [data-testid="stPopover"] > button:hover p,
+        [data-testid="stPopover"] button:hover p,
         div.stDownloadButton > button:hover p {
             color: var(--prime-blue) !important;
         }
@@ -1265,7 +1265,7 @@ leaflet_template = """
         #map-container:fullscreen { width: 100vw; height: 100vh; background: #FFFCFB; }
         #map-container:fullscreen #scan-results-panel { display: none !important; }
         #map-png {top:52px !important} 
-        #map-png, #map-fullscreen-toggle { width:34px; height:34px; position: absolute; top: 12px; left: 12px; z-index: 1500; border: 1px solid #C9AB4C; background: #003366; color: #FFFCFB; padding: 9px 12px; font: 700 11px Montserrat, sans-serif; letter-spacing: 1px; cursor: pointer; }
+        #map-png, #map-fullscreen-toggle { box-sizing:border-box; display:grid; place-items:center; width:34px; height:34px; position: absolute; top: 12px; left: 12px; z-index: 1500; border: 1px solid #C9AB4C; background: #003366; color: #FFFCFB; padding:0; line-height:1; cursor:pointer; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
         /* Centered Loading Splash Overlay UI */
@@ -1358,14 +1358,14 @@ leaflet_template = """
 </head>
 <body>
     <div id="map-container">
-        <button id="map-fullscreen-toggle" type="button" title="Show map fullscreen" aria-label="Show map fullscreen">&#x26F6;</button>
+        <button id="map-fullscreen-toggle" type="button" title="Show map fullscreen" aria-label="Show map fullscreen"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 6V2h4m4 0h4v4m0 4v4h-4m-4 0H2v-4"/></svg></button>
         <div id="map-loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
             <div class="loading-text">Scanning Area...</div>
         </div>
         
         <div id="map"></div>
-        <button id="map-png" type="button" title="Download map as PNG" aria-label="Download map as PNG"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1v9m-4-4 4 4 4-4M2 11v3h12v-3"/></svg></button>
+        <button id="map-png" type="button" title="Download map as PNG" aria-label="Download map as PNG"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1v9m-4-4 4 4 4-4M2 11v3h12v-3"/></svg></button>
 
         <div id="scan-results-panel">
             <div class="results-header" onclick="toggleWorkspacePanel(event)" style="cursor: pointer; user-select: none;">
