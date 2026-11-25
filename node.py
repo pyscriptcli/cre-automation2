@@ -3,11 +3,122 @@ import re
 import json
 import html
 import math
+import importlib
+import site
+import sys
+import subprocess
 from urllib.parse import urlencode, urlparse
 import os
 from queue import Empty, Queue
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from time import monotonic
+
+try:
+    from playwright.sync_api import sync_playwright
+except ModuleNotFoundError as error:
+    if error.name != "playwright":
+        raise
+    sync_playwright = None
+
+
+def get_sync_playwright():
+    """Resolve Playwright from this Streamlit interpreter, including its site dirs."""
+    global sync_playwright
+    if sync_playwright is not None:
+        return sync_playwright
+
+    site_paths = []
+    try:
+        site_paths.extend(site.getsitepackages())
+    except (AttributeError, TypeError):
+        pass
+    try:
+        site_paths.append(site.getusersitepackages())
+    except (AttributeError, TypeError):
+        pass
+
+    for site_path in site_paths:
+        if (
+            site_path
+            and site_path not in sys.path
+            and os.path.isdir(os.path.join(site_path, "playwright"))
+        ):
+            sys.path.insert(0, site_path)
+    importlib.invalidate_caches()
+
+    try:
+        from playwright.sync_api import sync_playwright as resolved_sync_playwright
+    except ModuleNotFoundError as error:
+        if error.name != "playwright":
+            raise
+        raise RuntimeError(
+            "Playwright is not installed for this Streamlit Python interpreter "
+            f"({sys.executable}). Install it with: \"{sys.executable}\" -m pip install playwright"
+        ) from error
+
+    sync_playwright = resolved_sync_playwright
+    return sync_playwright
+
+
+_PLAYWRIGHT_BROWSER_INSTALL_LOCK = Lock()
+
+
+def _browser_executable_missing(error):
+    message = str(error).lower()
+    return (
+        "executable doesn't exist" in message
+        or ("distribution" in message and "is not found" in message)
+    )
+
+
+def launch_overpass_browser(playwright, cancel_event):
+    """Use Edge on Windows and Playwright Chromium on Linux/macOS."""
+    if sys.platform == "win32":
+        try:
+            return playwright.chromium.launch(channel="msedge", headless=True)
+        except Exception as error:
+            if not _browser_executable_missing(error):
+                raise
+
+    try:
+        return playwright.chromium.launch(headless=True)
+    except Exception as error:
+        if not _browser_executable_missing(error):
+            raise
+
+    with _PLAYWRIGHT_BROWSER_INSTALL_LOCK:
+        if cancel_event.is_set():
+            raise RuntimeError("Browser setup cancelled.")
+
+        # Another scan may have installed Chromium while this worker waited.
+        try:
+            return playwright.chromium.launch(headless=True)
+        except Exception as error:
+            if not _browser_executable_missing(error):
+                raise
+
+        install_process = subprocess.Popen(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        while install_process.poll() is None:
+            if cancel_event.wait(0.25):
+                install_process.terminate()
+                try:
+                    install_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    install_process.kill()
+                    install_process.wait()
+                raise RuntimeError("Browser setup cancelled.")
+
+        if install_process.returncode != 0:
+            raise RuntimeError(
+                "Playwright could not install Chromium. Run "
+                f"\"{sys.executable}\" -m playwright install chromium in this environment."
+            )
+
+    return playwright.chromium.launch(headless=True)
 
 # --- PROGRAMMATIC LIGHT MODE LOCK (Must execute before st.set_page_config) ---
 _config_dir = ".streamlit"
@@ -747,13 +858,8 @@ def run_query_in_overpass_turbo(turbo_url, events, cancel_event=None):
     result_value = None
 
     try:
-        from playwright.sync_api import sync_playwright
-
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
-                channel="msedge",
-                headless=True,
-            )
+        with get_sync_playwright()() as playwright:
+            browser = launch_overpass_browser(playwright, cancel_event)
             try:
                 page = browser.new_page()
                 response_ready = Event()
@@ -886,8 +992,8 @@ def compile_features_kml(features):
 
 @st.dialog("Scan in progress", width="small")
 def show_turbo_scan_dialog():
-    st.status("Overpass Turbo is running your query…", state="running", expanded=False)
-    st.caption("Results will be imported here automatically when the query finishes.")
+    st.status("Preparing the browser and running your query…", state="running", expanded=False)
+    st.caption("First use on a new runtime may set up Chromium. Results import here automatically.")
     if st.button(
         "CANCEL SCAN",
         type="secondary",
