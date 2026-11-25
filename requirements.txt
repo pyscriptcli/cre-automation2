@@ -30,6 +30,7 @@ reportlab
 PyPDF2==3.0.1
 streamlit
 pandas
+playwright
 streamlit-drawable-canvas
 Pillow
 numpy
