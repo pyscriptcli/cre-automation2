@@ -1162,11 +1162,16 @@ with st.sidebar:
                 st.rerun()
                 return
 
-            st.session_state.scanned_records = records
+            existing = st.session_state.scanned_records
+            seen = {(row.get("osm_type"), row.get("osm_id")) for row in existing}
+            for row in records:
+                identity = (row["osm_type"], row["osm_id"])
+                if identity not in seen:
+                    row["uid"] = len(existing)
+                    existing.append(row)
+                    seen.add(identity)
             st.session_state.last_scan_lat = lat_coord
             st.session_state.last_scan_lon = lon_coord
-            st.session_state.layer_meta = {}
-            st.session_state.layer_groups = {}
             st.session_state.reset_poi_checks = True
             st.rerun()
 
@@ -1186,41 +1191,27 @@ with st.sidebar:
     st.button("CLEAR ALL", type="primary", key="clear_btn", on_click=clear_all_data)
     st.markdown("<hr style='margin: 12px 0; border: 0; border-top: 1px solid rgba(0, 51, 102, 0.08);'>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2)
-    visible_only_records = [
-        record for record in st.session_state.scanned_records
-        if record.get("visible", True)
-    ]
-    with col1:
-        st.download_button(
-            "RADIUS",
-            json.dumps(visible_only_records),
-            "scan.json",
-            "application/json",
-            use_container_width=True,
-        )
-    with col2:
-        st.download_button(
-            "Export KML",
-            compile_features_kml(st.session_state.scanned_records),
-            "POIs.kml",
-            "application/vnd.google-earth.kml+xml",
-            use_container_width=True,
-        )
+    import_col, export_col = st.columns(2)
+    with export_col.popover("Export", use_container_width=True):
+        rows = [r for r in st.session_state.scanned_records if r.get("visible", True)]
+        fmt = st.selectbox("File format", ["GeoJSON", "KML", "JSON"])
+        if fmt == "KML":
+            data, mime = compile_features_kml(rows), "application/vnd.google-earth.kml+xml"
+        elif fmt == "JSON":
+            data, mime = json.dumps(rows), "application/json"
+        else:
+            data = json.dumps({"type": "FeatureCollection", "features": [
+                {"type": "Feature",
+                 "geometry": {"type": "Point", "coordinates": [r["lon"], r["lat"]]},
+                 "properties": {k: v for k, v in r.items() if k not in ("lat", "lon")}}
+                for r in rows
+            ]})
+            mime = "application/geo+json"
+        st.download_button("Download", data, f"POIs.{fmt.lower()}", mime,
+                           use_container_width=True, disabled=not rows)
 
-    st.download_button(
-        "Export GeoJSON",
-        json.dumps({"type": "FeatureCollection", "features": [
-            {"type": "Feature",
-             "geometry": {"type": "Point", "coordinates": [row["lon"], row["lat"]]},
-             "properties": {k: v for k, v in row.items() if k not in ("lat", "lon")}}
-            for row in visible_only_records
-        ]}),
-        "POIs.geojson", "application/geo+json", use_container_width=True,
-    )
-
-    with st.popover("IMPORT OVERPASS JSON", use_container_width=True):
-        st.caption("In Overpass Turbo, choose Export, then Data, then raw data. Upload the downloaded JSON here.")
+    with import_col.popover("Import", use_container_width=True):
+        st.caption("Choose an Overpass or Open Node JSON file.")
         imported_file = st.file_uploader("Select JSON", type=["json"], label_visibility="collapsed")
         if imported_file is not None and st.button("LOAD RESULTS", type="secondary", use_container_width=True):
             try:
@@ -1273,8 +1264,8 @@ leaflet_template = """
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map-container:fullscreen { width: 100vw; height: 100vh; background: #FFFCFB; }
         #map-container:fullscreen #scan-results-panel { display: none !important; }
-        #map-png {left:62px !important} 
-        #map-png, #map-fullscreen-toggle { position: absolute; top: 12px; left: 12px; z-index: 1500; border: 1px solid #C9AB4C; background: #003366; color: #FFFCFB; padding: 9px 12px; font: 700 11px Montserrat, sans-serif; letter-spacing: 1px; cursor: pointer; }
+        #map-png {top:52px !important} 
+        #map-png, #map-fullscreen-toggle { width:34px; height:34px; position: absolute; top: 12px; left: 12px; z-index: 1500; border: 1px solid #C9AB4C; background: #003366; color: #FFFCFB; padding: 9px 12px; font: 700 11px Montserrat, sans-serif; letter-spacing: 1px; cursor: pointer; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
         /* Centered Loading Splash Overlay UI */
@@ -1374,7 +1365,7 @@ leaflet_template = """
         </div>
         
         <div id="map"></div>
-        <button id="map-png" type="button">Download PNG</button>
+        <button id="map-png" type="button" title="Download map as PNG" aria-label="Download map as PNG"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1v9m-4-4 4 4 4-4M2 11v3h12v-3"/></svg></button>
 
         <div id="scan-results-panel">
             <div class="results-header" onclick="toggleWorkspacePanel(event)" style="cursor: pointer; user-select: none;">
