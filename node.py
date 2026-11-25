@@ -1056,6 +1056,10 @@ with st.sidebar:
 
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     search_query = st.text_input("SEARCH POIs", placeholder="Search parameters...").lower()
+    if st.session_state.pop("reset_poi_checks", False):
+        for key in list(st.session_state):
+            if key.startswith("chk_"):
+                st.session_state[key] = False
     selected_tags = []
 
     for cat_name, node_items in POI_CONFIG.items():
@@ -1074,6 +1078,7 @@ with st.sidebar:
                     if st.checkbox(label, key=f"chk_adv_{cat_name}_{label}"):
                         selected_tags.append(tag)
 
+    st.caption(f"{len(selected_tags)} POIs selected")
     can_build_query = coordinates_valid and bool(selected_tags)
     if can_build_query:
         filters = list(dict.fromkeys(selected_tags))
@@ -1162,15 +1167,11 @@ with st.sidebar:
             st.session_state.last_scan_lon = lon_coord
             st.session_state.layer_meta = {}
             st.session_state.layer_groups = {}
-            st.session_state.turbo_scan_notice = (
-                "success",
-                f"Imported {len(records):,} map features from Overpass Turbo."
-            )
+            st.session_state.reset_poi_checks = True
             st.rerun()
 
         monitor_turbo_scan()
 
-    st.caption("Overpass Turbo runs in the background. Its results import here automatically when the query finishes.")
 
     def clear_all_data():
         st.session_state.pop("scan_message", None)
@@ -1200,12 +1201,23 @@ with st.sidebar:
         )
     with col2:
         st.download_button(
-            "MARKERS",
+            "Export KML",
             compile_features_kml(st.session_state.scanned_records),
             "POIs.kml",
             "application/vnd.google-earth.kml+xml",
             use_container_width=True,
         )
+
+    st.download_button(
+        "Export GeoJSON",
+        json.dumps({"type": "FeatureCollection", "features": [
+            {"type": "Feature",
+             "geometry": {"type": "Point", "coordinates": [row["lon"], row["lat"]]},
+             "properties": {k: v for k, v in row.items() if k not in ("lat", "lon")}}
+            for row in visible_only_records
+        ]}),
+        "POIs.geojson", "application/geo+json", use_container_width=True,
+    )
 
     with st.popover("IMPORT OVERPASS JSON", use_container_width=True):
         st.caption("In Overpass Turbo, choose Export, then Data, then raw data. Upload the downloaded JSON here.")
@@ -1253,6 +1265,7 @@ leaflet_template = """
 <html>
 <head>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -1260,7 +1273,8 @@ leaflet_template = """
         #map-container { position: relative; width: 100%; height: 100vh; }
         #map-container:fullscreen { width: 100vw; height: 100vh; background: #FFFCFB; }
         #map-container:fullscreen #scan-results-panel { display: none !important; }
-        #map-fullscreen-toggle { position: absolute; top: 12px; left: 12px; z-index: 1500; border: 1px solid #C9AB4C; background: #003366; color: #FFFCFB; padding: 9px 12px; font: 700 11px Montserrat, sans-serif; letter-spacing: 1px; cursor: pointer; }
+        #map-png {left:62px !important} 
+        #map-png, #map-fullscreen-toggle { position: absolute; top: 12px; left: 12px; z-index: 1500; border: 1px solid #C9AB4C; background: #003366; color: #FFFCFB; padding: 9px 12px; font: 700 11px Montserrat, sans-serif; letter-spacing: 1px; cursor: pointer; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
         /* Centered Loading Splash Overlay UI */
@@ -1353,13 +1367,14 @@ leaflet_template = """
 </head>
 <body>
     <div id="map-container">
-        <button id="map-fullscreen-toggle" type="button" aria-label="Show map fullscreen">FULLSCREEN</button>
+        <button id="map-fullscreen-toggle" type="button" title="Show map fullscreen" aria-label="Show map fullscreen">&#x26F6;</button>
         <div id="map-loading-overlay" style="display: none;">
             <div class="loading-spinner"></div>
             <div class="loading-text">Scanning Area...</div>
         </div>
         
         <div id="map"></div>
+        <button id="map-png" type="button">Download PNG</button>
 
         <div id="scan-results-panel">
             <div class="results-header" onclick="toggleWorkspacePanel(event)" style="cursor: pointer; user-select: none;">
@@ -1463,19 +1478,35 @@ leaflet_template = """
 
         const mapFrame = document.getElementById('map-container');
         const fullscreenToggle = document.getElementById('map-fullscreen-toggle');
+        document.getElementById('map-png').onclick = async function () {
+            this.disabled = true;
+            try {
+                const canvas = await html2canvas(document.getElementById('map'), {
+                    useCORS: true, logging: false, scale: window.devicePixelRatio || 1
+                });
+                const link = document.createElement('a');
+                link.download = 'current-map.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (error) {
+                alert('Could not export the map image: ' + error.message);
+            } finally {
+                this.disabled = false;
+            }
+        };
         async function toggleMapFullscreen() {
             try {
                 if (!document.fullscreenElement) await mapFrame.requestFullscreen();
                 else await document.exitFullscreen();
             } catch (error) {
-                fullscreenToggle.textContent = 'Fullscreen unavailable';
-                setTimeout(() => fullscreenToggle.textContent = 'FULLSCREEN', 2500);
+                fullscreenToggle.title = 'Fullscreen unavailable';
+                setTimeout(() => fullscreenToggle.title = 'Show map fullscreen', 2500);
             }
         }
         fullscreenToggle.addEventListener('click', toggleMapFullscreen);
         document.addEventListener('fullscreenchange', () => {
             const active = document.fullscreenElement === mapFrame;
-            fullscreenToggle.textContent = active ? 'EXIT FULLSCREEN' : 'FULLSCREEN';
+            fullscreenToggle.title = active ? 'Exit fullscreen' : 'Show map fullscreen';
             fullscreenToggle.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Show map fullscreen');
             setTimeout(() => map.invalidateSize(), 100);
         });
